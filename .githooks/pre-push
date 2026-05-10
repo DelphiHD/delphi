@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Pre-push hook: refuse to push if any canonical doc listed in CLAUDE.md is missing
+# or untracked. Catches the "I edited it locally and forgot to commit" drift.
+#
+# To enable in a fresh clone: `git config core.hooksPath .githooks`
+# (CLAUDE.md tells the agent to do this on first session.)
+
+set -euo pipefail
+
+# Files that must exist AND be tracked. Keep this list in sync with CLAUDE.md
+# "Read first". Files marked optional may not exist yet during early phases.
+required=(
+  "CLAUDE.md"
+  "HD-Reports-Master-Plan.md"
+  "docs/STACK_PORTED.md"
+  "docs/DECISIONS.md"
+)
+
+missing=()
+untracked=()
+
+for f in "${required[@]}"; do
+  if [[ ! -f "$f" ]]; then
+    missing+=("$f")
+    continue
+  fi
+  if ! git ls-files --error-unmatch "$f" >/dev/null 2>&1; then
+    untracked+=("$f")
+  fi
+done
+
+if (( ${#missing[@]} + ${#untracked[@]} > 0 )); then
+  echo "pre-push: canonical-doc check failed."
+  if (( ${#missing[@]} > 0 )); then
+    echo "  missing files:"
+    printf '    - %s\n' "${missing[@]}"
+  fi
+  if (( ${#untracked[@]} > 0 )); then
+    echo "  exists locally but not tracked (commit these first):"
+    printf '    - %s\n' "${untracked[@]}"
+  fi
+  echo
+  echo "Fix the list above, or update .githooks/pre-push and CLAUDE.md if a"
+  echo "canonical doc is being intentionally retired."
+  exit 1
+fi
+
+exit 0
