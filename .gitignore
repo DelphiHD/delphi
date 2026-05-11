@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build output
+.next/
+.vercel/
+dist/
+build/
+out/
+
+# Env files — secrets stay local. .env.example is committed.
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Claude Code internal state (worktrees, session cache)
+.claude/
+
+# Logs and pipes
+*.log
+.pull.log
+
+# Test artifacts
+coverage/
+test/results/
