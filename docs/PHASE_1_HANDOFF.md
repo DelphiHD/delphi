@@ -22,9 +22,9 @@ You are picking up the HD Reports build at the start of Phase 1: Foundation. Rea
 - [ ] `node --version` ≥ 20 and `npm --version` work.
 - [ ] `vercel --version` works. (CLI installed at `~/.local/bin/vercel`.) Run `vercel whoami` — must show a logged-in account. If not, run `vercel login` and stop until it returns.
 - [ ] `supabase --version` works. Run `supabase projects list` — must succeed. If not, run `supabase login` with a personal access token from https://supabase.com/dashboard/account/tokens and stop until it returns.
-- [ ] A Supabase project exists and you know its `project-ref`. If not, create one in the dashboard, copy the ref + anon key + service-role key, and stop here for the operator to paste them back.
+- [ ] Supabase project `biufjcapnuzbdowoksnb` exists (per `docs/DECISIONS.md`). Run `supabase link --project-ref biufjcapnuzbdowoksnb` from `~/delphi`. If the link prompts for the database password, ask the operator — it's in the shared 1Password vault. After linking, you'll need the anon key and service-role key from the dashboard (https://supabase.com/dashboard/project/biufjcapnuzbdowoksnb/settings/api) — ask the operator to paste them.
 - [ ] `vercel link` has been run inside `~/delphi` and `.vercel/project.json` exists. If not, link to a Vercel project (create new if needed).
-- [ ] Pricing model decision is recorded in `docs/DECISIONS.md`. If the entry isn't there, ask the operator to choose Option A or Option B per master plan lines 144–177, then add the entry before scaffolding pricing-shaped code.
+- [ ] Pricing model decision: **deferred**, per `docs/DECISIONS.md` entry "Pricing model decision is deferred". Do NOT scaffold any pricing-shaped code (no `prices`/`tiers` table, no Stripe products, no tier gates in the UI). If you reach a point where the master plan demands pricing scaffolding, stop and surface it to the operator instead of guessing.
 
 If any prerequisite fails, stop and tell the operator exactly which one, with the one-step fix. Do not paper over it by stubbing values.
 
