@@ -1,5 +1,12 @@
 # Dependencies
 node_modules/
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
 
 # Build output
 .next/
@@ -8,7 +15,7 @@ dist/
 build/
 out/
 
-# Env files — secrets stay local. .env.example is committed.
+# Env files. .env.example is committed; everything else is local-only.
 .env
 .env.local
 .env.*.local
@@ -17,17 +24,33 @@ out/
 
 # OS / editor
 .DS_Store
+*.pem
 .idea/
 .vscode/
 *.swp
 
-# Claude Code internal state (worktrees, session cache)
-.claude/
+# Claude Code internal state (worktrees, session cache).
+# Skills are tracked; everything else under .claude is local.
+.claude/*
+!.claude/skills/
+!.claude/settings.json
 
 # Logs and pipes
 *.log
 .pull.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
 
 # Test artifacts
 coverage/
 test/results/
+
+# Supabase local dev
+supabase/.temp/
+supabase/.branches/

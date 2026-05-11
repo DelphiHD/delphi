@@ -1,19 +1,26 @@
 #!/usr/bin/env bash
-# Pre-push hook: refuse to push if any canonical doc listed in CLAUDE.md is missing
-# or untracked. Catches the "I edited it locally and forgot to commit" drift.
+# Pre-push hook: refuse to push if any canonical doc listed in CLAUDE.md is
+# missing or untracked. Catches the "I edited it locally and forgot to commit"
+# drift. Keep this list in sync with the "Read first" sections of CLAUDE.md
+# and AGENTS.md.
 #
 # To enable in a fresh clone: `git config core.hooksPath .githooks`
 # (CLAUDE.md tells the agent to do this on first session.)
 
 set -euo pipefail
 
-# Files that must exist AND be tracked. Keep this list in sync with CLAUDE.md
-# "Read first". Files marked optional may not exist yet during early phases.
 required=(
   "CLAUDE.md"
+  "AGENTS.md"
   "HD-Reports-Master-Plan.md"
-  "docs/STACK_PORTED.md"
+  "docs/CONTEXT.md"
+  "docs/INTENT.md"
+  "docs/IDENTITY.md"
+  "docs/VOICE.md"
+  "docs/ARCHITECTURE.md"
   "docs/DECISIONS.md"
+  "docs/STACK_PORTED.md"
+  "docs/PHASE_1_HANDOFF.md"
 )
 
 missing=()
@@ -40,8 +47,8 @@ if (( ${#missing[@]} + ${#untracked[@]} > 0 )); then
     printf '    - %s\n' "${untracked[@]}"
   fi
   echo
-  echo "Fix the list above, or update .githooks/pre-push and CLAUDE.md if a"
-  echo "canonical doc is being intentionally retired."
+  echo "Fix the list above, or update .githooks/pre-push, CLAUDE.md, and"
+  echo "AGENTS.md together if a canonical doc is being intentionally retired."
   exit 1
 fi
 

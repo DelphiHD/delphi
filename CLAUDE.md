@@ -19,8 +19,9 @@ Don't suggest breaks or pauses. Keep forward motion on the problem.
 
 ## Read first
 
-These docs are the project's ground truth. They may not all exist yet — Phase 1 scaffolding seeds them. Read whichever exist:
+These docs are the project's ground truth. Read whichever exist:
 
+- `AGENTS.md` — mirror of this rulebook for non-Claude agents (Codex, etc.). Keep in sync.
 - `docs/CONTEXT.md` — factual ground truth.
 - `docs/INTENT.md` — strategic ground truth.
 - `docs/IDENTITY.md` — brand and lineage voice. Inject into every report-generation prompt.
@@ -28,7 +29,7 @@ These docs are the project's ground truth. They may not all exist yet — Phase 
 - `docs/ARCHITECTURE.md` — system map.
 - `docs/DECISIONS.md` — append-only log of why-we-chose-X.
 - `docs/STACK_PORTED.md` — inventory of Tennyson's prior-work repos being ported in.
-- `docs/DECISIONS.md` — append-only log of why-we-chose-X.
+- `docs/PHASE_1_HANDOFF.md` — the Phase 1 scaffolding spec.
 - `HD-Reports-Master-Plan.md` — the full phase-by-phase build plan.
 
 ## Cost discipline (the whole point)
@@ -48,7 +49,7 @@ These docs are the project's ground truth. They may not all exist yet — Phase 
 
 ## Git and deploy
 
-- Branching policy: TBD. The master plan says "work on main, push directly." The pre-launch review flagged this as risky for prod-affecting changes. Pending decision in `docs/DECISIONS.md`. Until decided, work on short-lived branches for anything that touches `invoke-llm`, webhooks, or migrations.
+- Branching policy: short-lived branches for anything that touches `invoke-llm`, webhooks, or migrations. Per-branch Vercel previews are the review surface. See the Phase 1 branching DECISION entry.
 - Migrations are date-prefixed: `supabase/migrations/YYYYMMDD_description.sql`.
 - No em dashes anywhere in user-facing copy or AI-generated prose. A linter must catch this; prompt-only enforcement leaks.
 
@@ -81,8 +82,8 @@ On a fresh clone, run once:
 
 If you intentionally retire a canonical doc, update both `.githooks/pre-push` and the "Read first" list in this file in the same commit.
 
-## Pre-Phase-1 state (current)
+## Phase 1 state (current)
 
-Phase 0 (account + CLI setup) is in progress. The `delphi` repo on GitHub holds the master plan, this CLAUDE.md, the docs/ stubs (STACK_PORTED.md, DECISIONS.md), and the pre-push hook. Phase 1 scaffolding (Next.js + Supabase) has not begun. The 18 ported forks all live under `DelphiHD/*` per `docs/STACK_PORTED.md`.
+Phase 1 scaffolding has landed: Next.js 16 App Router on Vercel, Supabase Auth wired up via `@supabase/ssr`, middleware-gated `/portal/*`, the `profiles` migration with RLS, security headers in `vercel.json`, PostHog instrumentation at `instrumentation-client.ts` and `lib/analytics/posthog.ts`, design tokens stub at `lib/design/tokens.ts`, all canonical docs seeded under `docs/`. The 18 ported forks all live under `DelphiHD/*` per `docs/STACK_PORTED.md`.
 
 A LaunchAgent at `~/Library/LaunchAgents/com.delphihd.delphi-pull.plist` keeps `~/delphi` synced with the remote daily and on every login.
