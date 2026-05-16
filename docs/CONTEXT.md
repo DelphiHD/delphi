@@ -36,7 +36,7 @@ As of 2026-05-16:
 | Database name | What's in it | Approx rows |
 |---|---|---|
 | HD Gates | 64 gate-level entries with main hexagram name, theme, center, channels, circuit, quarter, page-body narrative | 64 |
-| HD The Line Companion | Per-line detail (6 lines × 64 gates = 384), Ra quotes, exaltation/detriment language | hundreds |
+| HD The Line Companion | 64 rows (one per gate). Each page contains a `synced_block → callout → 7 toggles` structure. Toggles are: "HEXAGRAM N name" (gate-level intro), then "N.1 name" through "N.6 name" (per-line Ra material). See "Line Companion toggle structure" below. | 64 rows / 448 toggles |
 | HD Channels | 36 channels with type, circuit, keynote | 36 |
 | HD Centers | 9 centers with defined/undefined dynamics and not-self themes | 9 |
 | HD Types | The 5 HD types | 5 |
@@ -70,6 +70,24 @@ The **Notion public API does not render linked-block content**. It returns block
 Consequence for Phase 3 sync: we **read each underlying database directly** (HD Gates AND HD The Line Companion as separate sources). The linked views are invisible to the API and irrelevant to the sync.
 
 Consequence for the hd-analysis skill: the same limitation likely applies to the Notion MCP tools that the skill uses. The skill should query HD The Line Companion as its own data source rather than depending on the linked content inside Gates pages. If the skill instructs querying via the linked views, that instruction is stale.
+
+### Line Companion toggle structure
+
+Each row in HD The Line Companion is one gate. Inside the page, the content is wrapped as `synced_block → callout → 7 toggles`. The 7 toggles per gate are:
+
+1. **"HEXAGRAM N name"** (e.g., "HEXAGRAM 62  PREPONDERANCE OF THE SMALL") — gate-level Ra intro. This is the Main Hexagram toggle.
+2. **"N.1 name"** through **"N.6 name"** — one toggle per line, holding Ra's per-line material with all its rambling and cross-references kept intact.
+
+The rambling is intentional. Kaycee chose to keep each gate on one page rather than split lines across rows because Ra's per-line material has heavy cross-referencing within a gate; splitting would lose context.
+
+**Sync implication.** Phase 3 chunks by toggle, not by page. Each toggle becomes one chunk in pgvector with:
+- `kind = 'line'`
+- `gate_number = <N>` (parsed from the toggle title)
+- `line_number = 0` for the Main Hexagram toggle, `1..6` for the per-line toggles
+
+Yielding 7 chunks per gate, 448 chunks total from this database alone. At retrieval time, a gate-line activation like 21.3 pulls three chunks: HD Gates' gate-level intro (kind=gate, gate_number=21), the Main Hexagram toggle (kind=line, gate_number=21, line_number=0), and the 21.3 toggle (kind=line, gate_number=21, line_number=3).
+
+**Traversal pattern (for any code that needs to read this content).** The Notion API exposes this as four nested calls: `GET /blocks/{page_id}/children` returns one `synced_block` (with `synced_from: null` because this page IS the origin). Then `GET /blocks/{synced_block_id}/children` returns one `callout`. Then `GET /blocks/{callout_id}/children` returns the 7 toggles. Then `GET /blocks/{toggle_id}/children` returns the actual text content for that toggle. Cache aggressively; Notion's API rate limit is 3 requests per second.
 
 ### The other Notion API quirk: directory rows as linked views
 
