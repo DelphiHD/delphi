@@ -4,6 +4,66 @@ Append-only log of why-we-chose-X. New entries go at the top. Each entry: date, 
 
 ---
 
+## 2026-05-16 — Phase 3 V2: GitHub Actions cron instead of Vercel Cron + Edge Function
+
+**Decision.** The nightly Notion → Supabase sync runs as a GitHub Actions workflow (`.github/workflows/sync-notion.yml`), not as a Vercel Cron route or Supabase Edge Function as the master plan envisioned. Triggered nightly at 5:30 UTC plus manual `workflow_dispatch`.
+
+**Why.** A full sync takes about 10 minutes wall-clock (Notion's 3-req/sec rate limit times the four-level traversal for HD The Line Companion). Vercel's Hobby plan caps serverless functions at 60 seconds; Pro is 300 seconds (still under our walltime); Enterprise gets to 800 seconds. Supabase Edge Functions have similar bounds (50 seconds on free, 400 seconds on paid). GitHub Actions has a 6-hour limit and no incremental cost for a job that runs once a night, in an org we already own. The simplest correct tool wins.
+
+**Architecture.** The same `scripts/sync-notion.ts` Kaycee can run locally also runs in the GH Actions runner. Secrets (`NOTION_TOKEN`, `OPENAI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`) live as GitHub repo secrets, injected via the workflow's `env:` block. The Supabase Edge Function `ingest-markdown` from the master plan is not built. The Vercel cron route `/api/cron/notion-sync` from the master plan is not built. `/api/admin/library-health` is built as a Next.js route on Vercel because it's a quick HTTP read, not a long job.
+
+**Alternatives considered.** (a) Vercel Pro plan ($20/month) to unlock the 300s timeout, then split sync into multiple per-database invocations chained through a queue — too much plumbing for a nightly job we already own a runner for. (b) Self-hosted cron (Tennyson's machine via LaunchAgent) — works but creates a single-point-of-failure tied to one laptop. (c) Vercel Cron triggering a long-running Vercel function on Enterprise — the cost is wrong for our scale. GitHub Actions for the cron + Vercel for the observability endpoint is the right split.
+
+**How to apply.** When new env vars are needed in the sync, add them to both `.env.local` (local dev) and `gh secret set NAME` (GH Actions). When the sync logic changes, edit `scripts/sync-notion.ts`; both the local manual run and the workflow run pick up the change. The cron schedule lives in `.github/workflows/sync-notion.yml`.
+
+**Open.** Whether to mirror the markdown to git as part of the sync (master plan's "Notion → markdown → git → ingest" pattern) — deferred. With the current pipeline, the chunks table in Supabase is the canonical content store. If we later want a git-versioned record of the content, the GH Actions job is the natural place to add the commit step.
+
+---
+
+## 2026-05-16 — Phase ordering: Phase 3 (content pipeline) before Phase 2 (Stripe)
+
+**Decision.** Kaycee asked to push Stripe back. Phase 3 (Notion to pgvector content pipeline) runs next; Phase 2 (Stripe Checkout, orders, entitlements) is deferred until after Phase 4 (the report engine). The "pricing model: Option A" decision still stands; the Stripe-shaped code just lands later.
+
+**Why.** The Phase 3.5 quality gate (master plan lines 507 onward) is the single most important checkpoint in the entire build. The report has to be as good as Kaycee's manual reports. There is no value in shipping Stripe before we know whether the product is good enough to charge for. Reordering doesn't change the launch surface, just sequences the work so we hit the quality decision before the commercial decision.
+
+**Risk and mitigation.** By Phase 4 we have a working report engine and no way to charge for it. Acceptable, because nothing customer-facing ships in Phase 4 — the engine produces reports for internal review against Kaycee's manual baseline, not for paying customers. Stripe lands before public launch.
+
+**How to apply.** Phase 3 prereqs marked "Phase 2 complete" in the master plan are overridden: the content pipeline depends on Notion + OpenAI + Supabase + GitHub, not on Stripe. The `chunks` table has no per-customer aspect (everything lives in the `archive` namespace per STACK_PORTED.md), so no entitlements gating is needed yet.
+
+**Open.** Whether `nearest_chunks` should grow an entitlements check before public launch (probably yes, as a defense-in-depth measure) or only at the `invoke-llm` call site.
+
+---
+
+## 2026-05-16 — Phase 3 V1: single local script (Notion → embed → upsert)
+
+**Decision.** Phase 3 ships in two iterations. **V1 (this commit)** is a single TypeScript script at `scripts/sync-notion.ts` run manually via `npx tsx`. It walks Notion, extracts 826 chunks across 16 source databases (including a four-level traversal for HD The Line Companion's `synced_block → callout → 7 toggles` structure), embeds with OpenAI `text-embedding-3-small`, and upserts into Supabase via delete-then-insert per `source_kind`. A checkpoint at `.cache/chunks.json` lets a failed embed/persist resume without re-walking Notion.
+
+**V2** (separate work, before public launch) adds: the GitHub commit step (markdown lands in git, versioned), a Supabase Edge Function `ingest-markdown` that takes over the embedding work so it runs server-side, a Vercel cron route `/api/cron/notion-sync` that triggers nightly, and `/api/admin/library-health` for spot-checks.
+
+**Why.** V1 lets us verify the pipeline end-to-end (the actual content lands, retrieval works) without committing to the full cron + edge function plumbing. The master plan's Phase 3 spec assumed both pieces from day one; experience says iterate on the data pipeline first, then automate. V2 is straightforward once V1 is verified — most of the work is moving code from a local script into an Edge Function.
+
+**Alternatives considered.** (a) Build V1 + V2 in a single PR — ruled out because debug cycles on a cron + edge function are slower than on a local script, and we hit several Notion API quirks during V1 that would have been harder to diagnose inside an Edge Function. (b) Build V2 first — ruled out for the same reason in reverse.
+
+**How to apply.** Run `npx tsx scripts/sync-notion.ts` to refresh the chunks table after Kaycee edits Notion. Until V2 lands, this is a manual step. The script is idempotent (delete-then-insert per kind), so safe to re-run.
+
+**Open.** V2 timing — probably right before Phase 4 lands so the Phase 4 invoke-llm has a freshly-synced library to query against.
+
+---
+
+## 2026-05-16 — Phase 3 cost note: OpenAI embeddings
+
+**Decision.** Phase 3 uses OpenAI `text-embedding-3-small` (1536 dimensions). Total cost per full sync, with the current 826-chunk library, is roughly $0.02. The chunks table has the embedding column sized for 1536 dimensions; switching models means re-embedding everything.
+
+**Why.** `text-embedding-3-small` is OpenAI's cheapest current embedding model ($0.02 per 1M input tokens) and matches the master plan's choice. Its 1536-dim output is enough quality for HD content retrieval (verified empirically on the 4 test queries in `scripts/test-retrieval.ts`).
+
+**Per-sync cost math.** 826 chunks × roughly 1000 tokens each = ~800,000 tokens × $0.02/1M = **~$0.02 per full sync**. Nightly syncs over a year = ~$7. Negligible. The cost ceiling worry the master plan documents is for `invoke-llm` (Phase 4), not for this pipeline.
+
+**How to apply.** No per-call cost guard needed in V1 because the upper bound is trivial. If we ever sync a much larger library (e.g., absorb Ra's full lecture archive in Phase 4), add a token-count check before calling the embeddings API and cap with a HARD_COST_CEILING_CENTS-style abort.
+
+**Open.** Whether to switch to `text-embedding-3-large` (3072 dims, ~6x more expensive) if retrieval quality on full-report generation turns out to be the limiting factor in Phase 3.5. Default answer is no — the small model is good enough at this scale and the cost discipline rule applies.
+
+---
+
 ## 2026-05-10 — Pricing model: Option A (three fixed-length reports)
 
 **Decision.** HD Reports launches with Option A from master plan lines 144 to 157: three fixed report tiers. Single Reading $49 (3,500 words), Deep Reading $79 (5,500 words), Full Reading $129 (8,000 words). The depth-dial / subscription pattern of Option B is parked for a possible later layer on top.

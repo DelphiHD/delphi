@@ -8,6 +8,14 @@ description: |
 
 This skill powers Kaycee Vandenberg's HD reading practice. It handles everything from parsing raw chart data through generating final branded reports. The workflow has two major phases: building the session reference (the analytical backbone) and generating client-facing reports (the deliverable).
 
+## Read First
+
+Before doing anything, read `docs/CONTEXT.md` in the delphi repo. It is the canonical project context, including the full structure of Kaycee's Notion library, the firewall list, and the kind taxonomy. If anything in this skill file contradicts CONTEXT.md, CONTEXT.md wins.
+
+## Source-material rule of thumb
+
+Always query each Notion database directly. Each gate's page in `HD Gates` contains linked views pointing at `HD The Line Companion` for that gate's six lines, but those linked views are not reliably readable through programmatic queries (Notion API returns block type `unsupported`). Query both `HD Gates` (gate-level) and `HD The Line Companion` (line-level) as separate sources and merge by gate number when assembling the session reference. The earlier guidance to read only HD Gates because line content was "embedded" was based on a misread of how linked blocks behave through the API; it is wrong and has been removed.
+
 ## Important Context
 
 Kaycee's methodology is body-first: Variables/PHS before Type/Strategy/Authority. This is intentional and reflects her insight that body-level material lands as recognition rather than belief. Never revert to the conventional HD teaching sequence. Read `references/methodology.md` for the full framework.
