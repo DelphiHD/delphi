@@ -4,6 +4,50 @@ Append-only log of why-we-chose-X. New entries go at the top. Each entry: date, 
 
 ---
 
+## 2026-05-16 — Phase ordering: Phase 3 (content pipeline) before Phase 2 (Stripe)
+
+**Decision.** Kaycee asked to push Stripe back. Phase 3 (Notion to pgvector content pipeline) runs next; Phase 2 (Stripe Checkout, orders, entitlements) is deferred until after Phase 4 (the report engine). The "pricing model: Option A" decision still stands; the Stripe-shaped code just lands later.
+
+**Why.** The Phase 3.5 quality gate (master plan lines 507 onward) is the single most important checkpoint in the entire build. The report has to be as good as Kaycee's manual reports. There is no value in shipping Stripe before we know whether the product is good enough to charge for. Reordering doesn't change the launch surface, just sequences the work so we hit the quality decision before the commercial decision.
+
+**Risk and mitigation.** By Phase 4 we have a working report engine and no way to charge for it. Acceptable, because nothing customer-facing ships in Phase 4 — the engine produces reports for internal review against Kaycee's manual baseline, not for paying customers. Stripe lands before public launch.
+
+**How to apply.** Phase 3 prereqs marked "Phase 2 complete" in the master plan are overridden: the content pipeline depends on Notion + OpenAI + Supabase + GitHub, not on Stripe. The `chunks` table has no per-customer aspect (everything lives in the `archive` namespace per STACK_PORTED.md), so no entitlements gating is needed yet.
+
+**Open.** Whether `nearest_chunks` should grow an entitlements check before public launch (probably yes, as a defense-in-depth measure) or only at the `invoke-llm` call site.
+
+---
+
+## 2026-05-16 — Phase 3 V1: single local script (Notion → embed → upsert)
+
+**Decision.** Phase 3 ships in two iterations. **V1 (this commit)** is a single TypeScript script at `scripts/sync-notion.ts` run manually via `npx tsx`. It walks Notion, extracts 826 chunks across 16 source databases (including a four-level traversal for HD The Line Companion's `synced_block → callout → 7 toggles` structure), embeds with OpenAI `text-embedding-3-small`, and upserts into Supabase via delete-then-insert per `source_kind`. A checkpoint at `.cache/chunks.json` lets a failed embed/persist resume without re-walking Notion.
+
+**V2** (separate work, before public launch) adds: the GitHub commit step (markdown lands in git, versioned), a Supabase Edge Function `ingest-markdown` that takes over the embedding work so it runs server-side, a Vercel cron route `/api/cron/notion-sync` that triggers nightly, and `/api/admin/library-health` for spot-checks.
+
+**Why.** V1 lets us verify the pipeline end-to-end (the actual content lands, retrieval works) without committing to the full cron + edge function plumbing. The master plan's Phase 3 spec assumed both pieces from day one; experience says iterate on the data pipeline first, then automate. V2 is straightforward once V1 is verified — most of the work is moving code from a local script into an Edge Function.
+
+**Alternatives considered.** (a) Build V1 + V2 in a single PR — ruled out because debug cycles on a cron + edge function are slower than on a local script, and we hit several Notion API quirks during V1 that would have been harder to diagnose inside an Edge Function. (b) Build V2 first — ruled out for the same reason in reverse.
+
+**How to apply.** Run `npx tsx scripts/sync-notion.ts` to refresh the chunks table after Kaycee edits Notion. Until V2 lands, this is a manual step. The script is idempotent (delete-then-insert per kind), so safe to re-run.
+
+**Open.** V2 timing — probably right before Phase 4 lands so the Phase 4 invoke-llm has a freshly-synced library to query against.
+
+---
+
+## 2026-05-16 — Phase 3 cost note: OpenAI embeddings
+
+**Decision.** Phase 3 uses OpenAI `text-embedding-3-small` (1536 dimensions). Total cost per full sync, with the current 826-chunk library, is roughly $0.02. The chunks table has the embedding column sized for 1536 dimensions; switching models means re-embedding everything.
+
+**Why.** `text-embedding-3-small` is OpenAI's cheapest current embedding model ($0.02 per 1M input tokens) and matches the master plan's choice. Its 1536-dim output is enough quality for HD content retrieval (verified empirically on the 4 test queries in `scripts/test-retrieval.ts`).
+
+**Per-sync cost math.** 826 chunks × roughly 1000 tokens each = ~800,000 tokens × $0.02/1M = **~$0.02 per full sync**. Nightly syncs over a year = ~$7. Negligible. The cost ceiling worry the master plan documents is for `invoke-llm` (Phase 4), not for this pipeline.
+
+**How to apply.** No per-call cost guard needed in V1 because the upper bound is trivial. If we ever sync a much larger library (e.g., absorb Ra's full lecture archive in Phase 4), add a token-count check before calling the embeddings API and cap with a HARD_COST_CEILING_CENTS-style abort.
+
+**Open.** Whether to switch to `text-embedding-3-large` (3072 dims, ~6x more expensive) if retrieval quality on full-report generation turns out to be the limiting factor in Phase 3.5. Default answer is no — the small model is good enough at this scale and the cost discipline rule applies.
+
+---
+
 ## 2026-05-10 — Pricing model: Option A (three fixed-length reports)
 
 **Decision.** HD Reports launches with Option A from master plan lines 144 to 157: three fixed report tiers. Single Reading $49 (3,500 words), Deep Reading $79 (5,500 words), Full Reading $129 (8,000 words). The depth-dial / subscription pattern of Option B is parked for a possible later layer on top.

@@ -54,3 +54,6 @@ test/results/
 # Supabase local dev
 supabase/.temp/
 supabase/.branches/
+
+# Local sync checkpoints (extracted Notion content, not for git)
+.cache/
