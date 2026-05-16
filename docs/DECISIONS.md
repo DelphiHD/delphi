@@ -4,6 +4,22 @@ Append-only log of why-we-chose-X. New entries go at the top. Each entry: date, 
 
 ---
 
+## 2026-05-16 — Phase 3 V2: GitHub Actions cron instead of Vercel Cron + Edge Function
+
+**Decision.** The nightly Notion → Supabase sync runs as a GitHub Actions workflow (`.github/workflows/sync-notion.yml`), not as a Vercel Cron route or Supabase Edge Function as the master plan envisioned. Triggered nightly at 5:30 UTC plus manual `workflow_dispatch`.
+
+**Why.** A full sync takes about 10 minutes wall-clock (Notion's 3-req/sec rate limit times the four-level traversal for HD The Line Companion). Vercel's Hobby plan caps serverless functions at 60 seconds; Pro is 300 seconds (still under our walltime); Enterprise gets to 800 seconds. Supabase Edge Functions have similar bounds (50 seconds on free, 400 seconds on paid). GitHub Actions has a 6-hour limit and no incremental cost for a job that runs once a night, in an org we already own. The simplest correct tool wins.
+
+**Architecture.** The same `scripts/sync-notion.ts` Kaycee can run locally also runs in the GH Actions runner. Secrets (`NOTION_TOKEN`, `OPENAI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`) live as GitHub repo secrets, injected via the workflow's `env:` block. The Supabase Edge Function `ingest-markdown` from the master plan is not built. The Vercel cron route `/api/cron/notion-sync` from the master plan is not built. `/api/admin/library-health` is built as a Next.js route on Vercel because it's a quick HTTP read, not a long job.
+
+**Alternatives considered.** (a) Vercel Pro plan ($20/month) to unlock the 300s timeout, then split sync into multiple per-database invocations chained through a queue — too much plumbing for a nightly job we already own a runner for. (b) Self-hosted cron (Tennyson's machine via LaunchAgent) — works but creates a single-point-of-failure tied to one laptop. (c) Vercel Cron triggering a long-running Vercel function on Enterprise — the cost is wrong for our scale. GitHub Actions for the cron + Vercel for the observability endpoint is the right split.
+
+**How to apply.** When new env vars are needed in the sync, add them to both `.env.local` (local dev) and `gh secret set NAME` (GH Actions). When the sync logic changes, edit `scripts/sync-notion.ts`; both the local manual run and the workflow run pick up the change. The cron schedule lives in `.github/workflows/sync-notion.yml`.
+
+**Open.** Whether to mirror the markdown to git as part of the sync (master plan's "Notion → markdown → git → ingest" pattern) — deferred. With the current pipeline, the chunks table in Supabase is the canonical content store. If we later want a git-versioned record of the content, the GH Actions job is the natural place to add the commit step.
+
+---
+
 ## 2026-05-16 — Phase ordering: Phase 3 (content pipeline) before Phase 2 (Stripe)
 
 **Decision.** Kaycee asked to push Stripe back. Phase 3 (Notion to pgvector content pipeline) runs next; Phase 2 (Stripe Checkout, orders, entitlements) is deferred until after Phase 4 (the report engine). The "pricing model: Option A" decision still stands; the Stripe-shaped code just lands later.
