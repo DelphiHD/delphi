@@ -27,6 +27,24 @@ The wrapper is the only file that knows about API field names. Nothing past it s
 
 ---
 
+## 2026-05-16 — Incarnation Cross bulk import: defer to Phase 4 (Claude-driven)
+
+**Decision.** A `scripts/import-crosses.ts` was drafted to bulk-load the 192 named incarnation crosses from the IHDS Quarter PDFs (Ra Uru Hu, Jovian Archive 2008) into Kaycee's `HD Incarnation Crosses` Notion database. The regex-based parser is unreliable on profile-level splitting because the PDF's text extraction artifacts (smart-quote substitution, hyphenated line breaks, page-header repetition, occasional typos like "Right Angel" for "Right Angle") corrupt the section boundaries. The script is kept in place as scaffolding but **not run**; the actual import happens once Phase 4's Anthropic API key is in place, using Claude to do the structural extraction per cross section.
+
+**Why.** The profile-level splits matter for retrieval quality in Phase 4. A 4-profile LAC chunked as one big body lets the report engine retrieve "LAC of X" content but not "LAC of X for 5/2 profile" — losing surgical specificity. Kaycee's existing hand-curated entries (e.g., LAC of Cycles 1) have one toggle per supported profile, and the bulk import should match that structure rather than produce a non-matching one-toggle-per-cross fallback.
+
+The Claude-driven version is also small and cheap: feed each cross section (~2k tokens) to Sonnet, get back structured JSON with the cross name, gate quadrant, and one entry per profile-specific block. ~$0.02 per cross × ~200 crosses = ~$4 total for all 4 PDFs. Much better than fighting regex for an afternoon.
+
+**HD geometry constraint that informs the parser.** Right Angle Crosses support up to 7 profiles (1/3, 1/4, 2/4, 2/5, 3/5, 3/6, 4/6). Left Angle Crosses support up to 4 (5/1, 5/2, 6/2, 6/3). Juxtaposition Crosses are inherently single-profile (4/1 only). The Phase 4 import script will validate against these expected profile sets per cross type; any extraction outside them is rejected and flagged for review. See `docs/CONTEXT.md` "Incarnation Cross profile geometry" for the full rule.
+
+**Alternatives considered.** (a) Ship the one-toggle-per-cross fallback today — rejected because it creates structural inconsistency with Kaycee's existing entries and would need to be redone for fine-grained retrieval anyway. (b) Spend more time on the regex parser — rejected because PDF text artifacts make the bound on parser reliability lower than Claude's bound for this task.
+
+**How to apply.** When the Phase 4 Anthropic key is set up, add a Claude-extraction path to `scripts/import-crosses.ts`: replace the regex profile-splitter with a per-section call to Sonnet 4.6, prompt-cache the system instructions, parse the JSON response, validate profile sets against the geometry constraint, push to Notion. The existing PDF text extraction, name normalization, dedup, and Notion writing logic are reusable as-is.
+
+**Open.** Kaycee provides the remaining 3 Quarter PDFs (only Q1 is on disk as of 2026-05-16). Cleanup of the 192 placeholder rows currently in the database: keep, replace wholesale, or merge. Probably merge — preserve any hand-curation, overwrite empty bodies. Decide when running the Phase 4 import.
+
+---
+
 ## 2026-05-16 — Phase 3 V2: GitHub Actions cron instead of Vercel Cron + Edge Function
 
 **Decision.** The nightly Notion → Supabase sync runs as a GitHub Actions workflow (`.github/workflows/sync-notion.yml`), not as a Vercel Cron route or Supabase Edge Function as the master plan envisioned. Triggered nightly at 5:30 UTC plus manual `workflow_dispatch`.
