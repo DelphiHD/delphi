@@ -183,12 +183,18 @@ export async function retrieveForChart(
     }
   }
 
-  // Variables: the source library encodes variable entries by cognitive-type
-  // code (e.g. "PRR DRR"), not by individual theme names. For Phase 4 first-
-  // milestone we skip exact retrieval here and rely on the prompt + chart
-  // serialization (which now spells out the Right/Left brain frame and the
-  // theme names) for the model to write the section. When a per-theme library
-  // is curated later, this is where to load it.
+  // Variables: the source library encodes the cognitive type by the 4-arrow
+  // combination, e.g. "PLR DRR" for personality-motivation-Left,
+  // personality-perspective-Right, design-determination-Right,
+  // design-environment-Right. Pull the matching variable chunk so the
+  // Variables section of the report has the full cognitive-type narrative.
+  const m = chart.variables.motivation.arrow[0].toUpperCase();
+  const persArrow = chart.variables.perspective.arrow[0].toUpperCase();
+  const detArrow = chart.variables.determination.arrow[0].toUpperCase();
+  const envArrow = chart.variables.environment.arrow[0].toUpperCase();
+  const code = `P${m}${persArrow} D${detArrow}${envArrow}`;
+  const variableChunk = await findByTitle(s, "variable", code);
+  push(`variable=${code}`, variableChunk);
 
   // Gate entries (main hexagram) — one per unique gate in the chart.
   const gates = uniqueGates(chart);

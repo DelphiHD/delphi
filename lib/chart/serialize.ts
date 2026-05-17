@@ -61,27 +61,49 @@ export function serializeChart(client: { name: string }, chart: Chart): string {
   lines.push("");
 
   lines.push("## Variables (PHS)");
-  lines.push(`  Determination: arrow=${chart.variables.determination.arrow}  theme=${chart.variables.determination.theme}`);
-  lines.push(`  Environment:   arrow=${chart.variables.environment.arrow}  theme=${chart.variables.environment.theme}`);
-  lines.push(`  Perspective:   arrow=${chart.variables.perspective.arrow}  theme=${chart.variables.perspective.theme}`);
-  lines.push(`  Motivation:    arrow=${chart.variables.motivation.arrow}  theme=${chart.variables.motivation.theme}`);
-  if (chart.variables.sense) lines.push(`  Sense (personality side): ${chart.variables.sense}`);
-  if (chart.variables.designSense) lines.push(`  Sense (design side): ${chart.variables.designSense}`);
 
-  // Brain/Mind cognitive frame — computed from the four arrow directions per
-  // Ra's BG5/cognitive-type teaching. The Determination + Environment arrows
-  // form the body (right brain). The Perspective + Motivation arrows form
-  // the mind. A "right" brain means both body arrows point right; "left"
-  // means both left; "mixed" means one of each. Same for the mind.
+  // Pull the Color and Tone numbers from the planetary positions that drive
+  // each variable. Standard HD: Determination ← Design Sun (color, tone, base);
+  // Environment ← Design Nodes (we use Design North Node here);
+  // Motivation ← Personality Sun; Perspective ← Personality North Node.
+  // Sun and Earth share Color/Tone in HD geometry; we report Sun's values.
+  const dSun = chart.activations.design.find((p) => p.planet === "Sun");
+  const dNorth = chart.activations.design.find((p) => p.planet === "North Node");
+  const pSun = chart.activations.personality.find((p) => p.planet === "Sun");
+  const pNorth = chart.activations.personality.find((p) => p.planet === "North Node");
+
   const det = chart.variables.determination.arrow;
   const env = chart.variables.environment.arrow;
   const per = chart.variables.perspective.arrow;
   const mot = chart.variables.motivation.arrow;
+
+  const dump = (label: string, arrow: string, theme: string, sourcePlanet: { color: number; tone: number; base: number } | undefined, source: string) => {
+    const c = sourcePlanet ? `color=${sourcePlanet.color} tone=${sourcePlanet.tone} base=${sourcePlanet.base}` : "color=? tone=? base=?";
+    lines.push(`  ${label}: arrow=${arrow}  theme=${theme}  ${c}  (from ${source})`);
+  };
+  dump("Determination", det, chart.variables.determination.theme, dSun, "Design Sun");
+  dump("Environment  ", env, chart.variables.environment.theme, dNorth, "Design North Node");
+  dump("Motivation   ", mot, chart.variables.motivation.theme, pSun, "Personality Sun");
+  dump("Perspective  ", per, chart.variables.perspective.theme, pNorth, "Personality North Node");
+  if (chart.variables.sense) lines.push(`  Sense (personality side): ${chart.variables.sense}`);
+  if (chart.variables.designSense) lines.push(`  Sense (design side): ${chart.variables.designSense}`);
+
+  // Cognitive frame, both descriptive and as the BG5/OC16 code. The cognitive
+  // code is "P{Motivation}{Perspective} D{Determination}{Environment}" with
+  // L for left and R for right. This matches the title encoding in the
+  // HD Variables Notion database (e.g. "PLR DRR" for the cross-section of
+  // motivation-left, perspective-right, determination-right, environment-right).
   const brainSide = det === env ? det : "mixed";
   const mindSide = per === mot ? per : "mixed";
   const rights = [det, env, per, mot].filter((a) => a === "right").length;
   const lefts = 4 - rights;
+  const m = mot[0].toUpperCase();
+  const p = per[0].toUpperCase();
+  const d = det[0].toUpperCase();
+  const e = env[0].toUpperCase();
+  const cognitiveCode = `P${m}${p} D${d}${e}`;
   lines.push(`  → Cognitive frame: ${capitalize(brainSide)}-Brain, ${capitalize(mindSide)}-Mind (${rights}R/${lefts}L across all 4 arrows)`);
+  lines.push(`  → Cognitive code: ${cognitiveCode}`);
   lines.push("");
 
   lines.push("## Personality activations");

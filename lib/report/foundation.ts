@@ -160,13 +160,38 @@ The front matter is: "# Human Design Analysis" then the client's name on its own
 
 Then in order:
   # How to Use This Report  (a short framing — 2 to 3 paragraphs. No headings beneath.)
-  # Your Variables (PHS)
-    ## [Cognitive frame heading per the chart spec, e.g. "The Right-Brain, Left-Mind Frame"]
-    ## Determination: How You Are Built to Eat
-    ## Environment: Where You Are Built to Be
-    ## Perspective: How Your Mind Sees
-    ## Motivation: What Drives Your Inquiry
+  # Your Variables: <CognitiveCode>
+    (Replace <CognitiveCode> with the client's exact PRR-DRR style code from the chart spec, e.g. "Your Variables: PLR DRR". The chart spec shows the cognitive code on its own line; copy it verbatim into the H1.)
+
+    Open the section with TWO things, in this order:
+
+    (A) The active/receptive frame — 2 to 3 paragraphs introducing left and right cognition. Left arrows are active, focused, outward, and strategic. Right arrows are passive, receptive, peripheral, and receiving. Neither is better. Together they describe whether the body and mind are oriented to drive or to receive. Variables exist to put the form in the right conditions to live out its function; the right diet, the right environment, the right angle of perception, the right driver of inquiry are the biological and frequency conditions that let the design's correct opportunities become visible.
+
+    (B) A bulleted definitions list, in this exact order (Determination and Environment first because they set the bodily ground; Motivation and Perspective second because they describe how mind moves on that ground):
+
+    - **Determination** (Design Sun and Earth, also called Digestion): how you should consume food and information for proper functioning of the form. The physical brain's intake spec.
+    - **Environment** (Design Nodes): the ideal physical environmental conditions for proper functioning of the form. Where the body lives best.
+    - **Motivation** (Personality Sun and Earth): the mind's driver. What inquiry the mind moves toward.
+    - **Perspective** (Personality Nodes): how the mind is designed to see the world. The angle of perception.
+
+    Each bullet is one short sentence. Do not expand into prose under the bullets; the per-variable detail comes in the H2 subsections below.
+
+    ## Digestion: Color <N>: <ColorName>, <L|R> Arrow | <Active|Passive>: <SubName>, Tone <N>: <ToneName>
+    ## Environment: Color <N>: <ColorName>, <L|R> Arrow | <Active|Passive>: <SubName>, Tone <N>: <ToneName>
+    ## Motivation: Color <N>: <ColorName>, <L|R> Arrow | <Active|Passive>: <SubName>, Tone <N>: <ToneName>, Transference: <Name>
+    ## Perspective: Color <N>: <ColorName>, <L|R> Arrow | <Active|Passive>: <SubName>, Tone <N>: <ToneName>, Distraction: <Name>
     ## How Your Variables Work Together
+
+    Header format rules:
+    - "L Arrow" means left-pointing (active). "R Arrow" means right-pointing (receptive).
+    - Active and Passive are determined by the Tone, not the arrow. Tones 1, 2, 3 produce active variants; Tones 4, 5, 6 produce passive variants. The header should read "Active: <SubName>" or "Passive: <SubName>" based on the tone number from the chart spec.
+    - Color name, Tone name, the per-variable SubName, and (for Motivation and Perspective) the Transference and Distraction binary partner: pull these from the cached variable source library where present. If a name is not in the cached library for this code, use the standard HD lineage name (e.g. Digestion Color 1 is "Appetite" / "Cave Diet"), and if you cannot determine a name with confidence, write "<unknown>" rather than invent one. Color and tone NUMBERS always come directly from the chart spec.
+    - Use commas as separators, never em dashes or pipes. Headings never end with a period.
+
+    Per-variable prose body (under each H2): 200 to 350 words drawing from the cached source material. State the biological / cognitive mechanic, what the specific Color + Tone combination produces, and how the active or passive expression actually lives in the body. Detriments are not present in Variables, so no fixing-state framing here. The prose must thread the specific Color name, Tone name, and SubName into the explanation, not just describe the variable generically.
+
+    The final H2, "How Your Variables Work Together", is a synthesis: how the four work as one biological + cognitive system, what the dominant arrow direction (more right than left, more left than right, or mixed) means for this specific design, and what the form needs to land in its correct conditions.
+
   # Who You Are
     ## Your Type: <name>
     ## Your Strategy: <name>
