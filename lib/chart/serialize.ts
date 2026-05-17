@@ -90,6 +90,36 @@ export function serializeChart(client: { name: string }, chart: Chart): string {
 
   lines.push("## Design activations");
   for (const p of chart.activations.design) lines.push(planetLine(p));
+  lines.push("");
+
+  // Hanging gates: activated gates that don't participate in any defined
+  // channel. The Planetary Overview's Hanging Gates section needs this list.
+  const channelGateSet = new Set<number>();
+  for (const ch of chart.channels) {
+    channelGateSet.add(ch.gates[0]);
+    channelGateSet.add(ch.gates[1]);
+  }
+  const gateToActivations = new Map<number, { side: "personality" | "design"; planet: string; line: number; fix: string }[]>();
+  for (const p of chart.activations.personality) {
+    if (!gateToActivations.has(p.gate)) gateToActivations.set(p.gate, []);
+    gateToActivations.get(p.gate)!.push({ side: "personality", planet: p.planet, line: p.line, fix: p.fixingState });
+  }
+  for (const p of chart.activations.design) {
+    if (!gateToActivations.has(p.gate)) gateToActivations.set(p.gate, []);
+    gateToActivations.get(p.gate)!.push({ side: "design", planet: p.planet, line: p.line, fix: p.fixingState });
+  }
+  const hangingGates = [...gateToActivations.keys()].filter((g) => !channelGateSet.has(g)).sort((a, b) => a - b);
+  if (hangingGates.length > 0) {
+    lines.push("## Hanging gates (activated but not in any defined channel)");
+    for (const g of hangingGates) {
+      const acts = gateToActivations.get(g)!;
+      const descriptions = acts.map((a) => {
+        const fix = a.fix === "Exalted" ? " Exalted" : a.fix === "Detriment" ? " Detriment" : "";
+        return `${a.side[0].toUpperCase()}-${a.planet} at ${g}.${a.line}${fix}`;
+      }).join(", ");
+      lines.push(`  Gate ${g}: ${descriptions}`);
+    }
+  }
 
   return lines.join("\n");
 }

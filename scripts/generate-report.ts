@@ -22,6 +22,7 @@ import { resolve } from "node:path";
 import { getChart, getTimezoneForLocation } from "@/lib/mybodygraph";
 import { retrieveForChart } from "@/lib/retrieval/chartChunks";
 import { buildFoundationReport } from "@/lib/report/foundation";
+import { buildPlanetaryOverview } from "@/lib/report/planetary";
 
 interface ClientBrief {
   slug: string;
@@ -63,12 +64,15 @@ function must(name: string): string {
 
 async function main() {
   const slug = process.argv[2];
-  if (!slug || !CLIENTS[slug]) {
-    console.error("usage: npx tsx scripts/generate-report.ts <chris|sean|meelad>");
+  const kindArg = (process.argv[3] || "foundation").toLowerCase();
+  if (!slug || !CLIENTS[slug] || !["foundation", "planetary"].includes(kindArg)) {
+    console.error("usage: npx tsx scripts/generate-report.ts <chris|sean|meelad> [foundation|planetary]");
     process.exit(1);
   }
   const brief = CLIENTS[slug];
-  console.log(`\n=== Foundation Report for ${brief.name} ===\n`);
+  const kind = kindArg as "foundation" | "planetary";
+  const kindLabel = kind === "foundation" ? "Foundation Report" : "Planetary Overview";
+  console.log(`\n=== ${kindLabel} for ${brief.name} ===\n`);
 
   // 1. Resolve timezone + fetch chart.
   console.log(`Resolving timezone for "${brief.birthPlace}"…`);
@@ -109,19 +113,33 @@ async function main() {
 
   // 4. Generate.
   const length = (process.env.REPORT_LENGTH as "short" | "standard" | "long") ?? "standard";
-  console.log(`\nCalling Claude (Sonnet 4.6, length=${length}) …`);
+  console.log(`\nCalling Claude (Sonnet 4.6, kind=${kind}${kind === "foundation" ? `, length=${length}` : ""}) …`);
   const t0 = Date.now();
-  const result = await buildFoundationReport({
-    client: { name: brief.name },
-    chart,
-    retrieval,
-    identityMd,
-    voiceMd,
-    model: "claude-sonnet-4-6",
-    length,
-    apiKey: must("ANTHROPIC_API_KEY"),
-    hardCostCeilingCents: Number(process.env.HARD_COST_CEILING_CENTS ?? 80),
-  });
+  const apiKey = must("ANTHROPIC_API_KEY");
+  const ceiling = Number(process.env.HARD_COST_CEILING_CENTS ?? 80);
+  const result =
+    kind === "foundation"
+      ? await buildFoundationReport({
+          client: { name: brief.name },
+          chart,
+          retrieval,
+          identityMd,
+          voiceMd,
+          model: "claude-sonnet-4-6",
+          length,
+          apiKey,
+          hardCostCeilingCents: ceiling,
+        })
+      : await buildPlanetaryOverview({
+          client: { name: brief.name },
+          chart,
+          retrieval,
+          identityMd,
+          voiceMd,
+          model: "claude-sonnet-4-6",
+          apiKey,
+          hardCostCeilingCents: ceiling,
+        });
   const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
   console.log(`  done in ${elapsed}s`);
   for (const sec of result.sections) {
@@ -131,7 +149,8 @@ async function main() {
 
   // 5. Write.
   mkdirSync(".cache/reports", { recursive: true });
-  const outPath = `.cache/reports/${brief.slug}-foundation.md`;
+  const outSuffix = kind === "foundation" ? "foundation" : "planetary";
+  const outPath = `.cache/reports/${brief.slug}-${outSuffix}.md`;
   writeFileSync(outPath, result.text);
   console.log(`\n✓ ${outPath} (${result.text.split(/\s+/).length.toLocaleString()} words)`);
 
