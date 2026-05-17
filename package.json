@@ -7,9 +7,16 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "sync:notion": "tsx scripts/sync-notion.ts",
+    "report:chris": "tsx scripts/generate-report.ts chris",
+    "report:sean": "tsx scripts/generate-report.ts sean",
+    "report:meelad": "tsx scripts/generate-report.ts meelad",
+    "import:crosses:dry": "tsx scripts/import-crosses.ts --dry",
+    "import:crosses": "tsx scripts/import-crosses.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.96.0",
     "@notionhq/client": "^5.21.0",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.105.4",
