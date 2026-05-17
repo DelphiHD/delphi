@@ -291,7 +291,11 @@ async function syncStandardDatabase(
       const rendered = await renderBlocks(blocks);
       const body = title ? `# ${title}\n\n${rendered}` : rendered;
       if (!body.trim()) continue;
-      const slug = slugify(title) || page.id.slice(0, 8);
+      const baseSlug = slugify(title) || page.id.slice(0, 8);
+      // Append a short page-id suffix so two Notion pages with the same title
+      // (e.g. duplicate cross entries after a bulk import) produce different
+      // source_paths and don't collide on chunks_upsert_idx.
+      const slug = `${baseSlug}-${page.id.replace(/-/g, "").slice(-8)}`;
       // Heuristic: pull a leading number from the title as gate_number for
       // gate-like content (e.g., "21 - The Biter").
       const m = title.match(/^(\d+)\b/);
