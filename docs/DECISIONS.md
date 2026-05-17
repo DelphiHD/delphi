@@ -4,6 +4,29 @@ Append-only log of why-we-chose-X. New entries go at the top. Each entry: date, 
 
 ---
 
+## 2026-05-17 — Phase 4: mybodygraph as the canonical chart source
+
+**Decision.** Chart calculation goes through the **mybodygraph API** (`api.bodygraphchart.com`), wrapped at `lib/mybodygraph.ts`. This replaces (a) the master plan's HumanDesignHub assumption from `.env.example`'s `HD_HUB_API_KEY` placeholder, and (b) the earlier sketch of accepting pasted text from a public HD website as the chart input.
+
+**Why.** Two reasons.
+
+1. **Quality.** Raw chart text from public HD websites has unreliable cross detection and routinely omits exaltation / detriment flags. Kaycee's methodology hinges on those fixing states — a report that doesn't know a planet is in Detriment misses the whole reading. mybodygraph is Jovian-Archive-aligned, returns fixing states on every planet, and ships clean Personality / Design splits.
+2. **It already exists.** Kaycee subscribes to mybodygraph for her manual workflow. The master plan's `HD_HUB_API_KEY` slot was a placeholder for the not-yet-evaluated HumanDesignHub — switching to mybodygraph avoids signing up for a second account, and the API is Ra-aligned by construction.
+
+**Architecture.** The wrapper exposes two functions: `getTimezoneForLocation(query)` (free-text city → IANA timezone) and `getChart(args)` (birth data → internal `Chart` type defined at `lib/chart/types.ts`). The wrapper handles **variable-name translation** at the boundary so internal code (prompts, retrieval, reports) only ever sees Kaycee's vocabulary: API `Digestion` arrow + label → `determination`, `Environment` → `environment`, `Awareness` arrow + `Motivation` label → `motivation`, `Perspective` → `perspective`. The full mapping table is in `docs/CONTEXT.md`. The wrapper also derives `quarter` from the Personality Sun gate via a small lookup table embedded in `lib/mybodygraph.ts`.
+
+The wrapper is the only file that knows about API field names. Nothing past it should reference `Digestion` / `Awareness` / `bodygraphchart.com`.
+
+**Alternatives considered.** (a) HumanDesignHub (master-plan default) — ruled out: not vetted, second subscription, no evidence it returns Detriment / Exalted flags. (b) Self-hosted Swiss Ephemeris + custom HD geometry — ruled out: weeks of work to reimplement what mybodygraph charges a small fee for, and any bug in the geometry corrupts every reading. (c) Pasted text from public HD websites — ruled out: see "quality" above; this was Kaycee's frustration that motivated the API switch.
+
+**How to apply.** Env var is `MYBODYGRAPH_API_KEY` (server-only). Set in `.env.local` for local dev, in Vercel env vars before any chart-touching route deploys, and in GH Actions repo secrets if any future workflow needs it. When `HD_HUB_API_KEY` shows up in master-plan text or older `.env.example` comments, treat it as stale — `MYBODYGRAPH_API_KEY` is canonical. The master plan's chart-provider adapter step (Phase 4 task 6) is satisfied by `lib/mybodygraph.ts`; no separate `lib/chart/index.ts` indirection layer is needed because mybodygraph is the only chart source.
+
+**Cost note.** mybodygraph is a per-account subscription, not a per-call charge, so the cost-discipline rule (a paragraph estimating per-call cost before adding a new API) doesn't apply in the same way. Each customer report triggers one chart fetch; caching is per-customer (the chart only changes if birth data is corrected) and lives in the eventual `charts` table that Session B / Phase 4 report engine introduces. If we ever exceed mybodygraph's plan call cap, the fix is to upgrade the plan, not to re-architect.
+
+**Open.** Whether to cache chart responses in the database keyed on (birth_date, birth_time, timezone, lat, long) so re-generations don't re-hit the API. Probably yes once the customer flow lands; defer to Session B when the `charts` table is created.
+
+---
+
 ## 2026-05-16 — Phase 3 V2: GitHub Actions cron instead of Vercel Cron + Edge Function
 
 **Decision.** The nightly Notion → Supabase sync runs as a GitHub Actions workflow (`.github/workflows/sync-notion.yml`), not as a Vercel Cron route or Supabase Edge Function as the master plan envisioned. Triggered nightly at 5:30 UTC plus manual `workflow_dispatch`.

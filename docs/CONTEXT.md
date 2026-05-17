@@ -118,6 +118,42 @@ One `kind` value per source database, mapped from database name (strip "HD" pref
 
 This taxonomy supersedes the master plan's draft (`gate, channel, center, type, transit`), which was a placeholder and didn't reflect the actual library.
 
+## Chart input flow
+
+Chart data enters the system via the **mybodygraph API** (`api.bodygraphchart.com`), not via pasted text from any HD website. Wrapper lives at `lib/mybodygraph.ts`.
+
+Customer flow (Phase 4 onward): customer types birth date, time, and a free-text birth place. The portal calls `getTimezoneForLocation()` to resolve the place to an IANA timezone, then `getChart()` to fetch the structured chart. The wrapper normalizes the API response into the internal `Chart` type defined at `lib/chart/types.ts`. Nothing past the wrapper sees the raw API shape; downstream code (prompts, retrieval, report generation) consumes only the internal `Chart`.
+
+The wrapper exposes:
+
+- `getTimezoneForLocation(query: string) → Promise<string>` — uses `GET /v210502/locations`. Returns the first match's IANA timezone.
+- `getChart({ birthDate, birthTime, timezone, latitude?, longitude?, locationQuery?, includeChartImage? }) → Promise<Chart>` — uses `GET /v221006/hd-data`. Pass `includeChartImage: true` to also populate `chart.chartImageUrl` with the API's SVG for portal display.
+
+The API key lives in `MYBODYGRAPH_API_KEY` (server-only — no `NEXT_PUBLIC_` prefix). Set it in `.env.local` for local dev, in Vercel env vars for deployments, and in GH Actions repo secrets for any workflow that needs it.
+
+**Why mybodygraph and not raw text paste or HumanDesignHub.** Raw text from public HD websites has unreliable cross detection and routinely omits exaltation/detriment flags, which Kaycee's methodology depends on. The master plan's original `HD_HUB_API_KEY` was a placeholder for HumanDesignHub; mybodygraph is the Jovian-Archive-aligned source Kaycee already subscribes to. See `DECISIONS.md` for the switch.
+
+## Variable name mapping (API → Kaycee's terminology)
+
+The mybodygraph API uses different labels for the four variables than Kaycee does. The wrapper translates at the boundary so **internal code only ever sees Kaycee's vocabulary**. If you find raw API field names anywhere past `lib/mybodygraph.ts`, that's a leak and should be fixed.
+
+| mybodygraph API field | Kaycee's term | Where in API |
+|---|---|---|
+| `Variables.Digestion` (arrow `left`/`right`) | `determination.arrow` | top-level `Variables` |
+| `Properties.Digestion` (label, e.g. `"Cold"`) | `determination.theme` | `Properties` block |
+| `Variables.Environment` | `environment.arrow` | top-level `Variables` |
+| `Properties.Environment` (e.g. `"Kitchens"`) | `environment.theme` | `Properties` block |
+| `Variables.Awareness` | `motivation.arrow` | top-level `Variables` |
+| `Properties.Motivation` (e.g. `"Desire"`) | `motivation.theme` | `Properties` block |
+| `Variables.Perspective` | `perspective.arrow` | top-level `Variables` |
+| `Properties.Perspective` (e.g. `"Wanting"`) | `perspective.theme` | `Properties` block |
+| `Properties.Sense` (e.g. `"Security"`) | `variables.sense` | personality-side PHS sense |
+| `Properties.DesignSense` (e.g. `"Touch"`) | `variables.designSense` | design-side PHS sense |
+
+The renames that bite: API `Awareness` is what Kaycee calls **motivation**, and the API confusingly also has a separate `Motivation` field that's the PHS theme label for that same variable. The wrapper folds the arrow + label into a single `motivation: { arrow, theme }` object.
+
+The Notion `HD Variables` database uses Kaycee's terminology (Determination / Environment / Motivation / Perspective). Retrieval queries built from a `Chart` object can match against that database directly without renaming.
+
 ## Methodology rules that ship in every report
 
 These are non-negotiables from Kaycee. They constrain both the manual hd-analysis workflow and the eventual delphi web-product report engine.
