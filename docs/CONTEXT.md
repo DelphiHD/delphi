@@ -71,6 +71,18 @@ Consequence for Phase 3 sync: we **read each underlying database directly** (HD 
 
 Consequence for the hd-analysis skill: the same limitation likely applies to the Notion MCP tools that the skill uses. The skill should query HD The Line Companion as its own data source rather than depending on the linked content inside Gates pages. If the skill instructs querying via the linked views, that instruction is stale.
 
+### Incarnation Cross profile geometry
+
+Each named cross supports a specific subset of HD's 12 profiles, dictated by its geometry. This is non-obvious and gets forgotten across sessions, so it lives here as canon. The valid profile sets are:
+
+- **Right Angle Cross (RAC)** — profiles `1/3`, `1/4`, `2/4`, `2/5`, `3/5`, `3/6`, `4/6`. Up to 7 profile variants per named cross.
+- **Left Angle Cross (LAC)** — profiles `5/1`, `5/2`, `6/2`, `6/3`. Up to 4 profile variants per named cross.
+- **Juxtaposition Cross (JC)** — only `4/1`. A JC is inherently a single-profile cross; there is no "JC of X for profile Y" variant.
+
+Consequence for content extraction (PDF imports, scrapers, anything reading IHDS source material): RACs and LACs should produce one chunk per profile per cross. JCs produce exactly one chunk per cross. A parser that finds 13 profile labels in a single RAC section is wrong; the upper bound is 7. A parser that finds 0 profiles in a JC section is correct — the body is a single block of Ra's writing about that JC.
+
+Consequence for retrieval (Phase 4): when a customer's chart resolves to e.g. "Right Angle Cross of Eden 1, 1/3 profile," the report engine pulls `kind=cross, gate_number=<sun-personality-gate>, profile=1/3`. Storing profile as a structured property on each chunk is what makes this surgical.
+
 ### Line Companion toggle structure
 
 Each row in HD The Line Companion is one gate. Inside the page, the content is wrapped as `synced_block → callout → 7 toggles`. The 7 toggles per gate are:
