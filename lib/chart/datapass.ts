@@ -1,0 +1,790 @@
+// Data Pass / Activation Filter
+//
+// Deterministic, pure-data emit. Given a Chart (from mybodygraph) and the
+// synced HD chunks (with their structured metadata from Notion), produces the
+// canonical structural facts every report should consume. Mirrors the
+// "## Data Pass / Activation Filter" section of Kaycee's manual reference
+// files: planetary activation tables, center status, hanging gates by center,
+// channel listing, split-island detection, exact return dates.
+//
+// The output is the source of truth for chart structure. Reports MUST read
+// centers/channels/circuits/quarters from here, never derive them from prose
+// or guess.
+
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Chart, PlanetActivation } from "@/lib/chart/types";
+import type { Cycles } from "@/lib/chart/cycles";
+import { computeCycles } from "@/lib/chart/cycles";
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+export type CenterName =
+  | "head" | "ajna" | "throat" | "g" | "heart"
+  | "solar plexus" | "sacral" | "spleen" | "root";
+
+export type CenterStatus = "defined" | "undefined" | "open";
+
+export interface ActivationRow {
+  planet: PlanetActivation["planet"];
+  side: "personality" | "design";
+  gate: number;
+  line: number;
+  color: number;
+  tone: number;
+  base: number;
+  fixingState: PlanetActivation["fixingState"];
+  centerName: string;        // "Heart" | "Throat" | ... resolved from the gate's Notion metadata
+  channelStatus: string;     // "channel 21-45" | "hanging"
+  channelName: string | null; // "21 - 45: The Channel of Money" if in a defined channel
+}
+
+export interface CenterEntry {
+  name: string;                   // "Heart" | "Throat" | etc. (proper case, matches Notion)
+  canonical: CenterName;          // lowercase canonical key
+  status: CenterStatus;
+  activatedGates: number[];       // gates from this chart that live in this center
+  definedChannelIds: string[];    // channels in the chart that pass through this center
+  hangingGates: number[];         // activated gates that don't form a complete channel
+}
+
+export interface ChannelEntry {
+  id: string;                     // "21-45" (lower-higher gate)
+  name: string;                   // "Money" or full Notion title
+  centers: [string, string];      // ["Heart", "Throat"]
+  channelType: string | null;     // "MANIFESTED" | "GENERATED" | "PROJECTED" | "MANIFESTING GENERATED"
+  circuit: string | null;         // "Tribal: Ego"
+  consciousness: "personality" | "design" | "mixed";
+}
+
+export interface IslandEntry {
+  centers: string[];              // center names in this island
+  channels: string[];             // channel ids forming the island
+}
+
+export interface SplitAnalysis {
+  definitionLabel: string;        // "Single" | "Split (Simple)" | "Split (Wide)" | etc.
+  islandCount: number;
+  islands: IslandEntry[];
+  bridgingGates: number[];        // gates that, if activated by transit/another person, would bridge two islands
+}
+
+export interface DataPass {
+  client: { name: string };
+  birth: {
+    localDate: string;
+    utcDate: string;
+    designUtcDate: string;
+    timezone: string;
+    place: string | undefined;
+  };
+
+  // Top-level chart properties (verbatim from mybodygraph).
+  type: string;
+  strategy: string;
+  authority: string;
+  profile: string;
+  definition: string;
+  incarnationCross: string;
+  quarter: string | null;
+  signature: string;
+  notSelfTheme: string;
+
+  // Activation tables.
+  personalityActivations: ActivationRow[];
+  designActivations: ActivationRow[];
+
+  // Aggregates.
+  uniqueGates: number[];
+  doubleActivations: { gate: number; activations: string[] }[]; // human-readable list per gate
+
+  lineDistribution: { line: number; count: number; pct: number }[];
+  centerDistribution: { name: string; status: CenterStatus; gates: number[]; activationCount: number }[];
+  circuitDistribution: { circuit: string; gates: number[]; activationCount: number; pct: number }[];
+
+  // Per-element entries with full structured detail.
+  centers: CenterEntry[];
+  channels: ChannelEntry[];
+  hangingGatesByCenter: { center: string; gates: { gate: number; activations: string[] }[] }[];
+
+  // Split / island analysis.
+  split: SplitAnalysis;
+
+  // Exact return dates.
+  cycles: Cycles;
+
+  // Audit warnings: cases where the metadata didn't resolve cleanly.
+  warnings: string[];
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+const CANONICAL_CENTER_BY_LOWER: Record<string, CenterName> = {
+  "head": "head",
+  "ajna": "ajna",
+  "throat": "throat",
+  "g": "g",
+  "g center": "g",
+  "heart": "heart",
+  "ego": "heart",            // some Notion titles use "Ego (Heart, Will)"
+  "ego (heart, will)": "heart",
+  "solar plexus": "solar plexus",
+  "solar plexus (emotional)": "solar plexus",
+  "sacral": "sacral",
+  "spleen": "spleen",
+  "splenic": "spleen",
+  "root": "root",
+};
+
+function canonicalCenter(name: string): CenterName | null {
+  const k = name.trim().toLowerCase();
+  if (k in CANONICAL_CENTER_BY_LOWER) return CANONICAL_CENTER_BY_LOWER[k];
+  // Try matching by prefix word.
+  for (const prefix of Object.keys(CANONICAL_CENTER_BY_LOWER)) {
+    if (k.startsWith(prefix)) return CANONICAL_CENTER_BY_LOWER[prefix];
+  }
+  return null;
+}
+
+// Side abbreviation for activation list strings.
+function sideAbbr(side: "personality" | "design"): string {
+  return side === "personality" ? "P" : "D";
+}
+
+function formatActivationDescriptor(a: ActivationRow): string {
+  const fix = a.fixingState === "Exalted" ? " Exalted"
+            : a.fixingState === "Detriment" ? " Detriment"
+            : "";
+  return `${sideAbbr(a.side)} ${a.planet} ${a.gate}.${a.line}${fix}`;
+}
+
+// ─── Main entry: build the Data Pass from chart + structured chunks ─────────
+
+interface GateMetadata {
+  gateNumber: number;
+  title: string;
+  centerName: string | null;
+  channelTitles: { id: string; title: string }[]; // resolved channel relations
+  channelPartnerGates: number[];                  // resolved gate numbers
+  quarter: string | null;
+  circuit: string | null;
+  keynote: string | null;
+}
+
+interface ChannelMetadata {
+  notionPageId: string;
+  title: string;
+  gateNumbers: [number, number];
+  centerNames: [string, string];
+  channelType: string | null;
+  circuit: string | null;
+  keynote: string | null;
+}
+
+type RelationLink = { id: string; title?: string | null; kind?: string | null };
+
+function parseGateNumberFromTitle(title: string): number | null {
+  const m = title.match(/^(\d+)\b/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+function asRelationArray(v: unknown): RelationLink[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter((x): x is RelationLink => !!x && typeof x === "object");
+}
+
+function asString(v: unknown): string | null {
+  return typeof v === "string" ? v : null;
+}
+
+async function fetchChunkMetadata(
+  supabase: SupabaseClient,
+): Promise<{ gates: Map<number, GateMetadata>; channels: Map<string, ChannelMetadata>; warnings: string[] }> {
+  const warnings: string[] = [];
+
+  // Gates.
+  const { data: gateRows, error: gateErr } = await supabase
+    .from("chunks")
+    .select("notion_page_id, gate_number, title, metadata")
+    .eq("source_kind", "gate");
+  if (gateErr) throw gateErr;
+
+  const gates = new Map<number, GateMetadata>();
+  for (const row of gateRows ?? []) {
+    if (row.gate_number == null) continue;
+    const m = (row.metadata ?? {}) as Record<string, unknown>;
+    const centerRel = asRelationArray(m["Center"]);
+    const channelRel = asRelationArray(m["Channel"]);
+    const partnerRel = asRelationArray(m["Channel Partner Gate"]);
+    const quarter = asString(m["Quarter"]);
+    const circuitRel = asRelationArray(m["Human Design Circuits"]);
+    const keynote = asString(m["Keynote"]);
+
+    gates.set(row.gate_number, {
+      gateNumber: row.gate_number,
+      title: row.title,
+      centerName: centerRel[0]?.title ?? null,
+      channelTitles: channelRel.map((r) => ({ id: r.id, title: r.title ?? "" })),
+      channelPartnerGates: partnerRel
+        .map((r) => (r.title ? parseGateNumberFromTitle(r.title) : null))
+        .filter((n): n is number => n !== null),
+      quarter,
+      circuit: circuitRel[0]?.title ?? null,
+      keynote,
+    });
+  }
+
+  // Channels.
+  const { data: channelRows, error: channelErr } = await supabase
+    .from("chunks")
+    .select("notion_page_id, title, metadata")
+    .eq("source_kind", "channel");
+  if (channelErr) throw channelErr;
+
+  const channels = new Map<string, ChannelMetadata>();
+  for (const row of channelRows ?? []) {
+    const m = (row.metadata ?? {}) as Record<string, unknown>;
+    const gatesRel = asRelationArray(m["Gates"]);
+    const gateNumbers = gatesRel
+      .map((r) => (r.title ? parseGateNumberFromTitle(r.title) : null))
+      .filter((n): n is number => n !== null);
+    if (gateNumbers.length !== 2) {
+      warnings.push(`channel "${row.title}" has ${gateNumbers.length} gate relations; expected 2`);
+      continue;
+    }
+    const [lo, hi] = gateNumbers.sort((a, b) => a - b);
+    const centersRel = asRelationArray(m["Centers"]);
+    const centerNames = centersRel.map((r) => r.title ?? "").filter(Boolean);
+    if (centerNames.length !== 2) {
+      warnings.push(`channel "${row.title}" has ${centerNames.length} center relations; expected 2`);
+    }
+    const channelType = asString(m["Channel Type"]);
+    const circuitRel = asRelationArray(m["Circuit"]);
+
+    channels.set(`${lo}-${hi}`, {
+      notionPageId: row.notion_page_id,
+      title: row.title,
+      gateNumbers: [lo, hi],
+      centerNames: [centerNames[0] ?? "?", centerNames[1] ?? "?"],
+      channelType,
+      circuit: circuitRel[0]?.title ?? null,
+      keynote: asString(m["Keynote"]),
+    });
+  }
+
+  return { gates, channels, warnings };
+}
+
+// The standard 13 HD planets per side. Chiron and Lilith are returned by
+// mybodygraph but are not part of Ra's traditional HD activation table; Maia
+// Mechanics and Kaycee's reference files use only these 13.
+const STANDARD_PLANETS = new Set([
+  "Sun", "Earth", "North Node", "South Node", "Moon",
+  "Mercury", "Venus", "Mars", "Jupiter", "Saturn",
+  "Uranus", "Neptune", "Pluto",
+]);
+
+// Compute Personality + Design activation rows by joining chart activations
+// with structured gate metadata.
+function buildActivationRows(
+  chart: Chart,
+  gates: Map<number, GateMetadata>,
+  activeChannelIds: Set<string>,
+  warnings: string[],
+): { personality: ActivationRow[]; design: ActivationRow[] } {
+  function buildRow(
+    p: PlanetActivation,
+    side: "personality" | "design",
+  ): ActivationRow {
+    const meta = gates.get(p.gate);
+    if (!meta) {
+      warnings.push(`no gate metadata for gate ${p.gate} (${side} ${p.planet})`);
+    }
+    const centerName = meta?.centerName ?? "?";
+
+    // Find which channel (if any) this gate is participating in among the
+    // chart's defined channels. A gate's channel partner is in gate.channels;
+    // we cross-reference with active channels.
+    let channelStatus = "hanging";
+    let channelName: string | null = null;
+    const partners = meta?.channelPartnerGates ?? [];
+    for (const partnerGate of partners) {
+      const [lo, hi] = [Math.min(p.gate, partnerGate), Math.max(p.gate, partnerGate)];
+      const id = `${lo}-${hi}`;
+      if (activeChannelIds.has(id)) {
+        channelStatus = `in ${id}`;
+        // Find the matching channel meta for the name.
+        const chMeta = meta?.channelTitles.find((c) => c.title?.includes(`${lo}`) && c.title?.includes(`${hi}`));
+        channelName = chMeta?.title ?? null;
+        break;
+      }
+    }
+
+    return {
+      planet: p.planet,
+      side,
+      gate: p.gate,
+      line: p.line,
+      color: p.color,
+      tone: p.tone,
+      base: p.base,
+      fixingState: p.fixingState,
+      centerName,
+      channelStatus,
+      channelName,
+    };
+  }
+
+  return {
+    personality: chart.activations.personality
+      .filter((p) => STANDARD_PLANETS.has(p.planet))
+      .map((p) => buildRow(p, "personality")),
+    design: chart.activations.design
+      .filter((p) => STANDARD_PLANETS.has(p.planet))
+      .map((p) => buildRow(p, "design")),
+  };
+}
+
+// Detect split definition by graph-walking defined centers connected via
+// defined channels. Returns the islands, the bridging gates (gates that
+// belong to channels which would connect two islands if activated), and a
+// human-readable definition label.
+function analyzeSplit(
+  chart: Chart,
+  channels: Map<string, ChannelMetadata>,
+  gates: Map<number, GateMetadata>,
+): SplitAnalysis {
+  // Build a set of defined centers and the adjacency map between them.
+  const definedCenters = new Set(
+    chart.centers
+      .filter((c) => c.defined)
+      .map((c) => canonicalCenter(c.name))
+      .filter((c): c is CenterName => c !== null),
+  );
+  const activeChannelIds = new Set(chart.channels.map((c) => c.id));
+
+  // Adjacency: center -> set of other defined centers it connects to.
+  const adj = new Map<CenterName, Set<CenterName>>();
+  for (const c of definedCenters) adj.set(c, new Set());
+
+  for (const chId of activeChannelIds) {
+    const meta = channels.get(chId);
+    if (!meta) continue;
+    const [ca, cb] = meta.centerNames.map(canonicalCenter);
+    if (!ca || !cb) continue;
+    if (!definedCenters.has(ca) || !definedCenters.has(cb)) continue;
+    adj.get(ca)!.add(cb);
+    adj.get(cb)!.add(ca);
+  }
+
+  // Connected components.
+  const visited = new Set<CenterName>();
+  const islandRaw: CenterName[][] = [];
+  for (const start of definedCenters) {
+    if (visited.has(start)) continue;
+    const stack = [start];
+    const component: CenterName[] = [];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      if (visited.has(cur)) continue;
+      visited.add(cur);
+      component.push(cur);
+      for (const n of adj.get(cur) ?? []) {
+        if (!visited.has(n)) stack.push(n);
+      }
+    }
+    islandRaw.push(component.sort());
+  }
+
+  // Map island centers -> proper case from chart.centers.
+  const properName = new Map<CenterName, string>();
+  for (const c of chart.centers) {
+    const k = canonicalCenter(c.name);
+    if (k) properName.set(k, c.name);
+  }
+
+  // Compute which channels (by id) are inside each island.
+  const islands: IslandEntry[] = islandRaw.map((centers) => {
+    const centersSet = new Set(centers);
+    const includedChannels: string[] = [];
+    for (const chId of activeChannelIds) {
+      const meta = channels.get(chId);
+      if (!meta) continue;
+      const [a, b] = meta.centerNames.map(canonicalCenter);
+      if (a && b && centersSet.has(a) && centersSet.has(b)) {
+        includedChannels.push(chId);
+      }
+    }
+    return {
+      centers: centers.map((c) => properName.get(c) ?? c),
+      channels: includedChannels,
+    };
+  });
+
+  // Bridging gates: among the chart's activated gates, those whose
+  // Channel Partner Gate is in a DIFFERENT island would bridge the splits.
+  // Practically: for each activated gate that's hanging (not in a defined
+  // channel in the chart), check whether activating its partner would form
+  // a channel between two different islands.
+  const bridging: number[] = [];
+  if (islands.length > 1) {
+    const islandIdOfCenter = new Map<CenterName, number>();
+    for (let i = 0; i < islandRaw.length; i++) {
+      for (const c of islandRaw[i]) islandIdOfCenter.set(c, i);
+    }
+    // For each gate activated in the chart but hanging, find its partner; if
+    // the partner is in a different island's center, it's a bridge.
+    const activatedGates = new Set<number>();
+    for (const p of [...chart.activations.personality, ...chart.activations.design]) {
+      activatedGates.add(p.gate);
+    }
+    for (const g of activatedGates) {
+      const meta = gates.get(g);
+      if (!meta) continue;
+      // Skip gates that ARE in a defined channel already.
+      if (meta.channelPartnerGates.some((pg) => {
+        const [lo, hi] = [Math.min(g, pg), Math.max(g, pg)];
+        return activeChannelIds.has(`${lo}-${hi}`);
+      })) continue;
+      // For each partner, where does it live?
+      const myCenter = meta.centerName ? canonicalCenter(meta.centerName) : null;
+      if (!myCenter) continue;
+      const myIsland = islandIdOfCenter.get(myCenter);
+      for (const pg of meta.channelPartnerGates) {
+        const pgMeta = gates.get(pg);
+        if (!pgMeta?.centerName) continue;
+        const pgCenter = canonicalCenter(pgMeta.centerName);
+        if (!pgCenter) continue;
+        const pgIsland = islandIdOfCenter.get(pgCenter);
+        if (pgIsland !== undefined && myIsland !== undefined && pgIsland !== myIsland) {
+          bridging.push(g);
+          break;
+        }
+      }
+    }
+  }
+
+  // Definition label is whatever mybodygraph reports it as. We don't try to
+  // refine "Split Definition" into Simple vs Wide ourselves; that's a HD
+  // distinction Kaycee can make based on the bridging-gate list below.
+  return {
+    definitionLabel: chart.definition.value,
+    islandCount: islands.length,
+    islands,
+    bridgingGates: [...new Set(bridging)].sort((a, b) => a - b),
+  };
+}
+
+// ─── Public API ─────────────────────────────────────────────────────────────
+
+export async function buildDataPass(args: {
+  supabase: SupabaseClient;
+  client: { name: string };
+  chart: Chart;
+  nowUtcIso?: string;
+}): Promise<DataPass> {
+  const { supabase, client, chart } = args;
+  const warnings: string[] = [];
+
+  const { gates, channels, warnings: metaWarnings } = await fetchChunkMetadata(supabase);
+  warnings.push(...metaWarnings);
+
+  const activeChannelIds = new Set(chart.channels.map((c) => c.id));
+
+  // Activations.
+  const { personality, design } = buildActivationRows(chart, gates, activeChannelIds, warnings);
+
+  // Unique gates + double activations.
+  const allActivations = [...personality, ...design];
+  const gateOccurrences = new Map<number, ActivationRow[]>();
+  for (const a of allActivations) {
+    if (!gateOccurrences.has(a.gate)) gateOccurrences.set(a.gate, []);
+    gateOccurrences.get(a.gate)!.push(a);
+  }
+  const uniqueGates = [...gateOccurrences.keys()].sort((a, b) => a - b);
+  const doubleActivations = uniqueGates
+    .filter((g) => (gateOccurrences.get(g)?.length ?? 0) > 1)
+    .map((g) => ({
+      gate: g,
+      activations: gateOccurrences.get(g)!.map(formatActivationDescriptor),
+    }));
+
+  // Line distribution.
+  const lineCounts = new Map<number, number>();
+  for (const a of allActivations) lineCounts.set(a.line, (lineCounts.get(a.line) ?? 0) + 1);
+  const total = allActivations.length;
+  const lineDistribution = [...lineCounts.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([line, count]) => ({ line, count, pct: total > 0 ? (count / total) * 100 : 0 }));
+
+  // Center entries with strict status.
+  // - defined  = chart says center is defined (has at least one full channel passing through it)
+  // - undefined = at least one activated gate in the center, but no full channel — i.e. only hanging gates
+  // - open      = no activated gates in the center at all
+  const centerEntries: CenterEntry[] = chart.centers.map((c) => {
+    const canonical = canonicalCenter(c.name);
+    const activatedGates = uniqueGates.filter((g) => {
+      const meta = gates.get(g);
+      const k = meta?.centerName ? canonicalCenter(meta.centerName) : null;
+      return k !== null && k === canonical;
+    });
+    const definedChannelIds = chart.channels.filter((ch) => {
+      const meta = channels.get(ch.id);
+      if (!meta) return false;
+      return meta.centerNames.some((n) => canonicalCenter(n) === canonical);
+    }).map((ch) => ch.id);
+    const hangingGates = activatedGates.filter((g) => {
+      const meta = gates.get(g);
+      const inDefinedChannel = (meta?.channelPartnerGates ?? []).some((pg) => {
+        const [lo, hi] = [Math.min(g, pg), Math.max(g, pg)];
+        return activeChannelIds.has(`${lo}-${hi}`);
+      });
+      return !inDefinedChannel;
+    });
+
+    let status: CenterStatus;
+    if (c.defined) status = "defined";
+    else if (activatedGates.length === 0) status = "open";
+    else status = "undefined";
+
+    return {
+      name: c.name,
+      canonical: canonical ?? "head", // shouldn't fail; "head" as a safe default
+      status,
+      activatedGates,
+      definedChannelIds,
+      hangingGates,
+    };
+  });
+
+  // Center distribution table (for back-compat with manual data-pass shape).
+  const centerDistribution = centerEntries.map((c) => ({
+    name: c.name,
+    status: c.status,
+    gates: c.activatedGates,
+    activationCount: allActivations.filter((a) => canonicalCenter(a.centerName) === c.canonical).length,
+  }));
+
+  // Circuit distribution.
+  const circuitCounts = new Map<string, { gates: Set<number>; count: number }>();
+  for (const a of allActivations) {
+    const meta = gates.get(a.gate);
+    const circuit = meta?.circuit ?? "(unknown)";
+    if (!circuitCounts.has(circuit)) circuitCounts.set(circuit, { gates: new Set(), count: 0 });
+    const e = circuitCounts.get(circuit)!;
+    e.gates.add(a.gate);
+    e.count += 1;
+  }
+  const circuitDistribution = [...circuitCounts.entries()]
+    .sort((a, b) => b[1].count - a[1].count)
+    .map(([circuit, e]) => ({
+      circuit,
+      gates: [...e.gates].sort((a, b) => a - b),
+      activationCount: e.count,
+      pct: total > 0 ? (e.count / total) * 100 : 0,
+    }));
+
+  // Hanging gates organized by center.
+  const hangingGatesByCenter = centerEntries
+    .filter((c) => c.hangingGates.length > 0)
+    .map((c) => ({
+      center: c.name,
+      gates: c.hangingGates.map((g) => ({
+        gate: g,
+        activations: allActivations
+          .filter((a) => a.gate === g)
+          .map(formatActivationDescriptor),
+      })),
+    }));
+
+  // Channel entries: enrich each chart channel with structured metadata.
+  const channelEntries: ChannelEntry[] = chart.channels.map((ch) => {
+    const meta = channels.get(ch.id);
+    if (!meta) {
+      warnings.push(`no channel metadata for ${ch.id}`);
+      return {
+        id: ch.id,
+        name: ch.id,
+        centers: ["?", "?"],
+        channelType: null,
+        circuit: null,
+        consciousness: ch.consciousness === "mixed" ? "mixed" : ch.consciousness,
+      };
+    }
+    return {
+      id: ch.id,
+      name: meta.title.replace(/^\s*\d+\s*-\s*\d+:\s*/, "").trim() || meta.title,
+      centers: meta.centerNames as [string, string],
+      channelType: meta.channelType,
+      circuit: meta.circuit,
+      consciousness: ch.consciousness === "mixed" ? "mixed" : ch.consciousness,
+    };
+  });
+
+  // Split analysis.
+  const split = analyzeSplit(chart, channels, gates);
+
+  // Cycles (exact returns).
+  const cycles = await computeCycles(chart.birth.utcDate, args.nowUtcIso);
+
+  return {
+    client,
+    birth: {
+      localDate: chart.birth.localDate,
+      utcDate: chart.birth.utcDate,
+      designUtcDate: chart.birth.designUtcDate,
+      timezone: chart.birth.timezone,
+      place: chart.birth.locationQuery,
+    },
+    type: chart.type.value,
+    strategy: chart.strategy.value,
+    authority: chart.authority.value,
+    profile: chart.profile.value,
+    definition: chart.definition.value,
+    incarnationCross: chart.incarnationCross.value,
+    quarter: chart.quarter,
+    signature: chart.signature.value,
+    notSelfTheme: chart.notSelfTheme.value,
+
+    personalityActivations: personality,
+    designActivations: design,
+
+    uniqueGates,
+    doubleActivations,
+
+    lineDistribution,
+    centerDistribution,
+    circuitDistribution,
+
+    centers: centerEntries,
+    channels: channelEntries,
+    hangingGatesByCenter,
+
+    split,
+    cycles,
+    warnings,
+  };
+}
+
+// ─── Markdown rendering ─────────────────────────────────────────────────────
+
+// Renders the Data Pass as a Markdown block to inject into the report prompt
+// as canonical facts. Mirrors the format Kaycee uses in her manual Notion
+// reference files (## Data Pass / Activation Filter).
+export function renderDataPassMarkdown(dp: DataPass): string {
+  const lines: string[] = [];
+  lines.push(`# Data Pass for ${dp.client.name}`);
+  lines.push("");
+  lines.push("> Canonical structural facts. The report engine reads these directly. Never derive a center for a gate, a center-pair for a channel, a circuit, or a definition island from elsewhere; everything you need is below.");
+  lines.push("");
+
+  lines.push("## Chart Summary");
+  lines.push(`${dp.profile} | ${dp.type} | ${dp.authority} Authority | ${dp.definition}`);
+  lines.push(`**Birth**: ${dp.birth.localDate} (${dp.birth.timezone})${dp.birth.place ? `, ${dp.birth.place}` : ""}`);
+  lines.push(`**Design**: ${dp.birth.designUtcDate} UTC`);
+  lines.push(`**Incarnation Cross**: ${dp.incarnationCross}`);
+  lines.push(`**Quarter**: ${dp.quarter ?? "(unmapped)"}`);
+  lines.push(`**Signature**: ${dp.signature}    **Not-Self Theme**: ${dp.notSelfTheme}`);
+  lines.push("");
+
+  function renderActivationTable(label: string, rows: ActivationRow[]): void {
+    lines.push(`## ${label}`);
+    lines.push("Planet | Gate.Line | E/D | Center | Channel/Hanging");
+    lines.push("-------|-----------|-----|--------|-----------------");
+    for (const r of rows) {
+      const ed = r.fixingState === "Exalted" ? "Exalted"
+              : r.fixingState === "Detriment" ? "Detriment"
+              : "—";
+      lines.push(`${r.planet} | ${r.gate}.${r.line} | ${ed} | ${r.centerName} | ${r.channelStatus}`);
+    }
+    lines.push("");
+  }
+  renderActivationTable("Personality Activations", dp.personalityActivations);
+  renderActivationTable("Design Activations", dp.designActivations);
+
+  lines.push(`## Unique Gates (${dp.uniqueGates.length} from ${dp.personalityActivations.length + dp.designActivations.length} positions)`);
+  lines.push(dp.uniqueGates.join(", "));
+  lines.push("");
+
+  if (dp.doubleActivations.length) {
+    lines.push(`## Double Activations (${dp.doubleActivations.length} gates)`);
+    for (const d of dp.doubleActivations) {
+      lines.push(`- **Gate ${d.gate}**: ${d.activations.join(" + ")}`);
+    }
+    lines.push("");
+  }
+
+  lines.push("## Line Distribution");
+  lines.push("Line | Count | %");
+  lines.push("-----|-------|---");
+  for (const l of dp.lineDistribution) {
+    lines.push(`${l.line} | ${l.count} | ${l.pct.toFixed(1)}%`);
+  }
+  lines.push("");
+
+  lines.push("## Center Distribution");
+  lines.push("Center | Status | Gates | Activations");
+  lines.push("-------|--------|-------|------------");
+  for (const c of dp.centerDistribution) {
+    lines.push(`${c.name} | ${c.status.toUpperCase()} | ${c.gates.join(", ") || "—"} | ${c.activationCount}`);
+  }
+  lines.push("");
+
+  lines.push("## Circuit Distribution");
+  lines.push("Circuit | Activations | %");
+  lines.push("--------|-------------|---");
+  for (const c of dp.circuitDistribution) {
+    lines.push(`${c.circuit} | ${c.activationCount} | ${c.pct.toFixed(1)}%`);
+  }
+  lines.push("");
+
+  lines.push("## Channels");
+  lines.push("ID | Name | Centers | Type | Circuit | Consciousness");
+  lines.push("---|------|---------|------|---------|--------------");
+  for (const ch of dp.channels) {
+    lines.push(`${ch.id} | ${ch.name} | ${ch.centers.join(" ↔ ")} | ${ch.channelType ?? "?"} | ${ch.circuit ?? "?"} | ${ch.consciousness}`);
+  }
+  lines.push("");
+
+  lines.push(`## Definition: ${dp.split.definitionLabel} (${dp.split.islandCount} island${dp.split.islandCount === 1 ? "" : "s"})`);
+  for (let i = 0; i < dp.split.islands.length; i++) {
+    const is = dp.split.islands[i];
+    lines.push(`- Island ${i + 1}: centers [${is.centers.join(", ")}] connected by channels [${is.channels.join(", ") || "—"}]`);
+  }
+  if (dp.split.bridgingGates.length) {
+    lines.push(`Bridging gates (activated but unbridged across islands): ${dp.split.bridgingGates.join(", ")}`);
+  }
+  lines.push("");
+
+  if (dp.hangingGatesByCenter.length) {
+    lines.push("## Hanging Gates by Center");
+    for (const c of dp.hangingGatesByCenter) {
+      lines.push(`### ${c.center}`);
+      for (const g of c.gates) {
+        lines.push(`- Gate ${g.gate}: ${g.activations.join(", ")}`);
+      }
+    }
+    lines.push("");
+  }
+
+  lines.push("## Important Dates / Life Cycle (UTC)");
+  const fmtCycle = (label: string, cy: { firstPass: string; status: string; allPasses: string[] }) => {
+    if (!cy.firstPass) return `- ${label}: unknown`;
+    const window = cy.allPasses.length > 1
+      ? `  (full window: ${cy.allPasses[0]} → ${cy.allPasses[cy.allPasses.length - 1]}, ${cy.allPasses.length} passes)`
+      : "";
+    return `- ${label}: ${cy.firstPass} | ${cy.status}${window}`;
+  };
+  lines.push(fmtCycle("Saturn Return",       dp.cycles.saturnReturn));
+  lines.push(fmtCycle("Uranus Opposition",   dp.cycles.uranusOpposition));
+  lines.push(fmtCycle("Chiron Return",       dp.cycles.chironReturn));
+  lines.push(fmtCycle("2nd Saturn Return",   dp.cycles.secondSaturnReturn));
+  lines.push("");
+
+  if (dp.warnings.length) {
+    lines.push("## Audit Warnings");
+    for (const w of dp.warnings) lines.push(`- ${w}`);
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}

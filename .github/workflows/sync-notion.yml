@@ -20,7 +20,10 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # The Notion walk takes ~12-15 min with the full Line Companion + the now-
+    # populated Incarnation Crosses database. 45 minutes gives plenty of headroom
+    # while still being well under the 6-hour ceiling for free GitHub Actions.
+    timeout-minutes: 45
     concurrency:
       group: sync-notion
       cancel-in-progress: false

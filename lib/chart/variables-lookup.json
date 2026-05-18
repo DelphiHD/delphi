@@ -1,0 +1,512 @@
+{
+  "generatedAt": "2026-05-18T21:10:48.828Z",
+  "source": "notion://32de3fadcaaa80cb89e6ddbb8dd09112",
+  "bodyToneNames": [
+    "Smell",
+    "Taste",
+    "Outer Vision",
+    "Inner Vision",
+    "Feeling",
+    "Touch"
+  ],
+  "mindToneNames": [
+    "Security",
+    "Uncertainty",
+    "Action",
+    "Meditation",
+    "Judgement",
+    "Acceptance"
+  ],
+  "colors": [
+    {
+      "variable": "Determination",
+      "colorNumber": 1,
+      "colorName": "Cave Diet",
+      "activeVariant": "Consecutive",
+      "passiveVariant": "Alternating",
+      "transference": null,
+      "distraction": null,
+      "description": "\\n\\t\\t\\t\\t\\t\\t- The most primitive digestive system - approximately 1.2 billion people have this\\n\\t\\t\\t\\t\\t\\t- Eat one thing at a time: \\\"You want salt? Take a pinch of salt and put it on your tongue. One thing at a time.\\\"\\n\\t\\t\\t\\t\\t\\t- People with this diet have the most powerful reaction when they start eating correctly\\n\\t\\t\\t\\t\\t\\t- This is a very extreme diet that people will initially resist: \\\"you're gonna hate it\\\"\\n\\t\\t\\t\\t\\t\\t- Those who persist for 3-5 years often experience dramatic physical changes and eventually \\\"found their thing\\\"\\n\\t\\t\\t\\t\\t\\t"
+    },
+    {
+      "variable": "Determination",
+      "colorNumber": 2,
+      "colorName": "Taste",
+      "activeVariant": "Open",
+      "passiveVariant": "Closed",
+      "transference": null,
+      "distraction": null,
+      "description": "\\n\\t\\t\\t\\t\\t\\t- The gatherer diet - extremely rigid, eating the same thing day after day\\n\\t\\t\\t\\t\\t\\t- Should eat as much local produce as possible from the area you're living in\\n\\t\\t\\t\\t\\t\\t- Babies with this color show discernment immediately - open babies will try new foods, closed babies won't even let the spoon in\\n\\t\\t\\t\\t\\t\\t- These people need to find exactly what's perfect for them and stay with it, with only seasonal changes allowed\\n\\t\\t\\t\\t\\t\\t- The speaker's sister has this and \\\"insisted on eating the same things\\\" even before knowing about her design\\n\\t\\t\\t\\t\\t\\t"
+    },
+    {
+      "variable": "Determination",
+      "colorNumber": 3,
+      "colorName": "Thirst",
+      "activeVariant": "Hot",
+      "passiveVariant": "Cold",
+      "transference": null,
+      "distraction": null,
+      "description": "\\n\\t\\t\\t\\t\\t\\t- Deals with temperature - hot or cold\\n\\t\\t\\t\\t\\t\\t- Cold side: can only consume liquids and foods below body temperature because they have an overheated system that burns off what they need\\n\\t\\t\\t\\t\\t\\t- Hot side: need everything above body temperature because they have weak digestive systems running cold that need heat for chemical reaction\\n\\t\\t\\t\\t\\t\\t- The speaker's youngest son is cold and was born premature, never experiencing the instant conditioning from mother's breast\\n\\t\\t\\t\\t\\t\\t"
+    },
+    {
+      "variable": "Determination",
+      "colorNumber": 4,
+      "colorName": "Taste",
+      "activeVariant": "Calm",
+      "passiveVariant": "Nervous",
+      "transference": null,
+      "distraction": null,
+      "description": "\\n\\t\\t\\t\\t\\t\\t- About the environment when eating, not about controlling your own digestive process\\n\\t\\t\\t\\t\\t\\t- Calm (left side): need to be in a calm environment when eating - the speaker is this type and takes most meals alone\\n\\t\\t\\t\\t\\t\\t- Nervous (right side): need energy and disturbance while eating - shouldn't sit through a meal, can \\\"eat while they're walking and, you know, can eat and dance\\\"\\n\\t\\t\\t\\t\\t\\t- The speaker's son Loki is nervous - when they eat together, if it's calm it's bad for him, if it's disturbing it's bad for the speaker\\n\\t\\t\\t\\t\\t\\t"
+    },
+    {
+      "variable": "Determination",
+      "colorNumber": 5,
+      "colorName": "Sound",
+      "activeVariant": "High",
+      "passiveVariant": "Low",
+      "transference": null,
+      "distraction": null,
+      "description": "\\n\\t\\t\\t\\t\\t\\t- About acoustic environments\\n\\t\\t\\t\\t\\t\\t- High (left): need sound around when eating - should use iPod, turn up volume, perfect for busy restaurants\\n\\t\\t\\t\\t\\t\\t- Low (right): need silence - should use sound reduction headphones or soundproof rooms\\n\\t\\t\\t\\t\\t\\t- Connected to modern technologies for portable noise or noise elimination\\n\\t\\t\\t\\t\\t\\t"
+    },
+    {
+      "variable": "Determination",
+      "colorNumber": 6,
+      "colorName": "Light",
+      "activeVariant": "Direct",
+      "passiveVariant": "Indirect",
+      "transference": null,
+      "distraction": null,
+      "description": "\\n\\t\\t\\t\\t\\t\\t- The most sophisticated and sensitive digestive system\\n\\t\\t\\t\\t\\t\\t- Direct (left): can only eat when the sun is up\\n\\t\\t\\t\\t\\t\\t- Indirect (right): \\\"nocturnals\\\" who can only eat when the sun is down\\n\\t\\t\\t\\t\\t\\t- Nearly 800 million people work while others sleep - cities that never close support this\\n\\t\\t\\t\\t\\t\\t- The speaker advises indirect people to \\\"change their lives. Sleep in the daytime. Get night shift work\\\"\\n\\t\\t\\t\\t\\t\\t- One student from Greece is preparing to \\\"teach human design to nocturnals nocturnally\\\"\\n\\t\\t\\t\\t\\t\\t- Liquids are not restricted by time - can be taken throughout the day in any diet\\n\\t\\t\\t\\t\\t\\t- Can be challenging in northern countries with limited winter daylight\\n\\t\\t\\t\\t\\t\\t"
+    },
+    {
+      "variable": "Environment",
+      "colorNumber": 1,
+      "colorName": "Caves",
+      "activeVariant": null,
+      "passiveVariant": null,
+      "transference": null,
+      "distraction": null,
+      "description": "\\n\\t\\t\\t\\t\\t\\t\\t- Security-focused environments with controlled entry/exit\\n\\t\\t\\t\\t\\t\\t\\t- Need one entrance for security (multiple doors can disturb sleep in children)\\n\\t\\t\\t\\t\\t\\t\\t- Indoor people who control who enters their space\\n\\t\\t\\t\\t\\t\\t\\t- Examples: offices, enclosed spaces, automobiles\\n\\t\\t\\t\\t\\t\\t-"
+    },
+    {
+      "variable": "Environment",
+      "colorNumber": 2,
+      "colorName": "Markets",
+      "activeVariant": null,
+      "passiveVariant": null,
+      "transference": null,
+      "distraction": null,
+      "description": "\\n\\t\\t\\t\\t\\t\\t\\t- Fundamentally urban, need to be where the action is\\n\\t\\t\\t\\t\\t\\t\\t- Internal markets: business at home\\n\\t\\t\\t\\t\\t\\t\\t- External markets: out in the urban marketplace\\n\\t\\t\\t\\t\\t\\t\\t- Environment is foundation for material success\\n\\t\\t\\t\\t\\t\\t-"
+    },
+    {
+      "variable": "Environment",
+      "colorNumber": 3,
+      "colorName": "Kitchens",
+      "activeVariant": null,
+      "passiveVariant": null,
+      "transference": null,
+      "distraction": null,
+      "description": "\\n\\t\\t\\t\\t\\t\\t\\t- Divided into wet (high humidity) and dry (low humidity)\\n\\t\\t\\t\\t\\t\\t\\t- Places of transformation and creation\\n\\t\\t\\t\\t\\t\\t\\t- Most sophisticated and creative urban environments\\n\\t\\t\\t\\t\\t\\t\\t- Where things are designed and built\\n\\t\\t\\t\\t\\t\\t"
+    },
+    {
+      "variable": "Environment",
+      "colorNumber": 4,
+      "colorName": "Mountains",
+      "activeVariant": null,
+      "passiveVariant": null,
+      "transference": null,
+      "distraction": null,
+      "description": "\\n\\t\\t\\t\\t\\t\\t\\t- Need thin oxygen, thrive at high altitude\\n\\t\\t\\t\\t\\t\\t\\t- Designed to be above things, looking down\\n\\t\\t\\t\\t\\t\\t\\t- Active vs. passive mountain orientations\\n\\t\\t\\t\\t\\t\\t\\t- Not meant to get involved in nitty-gritty details\\n\\t\\t\\t\\t\\t\\t\\t- Others must climb the mountain to reach them\\n\\t\\t\\t\\t\\t\\t-"
+    },
+    {
+      "variable": "Environment",
+      "colorNumber": 5,
+      "colorName": "Valleys",
+      "activeVariant": null,
+      "passiveVariant": null,
+      "transference": null,
+      "distraction": null,
+      "description": "\\n\\t\\t\\t\\t\\t\\t\\t- Original highways where everything moved along\\n\\t\\t\\t\\t\\t\\t\\t- Internationalists designed to integrate with the world\\n\\t\\t\\t\\t\\t\\t\\t- Need to be where there's flow and movement\\n\\t\\t\\t\\t\\t\\t\\t- Need lots of oxygen, belong at ground level\\n\\t\\t\\t\\t\\t\\t\\t- Narrow valleys (urban) vs. wide valleys (bucolic)\\n\\t\\t\\t\\t\\t\\t\\t- Cannot thrive in true isolation\\n\\t\\t\\t\\t\\t\\t-"
+    },
+    {
+      "variable": "Environment",
+      "colorNumber": 6,
+      "colorName": "Shores",
+      "activeVariant": null,
+      "passiveVariant": null,
+      "transference": null,
+      "distraction": null,
+      "description": "\\n\\t\\t\\t\\t\\t\\t\\t- Connection to water is deeply important\\n\\t\\t\\t\\t\\t\\t\\t- Natural shores (water boundaries) or artificial shores (park boundaries, city divisions)\\n\\t\\t\\t\\t\\t\\t\\t- About having a horizon to look beyond\\n\\t\\t\\t\\t\\t\\t"
+    },
+    {
+      "variable": "Perspective",
+      "colorNumber": 1,
+      "colorName": "Survival",
+      "activeVariant": null,
+      "passiveVariant": null,
+      "transference": null,
+      "distraction": "Wanting",
+      "description": "\\n\\t\\t\\t\\t\\t\\t- Sees what can survive and what's necessary for survival\\n\\t\\t\\t\\t\\t\\t- Can lead to deep materialism and seeing what people are afraid of\\n\\t\\t\\t\\t\\t\\t- Sees the most primitive, foundational level of the world\\n\\t\\t\\t\\t\\t\\t- Transfers to/from wanting (4th color)\\n\\t\\t\\t\\t\\t\\t"
+    },
+    {
+      "variable": "Perspective",
+      "colorNumber": 2,
+      "colorName": "Possibility",
+      "activeVariant": null,
+      "passiveVariant": null,
+      "transference": null,
+      "distraction": "Probability",
+      "description": "\\n\\t\\t\\t\\t\\t\\t- Sees possibilities in everything and everyone\\n\\t\\t\\t\\t\\t\\t- Sweet quality that can be wonderful as outer authority\\n\\t\\t\\t\\t\\t\\t- Yearns to see possibility realized due to distraction to probability\\n\\t\\t\\t\\t\\t\\t- Inherent hope and belief in this perspective\\n\\t\\t\\t\\t\\t\\t- Transfers to/from probability (5th color)\\n\\t\\t\\t\\t\\t\\t"
+    },
+    {
+      "variable": "Perspective",
+      "colorNumber": 3,
+      "colorName": "Power",
+      "activeVariant": null,
+      "passiveVariant": null,
+      "transference": null,
+      "distraction": "Personal",
+      "description": "\\n\\t\\t\\t\\t\\t\\t- Sees who's winning and losing, who's up and down\\n\\t\\t\\t\\t\\t\\t- Related to the material plane - seeing who wins and loses literally\\n\\t\\t\\t\\t\\t\\t- The measuring ones - best restaurant, top rankings, classifications\\n\\t\\t\\t\\t\\t\\t- Transfers to/from personal (6th color)\\n\\t\\t\\t\\t\\t\\t"
+    },
+    {
+      "variable": "Perspective",
+      "colorNumber": 4,
+      "colorName": "Wanting",
+      "activeVariant": null,
+      "passiveVariant": null,
+      "transference": null,
+      "distraction": "Survival",
+      "description": "\\n\\t\\t\\t\\t\\t\\t- Sees what's missing and what's needed\\n\\t\\t\\t\\t\\t\\t- Deeply social perspective with capacity for connection\\n\\t\\t\\t\\t\\t\\t- Can become trapped trying to fix or address the needs seen\\n\\t\\t\\t\\t\\t\\t- Transfers to/from survival (1st color)\\n\\t\\t\\t\\t\\t\\t"
+    },
+    {
+      "variable": "Perspective",
+      "colorNumber": 5,
+      "colorName": "Probability",
+      "activeVariant": null,
+      "passiveVariant": null,
+      "transference": null,
+      "distraction": "Possibility",
+      "description": "\\n\\t\\t\\t\\t\\t\\t- Unsure people who see probabilities\\n\\t\\t\\t\\t\\t\\t- Can bet everything on probability when not-self\\n\\t\\t\\t\\t\\t\\t- Distraction to possibility provides necessary balance\\n\\t\\t\\t\\t\\t\\t- Transfers to/from possibility (2nd color)\\n\\t\\t\\t\\t\\t\\t"
+    },
+    {
+      "variable": "Perspective",
+      "colorNumber": 6,
+      "colorName": "Personal",
+      "activeVariant": null,
+      "passiveVariant": null,
+      "transference": null,
+      "distraction": "Power",
+      "description": "\\n\\t\\t\\t\\t\\t\\t- Sees everything through own context and process\\n\\t\\t\\t\\t\\t\\t- Very narcissistic - frames everything through own dimension\\n\\t\\t\\t\\t\\t\\t- Can be deeply isolating with inherent naivety if stuck in own perspective\\n\\t\\t\\t\\t\\t\\t- Needs distraction to power (3rd) to see what's going on in world\\n\\t\\t\\t\\t\\t\\t- Transfers to/from power (3rd color)\\n\\t\\t\\t\\t\\t\\t"
+    },
+    {
+      "variable": "Motivation",
+      "colorNumber": 1,
+      "colorName": "Fear",
+      "activeVariant": null,
+      "passiveVariant": null,
+      "transference": "Need",
+      "distraction": null,
+      "description": "\\n\\t\\t\\t\\t\\t\\t- Motivated by the unknown - foundation of conceptual intelligence\\n\\t\\t\\t\\t\\t\\t- Natural learners who dig deep to understand\\n\\t\\t\\t\\t\\t\\t- Not about being afraid, but about understanding what you can't yet comprehend\\n\\t\\t\\t\\t\\t\\t"
+    },
+    {
+      "variable": "Motivation",
+      "colorNumber": 2,
+      "colorName": "Hope",
+      "activeVariant": null,
+      "passiveVariant": null,
+      "transference": "Guilt",
+      "distraction": null,
+      "description": "\\n\\t\\t\\t\\t\\t\\t- Knows when not to act, when not to push\\n\\t\\t\\t\\t\\t\\t- In transference becomes \\\"dumb hope\\\" - false expectations without cognitive backing\\n\\t\\t\\t\\t\\t\\t"
+    },
+    {
+      "variable": "Motivation",
+      "colorNumber": 3,
+      "colorName": "Desire",
+      "activeVariant": null,
+      "passiveVariant": null,
+      "transference": "Innocence",
+      "distraction": null,
+      "description": "\\n\\t\\t\\t\\t\\t\\t- Overwhelming motivation that powerfully drives organization and leadership\\n\\t\\t\\t\\t\\t\\t- The speaker's own motivation\\n\\t\\t\\t\\t\\t\\t- In transference becomes avoidance and \\\"innocence\\\" as an escape\\n\\t\\t\\t\\t\\t\\t"
+    },
+    {
+      "variable": "Motivation",
+      "colorNumber": 4,
+      "colorName": "Need",
+      "activeVariant": null,
+      "passiveVariant": null,
+      "transference": "Fear",
+      "distraction": null,
+      "description": "\\n\\t\\t\\t\\t\\t\\t- Thinks about what needs to be thought about - not extraneous matters\\n\\t\\t\\t\\t\\t\\t- Critical given that 70% of humanity has undefined head centers and think about things that don't matter\\n\\t\\t\\t\\t\\t\\t"
+    },
+    {
+      "variable": "Motivation",
+      "colorNumber": 5,
+      "colorName": "Guilt",
+      "activeVariant": null,
+      "passiveVariant": null,
+      "transference": "Hope",
+      "distraction": null,
+      "description": "\\n\\t\\t\\t\\t\\t\\t- Fixers - motivated to repair and correct things\\n\\t\\t\\t\\t\\t\\t- Uses guilt as a tool for universalizing change\\n\\t\\t\\t\\t\\t\\t- In transference becomes those who hope things get fixed without knowing how\\n\\t\\t\\t\\t\\t\\t"
+    },
+    {
+      "variable": "Motivation",
+      "colorNumber": 6,
+      "colorName": "Innocence",
+      "activeVariant": null,
+      "passiveVariant": null,
+      "transference": "Desire",
+      "distraction": null,
+      "description": "\\n\\t\\t\\t\\t\\t\\t- Not actually a motivation - designed to be without agenda\\n\\t\\t\\t\\t\\t\\t- All transitional profiles (1-4, 2-5, 3-6, 4-1, 5-2, 6-3) have sixth color motivation\\n\\t\\t\\t\\t\\t\\t- Serves as innocent bridges in humanity's communication chain\\n\\t\\t\\t\\t\\t\\t- In transference becomes controlling and agenda-driven\\n\\t\\t\\t\\t\\t\\t"
+    }
+  ],
+  "byVariable": {
+    "Determination": [
+      {
+        "variable": "Determination",
+        "colorNumber": 1,
+        "colorName": "Cave Diet",
+        "activeVariant": "Consecutive",
+        "passiveVariant": "Alternating",
+        "transference": null,
+        "distraction": null,
+        "description": "\\n\\t\\t\\t\\t\\t\\t- The most primitive digestive system - approximately 1.2 billion people have this\\n\\t\\t\\t\\t\\t\\t- Eat one thing at a time: \\\"You want salt? Take a pinch of salt and put it on your tongue. One thing at a time.\\\"\\n\\t\\t\\t\\t\\t\\t- People with this diet have the most powerful reaction when they start eating correctly\\n\\t\\t\\t\\t\\t\\t- This is a very extreme diet that people will initially resist: \\\"you're gonna hate it\\\"\\n\\t\\t\\t\\t\\t\\t- Those who persist for 3-5 years often experience dramatic physical changes and eventually \\\"found their thing\\\"\\n\\t\\t\\t\\t\\t\\t"
+      },
+      {
+        "variable": "Determination",
+        "colorNumber": 2,
+        "colorName": "Taste",
+        "activeVariant": "Open",
+        "passiveVariant": "Closed",
+        "transference": null,
+        "distraction": null,
+        "description": "\\n\\t\\t\\t\\t\\t\\t- The gatherer diet - extremely rigid, eating the same thing day after day\\n\\t\\t\\t\\t\\t\\t- Should eat as much local produce as possible from the area you're living in\\n\\t\\t\\t\\t\\t\\t- Babies with this color show discernment immediately - open babies will try new foods, closed babies won't even let the spoon in\\n\\t\\t\\t\\t\\t\\t- These people need to find exactly what's perfect for them and stay with it, with only seasonal changes allowed\\n\\t\\t\\t\\t\\t\\t- The speaker's sister has this and \\\"insisted on eating the same things\\\" even before knowing about her design\\n\\t\\t\\t\\t\\t\\t"
+      },
+      {
+        "variable": "Determination",
+        "colorNumber": 3,
+        "colorName": "Thirst",
+        "activeVariant": "Hot",
+        "passiveVariant": "Cold",
+        "transference": null,
+        "distraction": null,
+        "description": "\\n\\t\\t\\t\\t\\t\\t- Deals with temperature - hot or cold\\n\\t\\t\\t\\t\\t\\t- Cold side: can only consume liquids and foods below body temperature because they have an overheated system that burns off what they need\\n\\t\\t\\t\\t\\t\\t- Hot side: need everything above body temperature because they have weak digestive systems running cold that need heat for chemical reaction\\n\\t\\t\\t\\t\\t\\t- The speaker's youngest son is cold and was born premature, never experiencing the instant conditioning from mother's breast\\n\\t\\t\\t\\t\\t\\t"
+      },
+      {
+        "variable": "Determination",
+        "colorNumber": 4,
+        "colorName": "Taste",
+        "activeVariant": "Calm",
+        "passiveVariant": "Nervous",
+        "transference": null,
+        "distraction": null,
+        "description": "\\n\\t\\t\\t\\t\\t\\t- About the environment when eating, not about controlling your own digestive process\\n\\t\\t\\t\\t\\t\\t- Calm (left side): need to be in a calm environment when eating - the speaker is this type and takes most meals alone\\n\\t\\t\\t\\t\\t\\t- Nervous (right side): need energy and disturbance while eating - shouldn't sit through a meal, can \\\"eat while they're walking and, you know, can eat and dance\\\"\\n\\t\\t\\t\\t\\t\\t- The speaker's son Loki is nervous - when they eat together, if it's calm it's bad for him, if it's disturbing it's bad for the speaker\\n\\t\\t\\t\\t\\t\\t"
+      },
+      {
+        "variable": "Determination",
+        "colorNumber": 5,
+        "colorName": "Sound",
+        "activeVariant": "High",
+        "passiveVariant": "Low",
+        "transference": null,
+        "distraction": null,
+        "description": "\\n\\t\\t\\t\\t\\t\\t- About acoustic environments\\n\\t\\t\\t\\t\\t\\t- High (left): need sound around when eating - should use iPod, turn up volume, perfect for busy restaurants\\n\\t\\t\\t\\t\\t\\t- Low (right): need silence - should use sound reduction headphones or soundproof rooms\\n\\t\\t\\t\\t\\t\\t- Connected to modern technologies for portable noise or noise elimination\\n\\t\\t\\t\\t\\t\\t"
+      },
+      {
+        "variable": "Determination",
+        "colorNumber": 6,
+        "colorName": "Light",
+        "activeVariant": "Direct",
+        "passiveVariant": "Indirect",
+        "transference": null,
+        "distraction": null,
+        "description": "\\n\\t\\t\\t\\t\\t\\t- The most sophisticated and sensitive digestive system\\n\\t\\t\\t\\t\\t\\t- Direct (left): can only eat when the sun is up\\n\\t\\t\\t\\t\\t\\t- Indirect (right): \\\"nocturnals\\\" who can only eat when the sun is down\\n\\t\\t\\t\\t\\t\\t- Nearly 800 million people work while others sleep - cities that never close support this\\n\\t\\t\\t\\t\\t\\t- The speaker advises indirect people to \\\"change their lives. Sleep in the daytime. Get night shift work\\\"\\n\\t\\t\\t\\t\\t\\t- One student from Greece is preparing to \\\"teach human design to nocturnals nocturnally\\\"\\n\\t\\t\\t\\t\\t\\t- Liquids are not restricted by time - can be taken throughout the day in any diet\\n\\t\\t\\t\\t\\t\\t- Can be challenging in northern countries with limited winter daylight\\n\\t\\t\\t\\t\\t\\t"
+      }
+    ],
+    "Environment": [
+      {
+        "variable": "Environment",
+        "colorNumber": 1,
+        "colorName": "Caves",
+        "activeVariant": null,
+        "passiveVariant": null,
+        "transference": null,
+        "distraction": null,
+        "description": "\\n\\t\\t\\t\\t\\t\\t\\t- Security-focused environments with controlled entry/exit\\n\\t\\t\\t\\t\\t\\t\\t- Need one entrance for security (multiple doors can disturb sleep in children)\\n\\t\\t\\t\\t\\t\\t\\t- Indoor people who control who enters their space\\n\\t\\t\\t\\t\\t\\t\\t- Examples: offices, enclosed spaces, automobiles\\n\\t\\t\\t\\t\\t\\t-"
+      },
+      {
+        "variable": "Environment",
+        "colorNumber": 2,
+        "colorName": "Markets",
+        "activeVariant": null,
+        "passiveVariant": null,
+        "transference": null,
+        "distraction": null,
+        "description": "\\n\\t\\t\\t\\t\\t\\t\\t- Fundamentally urban, need to be where the action is\\n\\t\\t\\t\\t\\t\\t\\t- Internal markets: business at home\\n\\t\\t\\t\\t\\t\\t\\t- External markets: out in the urban marketplace\\n\\t\\t\\t\\t\\t\\t\\t- Environment is foundation for material success\\n\\t\\t\\t\\t\\t\\t-"
+      },
+      {
+        "variable": "Environment",
+        "colorNumber": 3,
+        "colorName": "Kitchens",
+        "activeVariant": null,
+        "passiveVariant": null,
+        "transference": null,
+        "distraction": null,
+        "description": "\\n\\t\\t\\t\\t\\t\\t\\t- Divided into wet (high humidity) and dry (low humidity)\\n\\t\\t\\t\\t\\t\\t\\t- Places of transformation and creation\\n\\t\\t\\t\\t\\t\\t\\t- Most sophisticated and creative urban environments\\n\\t\\t\\t\\t\\t\\t\\t- Where things are designed and built\\n\\t\\t\\t\\t\\t\\t"
+      },
+      {
+        "variable": "Environment",
+        "colorNumber": 4,
+        "colorName": "Mountains",
+        "activeVariant": null,
+        "passiveVariant": null,
+        "transference": null,
+        "distraction": null,
+        "description": "\\n\\t\\t\\t\\t\\t\\t\\t- Need thin oxygen, thrive at high altitude\\n\\t\\t\\t\\t\\t\\t\\t- Designed to be above things, looking down\\n\\t\\t\\t\\t\\t\\t\\t- Active vs. passive mountain orientations\\n\\t\\t\\t\\t\\t\\t\\t- Not meant to get involved in nitty-gritty details\\n\\t\\t\\t\\t\\t\\t\\t- Others must climb the mountain to reach them\\n\\t\\t\\t\\t\\t\\t-"
+      },
+      {
+        "variable": "Environment",
+        "colorNumber": 5,
+        "colorName": "Valleys",
+        "activeVariant": null,
+        "passiveVariant": null,
+        "transference": null,
+        "distraction": null,
+        "description": "\\n\\t\\t\\t\\t\\t\\t\\t- Original highways where everything moved along\\n\\t\\t\\t\\t\\t\\t\\t- Internationalists designed to integrate with the world\\n\\t\\t\\t\\t\\t\\t\\t- Need to be where there's flow and movement\\n\\t\\t\\t\\t\\t\\t\\t- Need lots of oxygen, belong at ground level\\n\\t\\t\\t\\t\\t\\t\\t- Narrow valleys (urban) vs. wide valleys (bucolic)\\n\\t\\t\\t\\t\\t\\t\\t- Cannot thrive in true isolation\\n\\t\\t\\t\\t\\t\\t-"
+      },
+      {
+        "variable": "Environment",
+        "colorNumber": 6,
+        "colorName": "Shores",
+        "activeVariant": null,
+        "passiveVariant": null,
+        "transference": null,
+        "distraction": null,
+        "description": "\\n\\t\\t\\t\\t\\t\\t\\t- Connection to water is deeply important\\n\\t\\t\\t\\t\\t\\t\\t- Natural shores (water boundaries) or artificial shores (park boundaries, city divisions)\\n\\t\\t\\t\\t\\t\\t\\t- About having a horizon to look beyond\\n\\t\\t\\t\\t\\t\\t"
+      }
+    ],
+    "Perspective": [
+      {
+        "variable": "Perspective",
+        "colorNumber": 1,
+        "colorName": "Survival",
+        "activeVariant": null,
+        "passiveVariant": null,
+        "transference": null,
+        "distraction": "Wanting",
+        "description": "\\n\\t\\t\\t\\t\\t\\t- Sees what can survive and what's necessary for survival\\n\\t\\t\\t\\t\\t\\t- Can lead to deep materialism and seeing what people are afraid of\\n\\t\\t\\t\\t\\t\\t- Sees the most primitive, foundational level of the world\\n\\t\\t\\t\\t\\t\\t- Transfers to/from wanting (4th color)\\n\\t\\t\\t\\t\\t\\t"
+      },
+      {
+        "variable": "Perspective",
+        "colorNumber": 2,
+        "colorName": "Possibility",
+        "activeVariant": null,
+        "passiveVariant": null,
+        "transference": null,
+        "distraction": "Probability",
+        "description": "\\n\\t\\t\\t\\t\\t\\t- Sees possibilities in everything and everyone\\n\\t\\t\\t\\t\\t\\t- Sweet quality that can be wonderful as outer authority\\n\\t\\t\\t\\t\\t\\t- Yearns to see possibility realized due to distraction to probability\\n\\t\\t\\t\\t\\t\\t- Inherent hope and belief in this perspective\\n\\t\\t\\t\\t\\t\\t- Transfers to/from probability (5th color)\\n\\t\\t\\t\\t\\t\\t"
+      },
+      {
+        "variable": "Perspective",
+        "colorNumber": 3,
+        "colorName": "Power",
+        "activeVariant": null,
+        "passiveVariant": null,
+        "transference": null,
+        "distraction": "Personal",
+        "description": "\\n\\t\\t\\t\\t\\t\\t- Sees who's winning and losing, who's up and down\\n\\t\\t\\t\\t\\t\\t- Related to the material plane - seeing who wins and loses literally\\n\\t\\t\\t\\t\\t\\t- The measuring ones - best restaurant, top rankings, classifications\\n\\t\\t\\t\\t\\t\\t- Transfers to/from personal (6th color)\\n\\t\\t\\t\\t\\t\\t"
+      },
+      {
+        "variable": "Perspective",
+        "colorNumber": 4,
+        "colorName": "Wanting",
+        "activeVariant": null,
+        "passiveVariant": null,
+        "transference": null,
+        "distraction": "Survival",
+        "description": "\\n\\t\\t\\t\\t\\t\\t- Sees what's missing and what's needed\\n\\t\\t\\t\\t\\t\\t- Deeply social perspective with capacity for connection\\n\\t\\t\\t\\t\\t\\t- Can become trapped trying to fix or address the needs seen\\n\\t\\t\\t\\t\\t\\t- Transfers to/from survival (1st color)\\n\\t\\t\\t\\t\\t\\t"
+      },
+      {
+        "variable": "Perspective",
+        "colorNumber": 5,
+        "colorName": "Probability",
+        "activeVariant": null,
+        "passiveVariant": null,
+        "transference": null,
+        "distraction": "Possibility",
+        "description": "\\n\\t\\t\\t\\t\\t\\t- Unsure people who see probabilities\\n\\t\\t\\t\\t\\t\\t- Can bet everything on probability when not-self\\n\\t\\t\\t\\t\\t\\t- Distraction to possibility provides necessary balance\\n\\t\\t\\t\\t\\t\\t- Transfers to/from possibility (2nd color)\\n\\t\\t\\t\\t\\t\\t"
+      },
+      {
+        "variable": "Perspective",
+        "colorNumber": 6,
+        "colorName": "Personal",
+        "activeVariant": null,
+        "passiveVariant": null,
+        "transference": null,
+        "distraction": "Power",
+        "description": "\\n\\t\\t\\t\\t\\t\\t- Sees everything through own context and process\\n\\t\\t\\t\\t\\t\\t- Very narcissistic - frames everything through own dimension\\n\\t\\t\\t\\t\\t\\t- Can be deeply isolating with inherent naivety if stuck in own perspective\\n\\t\\t\\t\\t\\t\\t- Needs distraction to power (3rd) to see what's going on in world\\n\\t\\t\\t\\t\\t\\t- Transfers to/from power (3rd color)\\n\\t\\t\\t\\t\\t\\t"
+      }
+    ],
+    "Motivation": [
+      {
+        "variable": "Motivation",
+        "colorNumber": 1,
+        "colorName": "Fear",
+        "activeVariant": null,
+        "passiveVariant": null,
+        "transference": "Need",
+        "distraction": null,
+        "description": "\\n\\t\\t\\t\\t\\t\\t- Motivated by the unknown - foundation of conceptual intelligence\\n\\t\\t\\t\\t\\t\\t- Natural learners who dig deep to understand\\n\\t\\t\\t\\t\\t\\t- Not about being afraid, but about understanding what you can't yet comprehend\\n\\t\\t\\t\\t\\t\\t"
+      },
+      {
+        "variable": "Motivation",
+        "colorNumber": 2,
+        "colorName": "Hope",
+        "activeVariant": null,
+        "passiveVariant": null,
+        "transference": "Guilt",
+        "distraction": null,
+        "description": "\\n\\t\\t\\t\\t\\t\\t- Knows when not to act, when not to push\\n\\t\\t\\t\\t\\t\\t- In transference becomes \\\"dumb hope\\\" - false expectations without cognitive backing\\n\\t\\t\\t\\t\\t\\t"
+      },
+      {
+        "variable": "Motivation",
+        "colorNumber": 3,
+        "colorName": "Desire",
+        "activeVariant": null,
+        "passiveVariant": null,
+        "transference": "Innocence",
+        "distraction": null,
+        "description": "\\n\\t\\t\\t\\t\\t\\t- Overwhelming motivation that powerfully drives organization and leadership\\n\\t\\t\\t\\t\\t\\t- The speaker's own motivation\\n\\t\\t\\t\\t\\t\\t- In transference becomes avoidance and \\\"innocence\\\" as an escape\\n\\t\\t\\t\\t\\t\\t"
+      },
+      {
+        "variable": "Motivation",
+        "colorNumber": 4,
+        "colorName": "Need",
+        "activeVariant": null,
+        "passiveVariant": null,
+        "transference": "Fear",
+        "distraction": null,
+        "description": "\\n\\t\\t\\t\\t\\t\\t- Thinks about what needs to be thought about - not extraneous matters\\n\\t\\t\\t\\t\\t\\t- Critical given that 70% of humanity has undefined head centers and think about things that don't matter\\n\\t\\t\\t\\t\\t\\t"
+      },
+      {
+        "variable": "Motivation",
+        "colorNumber": 5,
+        "colorName": "Guilt",
+        "activeVariant": null,
+        "passiveVariant": null,
+        "transference": "Hope",
+        "distraction": null,
+        "description": "\\n\\t\\t\\t\\t\\t\\t- Fixers - motivated to repair and correct things\\n\\t\\t\\t\\t\\t\\t- Uses guilt as a tool for universalizing change\\n\\t\\t\\t\\t\\t\\t- In transference becomes those who hope things get fixed without knowing how\\n\\t\\t\\t\\t\\t\\t"
+      },
+      {
+        "variable": "Motivation",
+        "colorNumber": 6,
+        "colorName": "Innocence",
+        "activeVariant": null,
+        "passiveVariant": null,
+        "transference": "Desire",
+        "distraction": null,
+        "description": "\\n\\t\\t\\t\\t\\t\\t- Not actually a motivation - designed to be without agenda\\n\\t\\t\\t\\t\\t\\t- All transitional profiles (1-4, 2-5, 3-6, 4-1, 5-2, 6-3) have sixth color motivation\\n\\t\\t\\t\\t\\t\\t- Serves as innocent bridges in humanity's communication chain\\n\\t\\t\\t\\t\\t\\t- In transference becomes controlling and agenda-driven\\n\\t\\t\\t\\t\\t\\t"
+      }
+    ]
+  }
+}
