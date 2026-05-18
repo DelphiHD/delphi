@@ -274,6 +274,15 @@ async function fetchChunkMetadata(
   return { gates, channels, warnings };
 }
 
+// The standard 13 HD planets per side. Chiron and Lilith are returned by
+// mybodygraph but are not part of Ra's traditional HD activation table; Maia
+// Mechanics and Kaycee's reference files use only these 13.
+const STANDARD_PLANETS = new Set([
+  "Sun", "Earth", "North Node", "South Node", "Moon",
+  "Mercury", "Venus", "Mars", "Jupiter", "Saturn",
+  "Uranus", "Neptune", "Pluto",
+]);
+
 // Compute Personality + Design activation rows by joining chart activations
 // with structured gate metadata.
 function buildActivationRows(
@@ -326,8 +335,12 @@ function buildActivationRows(
   }
 
   return {
-    personality: chart.activations.personality.map((p) => buildRow(p, "personality")),
-    design: chart.activations.design.map((p) => buildRow(p, "design")),
+    personality: chart.activations.personality
+      .filter((p) => STANDARD_PLANETS.has(p.planet))
+      .map((p) => buildRow(p, "personality")),
+    design: chart.activations.design
+      .filter((p) => STANDARD_PLANETS.has(p.planet))
+      .map((p) => buildRow(p, "design")),
   };
 }
 
@@ -450,16 +463,11 @@ function analyzeSplit(
     }
   }
 
-  // Definition label normalized off chart.definition.value with island count.
-  const def = chart.definition.value;
-  let label = def;
-  if (islands.length === 1) label = "Single";
-  else if (islands.length === 2) label = def.includes("Wide") || def.includes("Broad") ? "Split (Wide / Broad)" : "Split (Simple)";
-  else if (islands.length === 3) label = "Triple Split";
-  else if (islands.length >= 4) label = "Quadruple Split";
-
+  // Definition label is whatever mybodygraph reports it as. We don't try to
+  // refine "Split Definition" into Simple vs Wide ourselves; that's a HD
+  // distinction Kaycee can make based on the bridging-gate list below.
   return {
-    definitionLabel: label,
+    definitionLabel: chart.definition.value,
     islandCount: islands.length,
     islands,
     bridgingGates: [...new Set(bridging)].sort((a, b) => a - b),
