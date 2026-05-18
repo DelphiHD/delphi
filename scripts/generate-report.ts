@@ -21,6 +21,7 @@ import { resolve } from "node:path";
 
 import { getChart, getTimezoneForLocation } from "@/lib/mybodygraph";
 import { retrieveForChart } from "@/lib/retrieval/chartChunks";
+import { buildDataPass } from "@/lib/chart/datapass";
 import { buildFoundationReport } from "@/lib/report/foundation";
 import { buildPlanetaryOverview } from "@/lib/report/planetary";
 
@@ -106,13 +107,23 @@ async function main() {
     if (retrieval.missing.length > 20) console.log(`    … and ${retrieval.missing.length - 20} more`);
   }
 
-  // 3. Load IDENTITY and VOICE.
+  // 3. Build the canonical Data Pass.
+  console.log(`\nBuilding Data Pass…`);
+  const dataPass = await buildDataPass({ supabase, client: { name: brief.name }, chart });
+  console.log(`  ${dataPass.personalityActivations.length} P + ${dataPass.designActivations.length} D activations`);
+  console.log(`  Definition: ${dataPass.split.definitionLabel} (${dataPass.split.islandCount} island${dataPass.split.islandCount === 1 ? "" : "s"})`);
+  if (dataPass.warnings.length) {
+    console.log(`  ⚠ ${dataPass.warnings.length} audit warning${dataPass.warnings.length === 1 ? "" : "s"}:`);
+    for (const w of dataPass.warnings) console.log(`    - ${w}`);
+  }
+
+  // 4. Load IDENTITY and VOICE.
   const root = resolve(__dirname, "..");
   const identityMd = readFileSync(resolve(root, "docs/IDENTITY.md"), "utf8");
   const voiceMd = readFileSync(resolve(root, "docs/VOICE.md"), "utf8");
 
-  // 4. Generate.
-  const length = (process.env.REPORT_LENGTH as "short" | "standard" | "long") ?? "standard";
+  // 5. Generate.
+  const length = (process.env.REPORT_LENGTH as "standard" | "long") ?? "standard";
   console.log(`\nCalling Claude (Sonnet 4.6, kind=${kind}${kind === "foundation" ? `, length=${length}` : ""}) …`);
   const t0 = Date.now();
   const apiKey = must("ANTHROPIC_API_KEY");
@@ -122,6 +133,7 @@ async function main() {
       ? await buildFoundationReport({
           client: { name: brief.name },
           chart,
+          dataPass,
           retrieval,
           identityMd,
           voiceMd,
