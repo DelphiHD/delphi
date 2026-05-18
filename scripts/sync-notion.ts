@@ -267,8 +267,72 @@ interface Chunk {
   body: string;
   gate_number: number | null;
   line_number: number | null;
+  // Structured properties from the Notion page, captured at sync time so the
+  // Data Pass and report engine can read centers / channels / circuits as
+  // structured data instead of inferring from prose. Relation values are
+  // resolved to page titles in a second pass after all pages are synced.
+  metadata: Record<string, unknown>;
   embedding?: number[];
   tokens?: number;
+}
+
+// Extract structured properties from a Notion page into a flat key/value map.
+// Skips: title (already on the chunk), rich_text bodies (captured in `body`),
+// rollups (read-only and derived). Captures: select, multi_select, number,
+// checkbox, url, and relations (as arrays of notion page ids, to be resolved
+// in a second pass). The exact set of useful properties varies by database;
+// the schema-discovery work happens in pickProps below.
+function extractProperties(page: { properties?: Record<string, unknown> }): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const props = page.properties ?? {};
+  for (const [name, raw] of Object.entries(props)) {
+    const v = raw as { type?: string; [k: string]: unknown };
+    if (!v?.type) continue;
+    switch (v.type) {
+      case "title":
+        continue; // already on chunk.title
+      case "rich_text": {
+        const text = ((v as { rich_text?: Array<{ plain_text?: string }> }).rich_text ?? [])
+          .map((r) => r.plain_text ?? "")
+          .join("")
+          .trim();
+        if (text) out[name] = text;
+        break;
+      }
+      case "select": {
+        const sel = (v as { select?: { name?: string } }).select;
+        if (sel?.name) out[name] = sel.name;
+        break;
+      }
+      case "multi_select": {
+        const arr = (v as { multi_select?: Array<{ name?: string }> }).multi_select ?? [];
+        const names = arr.map((s) => s.name).filter(Boolean);
+        if (names.length) out[name] = names;
+        break;
+      }
+      case "number": {
+        const n = (v as { number?: number | null }).number;
+        if (n !== null && n !== undefined) out[name] = n;
+        break;
+      }
+      case "checkbox":
+        out[name] = Boolean((v as { checkbox?: boolean }).checkbox);
+        break;
+      case "url": {
+        const u = (v as { url?: string | null }).url;
+        if (u) out[name] = u;
+        break;
+      }
+      case "relation": {
+        const rels = (v as { relation?: Array<{ id?: string }> }).relation ?? [];
+        const ids = rels.map((r) => r.id).filter(Boolean);
+        if (ids.length) out[name] = ids; // resolved to titles in a second pass
+        break;
+      }
+      // rollup/formula/people/files/etc. — skip; not useful for the report engine.
+    }
+  }
+  return out;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -312,6 +376,7 @@ async function syncStandardDatabase(
         body,
         gate_number: gate,
         line_number: null,
+        metadata: extractProperties(page as { properties?: Record<string, unknown> }),
       });
     }
     cursor = resp.next_cursor || undefined;
@@ -382,6 +447,7 @@ async function syncLineCompanion(databaseId: string): Promise<Chunk[]> {
           body: `# ${toggleTitle}\n\n${toggleBody}`,
           gate_number: gateNumber,
           line_number: lineNumber,
+          metadata: {},
         });
       }
     }
@@ -529,6 +595,7 @@ async function persistChunks(chunks: Chunk[]): Promise<void> {
         gate_number: c.gate_number,
         line_number: c.line_number,
         embedding: c.embedding,
+        metadata: c.metadata ?? {},
       }));
       const { error: insErr } = await supabase.from("chunks").insert(slice);
       if (insErr) {
@@ -603,6 +670,39 @@ async function main() {
     console.log("Nothing to embed. Exiting.");
     return;
   }
+
+  // Second pass: resolve relation arrays (Notion page IDs) to {id, title}
+  // objects. We can do this in-memory because every chunk's notion_page_id is
+  // present in allChunks. Relations across databases — e.g. Gate.Center
+  // pointing to a Center chunk — get resolved here.
+  console.log("\nResolving relation IDs to titles…");
+  const titleByPageId = new Map<string, { title: string; kind: string }>();
+  for (const c of allChunks) {
+    if (c.notion_page_id && c.notion_block_id == null) {
+      // Page-level chunks only; toggle-level Line Companion chunks share a
+      // page_id with each other and shouldn't shadow each other in the lookup.
+      if (!titleByPageId.has(c.notion_page_id)) {
+        titleByPageId.set(c.notion_page_id, { title: c.title, kind: c.source_kind });
+      }
+    }
+  }
+  let resolved = 0;
+  let unresolved = 0;
+  for (const c of allChunks) {
+    for (const [k, v] of Object.entries(c.metadata)) {
+      if (Array.isArray(v) && v.length > 0 && typeof v[0] === "string" && /^[0-9a-f-]{32,}$/.test(v[0] as string)) {
+        // Looks like an array of Notion page IDs (a relation).
+        const lookups = (v as string[]).map((id) => {
+          const hit = titleByPageId.get(id);
+          if (hit) { resolved++; return { id, title: hit.title, kind: hit.kind }; }
+          unresolved++;
+          return { id, title: null, kind: null };
+        });
+        c.metadata[k] = lookups;
+      }
+    }
+  }
+  console.log(`  resolved ${resolved} relation links; ${unresolved} unresolved (likely point outside synced databases)`);
 
   console.log("\nEmbedding with OpenAI text-embedding-3-small…");
   await embedChunks(allChunks);
