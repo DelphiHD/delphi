@@ -115,6 +115,7 @@ The user message contains a "Data Pass for <client name>" block. Treat it as the
 - **Do not reference sections that have not yet been introduced.** The sections build on each other in order. If a forward reference is structurally important, mention it briefly in the LATER section that's already been introduced (e.g. you can mention Profile mechanics in the Timeline section because Profile came first). The one exception: when discussing Type and Authority mechanics, you may reference the relevant Centers (Solar Plexus for Emotional Authority, etc.) even though Centers comes later.
 - **No spiritual jargon, no astrology cross-overs, no Gene Keys cross-references.** Stay inside Ra's lineage.
 - **The reader's specific chart drives everything.** Every section threads the chart's concrete details into the mechanical explanation. Generic Type-level or Profile-level descriptions that could apply to any chart of that Type/Profile do not belong here.
+- **Never write a table of contents.** Do not list the section headings as a preview, summary, or outline before the actual sections begin. The first call's front matter is the title, name, birth data, and a horizontal divider — then the first real H1 ("# How to Use This Report") begins immediately. No bulleted or unbulleted list of upcoming sections anywhere in the report.
 
 # Tone
 
@@ -477,15 +478,23 @@ export async function buildFoundationReport(args: BuildArgs): Promise<BuildResul
     let retried = false;
 
     // Per-section validation: run the validator against assembled text so
-    // far + this section. If a HARD failure could be tied to this section,
-    // retry once with an explicit nudge naming the failures. The cache is
-    // still warm so the retry is cheap.
+    // far + this section. Only retry if the failure was plausibly caused
+    // by THIS call (i.e. an issue whose section H1 is in this call's
+    // ownedSections, or an "(any)"-scope drift / banned-phrase issue).
+    // 'section-missing' issues for H1s this call doesn't own are skipped —
+    // they'll be checked by the final validation after every call has run.
     const provisional = previousMarkdown.concat([text]).join("\n\n");
     const v = validateReport(provisional, args.dataPass);
-    const sectionLabel = sectionH1ForCall(section.name);
-    const blamesThisSection = v.issues.filter((i) =>
-      i.severity === "hard" && (i.section === sectionLabel || sectionLabel === "(any)" || i.section === "(any)"),
-    );
+    const ownedSections = callOwnsSections(section.name);
+    const blamesThisSection = v.issues.filter((i) => {
+      if (i.severity !== "hard") return false;
+      // section-missing fires for any required H1 not in the assembled text.
+      // Only care if it's an H1 this call should have written.
+      if (i.rule === "section-missing") return ownedSections.some((h) => i.message.includes(`"# ${h}"`));
+      // For all other rules, retry if the issue's section is one we own, or
+      // is cross-cutting ("(any)").
+      return ownedSections.includes(i.section) || i.section === "(any)";
+    });
     if (blamesThisSection.length > 0) {
       const failsForRetry = blamesThisSection.slice(0, 6).map((i) => `  - ${i.rule}: ${i.message}${i.expected ? ` (Expected: ${i.expected})` : ""}`).join("\n");
       const nudge = `\n\nIMPORTANT: a validator just rejected a draft of this section with the following hard failures. Rewrite the section from scratch correcting EVERY failure. The Data Pass above is canonical. Do not introduce new failures of the same kind.\n${failsForRetry}\n`;
@@ -534,13 +543,24 @@ export async function buildFoundationReport(args: BuildArgs): Promise<BuildResul
   };
 }
 
-// Map a section's internal name (used in SectionPlan) to the H1 label the
-// validator emits when a failure is scoped to a particular section. Most
-// failures are cross-section ("(any)") so this mainly matters for centers
-// and channels.
-function sectionH1ForCall(name: string): string {
-  if (name === "defined-centers" || name === "undefined-open-centers") return "Your Centers";
-  if (name === "channels+gifts-themes-challenges") return "Your Channels";
-  if (name === "variables+cross+timeline+definition") return "Your Timeline";
-  return "(any)";
+// The list of H1 sections each call is responsible for writing. The
+// per-section retry filter uses this to know whether a validator failure
+// could plausibly have been caused by the just-finished call. Without this
+// filter, EVERY call retries because the assembled text is missing Centers,
+// Channels, etc. for sections that haven't been generated yet — a false
+// positive that doubles cost.
+function callOwnsSections(name: string): string[] {
+  switch (name) {
+    case "front+profile+type+strategy+authority":
+      return ["How to Use This Report", "Your Profile", "Your Type", "Your Strategy", "Your Authority"];
+    case "variables+cross+timeline+definition":
+      return ["Your Variables", "Your Incarnation Cross", "Your Timeline", "Your Definition"];
+    case "defined-centers":
+    case "undefined-open-centers":
+      return ["Your Centers"];
+    case "channels+gifts-themes-challenges":
+      return ["Your Channels", "Gifts, Themes, and Challenges"];
+    default:
+      return [];
+  }
 }

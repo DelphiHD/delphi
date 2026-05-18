@@ -53,21 +53,35 @@ function lowerCenterKey(headerName: string): string {
 }
 
 // Section slicer: returns the body of the named H1 section, or null.
+// Finds ALL occurrences of the H1 header, then returns the slice that has
+// the most body content. This is robust against accidental tables of contents
+// the model sometimes inserts at the top of the report (where every H1
+// appears as a one-liner with no body between consecutive headers).
 function getH1Section(text: string, h1Name: string): string | null {
-  // Match # H1 Name (case-insensitive, allowing extra trailing text like a
-  // cognitive code suffix on Variables).
   const escape = h1Name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const startRe = new RegExp(`^# ${escape}[^\\n]*$`, "im");
-  const startMatch = text.match(startRe);
-  if (!startMatch || startMatch.index === undefined) return null;
-  const startIdx = startMatch.index;
-  // Find the next H1 boundary.
-  const afterStart = text.slice(startIdx + startMatch[0].length);
-  const nextH1 = afterStart.match(/\n# [^\n]+/);
-  const endIdx = nextH1 && nextH1.index !== undefined
-    ? startIdx + startMatch[0].length + nextH1.index
-    : text.length;
-  return text.slice(startIdx, endIdx);
+  const startRe = new RegExp(`^# ${escape}[^\\n]*$`, "img");
+  const matches: { startIdx: number; headerEnd: number }[] = [];
+  for (const m of text.matchAll(startRe)) {
+    if (m.index === undefined) continue;
+    matches.push({ startIdx: m.index, headerEnd: m.index + m[0].length });
+  }
+  if (matches.length === 0) return null;
+
+  // For each match, compute the slice until the next H1 (any name).
+  let bestSlice: string | null = null;
+  let bestBodyLength = -1;
+  for (const m of matches) {
+    const afterStart = text.slice(m.headerEnd);
+    const nextH1 = afterStart.match(/\n# [^\n]+/);
+    const endIdx = nextH1 && nextH1.index !== undefined ? m.headerEnd + nextH1.index : text.length;
+    const slice = text.slice(m.startIdx, endIdx);
+    const bodyLength = slice.length - (m.headerEnd - m.startIdx); // body chars after the header line
+    if (bodyLength > bestBodyLength) {
+      bestBodyLength = bodyLength;
+      bestSlice = slice;
+    }
+  }
+  return bestSlice;
 }
 
 // Find an H2 within an H1 section by its label prefix.
@@ -169,8 +183,11 @@ export function validateReport(text: string, dp: DataPass): ValidationResult {
       const beforeWindow = text.slice(Math.max(0, idx - 60), idx).toLowerCase();
       const afterWindow  = text.slice(idx, Math.min(text.length, idx + m[0].length + 60)).toLowerCase();
 
-      // Skip contrastive contexts.
-      if (/\b(unlike|compared to|vs\.?|rather than|in contrast to|not a|not the|whereas a|whereas the)\b/.test(beforeWindow)) continue;
+      // Skip contrastive contexts. Includes comparative phrasings like
+      // "Split charts are more X than Y Definition charts" where any number
+      // of words can sit between 'more/less' and 'than'.
+      if (/\b(unlike|compared to|vs\.?|rather than|in contrast to|not a|not the|whereas a|whereas the|differs from|distinct from)\b/.test(beforeWindow)) continue;
+      if (/\b(more|less)\b[^.]{1,80}\bthan\b/.test(beforeWindow)) continue;
       // Skip generic teaching context that explicitly says "in a {Term} design" without claiming this is one — these tend to be educational asides. Heuristic: "in a Quadruple Split design" is teaching; "your Quadruple Split" or "the Quadruple Split finds" is drift.
       // We DO want to catch: "this Quadruple Split", "your Quadruple Split", "the Quadruple Split finds", "for the Quadruple Split", etc.
 
