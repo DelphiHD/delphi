@@ -19,6 +19,7 @@ import { invokeLLM, type InvokeResult, type ModelId } from "@/lib/llm/core";
 import type { Chart } from "@/lib/chart/types";
 import type { ChunkRow, RetrievalResult } from "@/lib/retrieval/chartChunks";
 import { renderDataPassMarkdown, type DataPass } from "@/lib/chart/datapass";
+import { validateReport, type ValidationResult } from "@/lib/report/validate";
 
 export type ReportLength = "standard" | "long";
 
@@ -264,17 +265,42 @@ interface SectionPlan {
   userInstruction: string;
 }
 
-function planForLength(length: ReportLength, clientName: string): SectionPlan[] {
+function planForLength(length: ReportLength, clientName: string, dataPass: DataPass): SectionPlan[] {
   const wordTargetSuffix = (lo: number, hi: number) =>
     `Target length for this call: ${lo.toLocaleString()}–${hi.toLocaleString()} words.`;
 
-  // We always split the Foundation Report into four calls so each call can
-  // breathe (Sonnet 4.6 caps output at ~8k tokens / ~5k words). The four
-  // partition the H1 sections cleanly without forward references:
+  // Pre-compute the per-chart constants we need to inject into the
+  // section-specific instructions so the model can't drift.
+  const definitionLabel = dataPass.split.definitionLabel;
+  const islandCount = dataPass.split.islandCount;
+  const islandBlurb = dataPass.split.islands.map((i, idx) =>
+    `Island ${idx + 1}: ${i.centers.join(", ")} connected by ${i.channels.length ? i.channels.join(", ") : "(no channels)"}`,
+  ).join("; ");
+  const bridgingBlurb = dataPass.split.bridgingGates.length
+    ? `Bridging gates activated in this chart: ${dataPass.split.bridgingGates.join(", ")}.`
+    : "No bridging gates activated.";
+  const definedCenters = dataPass.centers.filter((c) => c.status === "defined").map((c) => c.name);
+  const undefinedCenters = dataPass.centers.filter((c) => c.status === "undefined").map((c) => c.name);
+  const openCenters = dataPass.centers.filter((c) => c.status === "open").map((c) => c.name);
+  const channelsBlurb = dataPass.channels.map((c) =>
+    `(${c.id}) ${c.name}: ${c.centers[0]} ↔ ${c.centers[1]}, ${c.channelType ?? "?"}, ${c.circuit ?? "?"}, ${c.consciousness}`,
+  ).join("\n  - ");
+  const cyc = dataPass.cycles;
+  const returnsBlurb = [
+    `Saturn Return: ${cyc.saturnReturn.firstPass} | ${cyc.saturnReturn.status}`,
+    `Uranus Opposition: ${cyc.uranusOpposition.firstPass} | ${cyc.uranusOpposition.status}`,
+    `Chiron Return: ${cyc.chironReturn.firstPass} | ${cyc.chironReturn.status}`,
+    `Second Saturn Return: ${cyc.secondSaturnReturn.firstPass} | ${cyc.secondSaturnReturn.status}`,
+  ].join("\n  - ");
+
+  // We split the Foundation Report into FIVE calls so each can breathe
+  // (Sonnet 4.6 caps output at ~8k tokens / ~5k words). The five partition the
+  // H1 sections cleanly without forward references:
   //   call 1: front + How to Use + Profile + Type + Strategy + Authority
   //   call 2: Variables + Incarnation Cross + Timeline + Definition
-  //   call 3: Centers
-  //   call 4: Channels + Gifts, Themes, Challenges
+  //   call 3: Centers — DEFINED only
+  //   call 4: Centers — UNDEFINED + OPEN
+  //   call 5: Channels + Gifts, Themes, Challenges
   return [
     {
       name: "front+profile+type+strategy+authority",
@@ -311,42 +337,70 @@ Stop after the Authority section. Do NOT write Variables or anything later.`,
   # Your Incarnation Cross
     (Cross intro, geometry, gate list, profile-specific info; save deep planetary treatment for the Planetary Deep Dive report.)
   # Your Timeline
-    (Single framing paragraph, then the four returns in order. H2 per return with the standardized header format and EXACT dates from the Data Pass.)
+    (Single framing paragraph, then the four returns in order. H2 per return with the standardized header format and EXACT dates copied verbatim from this fact block:
+       - ${returnsBlurb}
+     Do NOT round, soften, or hedge these dates. They are exact.)
   # Your Definition
-    (Definition mechanic. For splits, name the islands and bridging gates from the Data Pass.)
+    (THIS CHART'S DEFINITION IS: "${definitionLabel}" with ${islandCount} island${islandCount === 1 ? "" : "s"}.
+     Islands: ${islandBlurb}.
+     ${bridgingBlurb}
+     Use these structural facts as canonical. Describe what "${definitionLabel}" means mechanically for this design. Do NOT invent a different Definition type or refer to the reader as having any other split classification.)
 
 Do NOT write earlier sections, Centers, Channels, or Gifts/Themes/Challenges. Start with the Variables H1.
 
 ${wordTargetSuffix(3500, 4500)}`,
     },
     {
-      name: "centers",
-      maxTokens: 8000,
-      userInstruction: `Continue the Foundation Report for ${clientName}. Render the next H1 section ONLY:
+      name: "defined-centers",
+      maxTokens: 7000,
+      userInstruction: `Continue the Foundation Report for ${clientName}. Open the Centers section and render the DEFINED centers only:
 
   # Your Centers
-    ## <Center Name> | <Center Theme> | <Defined|Undefined|Open>
+    (1-2 short paragraphs of orientation: what Centers are, defined vs undefined vs open, and a summary that THIS chart has ${definedCenters.length} defined center${definedCenters.length === 1 ? "" : "s"}, ${undefinedCenters.length} undefined, and ${openCenters.length} open. List them by name so the reader sees the layout.)
+  ## Defined Centers
+    (One H3 per defined center in the order they connect by channels. The defined centers in this chart are: ${definedCenters.join(", ")}. For each:
+     - H3 header format: \`### <Center Name> | <Center Theme> | Defined\`
+     - 1-2 prose paragraphs on the defined-center mechanic (not-self theme, conditioning influence on others, health/vitality)
+     - Bulleted list of activated gates in this center, format per the system prompt
+     - Optional short synthesis of how the gates work together in this design)
 
-For each Defined Center (listed in the order they connect by channels in this chart): mechanic prose paragraph(s), then a bulleted list of the center's activated gates using the bullet format from the system prompt (\`Gate N: Name | Hanging\` or \`Gate N: Name | forms (X-Y) The Channel of <Name>\`), then optional synthesis.
+Do NOT include Undefined or Open centers in this call (they get their own call). Do NOT write Channels or Gifts/Themes/Challenges. ${wordTargetSuffix(2800, 4000)}`,
+    },
+    {
+      name: "undefined-open-centers",
+      maxTokens: 6000,
+      userInstruction: `Continue the Foundation Report for ${clientName}. Render the Undefined and Open centers (continuation of the Centers H1 from the previous call; do NOT repeat the # Your Centers H1).
 
-For each Undefined Center: mechanic prose, bulleted hanging gates, optional synthesis.
+  ## Undefined Centers
+    (One H3 per undefined center. The undefined centers in this chart are: ${undefinedCenters.length ? undefinedCenters.join(", ") : "(none)"}. For each:
+     - H3 header format: \`### <Center Name> | <Center Theme> | Undefined\`
+     - 1-2 prose paragraphs on the undefined-center mechanic (not-self theme, conditioning factors, wisdom developed over time)
+     - Bulleted list of hanging gates in this center, format per the system prompt
+     - Optional short synthesis)
+  ## Open Centers
+    (One H3 per open center. The open centers in this chart are: ${openCenters.length ? openCenters.join(", ") : "(none)"}. For each:
+     - H3 header format: \`### <Center Name> | <Center Theme> | Open\`
+     - 1-2 prose paragraphs on the open-center mechanic and the specific wisdom + conditioning challenges this completely-open center carries. NO bulleted list because there are no placements.)
 
-For each Open Center: mechanic prose only (no bulleted list because no placements).
+If undefinedCenters is empty, write a single short paragraph noting that this chart has no Undefined centers and explain briefly what that means structurally (every center is either fully defined or fully open). Same convention if openCenters is empty.
 
-Use the Data Pass for every Center status, every gate-to-center assignment, and every channel-to-center assignment. The Data Pass is canonical. ${wordTargetSuffix(4500, 6000)}
-
-Do NOT write earlier sections, Channels, or Gifts/Themes/Challenges. Start with the H1 "Your Centers".`,
+Do NOT repeat the # Your Centers H1. Do NOT write the defined centers again. Do NOT write Channels or Gifts/Themes/Challenges. ${wordTargetSuffix(2500, 4000)}`,
     },
     {
       name: "channels+gifts-themes-challenges",
       maxTokens: 6000,
-      userInstruction: `Finish the Foundation Report for ${clientName}. Render the FINAL two H1 sections:
+      userInstruction: `Finish the Foundation Report for ${clientName}. Render the FINAL two H1 sections.
+
+THIS CHART'S CHANNELS (canonical, copy facts verbatim — never invent center pair, type, or circuit):
+  - ${channelsBlurb || "(no defined channels in this chart)"}
+
+THIS CHART'S DEFINITION IS: "${definitionLabel}" with ${islandCount} island${islandCount === 1 ? "" : "s"}. Do NOT refer to the reader as having any other split classification in the Gifts section or elsewhere.
 
   # Your Channels
     ## (<Gate-Gate>) <Channel Name>
-    (200-350 words per channel. Name the two centers, the Channel Type, the Circuit, the consciousness side(s). Weave the chart's specific planetary activations on each gate. Read center pair / Type / Circuit / consciousness DIRECTLY from the Data Pass.)
+    (200-350 words per channel. Name the two centers, the Channel Type, the Circuit, the consciousness side(s) — read DIRECTLY from the canonical fact list above. Weave the chart's specific planetary activations on each gate.)
   # Gifts, Themes, and Challenges
-    (Replaces the older Patterns + Application + Closing. 4-6 substantial paragraphs of woven prose synthesizing recurring threads, gifts, challenges, the way Variables shape the rest, the way Type and Authority interact, conditioning vulnerabilities at open/undefined centers. End with a brief closing thought that returns the reader to themselves. NO lineage attribution. NO mention of Kaycee.)
+    (Replaces the older Patterns + Application + Closing. 4-6 substantial paragraphs of woven prose synthesizing recurring threads, gifts, challenges, the way Variables shape the rest, the way Type and Authority interact, conditioning vulnerabilities at open/undefined centers. When you reference the chart's Definition, use "${definitionLabel}" exactly — never "Triple Split" or "Quadruple Split" or anything else unless that IS the chart's actual label above. End with a brief closing thought that returns the reader to themselves. NO lineage attribution. NO mention of any analyst by name.)
 
 Do NOT write earlier sections. Start with the H1 "Your Channels".
 
@@ -357,12 +411,13 @@ ${wordTargetSuffix(2800, 3800)}`,
 
 export interface BuildResult {
   text: string;
-  sections: { name: string; text: string; cost_cents: number; usage: InvokeResult["usage"]; }[];
+  sections: { name: string; text: string; cost_cents: number; usage: InvokeResult["usage"]; retried: boolean; }[];
   cost_cents: number;
   usage: InvokeResult["usage"];
   retrievedChunkIds: string[];
   totalRetrievalTokens: number;
   model: ModelId;
+  validation: ValidationResult;
 }
 
 export async function buildFoundationReport(args: BuildArgs): Promise<BuildResult> {
@@ -371,7 +426,7 @@ export async function buildFoundationReport(args: BuildArgs): Promise<BuildResul
 
   const libraryBlock = formatChunksForPrompt(args.retrieval.chunks);
   const dataPassBlock = renderDataPassMarkdown(args.dataPass);
-  const sections = planForLength(length, args.client.name);
+  const sections = planForLength(length, args.client.name, args.dataPass);
 
   const accumulated: BuildResult["sections"] = [];
   let totalCents = 0;
@@ -384,13 +439,13 @@ export async function buildFoundationReport(args: BuildArgs): Promise<BuildResul
 
   const previousMarkdown: string[] = [];
 
-  for (const section of sections) {
+  async function generateSection(section: SectionPlan, extraNudge: string = ""): Promise<{ text: string; result: InvokeResult }> {
     const continuationNote = previousMarkdown.length
       ? `\n\nNOTE: this is a continuation. The earlier sections have been generated; output ONLY the sections requested below, with no preamble or recap.`
       : "";
 
     const userContent =
-      `${dataPassBlock}\n\n---\n\n${section.userInstruction}${continuationNote}`;
+      `${dataPassBlock}\n\n---\n\n${section.userInstruction}${continuationNote}${extraNudge}`;
 
     const result = await invokeLLM(
       {
@@ -410,25 +465,62 @@ export async function buildFoundationReport(args: BuildArgs): Promise<BuildResul
       },
     );
 
-    // Post-process: strip any em dashes (safety net for the prompt).
     const text = result.text.replace(/—/g, ", ");
+    return { text, result };
+  }
+
+  for (const section of sections) {
+    const first = await generateSection(section);
+    let text = first.text;
+    let combinedCost = first.result.cost_cents;
+    let combinedUsage: InvokeResult["usage"] = { ...first.result.usage };
+    let retried = false;
+
+    // Per-section validation: run the validator against assembled text so
+    // far + this section. If a HARD failure could be tied to this section,
+    // retry once with an explicit nudge naming the failures. The cache is
+    // still warm so the retry is cheap.
+    const provisional = previousMarkdown.concat([text]).join("\n\n");
+    const v = validateReport(provisional, args.dataPass);
+    const sectionLabel = sectionH1ForCall(section.name);
+    const blamesThisSection = v.issues.filter((i) =>
+      i.severity === "hard" && (i.section === sectionLabel || sectionLabel === "(any)" || i.section === "(any)"),
+    );
+    if (blamesThisSection.length > 0) {
+      const failsForRetry = blamesThisSection.slice(0, 6).map((i) => `  - ${i.rule}: ${i.message}${i.expected ? ` (Expected: ${i.expected})` : ""}`).join("\n");
+      const nudge = `\n\nIMPORTANT: a validator just rejected a draft of this section with the following hard failures. Rewrite the section from scratch correcting EVERY failure. The Data Pass above is canonical. Do not introduce new failures of the same kind.\n${failsForRetry}\n`;
+      const retry = await generateSection(section, nudge);
+      text = retry.text;
+      combinedCost = Math.round((combinedCost + retry.result.cost_cents) * 10000) / 10000;
+      combinedUsage = {
+        input_tokens: combinedUsage.input_tokens + retry.result.usage.input_tokens,
+        output_tokens: combinedUsage.output_tokens + retry.result.usage.output_tokens,
+        cache_creation_input_tokens: combinedUsage.cache_creation_input_tokens + retry.result.usage.cache_creation_input_tokens,
+        cache_read_input_tokens: combinedUsage.cache_read_input_tokens + retry.result.usage.cache_read_input_tokens,
+      };
+      retried = true;
+    }
 
     accumulated.push({
       name: section.name,
       text,
-      cost_cents: result.cost_cents,
-      usage: result.usage,
+      cost_cents: combinedCost,
+      usage: combinedUsage,
+      retried,
     });
-    totalCents += result.cost_cents;
-    totalUsage.input_tokens += result.usage.input_tokens;
-    totalUsage.output_tokens += result.usage.output_tokens;
-    totalUsage.cache_creation_input_tokens += result.usage.cache_creation_input_tokens;
-    totalUsage.cache_read_input_tokens += result.usage.cache_read_input_tokens;
+    totalCents += combinedCost;
+    totalUsage.input_tokens += combinedUsage.input_tokens;
+    totalUsage.output_tokens += combinedUsage.output_tokens;
+    totalUsage.cache_creation_input_tokens += combinedUsage.cache_creation_input_tokens;
+    totalUsage.cache_read_input_tokens += combinedUsage.cache_read_input_tokens;
 
     previousMarkdown.push(text);
   }
 
   const fullText = previousMarkdown.join("\n\n");
+
+  // Final validation on the assembled report.
+  const validation = validateReport(fullText, args.dataPass);
 
   return {
     text: fullText,
@@ -438,5 +530,17 @@ export async function buildFoundationReport(args: BuildArgs): Promise<BuildResul
     retrievedChunkIds: args.retrieval.chunks.map((c) => c.id),
     totalRetrievalTokens: args.retrieval.totalTokensEstimate,
     model,
+    validation,
   };
+}
+
+// Map a section's internal name (used in SectionPlan) to the H1 label the
+// validator emits when a failure is scoped to a particular section. Most
+// failures are cross-section ("(any)") so this mainly matters for centers
+// and channels.
+function sectionH1ForCall(name: string): string {
+  if (name === "defined-centers" || name === "undefined-open-centers") return "Your Centers";
+  if (name === "channels+gifts-themes-challenges") return "Your Channels";
+  if (name === "variables+cross+timeline+definition") return "Your Timeline";
+  return "(any)";
 }

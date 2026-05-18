@@ -55,6 +55,20 @@ const CLIENTS: Record<string, ClientBrief> = {
     birthTime: "01:02",
     birthPlace: "Lodi, California, United States",
   },
+  tennyson: {
+    slug: "tennyson",
+    name: "Tennyson",
+    birthDate: "1993-01-06",
+    birthTime: "07:51",
+    birthPlace: "Orem, Utah, United States",
+  },
+  kaycee: {
+    slug: "kaycee",
+    name: "Kaycee Vandenberg",
+    birthDate: "1983-06-17",
+    birthTime: "06:29",
+    birthPlace: "Ogden, Utah, United States",
+  },
 };
 
 function must(name: string): string {
@@ -155,9 +169,24 @@ async function main() {
   const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
   console.log(`  done in ${elapsed}s`);
   for (const sec of result.sections) {
-    console.log(`    [${sec.name}]  in=${sec.usage.input_tokens}  out=${sec.usage.output_tokens}  cache_write=${sec.usage.cache_creation_input_tokens}  cache_read=${sec.usage.cache_read_input_tokens}  cost=$${(sec.cost_cents / 100).toFixed(4)}`);
+    const retryFlag = "retried" in sec && (sec as { retried?: boolean }).retried ? " (retried)" : "";
+    console.log(`    [${sec.name}]${retryFlag}  in=${sec.usage.input_tokens}  out=${sec.usage.output_tokens}  cache_write=${sec.usage.cache_creation_input_tokens}  cache_read=${sec.usage.cache_read_input_tokens}  cost=$${(sec.cost_cents / 100).toFixed(4)}`);
   }
   console.log(`  total cost = $${(result.cost_cents / 100).toFixed(4)}`);
+
+  // Surface validation if present (Foundation generator emits it).
+  if (kind === "foundation" && "validation" in result) {
+    const v = (result as { validation: { passed: boolean; hardCount: number; softCount: number; factsChecked: number; factsMatched: number; summary: string; issues: { severity: string; section: string; rule: string; message: string; expected?: string; detected: string }[] } }).validation;
+    console.log(`\nValidation: ${v.summary}`);
+    if (v.issues.length) {
+      for (const i of v.issues) {
+        const sev = i.severity === "hard" ? "✗" : "⚠";
+        console.log(`  ${sev} [${i.section}] ${i.rule}: ${i.message}`);
+        if (i.expected) console.log(`      Expected: ${i.expected}`);
+        console.log(`      Detected: ${i.detected.replace(/\n/g, " ").slice(0, 160)}`);
+      }
+    }
+  }
 
   // 5. Write.
   mkdirSync(".cache/reports", { recursive: true });
