@@ -2,178 +2,81 @@
 
 Append-only log of why-we-chose-X. New entries go at the top. Each entry: date, decision, why, alternatives considered, and any open questions.
 
----
+## 2026-05-27 — Delphi mandala chart is a programmatic SVG renderer
 
-## 2026-05-17 — Phase 4: mybodygraph as the canonical chart source
+**Decision.** The Delphi mandala chart, embedded in the Planetary Overview report, is a programmatic SVG renderer driven by chart data. Two outputs ship in Phase 1:
 
-**Decision.** Chart calculation goes through the **mybodygraph API** (`api.bodygraphchart.com`), wrapped at `lib/mybodygraph.ts`. This replaces (a) the master plan's HumanDesignHub assumption from `.env.example`'s `HD_HUB_API_KEY` placeholder, and (b) the earlier sketch of accepting pasted text from a public HD website as the chart input.
+1. `renderFullMandala(chart)` — full Planetary Mandala, used as the **cover page** of the Planetary Overview. Includes all 26 planetary activations (13 Personality + 13 Design), the Delphi-styled bodygraph at center (sourced from the `mybodygraph` `design=delphi` SVG), and four soft quarter color bands behind the wheel.
+2. `renderCrossMandala(chart)` — Incarnation Cross Mandala, used at the **start of the Incarnation Cross section**. Highlights only the four cross gates on the ring; quarter *labels* (no color bands) for Mutation, Initiation, Civilization, Duality.
 
-**Why.** Two reasons.
+Both functions return SVG strings. The same data contract feeds the current `.docx` deliverable today and a future interactive client-portal embed later. Module location: `lib/render/mandala.ts` (data contract at `lib/render/mandala.types.ts`, gate→longitude lookup at `lib/hd/gate-longitude.ts`).
 
-1. **Quality.** Raw chart text from public HD websites has unreliable cross detection and routinely omits exaltation / detriment flags. Kaycee's methodology hinges on those fixing states — a report that doesn't know a planet is in Detriment misses the whole reading. mybodygraph is Jovian-Archive-aligned, returns fixing states on every planet, and ships clean Personality / Design splits.
-2. **It already exists.** Kaycee subscribes to mybodygraph for her manual workflow. The master plan's `HD_HUB_API_KEY` slot was a placeholder for the not-yet-evaluated HumanDesignHub — switching to mybodygraph avoids signing up for a second account, and the API is Ra-aligned by construction.
+**Why.** Two outputs, one engine, one data contract. Kaycee's stated horizon is "this is Phase 1 to get the reports usable; at some point I want it as an interactive element in the client portal." A hand-designed template approach (Figma/Illustrator with overlays) cannot drive an interactive portal element. Programmatic SVG can: the same `<g>` paths the docx pipeline flattens are the same paths a React component later mounts and binds hover/click handlers to. One renderer, two consumers, no design-tool round-trip when chart data changes.
 
-**Architecture.** The wrapper exposes two functions: `getTimezoneForLocation(query)` (free-text city → IANA timezone) and `getChart(args)` (birth data → internal `Chart` type defined at `lib/chart/types.ts`). The wrapper handles **variable-name translation** at the boundary so internal code (prompts, retrieval, reports) only ever sees Kaycee's vocabulary: API `Digestion` arrow + label → `determination`, `Environment` → `environment`, `Awareness` arrow + `Motivation` label → `motivation`, `Perspective` → `perspective`. The full mapping table is in `docs/CONTEXT.md`. The wrapper also derives `quarter` from the Personality Sun gate via a small lookup table embedded in `lib/mybodygraph.ts`.
+**Render rules.** Encoded in canonical brand memory (`brand_delphi.md`):
+- Unactivated gates: gray (template default). Activated gates: filled with color so they pop.
+- Spokes (384 line subdivisions): unactivated stay gray; activated take a slightly muted version of the *activating center's* color, with a fade near the center and outer ring so the brightest part is mid-spoke.
+- Activation glyphs in spokes: Personality black, Design `#e06666`.
+- Channels: undefined white outline, Personality black, Design `#e06666`, mixed = half-and-half stripes.
+- Bodygraph center: composited from the `mybodygraph` `design=delphi` SVG; colors already match the Delphi palette, no color-swap pass needed.
+- Quarter palette (full mandala only): Mutation `#e8d8ed`, Initiation `#fbf7b2` at ~40% opacity, Civilization `#e8e8e8`, Duality `#f5d4d4`.
 
-The wrapper is the only file that knows about API field names. Nothing past it should reference `Digestion` / `Awareness` / `bodygraphchart.com`.
+**Gate→longitude anchor.** 0° Aquarius = Gate 41.1. Each gate spans 5.625° of the ecliptic; each line spans 0.9375°. Lookup table is canonical for both the renderer and any future ephemeris work.
 
-**Alternatives considered.** (a) HumanDesignHub (master-plan default) — ruled out: not vetted, second subscription, no evidence it returns Detriment / Exalted flags. (b) Self-hosted Swiss Ephemeris + custom HD geometry — ruled out: weeks of work to reimplement what mybodygraph charges a small fee for, and any bug in the geometry corrupts every reading. (c) Pasted text from public HD websites — ruled out: see "quality" above; this was Kaycee's frustration that motivated the API switch.
+**Alternatives considered.**
+- (a) Hand-designed PNG/SVG template with per-chart overlay layer — ruled out because it cannot drive a future interactive portal element and forces a design-tool step into every chart update.
+- (b) Use a third-party HD mandala API (none of high quality exist; Maia Mechanics is the closest visually but is closed and image-only) — ruled out for the same portal reason and for cost/dependency.
+- (c) Embed the mandala in the Foundation Report alongside the bodygraph — ruled out: the bodygraph is the Foundation visual; the mandala is the Planetary Overview's visual. Separation is intentional.
 
-**How to apply.** Env var is `MYBODYGRAPH_API_KEY` (server-only). Set in `.env.local` for local dev, in Vercel env vars before any chart-touching route deploys, and in GH Actions repo secrets if any future workflow needs it. When `HD_HUB_API_KEY` shows up in master-plan text or older `.env.example` comments, treat it as stale — `MYBODYGRAPH_API_KEY` is canonical. The master plan's chart-provider adapter step (Phase 4 task 6) is satisfied by `lib/mybodygraph.ts`; no separate `lib/chart/index.ts` indirection layer is needed because mybodygraph is the only chart source.
+**How to apply.** Any new chart visual that needs the wheel reuses this renderer. Skill workflows (`hd-phase2-reports`, `hd-analysis`) call into `lib/render/mandala.ts` rather than generating their own visuals. The Phase 5 PDF / portal work inherits the same module without rewriting.
 
-**Cost note.** mybodygraph is a per-account subscription, not a per-call charge, so the cost-discipline rule (a paragraph estimating per-call cost before adding a new API) doesn't apply in the same way. Each customer report triggers one chart fetch; caching is per-customer (the chart only changes if birth data is corrected) and lives in the eventual `charts` table that Session B / Phase 4 report engine introduces. If we ever exceed mybodygraph's plan call cap, the fix is to upgrade the plan, not to re-architect.
+**Cost note.** No Claude API calls in this path; the renderer is deterministic compute. Zero per-report cost beyond the existing `mybodygraph` SVG fetch (already in the Foundation Report path).
 
-**Open.** Whether to cache chart responses in the database keyed on (birth_date, birth_time, timezone, lat, long) so re-generations don't re-hit the API. Probably yes once the customer flow lands; defer to Session B when the `charts` table is created.
-
----
-
-## 2026-05-16 — Incarnation Cross bulk import: defer to Phase 4 (Claude-driven)
-
-**Decision.** A `scripts/import-crosses.ts` was drafted to bulk-load the 192 named incarnation crosses from the IHDS Quarter PDFs (Ra Uru Hu, Jovian Archive 2008) into Kaycee's `HD Incarnation Crosses` Notion database. The regex-based parser is unreliable on profile-level splitting because the PDF's text extraction artifacts (smart-quote substitution, hyphenated line breaks, page-header repetition, occasional typos like "Right Angel" for "Right Angle") corrupt the section boundaries. The script is kept in place as scaffolding but **not run**; the actual import happens once Phase 4's Anthropic API key is in place, using Claude to do the structural extraction per cross section.
-
-**Why.** The profile-level splits matter for retrieval quality in Phase 4. A 4-profile LAC chunked as one big body lets the report engine retrieve "LAC of X" content but not "LAC of X for 5/2 profile" — losing surgical specificity. Kaycee's existing hand-curated entries (e.g., LAC of Cycles 1) have one toggle per supported profile, and the bulk import should match that structure rather than produce a non-matching one-toggle-per-cross fallback.
-
-The Claude-driven version is also small and cheap: feed each cross section (~2k tokens) to Sonnet, get back structured JSON with the cross name, gate quadrant, and one entry per profile-specific block. ~$0.02 per cross × ~200 crosses = ~$4 total for all 4 PDFs. Much better than fighting regex for an afternoon.
-
-**HD geometry constraint that informs the parser.** Right Angle Crosses support up to 7 profiles (1/3, 1/4, 2/4, 2/5, 3/5, 3/6, 4/6). Left Angle Crosses support up to 4 (5/1, 5/2, 6/2, 6/3). Juxtaposition Crosses are inherently single-profile (4/1 only). The Phase 4 import script will validate against these expected profile sets per cross type; any extraction outside them is rejected and flagged for review. See `docs/CONTEXT.md` "Incarnation Cross profile geometry" for the full rule.
-
-**Alternatives considered.** (a) Ship the one-toggle-per-cross fallback today — rejected because it creates structural inconsistency with Kaycee's existing entries and would need to be redone for fine-grained retrieval anyway. (b) Spend more time on the regex parser — rejected because PDF text artifacts make the bound on parser reliability lower than Claude's bound for this task.
-
-**How to apply.** When the Phase 4 Anthropic key is set up, add a Claude-extraction path to `scripts/import-crosses.ts`: replace the regex profile-splitter with a per-section call to Sonnet 4.6, prompt-cache the system instructions, parse the JSON response, validate profile sets against the geometry constraint, push to Notion. The existing PDF text extraction, name normalization, dedup, and Notion writing logic are reusable as-is.
-
-**Open.** Kaycee provides the remaining 3 Quarter PDFs (only Q1 is on disk as of 2026-05-16). Cleanup of the 192 placeholder rows currently in the database: keep, replace wholesale, or merge. Probably merge — preserve any hand-curation, overwrite empty bodies. Decide when running the Phase 4 import.
+**Open.** Mixed-activation channel rendering (gate active on both Personality and Design) defaults to half-and-half stripes; revisit if it reads poorly at docx-embed size. Quarter palette is provisional pending visual review of the first rendered output.
 
 ---
 
-## 2026-05-16 — Phase 3 V2: GitHub Actions cron instead of Vercel Cron + Edge Function
+## 2026-05-10 — Phase 1 scaffold landed (Next.js 16 + Tailwind 4 + Supabase SSR)
 
-**Decision.** The nightly Notion → Supabase sync runs as a GitHub Actions workflow (`.github/workflows/sync-notion.yml`), not as a Vercel Cron route or Supabase Edge Function as the master plan envisioned. Triggered nightly at 5:30 UTC plus manual `workflow_dispatch`.
+**Decision.** Phase 1 foundation scaffolded directly into the repo root: Next.js 16 App Router, React 19, TypeScript strict, Tailwind 4 (PostCSS plugin, no `tailwind.config.js`), `@supabase/ssr` for auth, shadcn/ui in `new-york` style with `neutral` base color and CSS variables, Radix primitives for `Button`/`Input`/`Label`/`Card`. Auth pages: `/login` (password + magic link), `/signup`, `/auth/callback`, `/portal/welcome` (gated). Root `middleware.ts` refreshes cookies on every request and redirects unauthenticated traffic away from `/portal/*`. First migration `supabase/migrations/20260510_init_profiles.sql` creates `public.profiles` with RLS on, own-row read/update, and a `handle_new_user()` trigger.
 
-**Why.** A full sync takes about 10 minutes wall-clock (Notion's 3-req/sec rate limit times the four-level traversal for HD The Line Companion). Vercel's Hobby plan caps serverless functions at 60 seconds; Pro is 300 seconds (still under our walltime); Enterprise gets to 800 seconds. Supabase Edge Functions have similar bounds (50 seconds on free, 400 seconds on paid). GitHub Actions has a 6-hour limit and no incremental cost for a job that runs once a night, in an org we already own. The simplest correct tool wins.
+**Why.** Master plan Phase 1 lines 245–351 plus `docs/PHASE_1_HANDOFF.md`. Couldn't run `create-next-app` against a non-empty repo (already had PostHog wizard output, docs, `.env.example`, hooks); merged the scaffold by hand instead of nesting under a sub-directory, since the handoff explicitly says repo-root is the project root. Scripts use Turbopack for `dev` since Next 16 ships it as the default. `next lint` is deprecated in Next 16, so `npm run lint` calls `eslint` directly via `eslint-config-next`.
 
-**Architecture.** The same `scripts/sync-notion.ts` Kaycee can run locally also runs in the GH Actions runner. Secrets (`NOTION_TOKEN`, `OPENAI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`) live as GitHub repo secrets, injected via the workflow's `env:` block. The Supabase Edge Function `ingest-markdown` from the master plan is not built. The Vercel cron route `/api/cron/notion-sync` from the master plan is not built. `/api/admin/library-health` is built as a Next.js route on Vercel because it's a quick HTTP read, not a long job.
+**Files added.** `tsconfig.json`, `next.config.ts`, `postcss.config.mjs`, `eslint.config.mjs`, `next-env.d.ts`, `components.json`, `app/{layout,page,globals.css}`, `app/login/*`, `app/signup/*`, `app/auth/callback/route.ts`, `app/portal/welcome/*`, `middleware.ts`, `lib/utils.ts`, `lib/supabase/{client,server,admin,middleware}.ts`, `lib/posthog/server.ts`, `lib/design/tokens.ts`, `components/ui/{button,input,label,card}.tsx`, `supabase/migrations/20260510_init_profiles.sql`, `vercel.json`, `AGENTS.md`, `docs/{CONTEXT,INTENT,IDENTITY,VOICE,ARCHITECTURE}.md`. Updated `package.json`, `.githooks/pre-push`, `.env.local.example`, `README.md`.
 
-**Alternatives considered.** (a) Vercel Pro plan ($20/month) to unlock the 300s timeout, then split sync into multiple per-database invocations chained through a queue — too much plumbing for a nightly job we already own a runner for. (b) Self-hosted cron (Tennyson's machine via LaunchAgent) — works but creates a single-point-of-failure tied to one laptop. (c) Vercel Cron triggering a long-running Vercel function on Enterprise — the cost is wrong for our scale. GitHub Actions for the cron + Vercel for the observability endpoint is the right split.
-
-**How to apply.** When new env vars are needed in the sync, add them to both `.env.local` (local dev) and `gh secret set NAME` (GH Actions). When the sync logic changes, edit `scripts/sync-notion.ts`; both the local manual run and the workflow run pick up the change. The cron schedule lives in `.github/workflows/sync-notion.yml`.
-
-**Open.** Whether to mirror the markdown to git as part of the sync (master plan's "Notion → markdown → git → ingest" pattern) — deferred. With the current pipeline, the chunks table in Supabase is the canonical content store. If we later want a git-versioned record of the content, the GH Actions job is the natural place to add the commit step.
+**Open.** `vercel link` and `supabase link --project-ref biufjcapnuzbdowoksnb` not yet run — operator action required (DB password from 1Password, Supabase anon + service-role keys pasted into `.env.local`). `vercel whoami` returns `hello-22519849`, which doesn't look like the DelphiHD account; verify before linking. No deploy attempted yet.
 
 ---
 
-## 2026-05-16 — Phase ordering: Phase 3 (content pipeline) before Phase 2 (Stripe)
+## 2026-05-10 — Security headers chosen per master plan Appendix B
 
-**Decision.** Kaycee asked to push Stripe back. Phase 3 (Notion to pgvector content pipeline) runs next; Phase 2 (Stripe Checkout, orders, entitlements) is deferred until after Phase 4 (the report engine). The "pricing model: Option A" decision still stands; the Stripe-shaped code just lands later.
+**Decision.** `vercel.json` ships exactly the header set listed in master plan Appendix B: HSTS (`max-age=63072000; includeSubDomains; preload`), `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: accelerometer=(), camera=(), geolocation=(), microphone=(), payment=(self)`. No CSP yet.
 
-**Why.** The Phase 3.5 quality gate (master plan lines 507 onward) is the single most important checkpoint in the entire build. The report has to be as good as Kaycee's manual reports. There is no value in shipping Stripe before we know whether the product is good enough to charge for. Reordering doesn't change the launch surface, just sequences the work so we hit the quality decision before the commercial decision.
+**Why.** Appendix B is the agreed default. CSP is intentionally deferred — getting it right requires knowing the final set of third-party origins (Stripe, ElevenLabs CDN, PostHog, Supabase Storage signed URLs). Adding a partial CSP now would either be too loose to matter or break Stripe Checkout / PostHog autocapture. Revisit at Phase 2 (Stripe lands the first cross-origin script) and again at Phase 5 (audio).
 
-**Risk and mitigation.** By Phase 4 we have a working report engine and no way to charge for it. Acceptable, because nothing customer-facing ships in Phase 4 — the engine produces reports for internal review against Kaycee's manual baseline, not for paying customers. Stripe lands before public launch.
-
-**How to apply.** Phase 3 prereqs marked "Phase 2 complete" in the master plan are overridden: the content pipeline depends on Notion + OpenAI + Supabase + GitHub, not on Stripe. The `chunks` table has no per-customer aspect (everything lives in the `archive` namespace per STACK_PORTED.md), so no entitlements gating is needed yet.
-
-**Open.** Whether `nearest_chunks` should grow an entitlements check before public launch (probably yes, as a defense-in-depth measure) or only at the `invoke-llm` call site.
+**Open.** Add CSP at the start of Phase 2. Confirm `X-Frame-Options: SAMEORIGIN` doesn't block any future Stripe/HumanDesignHub iframe (master plan Appendix B chose `SAMEORIGIN` over the original `DENY` from the handoff text).
 
 ---
 
-## 2026-05-16 — Phase 3 V1: single local script (Notion → embed → upsert)
+## 2026-05-10 — PostHog env var renamed: TOKEN → KEY
 
-**Decision.** Phase 3 ships in two iterations. **V1 (this commit)** is a single TypeScript script at `scripts/sync-notion.ts` run manually via `npx tsx`. It walks Notion, extracts 826 chunks across 16 source databases (including a four-level traversal for HD The Line Companion's `synced_block → callout → 7 toggles` structure), embeds with OpenAI `text-embedding-3-small`, and upserts into Supabase via delete-then-insert per `source_kind`. A checkpoint at `.cache/chunks.json` lets a failed embed/persist resume without re-walking Notion.
+**Decision.** The PostHog project API key is read as `NEXT_PUBLIC_POSTHOG_KEY` everywhere. Updated `instrumentation-client.ts`, the new `lib/posthog/server.ts`, and `.env.local.example`.
 
-**V2** (separate work, before public launch) adds: the GitHub commit step (markdown lands in git, versioned), a Supabase Edge Function `ingest-markdown` that takes over the embedding work so it runs server-side, a Vercel cron route `/api/cron/notion-sync` that triggers nightly, and `/api/admin/library-health` for spot-checks.
+**Why.** The PostHog setup wizard wrote `NEXT_PUBLIC_POSTHOG_TOKEN`, but the canonical multi-phase env contract in `.env.example` already used `NEXT_PUBLIC_POSTHOG_KEY`. Two names for the same value would have caused either a silent boot failure (one of the two reads `undefined`) or future copy-paste errors. PostHog's own docs use "project API key" terminology, so `_KEY` reads more naturally.
 
-**Why.** V1 lets us verify the pipeline end-to-end (the actual content lands, retrieval works) without committing to the full cron + edge function plumbing. The master plan's Phase 3 spec assumed both pieces from day one; experience says iterate on the data pipeline first, then automate. V2 is straightforward once V1 is verified — most of the work is moving code from a local script into an Edge Function.
-
-**Alternatives considered.** (a) Build V1 + V2 in a single PR — ruled out because debug cycles on a cron + edge function are slower than on a local script, and we hit several Notion API quirks during V1 that would have been harder to diagnose inside an Edge Function. (b) Build V2 first — ruled out for the same reason in reverse.
-
-**How to apply.** Run `npx tsx scripts/sync-notion.ts` to refresh the chunks table after Kaycee edits Notion. Until V2 lands, this is a manual step. The script is idempotent (delete-then-insert per kind), so safe to re-run.
-
-**Open.** V2 timing — probably right before Phase 4 lands so the Phase 4 invoke-llm has a freshly-synced library to query against.
+**How to apply.** Anything new that needs the key reads `process.env.NEXT_PUBLIC_POSTHOG_KEY`. The previous PostHog DECISIONS entry below is now slightly stale on the env-var name; this entry supersedes it.
 
 ---
 
-## 2026-05-16 — Phase 3 cost note: OpenAI embeddings
+## 2026-05-10 — `app/posthog.ts` moved to `lib/posthog/server.ts`
 
-**Decision.** Phase 3 uses OpenAI `text-embedding-3-small` (1536 dimensions). Total cost per full sync, with the current 826-chunk library, is roughly $0.02. The chunks table has the embedding column sized for 1536 dimensions; switching models means re-embedding everything.
+**Decision.** The PostHog server-side `PostHogClient()` factory now lives at `lib/posthog/server.ts`. The old `app/posthog.ts` was deleted.
 
-**Why.** `text-embedding-3-small` is OpenAI's cheapest current embedding model ($0.02 per 1M input tokens) and matches the master plan's choice. Its 1536-dim output is enough quality for HD content retrieval (verified empirically on the 4 test queries in `scripts/test-retrieval.ts`).
-
-**Per-sync cost math.** 826 chunks × roughly 1000 tokens each = ~800,000 tokens × $0.02/1M = **~$0.02 per full sync**. Nightly syncs over a year = ~$7. Negligible. The cost ceiling worry the master plan documents is for `invoke-llm` (Phase 4), not for this pipeline.
-
-**How to apply.** No per-call cost guard needed in V1 because the upper bound is trivial. If we ever sync a much larger library (e.g., absorb Ra's full lecture archive in Phase 4), add a token-count check before calling the embeddings API and cap with a HARD_COST_CEILING_CENTS-style abort.
-
-**Open.** Whether to switch to `text-embedding-3-large` (3072 dims, ~6x more expensive) if retrieval quality on full-report generation turns out to be the limiting factor in Phase 3.5. Default answer is no — the small model is good enough at this scale and the cost discipline rule applies.
+**Why.** Under Next.js App Router, `app/` is for routes (pages, layouts, route handlers, loading/error boundaries). A non-route module placed there is at best wasted convention and at worst can confuse the router. Server-side helpers belong under `lib/`. The root-level `instrumentation-client.ts` stays where it is — that one is a Next.js file convention.
 
 ---
 
-## 2026-05-10 — Pricing model: Option A (three fixed-length reports)
-
-**Decision.** HD Reports launches with Option A from master plan lines 144 to 157: three fixed report tiers. Single Reading $49 (3,500 words), Deep Reading $79 (5,500 words), Full Reading $129 (8,000 words). The depth-dial / subscription pattern of Option B is parked for a possible later layer on top.
-
-**Why.** The master plan recommends launching simple and adding the depth dial later as a layer on top. Option A is faster to ship, simpler to explain, and lets us measure cost-per-report against a stable target before introducing variable-length output. Predictable revenue per customer makes the first 60 days of post-launch numbers legible. The depth dial can be bolted onto Option A pricing without rebuilding the report engine — Phase 4 already produces fixed-length output, and Phase 5+ can add "go deeper" generation as additional invoke-llm calls against the same chunk cache.
-
-**Alternatives considered.** Option B (base $49 + $7 per "go deeper" section + $19/month subscription) — ruled out for v1 on complexity grounds, kept as a planned post-launch overlay.
-
-**How to apply.** Stripe price IDs in `.env.example` are scoped to Option A (`STRIPE_PRICE_SINGLE`, `STRIPE_PRICE_DEEP`, `STRIPE_PRICE_FULL`). Phase 2 builds three Stripe Checkout flows. Phase 4 prompts produce 3,500 / 5,500 / 8,000-word outputs against the same retrieval set. When Phase 5 considers adding the depth dial, revisit this entry.
-
-**Open.** Daily-letter upsell ($1/day, master plan Phase 6) sits orthogonal to the report-tier choice. Continue to plan for it regardless.
-
----
-
-## 2026-05-10 — Branching policy: short-lived branches with Vercel previews
-
-**Decision.** Override the master plan's "work on main, push directly" guidance from Phase 0. Use short-lived branches (`claude/<slug>`, `feature/<slug>`, etc.) for any change that touches `invoke-llm`, webhooks, Supabase migrations, or production env vars. Phase 1 scaffolding lands on the `claude/vigilant-curie-e71e20` branch and merges to `main` once verified. Solo work that is contained to copy, docs, or non-production code can still go directly to main.
-
-**Why.** The master plan's Phase 0 said "work on main, push directly." The pre-launch review flagged that as risky for prod-affecting changes. Branch + Vercel preview gives us a deployable build to verify against the real Supabase project before flipping production. Cost: one extra merge step per change. Benefit: every migration and every `invoke-llm` change gets a preview URL to verify before it touches production.
-
-**How to apply.** When scaffolding, migrating, or wiring webhooks: branch first, deploy preview, verify, then merge. CLAUDE.md and AGENTS.md reflect this in the "Git and deploy" section.
-
-**Open.** Whether to enforce via GitHub branch protection on `main` (require PR + 1 review) is not yet configured on the `DelphiHD` org. Decide before Phase 2.
-
----
-
-## 2026-05-10 — Security headers in `vercel.json`
-
-**Decision.** Phase 1 ships with `vercel.json` setting HSTS (2 years, includeSubDomains, preload), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, a locked-down `Permissions-Policy` (camera, geolocation, microphone, etc. all denied; `payment=(self)` for Stripe Elements later), and a CSP that allows self, Supabase (https + wss for realtime), PostHog (us.i.posthog.com + us-assets.i.posthog.com), Stripe (api.stripe.com + js.stripe.com + hooks.stripe.com), Vercel preview (vercel.live), and Google Fonts.
-
-**Why.** Master plan Appendix A was not yet fleshed out at the time of Phase 1 scaffolding. The header set above is the standard hardened Next.js baseline plus exact host allow-lists for the services this app uses. `frame-ancestors 'none'` prevents clickjacking; `object-src 'none'` blocks legacy plugin attacks; CSP `'unsafe-inline'` is retained on `script-src` because Next.js inlines hydration scripts and PostHog requires it on `style-src`. This is the standard tradeoff for Next.js apps.
-
-**Alternatives considered.** (a) Stricter CSP with nonces — viable but requires custom middleware to inject nonces into every Next.js inline script tag; deferred until the surface area stabilizes. (b) Set headers in `next.config.ts` instead of `vercel.json` — equivalent in effect, but `vercel.json` is the surface Vercel reads first and keeps platform-level config in one place.
-
-**How to apply.** Add new host allow-list entries to `connect-src` / `script-src` / `frame-src` whenever a new external service is wired up. Verify after every deploy with `curl -I <deploy-url>`.
-
-**Open.** Nonce-based CSP. Revisit when the app surface stabilizes.
-
----
-
-## 2026-05-10 — PostHog wiring revised to fit Phase 1 scaffold
-
-**Decision.** The earlier PostHog entry (further down this log) put the server-side client at `app/posthog.ts` and named the public env var `NEXT_PUBLIC_POSTHOG_TOKEN`. Phase 1 scaffolding revises both: the server-side client moves to `lib/analytics/posthog.ts`, and the env var is renamed to `NEXT_PUBLIC_POSTHOG_KEY`. `.env.local.example` is replaced by a comprehensive `.env.example` that covers every phase. The real PostHog project key is preserved as a commented reference inside `.env.example`.
-
-**Why.** `app/<file>.ts` collides with Next.js App Router conventions; `app/` is for routes and route-adjacent files (`layout.tsx`, `page.tsx`, `route.ts`), not arbitrary utility modules. `lib/analytics/posthog.ts` is the correct home for a server util. The env var rename matches the standard PostHog naming used in their official Next.js docs and in the rest of our `.env.example`. `.env.example` (singular) is the Vercel-recognized convention; the earlier `.env.local.example` was non-standard.
-
-**Alternatives considered.** Keeping `app/posthog.ts` and adding a manifest of "files in app/ that are not routes" — ruled out as fragile. Keeping `NEXT_PUBLIC_POSTHOG_TOKEN` — ruled out for inconsistency with our other env vars.
-
-**How to apply.** When seeding real env values: `cp .env.example .env.local` and fill in `NEXT_PUBLIC_POSTHOG_KEY` from the value preserved as a comment.
-
-**Open.** PostHog reverse-proxy via Next.js rewrites (to reduce ad-blocker interference) is still TODO. Deferred to Phase 7.
-
----
-
-## 2026-05-10 — Next.js 16 / React 19 / Tailwind v4 baseline
-
-**Decision.** Phase 1 scaffolds Next.js 16.2.6 (App Router, TypeScript), React 19.2.4, Tailwind v4 with `@tailwindcss/postcss`, ESLint 9 via `eslint-config-next`. No `src/` directory. Path alias `@/*` pointing at the repo root. Turbopack as the dev bundler. No shadcn/ui yet — the auth forms are hand-rolled with Tailwind utility classes only.
-
-**Why.** Latest stable Next.js at scaffold time. App Router is mandatory per the master plan. Tailwind v4 ships with `@theme inline` CSS-variable token system which slots cleanly into `lib/design/tokens.ts`. Skipping shadcn/ui at this stage avoids committing to a component lineage before `IDENTITY.md` is filled in; the auth pages are simple enough that vanilla Tailwind is less rework than installing shadcn now and re-styling later.
-
-**Alternatives considered.** Next 15 (older); `src/`-nested layout (rejected per handoff); shadcn/ui at scaffold time (deferred until brand identity is locked).
-
-**How to apply.** When Phase 1 design pass runs (after IDENTITY.md is filled in), initialize shadcn/ui then. The `lib/design/tokens.ts` placeholder values map cleanly to shadcn's `--background` / `--foreground` / etc. CSS variables.
-
-**Open.** Whether to add the `@tailwindcss/typography` plugin for long-form report rendering in the customer portal (Phase 5+).
-
----
-
-## 2026-05-10 — PostHog analytics wired up (SUPERSEDED by "PostHog wiring revised")
+## 2026-05-10 — PostHog analytics wired up
 
 **Decision.** Use PostHog (US Cloud, project 417782) for client-side and server-side analytics. SDK: `posthog-js` (client) and `posthog-node` (server). Initialized via `instrumentation-client.ts` at the Next.js app root using the new `instrumentation-client` file convention (Next.js 15+).
 
@@ -181,7 +84,7 @@ The Claude-driven version is also small and cheap: feed each cross section (~2k 
 
 **Files added.** `instrumentation-client.ts` (client init), `app/posthog.ts` (server-side PostHogClient function), `.env.local.example` (env var template with real token and host).
 
-**Superseded by** the "PostHog wiring revised" entry above. Server-side client moved to `lib/analytics/posthog.ts`; env var renamed to `NEXT_PUBLIC_POSTHOG_KEY`; `.env.local.example` folded into `.env.example`.
+**Open.** Add `posthog-js` and `posthog-node` to `package.json` when Phase 1 Next.js scaffold runs. Consider adding a reverse proxy via Next.js rewrites to reduce ad-blocker interference.
 
 ---
 
@@ -197,7 +100,7 @@ The Claude-driven version is also small and cheap: feed each cross section (~2k 
 
 ---
 
-## 2026-05-10 — Pricing model decision is deferred (SUPERSEDED by "Pricing model: Option A")
+## 2026-05-10 — Pricing model decision is deferred
 
 **Decision.** No pricing tier (Option A vs Option B from master plan lines 144–177) is being chosen at this time. Phase 1 ships without any pricing-shaped code: no `prices` table, no Stripe products, no tier-gating in the UI. The `/portal/welcome` page is a flat landing for any signed-in user.
 
@@ -205,7 +108,7 @@ The Claude-driven version is also small and cheap: feed each cross section (~2k 
 
 **How to apply.** Phase 1 + Phase 2's payment scaffolding may need a placeholder. If the new session reaches a point where it would write a `prices` or `tiers` table, it should pause and surface the decision instead of guessing. Master plan Phase 2 ("Payments") cannot start until this gap is filled — that's the natural forcing function.
 
-**Superseded by** the "Pricing model: Option A" entry above (Tennyson chose Option A explicitly later in the Phase 1 session). The point this entry made about Phase 1 not needing pricing code is still true — Phase 1 ships without any pricing-shaped code regardless of which tier was picked. The reversal is just that Option A is now on the record so Phase 2 can begin without re-opening the question.
+**Open.** When ready to revisit, A vs B is the question. Master plan's default recommendation is A unless we want engagement data.
 
 ---
 

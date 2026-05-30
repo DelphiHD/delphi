@@ -30,6 +30,7 @@ These docs are the project's ground truth. Read whichever exist:
 - `docs/DECISIONS.md` — append-only log of why-we-chose-X.
 - `docs/STACK_PORTED.md` — inventory of Tennyson's prior-work repos being ported in.
 - `docs/PHASE_1_HANDOFF.md` — the Phase 1 scaffolding spec.
+- `docs/PHASE_4_HANDOFF.md` — current state of the Planetary Overview build (v3). READ THIS when continuing PO work.
 - `HD-Reports-Master-Plan.md` — the full phase-by-phase build plan.
 
 ## Cost discipline (the whole point)

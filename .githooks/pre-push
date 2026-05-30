@@ -21,6 +21,7 @@ required=(
   "docs/DECISIONS.md"
   "docs/STACK_PORTED.md"
   "docs/PHASE_1_HANDOFF.md"
+  "docs/PHASE_4_HANDOFF.md"
 )
 
 missing=()
