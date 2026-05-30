@@ -1,0 +1,412 @@
+// Planetary Overview generator.
+//
+// The companion to the Foundation Report. Where the Foundation Report covers
+// the structural backbone, the Planetary Overview is the per-planet deep dive:
+// each planetary activation gets a standardized H3 header (Planet, Gate.Line,
+// Main Gate Name, Line Name, Exalted/Detriment if any, Center, Quarter)
+// followed by prose drawing from the gate + line companion source material.
+//
+// Section order from .claude/skills/hd-analysis/SKILL.md:
+//   1. Front matter
+//   2. How to Use This Report
+//   3. Introduction (brief framing of the report's purpose)
+//   4. Personality Activations (13 planets: Sun, Earth, Moon, NN, SN, Mercury, Mars, Venus, Jupiter, Saturn, Uranus, Neptune, Pluto)
+//   5. Design Activations (13 planets, same order)
+//   6. Incarnation Cross deep dive
+//   7. Moon Placements (P Moon + D Moon)
+//   8. Nodal Analysis (4 nodes)
+//   9. Hanging Gates (organized by center)
+//  10. Closing synthesis
+//
+// Target length: 8,000–10,000 words per the master plan's standard tier.
+// Architecture: four cached Sonnet 4.6 calls sharing the same system + library
+// blocks as the Foundation Report (so if both reports run for the same chart
+// back-to-back, the second pays cache-read prices for the library block).
+
+import { invokeLLM, type InvokeResult, type ModelId } from "@/lib/llm/core";
+import type { Chart } from "@/lib/chart/types";
+import type { ChunkRow, RetrievalResult } from "@/lib/retrieval/chartChunks";
+import { renderDataPassMarkdown, type DataPass } from "@/lib/chart/datapass";
+import { validateReport, type ValidationResult } from "@/lib/report/validate";
+
+export interface BuildArgs {
+  client: { name: string };
+  chart: Chart;
+  dataPass: DataPass;
+  retrieval: RetrievalResult;
+  identityMd: string;
+  voiceMd: string;
+  model?: ModelId;
+  apiKey: string;
+  hardCostCeilingCents?: number;
+}
+
+function orderChunks(chunks: ChunkRow[]): ChunkRow[] {
+  const kindOrder = [
+    "type", "strategy", "authority", "profile", "definition", "quarter", "cross",
+    "center", "channel", "circuit", "channel_type", "variable", "planet",
+    "gate", "line", "profile_line", "geometry",
+  ];
+  return [...chunks].sort((a, b) => {
+    const ai = kindOrder.indexOf(a.source_kind);
+    const bi = kindOrder.indexOf(b.source_kind);
+    if (ai !== bi) return ai - bi;
+    if ((a.gate_number ?? 999) !== (b.gate_number ?? 999)) {
+      return (a.gate_number ?? 999) - (b.gate_number ?? 999);
+    }
+    return (a.line_number ?? -1) - (b.line_number ?? -1);
+  });
+}
+
+function formatChunksForPrompt(chunks: ChunkRow[]): string {
+  const lines: string[] = [];
+  lines.push("# HD Source Library — relevant chunks for this chart");
+  lines.push("");
+  lines.push(
+    "Each chunk below is verbatim source material from Ra Uru Hu's lectures or " +
+    "Kaycee's analytical reference, mirrored from her Notion library. When the " +
+    "report makes a claim about a gate, line, channel, center, planet, cross, " +
+    "or quarter, that claim must be grounded in the chunks below. Do not " +
+    "invent material that is not supported by these chunks.",
+  );
+  lines.push("");
+
+  for (const c of orderChunks(chunks)) {
+    const tag = c.gate_number != null
+      ? c.line_number != null
+        ? `[${c.source_kind} ${c.gate_number}.${c.line_number}]`
+        : `[${c.source_kind} gate ${c.gate_number}]`
+      : `[${c.source_kind}]`;
+    lines.push(`## ${tag} ${c.title}`);
+    lines.push("");
+    lines.push(c.body.trim());
+    lines.push("");
+  }
+  return lines.join("\n");
+}
+
+const MASTER_SYSTEM = `You are the report engine for HD Reports, a paid Human Design product. You produce sections of a Planetary Overview Report for the chart attached to the user message.
+
+The Planetary Overview is the per-planet deep dive companion to the Foundation Report. Where the Foundation Report covers the structural backbone (Type, Authority, Profile, Centers, Channels), the Planetary Overview walks through each of the 26 planetary activations (13 personality + 13 design) one at a time and shows what each activation is doing in this design. It also synthesizes the Incarnation Cross's 4 gates, the Moon placements, the Nodal arc, and the Hanging Gates.
+
+A Planetary Overview is the customer's per-thread reference: a 8,000 to 10,000 word Markdown document they return to when a specific planet or gate shows up in their life. Each H2 section is a complete passage about one activation, grounded in Ra's per-gate and per-line material.
+
+# Data Pass: canonical chart facts
+
+The user message includes a "Data Pass" block. It is the canonical, deterministic source of every structural fact about this chart: which gate each planet activates, the gate.line.color.tone, the fixing state (Exalted / Detriment), which center the gate sits in, the chart's Quarter, the chart's Definition label, exact return dates, and canonical names for every activated gate. Read these directly.
+
+**The Data Pass wins.** Never derive a chart fact from training data or from the Source Library chunks if it disagrees with the Data Pass.
+
+# Hard rules (apply to every section)
+
+- **No em dashes anywhere, including inside headings.** Use commas, colons, semicolons, or restructure.
+- **No bullet points in body prose.** Paragraphs only. Headings are the only structural breaks.
+- **Address the reader as "you."** Strict second person throughout. First-person ("I", "we") is never used. The reader's NAME appears ONLY inside the front matter (title block at the top). After the front matter, never write the reader's name again, say "you," "your," "the body," "the design," "this chart." Phrases like "Tennyson's chart," "In Tennyson's design," "what Tennyson carries" are POV slips the validator will reject.
+- **Never use "BodyGraph" / "Body Graph" / "Bodygraph."** Use "the chart" or "the design" or "this design."
+- **Never mention Kaycee by name.**
+- **This report is about the reader, not about Ra.** Minimize references to Ra. The lineage acknowledgment in the front matter covers attribution once; do not keep inserting "as Ra named it," "Ra was direct about this," "Ra described it that way," or parenthetical "(Ra's term)" attributions across the body. State the mechanic in the report's own voice.
+- **Do not generate Human Design teachings.** Organize the cached source material against the chart. When the source library is sparse for a chart element, write less; do not improvise.
+- **Quote sparingly.** Source material is the spine; the prose is original. Pull a phrase of Ra's language when it lands.
+- **Mechanics not pathology.** Detriments and challenging gates are named with full directness. The mechanical framing IS the compassion.
+- **No predictions, no spiritual jargon, no astrology cross-overs, no Gene Keys references.**
+- **Never call anyone a slave or slave owner. Never write about killing people.** Banned, hard-fail: "slave," "slaves," "slavery," "enslaved," "enslave," "slave owner(s)," "killing people," "genocide," "holocaust." Other potentially-loaded words (king, queen, kingdom, realm, throne, monarch, war) are NOT banned — they show up as useful English descriptors for HD concepts. Use them when meaning lands; don't reach for them when a plainer word would do.
+- **Use the chart's actual Type.** The Data Pass states the reader's Type. Never substitute a different Type in synthesis prose. Phrases like "allowing the Manifesting Generator mechanics to run" on a Manifestor chart, or "as a Projector, you" on a Generator chart, are structural errors the validator will reject.
+- **Use the hexagram name as the gate's label.** "Gathering Together" is gate 45's hexagram name; "The Gate of the Gatherer" is its keynote. The H2 headers use the hexagram name. The keynote can appear in the prose body when its wording reinforces a point.
+- **Avoid stale openers.** Do not begin sentences with "It's worth noting that," "It is important to understand," "What this means is," "The source material is direct about." Restate the point in the body's native language.
+- **Never write a table of contents.** No bulleted or unbulleted list of upcoming sections anywhere in the report.
+
+# The standardized H2 header format for each planetary activation
+
+Every planet's section begins with an H2 in this exact format:
+
+  ## Planet, Gate#.Line#: Hexagram Name, Line Name, [Exalted | Detriment if present], Center, Quarter
+
+Examples:
+  ## Sun, 45.6: Gathering Together, Reconsideration, Throat, Civilization
+  ## Saturn, 47.4: Oppression, Repression, Exalted, Ajna, Duality
+  ## Neptune, 58.4: The Joyous, Focusing, Detriment, Root, Mutation
+
+Rules for the header:
+- The Data Pass's Personality Activations and Design Activations tables list each planet with its gate, line, fixing state (Exalted / Detriment / None), and center. Read from those tables.
+- Only include "Exalted" or "Detriment" if the activation carries one. Omit for neutral placements.
+- "Hexagram Name" is the gate's hexagram name from the Data Pass's "Activated Gate Names (canonical)" table (e.g. "Gathering Together," "Standstill"). NOT the keynote (e.g. "The Gate of the Gatherer").
+- "Line Name" is the line's name from the cached source library (the "[line N.M]" chunks).
+- Center is the center that gate sits in, exactly as written in the Data Pass.
+- Quarter is the chart's overall Quarter, exactly as written in the Data Pass.
+
+Use commas as separators in the header, never em dashes or pipes. Never end headings with a period.
+
+# Per-activation prose body
+
+Under each H2, write 200 to 350 words of prose:
+
+1. State the mechanic of the gate in this body, drawing from the cached gate-level material.
+2. Name what the specific line adds, drawing from the cached line-companion material.
+3. If the activation is in Exalted or Detriment, name what that does specifically. Detriments stay direct; the mechanical framing IS the compassion.
+4. Connect to the planet's archetype: a Saturn placement reads structurally as the lesson and reorganization the design is here to meet; a Venus placement reads as the design's mode of valuing and relating; a Pluto placement as the deep generational pressure carried in the body.
+5. Where the activation lands in a defined channel, mention which channel and what the channel produces. Where it's a hanging gate, mention that briefly.
+
+Do not paste source material verbatim. Pull a phrase of Ra's language when it sharpens the point; otherwise the prose is original.
+
+# Section order (NON-NEGOTIABLE)
+
+Render exactly these H1 sections in this order:
+
+(Front matter, no H1: title "Planetary Overview", reader's name, birth data, a single italicized line of attribution, and a horizontal divider. NO closing lineage paragraph at the end of the report.)
+
+# How to Use This Report
+(2 to 3 short paragraphs. This is a per-thread reference, not a single read. Return to it when an activation shows up in life. Audio works too.)
+
+# Introduction
+(1 to 2 paragraphs. This report walks through the 26 planetary activations as 26 distinct threads in your design.)
+
+# Personality Activations
+## [H2 for each of the 13 personality planets in order: Sun, Earth, North Node, South Node, Moon, Mercury, Venus, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto]
+
+# Design Activations
+## [H2 for each of the 13 design planets, same order]
+
+# Your Incarnation Cross
+(Synthesis section drawing the 4 cross gates together. Around 400 to 600 words. Names the cross by its full name from the Data Pass, then walks through the dynamic between the four gates as a single design statement. Frame the cross as the naturally resulting function of the design lived correctly, not as a mission to pursue. Do not include taxonomy trivia like "one of the four crosses in the Penetration family.")
+
+# Your Moon Placements
+(Synthesis of personality Moon + design Moon as a pair. Around 250 to 400 words. The Moon describes the unconscious emotional needs and the design's relationship to fluctuation.)
+
+# Your Nodal Analysis
+(Synthesis of the 4 nodes as a karmic arc. Around 400 to 600 words. The South Nodes describe the design's familiar territory; the North Nodes describe what it grows into.)
+
+# Your Hanging Gates
+(Synthesis of the unactivated channel gates, organized by center. The Data Pass's "Hanging Gates by Center" block lists each. Around 300 to 500 words. These are gates the design carries but which don't form a complete channel internally; they're the design's points of conditioning openness through transits and other people.)
+
+You may be asked for any subset of these in one call. Render exactly the sections requested. Do not preview or transition into sections that were not requested.
+
+# Output format
+
+Pure Markdown. No code fences. No preamble ("Here is the report:"). No closing commentary outside the report itself.`;
+
+interface SectionPlan {
+  name: string;
+  maxTokens: number;
+  userInstruction: string;
+}
+
+function buildSections(clientName: string, dataPass: DataPass): SectionPlan[] {
+  const target = (lo: number, hi: number) => `Target length: ${lo.toLocaleString()} to ${hi.toLocaleString()} words for this call.`;
+  const expectedType = dataPass.type;
+
+  return [
+    {
+      name: "front+how-to+intro+personality",
+      maxTokens: 8000,
+      userInstruction: `Generate the FRONT MATTER and the first H1 sections of the Planetary Overview for ${clientName}.
+
+THE READER'S TYPE IS "${expectedType}". When the synthesis sections refer to the reader's design running correctly, say "the ${expectedType} mechanics" or "your ${expectedType} architecture" — NEVER substitute a different Type.
+
+Front matter (NO H1, just):
+  Planetary Overview
+  ${clientName}
+  Date of Birth: <local date from Data Pass>
+  Place of Birth: <place from Data Pass, if present>
+  *A per-thread reference: each of the 26 planetary activations as a section you return to when that thread shows up in life.*
+  ---
+
+After the front matter divider, in order:
+  # How to Use This Report  (2 to 3 short paragraphs, no subheadings)
+  # Introduction  (1 to 2 paragraphs framing the per-planet structure)
+  # Personality Activations
+    ## Sun, <gate>.<line>: ... (H2 headers per the format in the system prompt; one H2 per planet)
+    ## Earth, ...
+    ## North Node, ...
+    ## South Node, ...
+    ## Moon, ...
+    ## Mercury, ...
+    ## Venus, ...
+    ## Mars, ...
+    ## Jupiter, ...
+    ## Saturn, ...
+    ## Uranus, ...
+    ## Neptune, ...
+    ## Pluto, ...
+  Each H2 is 200 to 350 words of prose per the format described in the system prompt. Pull each planet's gate, line, fixing state, and center directly from the Data Pass's Personality Activations table.
+
+Do NOT write Design Activations or anything after. Stop at the end of the Personality Pluto section.
+
+${target(4500, 5500)}`,
+    },
+    {
+      name: "design",
+      maxTokens: 8000,
+      userInstruction: `Continue the Planetary Overview for ${clientName}. Render the next H1 section ONLY:
+
+  # Design Activations
+    ## Sun, <gate>.<line>: ...
+    ## Earth, ...
+    ## North Node, ...
+    ## South Node, ...
+    ## Moon, ...
+    ## Mercury, ...
+    ## Venus, ...
+    ## Mars, ...
+    ## Jupiter, ...
+    ## Saturn, ...
+    ## Uranus, ...
+    ## Neptune, ...
+    ## Pluto, ...
+
+Each H2 is 200 to 350 words of prose. Pull each planet's gate, line, fixing state, and center directly from the Data Pass's Design Activations table. Design-side planets run below conscious awareness; describe what they do as qualities woven into the body rather than the conscious mind's experience. Do NOT write the front matter, Personality Activations, or anything after Design Pluto. Start directly with the H1 "Design Activations".
+
+${target(4500, 5500)}`,
+    },
+    {
+      name: "cross+moon+nodes+hanging",
+      maxTokens: 5000,
+      userInstruction: `Finish the Planetary Overview for ${clientName}. Render the final four H1 sections:
+
+  # Your Incarnation Cross
+    (Synthesis of the 4 cross gates as a single design statement. 400 to 600 words. Use the cross's full name from the Data Pass. Frame the cross as the naturally resulting function of the design lived correctly: when the body follows its ${expectedType} Strategy and Authority, the cross's theme expresses itself as a by-product. Do not include taxonomy trivia.)
+  # Your Moon Placements
+    (Synthesis of personality Moon + design Moon. 250 to 400 words. Read both Moon placements from the Data Pass activation tables.)
+  # Your Nodal Analysis
+    (Synthesis of the 4 nodes as a karmic arc. 400 to 600 words. South Nodes are familiar territory; North Nodes are what the design grows into. Pull all four nodal positions from the Data Pass activation tables.)
+  # Your Hanging Gates
+    (The Data Pass's "Hanging Gates by Center" block organizes hanging gates by center. Walk through each center that has hanging gates, with a short paragraph per gate describing the mechanic and what it does in this body. 300 to 500 words total. End with a single short closing thought that returns the reader to themselves. NO lineage attribution. NO mention of any analyst by name.)
+
+Do NOT write Personality Activations or Design Activations. Start directly with the H1 "Your Incarnation Cross".
+
+${target(1500, 2200)}`,
+    },
+  ];
+}
+
+export interface BuildResult {
+  text: string;
+  sections: { name: string; text: string; cost_cents: number; usage: InvokeResult["usage"]; }[];
+  cost_cents: number;
+  usage: InvokeResult["usage"];
+  retrievedChunkIds: string[];
+  totalRetrievalTokens: number;
+  model: ModelId;
+  validation: ValidationResult;
+}
+
+export async function buildPlanetaryOverview(args: BuildArgs): Promise<BuildResult> {
+  const model = args.model ?? "claude-sonnet-4-6";
+
+  const libraryBlock = formatChunksForPrompt(args.retrieval.chunks);
+  const dataPassBlock = renderDataPassMarkdown(args.dataPass);
+  const sections = buildSections(args.client.name, args.dataPass);
+
+  const accumulated: BuildResult["sections"] = [];
+  let totalCents = 0;
+  const totalUsage: InvokeResult["usage"] = {
+    input_tokens: 0,
+    output_tokens: 0,
+    cache_creation_input_tokens: 0,
+    cache_read_input_tokens: 0,
+  };
+
+  const previousMarkdown: string[] = [];
+
+  async function generateSection(section: SectionPlan, extraNudge: string = ""): Promise<{ text: string; result: InvokeResult }> {
+    const continuationNote = previousMarkdown.length
+      ? `\n\nNOTE: this is a continuation. The previous sections have already been generated; output ONLY the sections requested below, with no preamble or recap.`
+      : "";
+
+    const userContent =
+      `${dataPassBlock}\n\n` +
+      `---\n\n${section.userInstruction}${continuationNote}${extraNudge}`;
+
+    const result = await invokeLLM(
+      {
+        model,
+        max_tokens: section.maxTokens,
+        system: MASTER_SYSTEM,
+        cache_blocks: [
+          { name: "IDENTITY", text: `# IDENTITY (lineage and brand)\n\n${args.identityMd}` },
+          { name: "VOICE", text: `# VOICE (how to write)\n\n${args.voiceMd}` },
+          { name: "LIBRARY", text: libraryBlock },
+        ],
+        messages: [{ role: "user", content: userContent }],
+      },
+      {
+        apiKey: args.apiKey,
+        hardCostCeilingCents: args.hardCostCeilingCents,
+      },
+    );
+
+    const text = result.text.replace(/—/g, ", ");
+    return { text, result };
+  }
+
+  for (const section of sections) {
+    const first = await generateSection(section);
+    let text = first.text;
+    let combinedCost = first.result.cost_cents;
+    let combinedUsage: InvokeResult["usage"] = { ...first.result.usage };
+
+    // Delta-based retry loop, up to MAX_RETRIES attempts. Each pass:
+    // validate the assembled-so-far text and retry on hard issues THIS
+    // call introduced (cross-cutting "(any)" issues that didn't exist
+    // before this call's output). A second retry covers the case where
+    // retry #1 fixes the original failure but introduces a different
+    // one — Foundation v10 surfaced this concretely.
+    const MAX_RETRIES = 2;
+    const priorOnly = previousMarkdown.join("\n\n");
+    const vPrior = priorOnly ? validateReport(priorOnly, args.dataPass, "planetary") : { issues: [] as ValidationResult["issues"] };
+    const priorKey = (i: ValidationResult["issues"][number]) => `${i.rule}::${i.detected}`;
+    const priorIssueKeys = new Set(vPrior.issues.map(priorKey));
+
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      const provisional = previousMarkdown.concat([text]).join("\n\n");
+      const v = validateReport(provisional, args.dataPass, "planetary");
+      const blames = v.issues.filter((i) => {
+        if (i.severity !== "hard") return false;
+        if (i.rule === "section-missing") return false;
+        if (i.section === "(any)") return !priorIssueKeys.has(priorKey(i));
+        return false;
+      });
+      if (blames.length === 0) break;
+
+      const failsForRetry = blames.slice(0, 6).map((i) => `  - ${i.rule}: ${i.message}${i.expected ? ` (Expected: ${i.expected})` : ""}`).join("\n");
+      const attemptLabel = attempt === 0 ? "first retry" : `retry #${attempt + 1}`;
+      const nudge = `\n\nIMPORTANT (${attemptLabel}): a validator just rejected a draft of this section with the following hard failures. Rewrite the section from scratch correcting EVERY failure. The Data Pass above is canonical. Pay attention to every banned-phrase / drift / sentence-shape rule, even ones the prompt only describes by example — those examples are anchors, not the literal set of forbidden strings. Do not introduce new failures of the same kind.\n${failsForRetry}\n`;
+      const retry = await generateSection(section, nudge);
+      text = retry.text;
+      combinedCost = Math.round((combinedCost + retry.result.cost_cents) * 10000) / 10000;
+      combinedUsage = {
+        input_tokens: combinedUsage.input_tokens + retry.result.usage.input_tokens,
+        output_tokens: combinedUsage.output_tokens + retry.result.usage.output_tokens,
+        cache_creation_input_tokens: combinedUsage.cache_creation_input_tokens + retry.result.usage.cache_creation_input_tokens,
+        cache_read_input_tokens: combinedUsage.cache_read_input_tokens + retry.result.usage.cache_read_input_tokens,
+      };
+    }
+
+    accumulated.push({
+      name: section.name,
+      text,
+      cost_cents: combinedCost,
+      usage: combinedUsage,
+    });
+    totalCents += combinedCost;
+    totalUsage.input_tokens += combinedUsage.input_tokens;
+    totalUsage.output_tokens += combinedUsage.output_tokens;
+    totalUsage.cache_creation_input_tokens += combinedUsage.cache_creation_input_tokens;
+    totalUsage.cache_read_input_tokens += combinedUsage.cache_read_input_tokens;
+
+    previousMarkdown.push(text);
+  }
+
+  const fullText = previousMarkdown.join("\n\n");
+  const validation = validateReport(fullText, args.dataPass, "planetary");
+
+  return {
+    text: fullText,
+    sections: accumulated,
+    cost_cents: Math.round(totalCents * 10000) / 10000,
+    usage: totalUsage,
+    retrievedChunkIds: args.retrieval.chunks.map((c) => c.id),
+    totalRetrievalTokens: args.retrieval.totalTokensEstimate,
+    model,
+    validation,
+  };
+}
