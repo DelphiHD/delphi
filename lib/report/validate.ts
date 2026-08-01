@@ -894,9 +894,15 @@ export function validateReport(text: string, dp: DataPass, tier: ReportTier = "f
       msg: "Names a fixing planet in an exaltation/detriment claim ('Mars is exalted', 'Venus is in detriment'). Hard rule forbids naming any fixing planet, even when the placement IS exalted or in detriment. Say 'this placement is exalted' or 'in detriment' without naming any planet, then stop.",
     },
     {
-      re: new RegExp(`\\b(?:The\\s+)?${TONE_PLANETS}\\s+exalted\\s+(?:here|in|at|would)\\b`, "g"),
+      // Match "[Planet] exalted" regardless of the following word — symmetric
+      // with the "[Planet] in detriment" rule below. The earlier "here/in/at/
+      // would" restriction let "(Pluto exalted)" and "…truth, Venus exalted."
+      // slip through (Russell v1). "[Planet] is exalted" is caught separately
+      // above; "[Planet]'s exalted" (possessive) won't match because the
+      // apostrophe breaks the \s+ join.
+      re: new RegExp(`\\b(?:The\\s+)?${TONE_PLANETS}\\s+exalted\\b`, "g"),
       label: "fixing-planet-named",
-      msg: "Phrase '[Planet] exalted here/in/at/would' names a fixing planet. Hard rule forbids.",
+      msg: "Phrase '[Planet] exalted' names a fixing planet. Hard rule: say 'exalted' alone, never with the planet name.",
     },
     {
       re: new RegExp(`\\b${TONE_PLANETS}\\s+would\\s+(?:exalt|provide|bring|name|add|harden|fix)\\b`, "g"),
