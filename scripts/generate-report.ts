@@ -26,101 +26,10 @@ import { buildDataPass } from "@/lib/chart/datapass";
 import { buildFoundationReport } from "@/lib/report/foundation";
 import { buildPlanetaryOverview } from "@/lib/report/planetary";
 import { buildQuickstart } from "@/lib/report/quickstart";
-
-interface ClientBrief {
-  slug: string;
-  name: string;
-  birthDate: string;
-  birthTime: string;
-  birthPlace: string;
-}
-
-const CLIENTS: Record<string, ClientBrief> = {
-  chris: {
-    slug: "chris",
-    name: "Chris Kulish",
-    birthDate: "1988-06-03",
-    birthTime: "11:37",
-    birthPlace: "Johnstown, Pennsylvania, United States",
-  },
-  sean: {
-    slug: "sean",
-    name: "Sean Preetorious",
-    birthDate: "1985-01-19",
-    birthTime: "23:02",
-    birthPlace: "San Diego, California, United States",
-  },
-  meelad: {
-    slug: "meelad",
-    name: "Meelad Kharazian",
-    birthDate: "1986-02-09",
-    birthTime: "01:02",
-    birthPlace: "Lodi, California, United States",
-  },
-  tennyson: {
-    slug: "tennyson",
-    name: "Tennyson",
-    birthDate: "1993-01-06",
-    birthTime: "07:51",
-    birthPlace: "Orem, Utah, United States",
-  },
-  kaycee: {
-    slug: "kaycee",
-    name: "Kaycee Vandenberg",
-    birthDate: "1983-06-17",
-    birthTime: "06:29",
-    birthPlace: "Ogden, Utah, United States",
-  },
-  paul: {
-    slug: "paul",
-    name: "Paul",
-    birthDate: "1978-11-07",
-    birthTime: "15:10",
-    birthPlace: "Bountiful, Utah, United States",
-  },
-  tiff: {
-    slug: "tiff",
-    name: "Tiff",
-    birthDate: "1981-12-01",
-    birthTime: "15:05",
-    birthPlace: "Saratoga Springs, New York, United States",
-  },
-  michael: {
-    slug: "michael",
-    name: "Michael",
-    birthDate: "1958-08-29",
-    birthTime: "07:33",
-    birthPlace: "Gary, Indiana, United States",
-  },
-  matt: {
-    slug: "matt",
-    name: "Matt Hollingshead",
-    birthDate: "1984-04-08",
-    birthTime: "07:15",
-    birthPlace: "Bountiful, Utah, United States",
-  },
-  brit: {
-    slug: "brit",
-    name: "Brit",
-    birthDate: "1988-03-21",
-    birthTime: "13:27",
-    birthPlace: "Payson, Utah, United States",
-  },
-  jason: {
-    slug: "jason",
-    name: "Jason",
-    birthDate: "1981-09-11",
-    birthTime: "16:51",
-    birthPlace: "Lodi, California, United States",
-  },
-  sarah: {
-    slug: "sarah",
-    name: "Sarah Marie",
-    birthDate: "1986-05-13",
-    birthTime: "09:20",
-    birthPlace: "Murray, Utah, United States",
-  },
-};
+import { renderReportDocx, svgToPng } from "@/lib/render/docx";
+import { renderCrossMandala } from "@/lib/render/mandala";
+import type { Activation as MandalaActivation, MandalaChart, Planet as MandalaPlanet } from "@/lib/render/mandala.types";
+import { CLIENTS, type ClientBrief } from "./client-roster";
 
 function must(name: string): string {
   const v = process.env[name];
@@ -128,14 +37,72 @@ function must(name: string): string {
   return v;
 }
 
+// Tiny flag parser. Supports `--name "X"`, `--name=X`. Used for the ad-hoc
+// mode where the caller passes chart data on the CLI instead of editing
+// the CLIENTS map (the common case for real client work — the map is just
+// for the benchmark cohort).
+function parseFlags(argv: string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (!a.startsWith("--")) continue;
+    const eq = a.indexOf("=");
+    if (eq >= 0) { out[a.slice(2, eq)] = a.slice(eq + 1); continue; }
+    const key = a.slice(2);
+    const next = argv[i + 1];
+    if (next === undefined || next.startsWith("--")) { out[key] = "true"; continue; }
+    out[key] = next; i++;
+  }
+  return out;
+}
+
+function slugify(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "client";
+}
+
+const USAGE = [
+  "usage:",
+  "  slug mode:  npx tsx scripts/generate-report.ts <chris|sean|...> [foundation|planetary|quickstart]",
+  "  ad-hoc:     npx tsx scripts/generate-report.ts --name \"Client Name\" --date 1988-06-03 --time 11:37 \\",
+  "                  --place \"Johnstown, Pennsylvania, United States\" [--tier foundation] [--no-docx]",
+  "",
+  "flags:",
+  "  --name, --date (YYYY-MM-DD), --time (HH:MM 24h local), --place (geocodable string)",
+  "  --tier  foundation | planetary | quickstart   (default: foundation)",
+  "  --no-docx  skip the branded .docx render (markdown only)",
+  "  --slug  override the generated client slug used for filenames",
+].join("\n");
+
 async function main() {
-  const slug = process.argv[2];
-  const kindArg = (process.argv[3] || "foundation").toLowerCase();
-  if (!slug || !CLIENTS[slug] || !["foundation", "planetary", "quickstart"].includes(kindArg)) {
-    console.error("usage: npx tsx scripts/generate-report.ts <chris|sean|meelad|tennyson|kaycee> [foundation|planetary|quickstart]");
+  const flags = parseFlags(process.argv.slice(2));
+  const isAdHoc = !!(flags.name && flags.date && flags.time && flags.place);
+
+  let brief: ClientBrief;
+  let kindArg: string;
+  if (isAdHoc) {
+    const slug = flags.slug || slugify(flags.name);
+    brief = {
+      slug,
+      name: flags.name,
+      birthDate: flags.date,
+      birthTime: flags.time,
+      birthPlace: flags.place,
+    };
+    kindArg = (flags.tier || "foundation").toLowerCase();
+  } else {
+    const slug = process.argv[2];
+    kindArg = (process.argv[3] || "foundation").toLowerCase();
+    if (!slug || !CLIENTS[slug]) {
+      console.error(USAGE);
+      process.exit(1);
+    }
+    brief = CLIENTS[slug];
+  }
+  if (!["foundation", "planetary", "quickstart"].includes(kindArg)) {
+    console.error(USAGE);
     process.exit(1);
   }
-  const brief = CLIENTS[slug];
+  const renderDocx = flags["no-docx"] !== "true";
   const kind = kindArg as "foundation" | "planetary" | "quickstart";
   const kindLabel = kind === "foundation" ? "Foundation Report" : kind === "planetary" ? "Planetary Overview" : "Quickstart";
   console.log(`\n=== ${kindLabel} for ${brief.name} ===\n`);
@@ -150,6 +117,7 @@ async function main() {
     birthTime: brief.birthTime,
     timezone: tz,
     locationQuery: brief.birthPlace,
+    includeChartImage: renderDocx, // pulls the Delphi-styled bodygraph SVG
   });
   console.log(`  ${chart.type.value} | ${chart.profile.value} | ${chart.authority.value} | ${chart.definition.value}`);
   console.log(`  Cross: ${chart.incarnationCross.value}`);
@@ -256,24 +224,39 @@ async function main() {
   mkdirSync(".cache/reports", { recursive: true });
   const outSuffix = kind; // foundation | planetary | quickstart
 
-  // Auto-publish to the operator's Benchmark Reports folder (default:
-  // ~/Desktop/Benchmark Reports/Phase 4 Output). Override with the
-  // BENCHMARK_REPORTS_DIR env var. Each run creates a NEW versioned file
-  // (Phase 4 v<N+1>) so prior pilots are preserved automatically. We
-  // compute the next version FIRST so the metadata block at the top of
-  // the file can carry it.
+  // Where deliverables go. Two destinations and one operator-facing rule
+  // baked in: every output file lands somewhere Kaycee can find in Finder.
+  // The .cache/reports/ paths inside the worktree are debug-only.
+  //
+  //   - REAL client work (ad-hoc mode):   ~/Desktop/HD Reports/<Client>/
+  //   - Benchmark cohort (slug mode):      ~/Desktop/Benchmark Reports/Phase 4 Output/
+  //
+  // Override either with HD_REPORTS_DIR or BENCHMARK_REPORTS_DIR.
+  const clientDir = process.env.HD_REPORTS_DIR
+    ?? resolve(homedir(), "Desktop", "HD Reports", brief.name);
   const benchmarkDir = process.env.BENCHMARK_REPORTS_DIR
     ?? resolve(homedir(), "Desktop", "Benchmark Reports", "Phase 4 Output");
+  // For ad-hoc real-client runs, primary destination is clientDir.
+  // For slug-mode benchmark runs, primary destination is benchmarkDir.
+  const primaryDir = isAdHoc ? clientDir : benchmarkDir;
+  mkdirSync(primaryDir, { recursive: true });
+
   const kindLabel2 = kind === "foundation" ? "Foundation"
                    : kind === "planetary"  ? "Planetary Overview"
                    :                         "Quickstart";
+  // Versioning convention differs by destination:
+  //   - Benchmark: "<Name> - <Tier> - Phase 4 v<N>.md/.docx"
+  //   - Client:    "<Name> - <Tier> - v<N>.md/.docx"  (no "Phase 4" prefix —
+  //                this is the client's actual deliverable, not a benchmark)
+  const versionPrefix = isAdHoc
+    ? `${brief.name} - ${kindLabel2} - v`
+    : `${brief.name} - ${kindLabel2} - Phase 4 v`;
   let nextV = 1;
-  if (existsSync(benchmarkDir)) {
-    const prefix = `${brief.name} - ${kindLabel2} - Phase 4 v`;
+  if (existsSync(primaryDir)) {
     let maxV = 0;
-    for (const f of readdirSync(benchmarkDir)) {
-      if (!f.startsWith(prefix) || !f.endsWith(".md")) continue;
-      const m = f.slice(prefix.length, -3).match(/^(\d+)/);
+    for (const f of readdirSync(primaryDir)) {
+      if (!f.startsWith(versionPrefix) || !f.endsWith(".md")) continue;
+      const m = f.slice(versionPrefix.length, -3).match(/^(\d+)/);
       if (m) maxV = Math.max(maxV, parseInt(m[1], 10));
     }
     nextV = maxV + 1;
@@ -311,17 +294,17 @@ soft_warnings: ${softCount}
 `;
   const finalText = metadataBlock + result.text;
 
+  // Write the cache copy (debug / re-render input) and the primary
+  // deliverable (visible in Finder). The cache path is ALSO printed so
+  // anyone debugging can find it, but it's secondary to the visible path.
   const outPath = `.cache/reports/${brief.slug}-${outSuffix}.md`;
   writeFileSync(outPath, finalText);
-  console.log(`\n✓ ${outPath} (${wordCount.toLocaleString()} words)`);
 
-  if (existsSync(benchmarkDir)) {
-    const benchmarkPath = resolve(benchmarkDir, `${brief.name} - ${kindLabel2} - Phase 4 v${nextV}.md`);
-    writeFileSync(benchmarkPath, finalText);
-    console.log(`✓ published to: ${benchmarkPath}`);
-  } else {
-    console.log(`  (skipped benchmark publish: ${benchmarkDir} not found; set BENCHMARK_REPORTS_DIR to enable)`);
-  }
+  const primaryMdPath = resolve(primaryDir, `${versionPrefix}${nextV}.md`);
+  writeFileSync(primaryMdPath, finalText);
+  console.log(`\n✓ markdown written:`);
+  console.log(`    ${primaryMdPath}`);
+  console.log(`    (debug copy: ${resolve(outPath)})`);
 
   // 5c. Append to the report log (JSONL — one JSON object per line, easy
   // to grep, jq, or load into a sheet). Lives next to the working-copy
@@ -340,13 +323,10 @@ soft_warnings: ${softCount}
     validation:    validationLine,
     hard_failures: hardCount,
     soft_warnings: softCount,
-    benchmark_path: existsSync(benchmarkDir)
-      ? resolve(benchmarkDir, `${brief.name} - ${kindLabel2} - Phase 4 v${nextV}.md`)
-      : null,
-    cache_path: resolve(outPath),
+    primary_path: primaryMdPath,
+    cache_path:   resolve(outPath),
   };
   appendFileSync(".cache/reports/log.jsonl", JSON.stringify(logEntry) + "\n");
-  console.log(`✓ logged to .cache/reports/log.jsonl`);
 
   // 6. Lint: no em dashes.
   if (/—/.test(result.text)) {
@@ -354,6 +334,100 @@ soft_warnings: ${softCount}
     console.log(`\n  ⚠ ${count} em dash(es) found in output. Fix the prompt; report fails the no-em-dash rule.`);
   } else {
     console.log(`\n  ✓ no em dashes`);
+  }
+
+  // 7. Branded .docx render — Georgia + purple #845095 + Delphi bodygraph on
+  // the title page. Lives alongside the markdown so Kaycee can light-edit in
+  // Word and send to the client. Skip with --no-docx.
+  if (renderDocx) {
+    const reportTitle = kind === "foundation" ? "Human Design Analysis"
+                      : kind === "planetary"  ? "Planetary Overview"
+                      :                         "Quickstart";
+
+    // Planetary Overview: route through scripts/render-planetary-docx.ts,
+    // NOT the generic renderer. The PO-specific renderer knows how to expand
+    // [[PERSONALITY_PLACEMENTS_TABLE]] / [[DESIGN_PLACEMENTS_TABLE]] markers,
+    // insert the Full Mandala on the cover, insert the Cross Mandala after
+    // the Cross H1, and render per-H2 hexagram images. The generic renderer
+    // does none of that — using it for a PO yields brackets where the tables
+    // should be and a bodygraph composite where the mandala should be.
+    if (kind === "planetary") {
+      const { spawnSync } = await import("node:child_process");
+      console.log(`\nRendering branded .docx via scripts/render-planetary-docx.ts (PO-specific renderer)…`);
+      const res = spawnSync("./node_modules/.bin/tsx", ["scripts/render-planetary-docx.ts", brief.slug], { stdio: "inherit", cwd: process.cwd() });
+      if (res.status !== 0) {
+        console.error(`\n✗ render-planetary-docx.ts exited with code ${res.status}`);
+        process.exit(1);
+      }
+      return;
+    }
+
+    if (!chart.chartImageSvg) {
+      console.log(`\n  ⚠ no Delphi bodygraph SVG returned by mybodygraph; .docx will render without the composite cover.`);
+    }
+    // Cross Mandala image — inserted after the "{Cross Name} | (P/E | D/E)"
+    // H1 in the Planetary Overview. Skip for other tiers (foundation +
+    // quickstart don't emit that H1 pattern, so the renderer wouldn't slot
+    // the image anywhere anyway).
+    let crossMandalaPng: Buffer | undefined;
+    if (kind === "planetary" && chart.chartImageSvg) {
+      try {
+        const activations: MandalaActivation[] = [];
+        const planetKey = (p: string): MandalaPlanet | null => {
+          const key = p.toLowerCase().replace(/\s+/g, "-");
+          const valid: MandalaPlanet[] = ["sun", "earth", "moon", "north-node", "south-node", "mercury", "mars", "venus", "jupiter", "saturn", "uranus", "neptune", "pluto"];
+          return valid.includes(key as MandalaPlanet) ? (key as MandalaPlanet) : null;
+        };
+        for (const a of chart.activations.personality) {
+          const k = planetKey(a.planet); if (!k) continue;
+          activations.push({ side: "personality", planet: k, gate: a.gate, line: a.line });
+        }
+        for (const a of chart.activations.design) {
+          const k = planetKey(a.planet); if (!k) continue;
+          activations.push({ side: "design", planet: k, gate: a.gate, line: a.line });
+        }
+        const pSun = chart.activations.personality.find((a) => a.planet === "Sun");
+        const pEarth = chart.activations.personality.find((a) => a.planet === "Earth");
+        const dSun = chart.activations.design.find((a) => a.planet === "Sun");
+        const dEarth = chart.activations.design.find((a) => a.planet === "Earth");
+        if (pSun && pEarth && dSun && dEarth) {
+          const mandalaChart: MandalaChart = {
+            clientName: brief.name,
+            activations,
+            cross: {
+              personalitySun: pSun.gate, personalityEarth: pEarth.gate,
+              designSun: dSun.gate, designEarth: dEarth.gate,
+            },
+            bodygraphSvg: chart.chartImageSvg,
+          };
+          const svg = renderCrossMandala(mandalaChart);
+          crossMandalaPng = svgToPng(svg, { widthPx: 1600 });
+          console.log(`\n  ✓ Cross Mandala rendered (${(crossMandalaPng.length / 1024).toFixed(0)} KB)`);
+        }
+      } catch (e) {
+        console.log(`\n  ⚠ Cross Mandala render failed (docx will render without it): ${e instanceof Error ? e.message : e}`);
+      }
+    }
+
+    console.log(`\nRendering branded .docx (with composite cover)…`);
+    const buf = await renderReportDocx({
+      markdown: result.text,
+      clientName: brief.name,
+      reportTitle,
+      chart,
+      dataPass,
+      crossMandalaPng,
+    });
+
+    const docxCachePath = `.cache/reports/${brief.slug}-${outSuffix}.docx`;
+    writeFileSync(docxCachePath, buf);
+
+    const primaryDocxPath = resolve(primaryDir, `${versionPrefix}${nextV}.docx`);
+    writeFileSync(primaryDocxPath, buf);
+    console.log(`\n✓ branded .docx written (${(buf.length / 1024).toFixed(0)} KB):`);
+    console.log(`    ${primaryDocxPath}`);
+    console.log(`    (debug copy: ${resolve(docxCachePath)})`);
+    console.log(`\n→ open in Finder:  open "${primaryDir}"`);
   }
 }
 

@@ -144,15 +144,25 @@ const REQUIRED_H1_BY_TIER: Record<ReportTier, string[]> = {
     "Themes",
     "Gifts and Challenges",
   ],
+  // Planetary list updated 2026-05-29 for the v4 restructure. The
+  // Introduction, Personality Placements Table, and Design Placements Table
+  // are now static-injected (Kaycee's verbatim Introduction). The Cross H1
+  // is the cross's thematic name itself with a parenthetical gate string
+  // (e.g. "The Left Angle Cross of The Clarion | (51/57 | 61/62)") — it
+  // varies per chart so it can't be required by literal name; the post-loop
+  // check below handles it via regex. Timeline MOVED to the end of the
+  // report. Conjunctions is conditional and intentionally omitted.
   planetary: [
-    "How to Use This Report",
     "Introduction",
-    "Personality Activations",
-    "Design Activations",
-    "Your Incarnation Cross",
-    "Your Moon Placements",
-    "Your Nodal Analysis",
-    "Your Hanging Gates",
+    "Personality Placements Table",
+    "Design Placements Table",
+    "Sun and Earth",
+    "Moon Placements",
+    "Nodes of the Moon",
+    "Inner Planets",
+    "Saturn and Jupiter",
+    "Outer Planets",
+    "Your Timeline",
   ],
   quickstart: [
     "How to Use This Report",
@@ -186,6 +196,28 @@ export function validateReport(text: string, dp: DataPass, tier: ReportTier = "f
       message: `Required H1 section "# ${h}" not found in report.`,
       detected: "(missing)", expected: `# ${h}`,
     });
+  }
+
+  // 1b. Planetary-tier Incarnation Cross H1 check. The Cross H1 in v4 carries
+  // the cross's thematic name itself, with a pipe-delimited gate string in
+  // parens (e.g. "# The Left Angle Cross of The Clarion | (51/57 | 61/62)").
+  // The literal-name match in the loop above can't catch this because the
+  // name varies per chart. Look for any H1 line containing the standardized
+  // "(N/N | N/N)" parenthetical.
+  if (tier === "planetary") {
+    factsChecked++;
+    const crossH1Re = /^#\s+.*\(\s*\d+\s*\/\s*\d+\s*\|\s*\d+\s*\/\s*\d+\s*\)/m;
+    if (crossH1Re.test(text)) {
+      factsMatched++;
+    } else {
+      pushHard({
+        section: "Your Incarnation Cross",
+        rule: "cross-h1-missing",
+        message: `Incarnation Cross H1 in standardized format not found. Expected an H1 of the form "# <Cross Thematic Name> | (P-Sun-gate/P-Earth-gate | D-Sun-gate/D-Earth-gate)" — e.g. "# The Left Angle Cross of The Clarion | (51/57 | 61/62)".`,
+        detected: "(missing)",
+        expected: `# <Cross Name> | (N/N | N/N)`,
+      });
+    }
   }
 
   // 2. Definition section must reference the canonical Definition label, and
@@ -386,6 +418,14 @@ export function validateReport(text: string, dp: DataPass, tier: ReportTier = "f
       // term starts before this match and extends to this match's end.
       const before20 = text.slice(Math.max(0, idx - 20), idx);
       if (t === "Generator" && /Manifesting[\s-]$/i.test(before20)) return false;
+      // "pure Generator" on a Manifesting Generator chart is contrastive, not
+      // drift: an MG report legitimately distinguishes the reader from a pure
+      // Generator ("is a Manifesting Generator, not a pure Generator", "where
+      // a pure Generator moves step by step"). That phrase is the reader being
+      // told what they are NOT, so it must not count toward wrong-Type
+      // saturation. Parker v1 surfaced this: 3 correct "pure Generator"
+      // contrasts falsely tripped the 3+ backstop.
+      if (t === "Generator" && expectedType === "Manifesting Generator" && /pure\s+$/i.test(before20)) return false;
       return true;
     });
     if (filteredMatches.length >= 3) {
@@ -826,6 +866,208 @@ export function validateReport(text: string, dp: DataPass, tier: ReportTier = "f
         message: `Banned phrase "${m[0]}" appears in report.`,
         detected: text.slice(Math.max(0, (m.index ?? 0) - 40), Math.min(text.length, (m.index ?? 0) + 100)).replace(/\n/g, " "),
         expected: `(omit "${phrase}")`,
+      });
+    }
+  }
+
+  // 9b. Planetary-tone hard rules.
+  //
+  // Planetary Overview v3 exposed two systematic leakages from the source
+  // library into the prose. Both violate hard rules in the master prompt
+  // (the "no fixing-planet names" rule, the "no exaltation/detriment on
+  // neutral placements" rule, the "no inline source citations" rule, and the
+  // "no Ra by name in body prose" rule). When the model reaches for library
+  // scaffolding instead of writing in voice, these patterns surface. Hard
+  // fail so the retry loop forces a rewrite.
+  //
+  // Tier-agnostic on purpose: Foundation and Planetary both forbid these
+  // patterns. The Foundation Report is generally tighter on voice, but if
+  // the model ever leaks them there too, the rules catch it.
+  const TONE_PLANETS = "(?:Sun|Earth|Moon|Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Neptune|Pluto|Chiron)";
+  const planetaryToneHardPatterns: { re: RegExp; label: string; msg: string }[] = [
+    // Fixing-planet leakage: planet named as the exalter/detrimenter.
+    // The master prompt says: "say 'exalted' or 'in detriment' alone, never
+    // with the planet name."
+    {
+      re: new RegExp(`\\b${TONE_PLANETS}\\b\\s+(?:is|sits|would\\s+be|would|was|are)\\s+(?:in\\s+)?(?:exalted|in\\s+detriment|the\\s+exalted|the\\s+detriment)\\b`, "g"),
+      label: "fixing-planet-named",
+      msg: "Names a fixing planet in an exaltation/detriment claim ('Mars is exalted', 'Venus is in detriment'). Hard rule forbids naming any fixing planet, even when the placement IS exalted or in detriment. Say 'this placement is exalted' or 'in detriment' without naming any planet, then stop.",
+    },
+    {
+      re: new RegExp(`\\b(?:The\\s+)?${TONE_PLANETS}\\s+exalted\\s+(?:here|in|at|would)\\b`, "g"),
+      label: "fixing-planet-named",
+      msg: "Phrase '[Planet] exalted here/in/at/would' names a fixing planet. Hard rule forbids.",
+    },
+    {
+      re: new RegExp(`\\b${TONE_PLANETS}\\s+would\\s+(?:exalt|provide|bring|name|add|harden|fix)\\b`, "g"),
+      label: "fixing-planet-named",
+      msg: "Phrase '[Planet] would exalt/provide/bring/...' both names a fixing planet AND discusses a fixing the chart does not carry. Both violate hard rules. Drop the sentence and write the placement's own mechanic.",
+    },
+    {
+      re: new RegExp(`\\b${TONE_PLANETS}\\s+in\\s+detriment\\b`, "g"),
+      label: "fixing-planet-named",
+      msg: "Phrase '[Planet] in detriment' names a fixing planet. Hard rule: say 'in detriment' alone, never with the planet name.",
+    },
+    {
+      re: new RegExp(`\\b(?:the\\s+)?(?:exaltation|detriment)\\s*,\\s*${TONE_PLANETS}\\s*,`, "g"),
+      label: "fixing-planet-named",
+      msg: "Apposition 'the exaltation/detriment, [Planet],' names a fixing planet. Hard rule forbids.",
+    },
+    {
+      re: new RegExp(`\\b${TONE_PLANETS}\\s+(?:fixes|fix)\\s+(?:this|the)\\s+line\\b`, "g"),
+      label: "fixing-planet-named",
+      msg: "Phrase '[Planet] fixes this line' names a fixing planet. Hard rule forbids.",
+    },
+    {
+      re: new RegExp(`\\b${TONE_PLANETS}\\s+is\\s+(?:the\\s+)?(?:exalted|detriment)\\s+planet\\b`, "g"),
+      label: "fixing-planet-named",
+      msg: "Phrase '[Planet] is the exalted/detriment planet' names a fixing planet. Hard rule forbids.",
+    },
+    // Hedge bridges that justify discussing exaltation/detriment on a
+    // neutral placement. The master prompt's "exaltation/detriment energy
+    // ONLY when actually present" rule says to drop the entire construction.
+    {
+      re: /\bactivation\s+(?:this|the)\s+(?:chart|position|placement)\s+does\s+not\s+carry\b/gi,
+      label: "neutral-placement-exaltation-hedge",
+      msg: "Hedge 'an activation this chart/position does not carry' indicates the prose is discussing a fixing the placement lacks. Hard rule: drop the entire construction, write the placement's own mechanic instead.",
+    },
+    {
+      re: /\bwhich\s+(?:the\s+chart|this\s+activation|this\s+chart)\s+does\s+not\s+carry\b/gi,
+      label: "neutral-placement-exaltation-hedge",
+      msg: "Hedge 'which the chart does not carry' indicates the prose is discussing fixings the chart lacks. Drop the sentence.",
+    },
+    {
+      re: /\bbut\s+the\s+structural\s+(?:theme|reading|pattern)\s+(?:remains|holds|is\s+unmistakable)\b/gi,
+      label: "neutral-placement-exaltation-hedge",
+      msg: "Bridge 'but the structural theme/reading/pattern remains/holds' is the second half of the neutral-placement exaltation hedge. Drop the entire construction; write the placement's own mechanic instead.",
+    },
+    {
+      re: /\bcarries\s+this\s+activation\s+only\s+at\s+the\s+structural\s+level\b/gi,
+      label: "neutral-placement-exaltation-hedge",
+      msg: "Hedge 'carries this activation only at the structural level' is fixing-planet scaffolding. Drop the construction.",
+    },
+    // Inline source citations. The master prompt forbids naming the library
+    // or any specific source ('the source material', 'the Rave I'Ching',
+    // 'Edinburgh', etc.) in body prose.
+    {
+      re: /\bthe\s+source\s+material\b/gi,
+      label: "inline-source-citation",
+      msg: "Phrase 'the source material' names the library in body prose. Hard rule forbids inline source citations. State the claim directly in the report's voice.",
+    },
+    {
+      re: /\bin\s+the\s+source\s+material(?:'s|s'?)?\s+\w+\b/gi,
+      label: "inline-source-citation",
+      msg: "Phrase 'in the source material's framing/words/etc.' names the library in body prose. Drop the attribution.",
+    },
+    {
+      re: /\b(?:the\s+)?(?:Rave\s+I'?Ching|Line\s+Companion|cached\s+library|cached\s+material|Way\s+of\s+the\s+Mind|Understanding\s+the\s+Planets|Lifecycles)\b/gi,
+      label: "inline-source-citation",
+      msg: "Names a specific source by title. Hard rule forbids inline source citations.",
+    },
+    {
+      re: /\bEdinburgh\b/g,
+      label: "inline-source-citation",
+      msg: "Names 'Edinburgh' (the lecture series) as a source. Hard rule forbids inline source citations.",
+    },
+    // Ra-by-name-in-body. The patterns require Ra to be followed by an
+    // attribution verb, so an authorized "Ra Uru Hu" front-matter mention
+    // (if Kaycee ever adds one) does not trip the rule — "Ra Uru" is not a
+    // verb-following pattern. "Ra rendered" / "Ra was clear" / "Ra noted"
+    // are caught.
+    {
+      re: /\bRa\s+(?:was|is|noted|named|said|wrote|saw|put\s+it|observed|emphasi[sz]ed|made\s+(?:it\s+)?clear|made\s+the\s+point|was\s+direct|was\s+clear|was\s+explicit|rendered|transmitted|taught|once\s+said|called|knew|understood|was\s+making)\b/g,
+      label: "ra-by-name-in-body",
+      msg: "Names 'Ra' with an attribution verb. Hard rule forbids naming Ra in body prose; state the claim directly in the report's voice.",
+    },
+    {
+      re: /\b(?:as|per)\s+Ra\b(?!\s+Uru\b)/g,
+      label: "ra-by-name-in-body",
+      msg: "Phrase 'as Ra' / 'per Ra' attributes a claim to Ra by name. Hard rule forbids.",
+    },
+  ];
+  for (const p of planetaryToneHardPatterns) {
+    for (const m of text.matchAll(p.re)) {
+      const idx = m.index ?? 0;
+      pushHard({
+        section: "(any)",
+        rule: p.label,
+        message: p.msg,
+        detected: text.slice(Math.max(0, idx - 40), Math.min(text.length, idx + m[0].length + 80)).replace(/\n/g, " "),
+        expected: "(omit fixing-planet / source-citation scaffolding)",
+      });
+    }
+  }
+
+  // 9c. "Section-as-reading" usage — calling a section of THIS report "a
+  // reading." Per Kaycee (v5 review): "we do need to not refer to the
+  // sections in the report as 'readings'." The verb "read" stays legal,
+  // and "reading window" (a timing concept around returns) stays legal;
+  // only the specific section-label usage is hard-failed.
+  const readingPatterns: { re: RegExp; msg: string }[] = [
+    { re: /\b(?:its|their|this)\s+own\s+reading\b/gi, msg: `Phrase 'its/their/this own reading' labels a section as a "reading", which Kaycee's spec forbids. Rewrite without the reading-as-section framing.` },
+    { re: /\b(?:not\s+a\s+reading\s+best|a\s+reading\s+best\s+taken|the\s+reading\s+of\s+this\s+section)\b/gi, msg: `Calling a section "a reading" is forbidden. Rewrite as "not best understood in the moment" or similar.` },
+    { re: /\breceives?\s+(?:its|their)\s+(?:own\s+)?reading\b/gi, msg: `"receives its own reading" labels a section as a reading; rewrite as "is described" / "is covered" / similar.` },
+  ];
+  for (const p of readingPatterns) {
+    for (const m of text.matchAll(p.re)) {
+      const idx = m.index ?? 0;
+      pushHard({
+        section: "(any)",
+        rule: "section-as-reading",
+        message: p.msg,
+        detected: text.slice(Math.max(0, idx - 40), Math.min(text.length, idx + m[0].length + 80)).replace(/\n/g, " "),
+        expected: `(omit "reading" as a section label)`,
+      });
+    }
+  }
+
+  // 9d. Operational instructions leaking into client-facing prose.
+  // Phrases like "Chart image goes here" / "[image]" / "(see image)" are
+  // editorial placeholders that should never reach a reader. Hard fail.
+  const operationalInstructionPatterns: { re: RegExp; msg: string }[] = [
+    { re: /\b(?:chart|mandala|hexagram|image)\s+(?:image\s+)?goes\s+here\b/gi, msg: `Operational placeholder "<X> goes here" leaked into prose; the renderer handles all image placement.` },
+    { re: /\b(?:insert|see)\s+(?:image|mandala|chart|hexagram|figure)\b/gi, msg: `Operational instruction "insert/see <image>" leaked into prose.` },
+    { re: /\[(?:image|mandala|chart|hexagram|figure)\]/gi, msg: `Bracketed placeholder like [image] leaked into prose.` },
+    { re: /\bimage\s+to\s+(?:follow|come)\b/gi, msg: `Operational placeholder "image to follow/come" leaked into prose.` },
+  ];
+  for (const p of operationalInstructionPatterns) {
+    for (const m of text.matchAll(p.re)) {
+      const idx = m.index ?? 0;
+      pushHard({
+        section: "(any)",
+        rule: "operational-instruction-leak",
+        message: p.msg,
+        detected: text.slice(Math.max(0, idx - 40), Math.min(text.length, idx + m[0].length + 80)).replace(/\n/g, " "),
+        expected: "(omit production-side placeholder; let the renderer handle images)",
+      });
+    }
+  }
+
+  // 9e. Common misspellings the LLM occasionally produces. Soft warnings so
+  // they don't trigger a retry — they're rare and a retry would be wasteful
+  // — but they surface in the validation summary so the operator can fix
+  // them in-place. Add new patterns here when concrete examples surface.
+  const commonMisspellings: { wrong: RegExp; right: string }[] = [
+    { wrong: /\bcenterd\b/gi, right: "centered" },
+    { wrong: /\brecieve(?:d|s|r|rs|ing)?\b/gi, right: "receive" },
+    { wrong: /\bseperate(?:d|s|ly|ing)?\b/gi, right: "separate" },
+    { wrong: /\boccured\b/gi, right: "occurred" },
+    { wrong: /\bdefinately\b/gi, right: "definitely" },
+    { wrong: /\baccomodat(?:e|ed|es|ing|ion)\b/gi, right: "accommodate" },
+    { wrong: /\bmaintainence\b/gi, right: "maintenance" },
+    { wrong: /\bnoticable\b/gi, right: "noticeable" },
+    { wrong: /\bconsious(?:ly|ness)?\b/gi, right: "conscious" },
+    { wrong: /\boccassion(?:al(?:ly)?)?\b/gi, right: "occasion" },
+  ];
+  for (const m of commonMisspellings) {
+    for (const hit of text.matchAll(m.wrong)) {
+      const idx = hit.index ?? 0;
+      pushSoft({
+        section: "(any)",
+        rule: "common-misspelling",
+        message: `Likely misspelling "${hit[0]}" — should be "${m.right}".`,
+        detected: text.slice(Math.max(0, idx - 30), Math.min(text.length, idx + hit[0].length + 30)).replace(/\n/g, " "),
+        expected: m.right,
       });
     }
   }
