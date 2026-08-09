@@ -34,6 +34,9 @@ export const CLIENTS: Record<string, ClientBrief> = {
   parker:   { slug: "parker",   name: "Parker Goodin",     birthDate: "1989-08-11", birthTime: "16:30", birthPlace: "Ogden, Utah, United States" },
   austin:   { slug: "austin",   name: "Austin Vandenberg", birthDate: "2007-09-04", birthTime: "14:30", birthPlace: "Ogden, Utah, United States" },
   waylon:   { slug: "waylon",   name: "Waylon Vandenberg", birthDate: "2009-12-29", birthTime: "07:35", birthPlace: "Ogden, Utah, United States" },
+  annie:    { slug: "annie",    name: "Annie Hollingshead", birthDate: "2009-08-04", birthTime: "21:43", birthPlace: "American Fork, Utah, United States" },
+  izzy:     { slug: "izzy",     name: "Izzy Hollingshead",  birthDate: "2013-02-02", birthTime: "06:23", birthPlace: "Orem, Utah, United States" },
+  jack:     { slug: "jack",     name: "Jack Hollingshead",  birthDate: "2007-03-21", birthTime: "20:32", birthPlace: "American Fork, Utah, United States" },
 };
 
 /** Resolve a slug to a ClientBrief or exit with usage. */
