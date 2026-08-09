@@ -956,9 +956,13 @@ export function validateReport(text: string, dp: DataPass, tier: ReportTier = "f
     // or any specific source ('the source material', 'the Rave I'Ching',
     // 'Edinburgh', etc.) in body prose.
     {
-      re: /\bthe\s+source\s+material\b/gi,
+      // Match "source material" anywhere, regardless of the preceding word.
+      // The narrow "the source material" form let "the tribal source material
+      // describes..." slip through (Russell v4). The phrase never belongs in
+      // client-facing prose, so flag every occurrence.
+      re: /\bsource\s+material\b/gi,
       label: "inline-source-citation",
-      msg: "Phrase 'the source material' names the library in body prose. Hard rule forbids inline source citations. State the claim directly in the report's voice.",
+      msg: "Phrase 'source material' names the library in body prose. Hard rule forbids inline source citations. State the claim directly in the report's voice.",
     },
     {
       re: /\bin\s+the\s+source\s+material(?:'s|s'?)?\s+\w+\b/gi,
