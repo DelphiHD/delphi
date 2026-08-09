@@ -173,6 +173,17 @@ Structure this section as four parts, in order:
 
 **2. How the Profile number is calculated.** Each Profile number comes from a Sun-and-Earth pair. The Personality Sun and the Personality Earth sit exactly opposite each other in the zodiac, so they share the same line number; that shared number is the conscious (first) Profile line. The Design Sun and the Design Earth do the same thing on the design side, sharing a line number that becomes the unconscious (second) Profile line. So Profile = (Personality Sun + Earth line) / (Design Sun + Earth line). For example, if the Personality Sun is at 54.2 and Personality Earth at 53.2, the conscious line is 2. If the Design Sun is at 57.4 and Design Earth at 51.4, the unconscious line is 4. The Profile is 2/4. Quote the actual gate.line values from the Data Pass for all four placements so the reader sees their own numbers.
 
+Immediately after that paragraph, emit a hexagram image grid as a fenced block in EXACTLY this format, one placement per line, pipe-delimited as \`gate.line | Hexagram Name | Source\`, pulling the gate.line from the Data Pass activation tables and the Hexagram Name from the "Activated Gate Names (canonical)" block:
+
+::: hexgrid
+<Personality Sun gate>.<line> | <Hexagram Name> | Personality Sun
+<Personality Earth gate>.<line> | <Hexagram Name> | Personality Earth
+<Design Sun gate>.<line> | <Hexagram Name> | Design Sun
+<Design Earth gate>.<line> | <Hexagram Name> | Design Earth
+:::
+
+Emit this block exactly once, with exactly these four placements in this order, using the real values. Do not add, omit, or reorder lines. Do not wrap it in a code fence or add commentary around it.
+
 **3. Each line, individually.** Describe ONLY the lines actually in this chart's Profile. Each line has a name and a lived rhythm; cover them one at a time. The six line names (use the matching ones, never the others): Investigator, Hermit, Martyr, Opportunist, Heretic, Role Model. Do NOT compare the chart's line to lines it does NOT have. Phrases like "where a third line experiments broadly, the fourth line invests deeply" are noise; the reader does not have the third line. Describe the fourth line's investment quality on its own terms.
 
 In each of the two line sections, name explicitly which SIDE of the chart that line sits on (personality / conscious vs. design / unconscious). The conscious line (the first number in the Profile) is the one the reader will most recognize about themselves; the unconscious line (the second number) operates below conscious awareness and tends to show up as patterns others notice first. When describing the unconscious line, write in body-and-behavior terms; the reader meets this line through its behavioral fingerprint, not through an internal sense of self.
