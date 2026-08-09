@@ -48,14 +48,10 @@ export function clientFromSlug(slug: string | undefined): ClientBrief {
 
 /**
  * Canonical output directory for a client's deliverables.
- * Mirrors generate-report.ts: prefer ~/Desktop/HD Reports/Paid HD Reports/<Name>/
- * if it already exists, otherwise fall back to ~/Desktop/HD Reports/<Name>/.
- * All render + export scripts should call this so .md, .docx, and PNGs sit
- * together in the same folder.
+ * All client subfolders live under ~/Desktop/HD Reports/Paid HD Reports/<Name>/
+ * (Kaycee's convention). All render + export scripts should call this so .md,
+ * .docx, and PNGs sit together in the same folder.
  */
-import { existsSync } from "node:fs";
 export function clientOutputDir(client: ClientBrief): string {
-  const paid = `/Users/dorothygale/Desktop/HD Reports/Paid HD Reports/${client.name}`;
-  if (existsSync(paid)) return paid;
-  return `/Users/dorothygale/Desktop/HD Reports/${client.name}`;
+  return `/Users/dorothygale/Desktop/HD Reports/Paid HD Reports/${client.name}`;
 }

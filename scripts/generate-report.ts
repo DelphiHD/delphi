@@ -228,12 +228,13 @@ async function main() {
   // baked in: every output file lands somewhere Kaycee can find in Finder.
   // The .cache/reports/ paths inside the worktree are debug-only.
   //
-  //   - REAL client work (ad-hoc mode):   ~/Desktop/HD Reports/<Client>/
+  //   - REAL client work (ad-hoc mode):   ~/Desktop/HD Reports/Paid HD Reports/<Client>/
   //   - Benchmark cohort (slug mode):      ~/Desktop/Benchmark Reports/Phase 4 Output/
   //
+  // All client subfolders live under "Paid HD Reports/" (Kaycee's convention).
   // Override either with HD_REPORTS_DIR or BENCHMARK_REPORTS_DIR.
   const clientDir = process.env.HD_REPORTS_DIR
-    ?? resolve(homedir(), "Desktop", "HD Reports", brief.name);
+    ?? resolve(homedir(), "Desktop", "HD Reports", "Paid HD Reports", brief.name);
   const benchmarkDir = process.env.BENCHMARK_REPORTS_DIR
     ?? resolve(homedir(), "Desktop", "Benchmark Reports", "Phase 4 Output");
   // For ad-hoc real-client runs, primary destination is clientDir.
