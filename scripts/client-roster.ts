@@ -37,6 +37,7 @@ export const CLIENTS: Record<string, ClientBrief> = {
   annie:    { slug: "annie",    name: "Annie Hollingshead", birthDate: "2009-08-04", birthTime: "21:43", birthPlace: "American Fork, Utah, United States" },
   izzy:     { slug: "izzy",     name: "Izzy Hollingshead",  birthDate: "2013-02-02", birthTime: "06:23", birthPlace: "Orem, Utah, United States" },
   jack:     { slug: "jack",     name: "Jack Hollingshead",  birthDate: "2007-03-21", birthTime: "20:32", birthPlace: "American Fork, Utah, United States" },
+  bryan:    { slug: "bryan",    name: "Bryan Rodabough",    birthDate: "1986-08-01", birthTime: "10:41", birthPlace: "Bountiful, Utah, United States" },
 };
 
 /** Resolve a slug to a ClientBrief or exit with usage. */
