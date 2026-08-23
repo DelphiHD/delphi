@@ -21,6 +21,8 @@ import { renderFullMandala, renderCrossMandala } from "@/lib/render/mandala";
 import { svgToPng } from "@/lib/render/docx";
 import { gateName, GATE_NAMES } from "@/lib/hd/gate-names";
 import { getChart } from "@/lib/mybodygraph";
+import { buildDataPass } from "@/lib/chart/datapass";
+import { createClient } from "@supabase/supabase-js";
 import type { MandalaChart, Activation, Planet } from "@/lib/render/mandala.types";
 
 const HOST = "https://api.bodygraphchart.com";
@@ -65,6 +67,72 @@ function uranusGlyphSvg(glyphX: number, y: number, color: string): string {
     + `<line x1="${cx}" y1="${y - 9}" x2="${cx}" y2="${y - 1}"/>`
     + `<circle cx="${cx}" cy="${y + 1.5}" r="2.4" fill="${color}" stroke="none"/>`
     + `</g>`;
+}
+
+// Canonical center order (top to bottom) + standard theme text. The theme
+// column has no stored source, so these are standard HD center themes for
+// Kaycee to adjust.
+const CENTER_ORDER = ["Head", "Ajna", "Throat", "G", "Heart", "Sacral", "Solar Plexus", "Spleen", "Root"];
+const CENTER_THEMES: Record<string, string> = {
+  Head: "Inspiration & mental pressure",
+  Ajna: "Conceptualization & certainty",
+  Throat: "Communication & manifestation",
+  G: "Identity, love & direction",
+  Heart: "Willpower & worth",
+  Sacral: "Life force & work",
+  "Solar Plexus": "Emotions & spirit",
+  Spleen: "Intuition, health & survival",
+  Root: "Pressure & drive",
+};
+// Normalize a Data Pass center name to a CENTER_THEMES key.
+function normCenter(name: string): string {
+  const n = name.toLowerCase().replace(/\s*center$/i, "").trim();
+  if (/^(g|identity|self)$/.test(n)) return "G";
+  if (/^(heart|ego|will)$/.test(n)) return "Heart";
+  if (/spleen|splenic/.test(n)) return "Spleen";
+  if (/solar|emotional|plexus/.test(n)) return "Solar Plexus";
+  if (n === "head") return "Head";
+  if (n === "ajna") return "Ajna";
+  if (n === "throat") return "Throat";
+  if (n === "sacral") return "Sacral";
+  if (n === "root") return "Root";
+  return name;
+}
+
+// Generic multi-column grid table (Centers, Channels), brand-styled with a
+// centered all-caps title, a purple header row, and alternating row shading.
+// Column x-positions auto-fit the content.
+function gridTableSvg(title: string, headers: string[], rows: string[][]): { svg: string; w: number } {
+  const { mX, rowH } = PT;
+  const top = 138;
+  const gap = 34;
+  const xs: number[] = [];
+  let x = mX;
+  for (let c = 0; c < headers.length; c++) {
+    xs.push(x);
+    const colChars = Math.max(headers[c].length, ...rows.map((r) => (r[c] || "").length));
+    x += Math.ceil(colChars * 9.7) + gap;
+  }
+  const W = Math.max(430, x - gap + mX);
+  const H = top + rows.length * rowH + 16;
+  const purple = "#845095", charcoal = "#333333", gray = "#555555";
+  const ff = `font-family="Montserrat, 'Helvetica Neue', Arial, sans-serif"`;
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
+  s += `<rect width="${W}" height="${H}" fill="#ffffff"/>`;
+  s += `<text x="${W / 2}" y="46" ${ff} font-size="30" font-weight="700" fill="${charcoal}" text-anchor="middle" letter-spacing="2">${escXml(title.toUpperCase())}</text>`;
+  headers.forEach((h, c) => { s += `<text x="${xs[c]}" y="98" ${ff} font-size="14" font-weight="700" fill="${purple}">${escXml(h.toUpperCase())}</text>`; });
+  s += `<line x1="${mX}" y1="110" x2="${W - mX}" y2="110" stroke="${purple}" stroke-width="1.5"/>`;
+  rows.forEach((r, i) => {
+    const y = top + i * rowH;
+    if (i % 2 === 1) s += `<rect x="${mX - 8}" y="${y - 28}" width="${W - 2 * mX + 16}" height="${rowH}" fill="#f6f2f7"/>`;
+    r.forEach((cell, c) => {
+      const bold = c === 0 ? ` font-weight="700"` : "";
+      const col = c === 0 ? charcoal : gray;
+      s += `<text x="${xs[c]}" y="${y}" ${ff} font-size="18"${bold} fill="${col}">${escXml(cell)}</text>`;
+    });
+  });
+  s += `</svg>`;
+  return { svg: s, w: W };
 }
 
 // Generic two-column key/value table (Overview, Variables), same brand styling
@@ -313,6 +381,37 @@ async function main() {
   writeFileSync(variablesPath, variablesPng);
   console.log(`✓ ${overviewPath}  (${(overviewPng.length / 1024).toFixed(0)} KB)`);
   console.log(`✓ ${variablesPath}  (${(variablesPng.length / 1024).toFixed(0)} KB)`);
+
+  // Centers + Channels tables from the Data Pass (authoritative 3-state center
+  // status and channel circuits from Kaycee's Notion library). Best-effort: a
+  // Supabase/library hiccup must not lose the images already written above.
+  try {
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+  const dataPass = await buildDataPass({ supabase, client: { name: client.name }, chart: hdChart });
+  const cap = (t: string) => (t ? t.charAt(0).toUpperCase() + t.slice(1) : "");
+  const statusByCenter = new Map(dataPass.centers.map((c) => [normCenter(c.name), c.status]));
+  const centerRows = CENTER_ORDER.map((cn) => [
+    cn === "G" ? "G (Identity)" : cn,
+    CENTER_THEMES[cn],
+    cap(statusByCenter.get(cn) || "open"),
+  ]);
+  const channelRows = dataPass.channels.map((ch) => {
+    const [circuit, type] = (ch.circuit || "").split(":").map((x) => x.trim());
+    return [ch.name, circuit || "", type || ""];
+  });
+  const centersTbl = gridTableSvg("Centers", ["Center", "Theme", "Status"], centerRows);
+  const channelsTbl = gridTableSvg("Channels", ["Name", "Circuit", "Type"], channelRows);
+  const centersPath = join(outDir, `${client.name} - Centers.png`);
+  const channelsPath = join(outDir, `${client.name} - Channels.png`);
+  const centersPng = svgToPng(centersTbl.svg, { widthPx: centersTbl.w * 2 });
+  const channelsPng = svgToPng(channelsTbl.svg, { widthPx: channelsTbl.w * 2 });
+  writeFileSync(centersPath, centersPng);
+  writeFileSync(channelsPath, channelsPng);
+  console.log(`✓ ${centersPath}  (${(centersPng.length / 1024).toFixed(0)} KB)`);
+  console.log(`✓ ${channelsPath}  (${(channelsPng.length / 1024).toFixed(0)} KB)`);
+  } catch (e) {
+    console.log(`  ⚠ Centers/Channels tables skipped (Data Pass unavailable): ${e instanceof Error ? e.message : e}`);
+  }
 }
 
 main().catch((err) => {
