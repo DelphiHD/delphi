@@ -53,6 +53,17 @@ const PT = { mX: 22, glyphX: 22, planetX: 50, gateX: 196, nameX: 292, rowH: 44, 
 // Standardize the name column to the longest gate name in the catalog so every
 // image (both sides, every client) comes out the same width.
 const LONGEST_GATE_NAME = Math.max(...Object.values(GATE_NAMES).map((n) => n.length));
+const PROFILE_LINES: Record<number, string> = { 1: "Investigator", 2: "Hermit", 3: "Martyr", 4: "Opportunist", 5: "Heretic", 6: "Role Model" };
+
+// Parse a Data Pass variable header into { variable, color, direction, tone }.
+// e.g. "Digestion - Color 5: Sound, Left Arrow | Active: High, Tone 3: Outer Vision"
+// (a trailing ", Transference: ..." / ", Distraction: ..." is intentionally dropped).
+function parseVariableHeader(h: string): { variable: string; color: string; direction: string; tone: string } | null {
+  const m = h.match(/^(.+?) - Color (\d+): (.+?), (Left|Right) Arrow \| (.+?), Tone (\d+): ([^,]+)/);
+  if (!m) return null;
+  const arrow = m[4] === "Left" ? "◀" : "▶";
+  return { variable: m[1], color: `${m[2]}: ${m[3]}`, direction: `${arrow} ${m[5]}`, tone: `${m[6]}: ${m[7]}` };
+}
 
 // Herschel "H with a circle" Uranus symbol (⛢), drawn as vectors because that
 // codepoint isn't in the fonts resvg can reach (it rasterizes as tofu). Clearer
@@ -74,15 +85,15 @@ function uranusGlyphSvg(glyphX: number, y: number, color: string): string {
 // Kaycee to adjust.
 const CENTER_ORDER = ["Head", "Ajna", "Throat", "G", "Heart", "Sacral", "Solar Plexus", "Spleen", "Root"];
 const CENTER_THEMES: Record<string, string> = {
-  Head: "Inspiration & mental pressure",
-  Ajna: "Conceptualization & certainty",
-  Throat: "Communication & manifestation",
-  G: "Identity, love & direction",
-  Heart: "Willpower & worth",
-  Sacral: "Life force & work",
-  "Solar Plexus": "Emotions & spirit",
-  Spleen: "Intuition, health & survival",
-  Root: "Pressure & drive",
+  Head: "Inspiration & Mental Pressure",
+  Ajna: "Conceptualization & Certainty",
+  Throat: "Communication & Manifestation",
+  G: "Identity, Love & Direction",
+  Heart: "Willpower & Worth",
+  Sacral: "Life Force & Work",
+  "Solar Plexus": "Emotions & Spirit",
+  Spleen: "Intuition, Health & Survival",
+  Root: "Pressure & Drive",
 };
 // Normalize a Data Pass center name to a CENTER_THEMES key.
 function normCenter(name: string): string {
@@ -349,38 +360,24 @@ async function main() {
   console.log(`✓ ${persTablePath}  (${(persTablePng.length / 1024).toFixed(0)} KB)`);
   console.log(`✓ ${desTablePath}  (${(desTablePng.length / 1024).toFixed(0)} KB)`);
 
-  // Overview + Variables tables, from getChart so the values (esp. the variable
-  // themes) match the vocabulary the reports use, not the raw API's terms.
+  // Overview table from getChart (values in the reports' vocabulary). Profile
+  // includes the line names, e.g. "2 / 4 Hermit Opportunist".
   const hdChart = await getChart({ birthDate: client.birthDate, birthTime: client.birthTime, timezone: tz, locationQuery: client.birthPlace, includeChartImage: false });
+  const profLines = (hdChart.profile.value.match(/\d/g) ?? []).map(Number).map((n) => PROFILE_LINES[n]).filter(Boolean);
   const overviewRows = [
     { k: "Type", v: hdChart.type.value },
-    { k: "Profile", v: hdChart.profile.value },
+    { k: "Profile", v: `${hdChart.profile.value} ${profLines.join(" ")}`.trim() },
     { k: "Definition", v: hdChart.definition.value },
     { k: "Authority", v: hdChart.authority.value },
     { k: "Strategy", v: hdChart.strategy.value },
     { k: "Not-Self Theme", v: hdChart.notSelfTheme.value },
     { k: "Incarnation Cross", v: hdChart.incarnationCross.value },
   ];
-  const V = hdChart.variables;
-  const arw = (a: string) => (a === "left" ? "◀" : "▶");
-  const variableRows = [
-    { k: "Determination", v: `${arw(V.determination.arrow)}  ${V.determination.theme}` },
-    { k: "Environment", v: `${arw(V.environment.arrow)}  ${V.environment.theme}` },
-    { k: "Motivation", v: `${arw(V.motivation.arrow)}  ${V.motivation.theme}` },
-    { k: "Perspective", v: `${arw(V.perspective.arrow)}  ${V.perspective.theme}` },
-    { k: "Sense", v: V.sense },
-    { k: "Design Sense", v: V.designSense },
-  ];
   const overview = kvTableSvg("Overview", overviewRows);
-  const variables = kvTableSvg("Variables", variableRows);
   const overviewPath = join(outDir, `${client.name} - Overview.png`);
-  const variablesPath = join(outDir, `${client.name} - Variables.png`);
   const overviewPng = svgToPng(overview.svg, { widthPx: overview.w * 2 });
-  const variablesPng = svgToPng(variables.svg, { widthPx: variables.w * 2 });
   writeFileSync(overviewPath, overviewPng);
-  writeFileSync(variablesPath, variablesPng);
   console.log(`✓ ${overviewPath}  (${(overviewPng.length / 1024).toFixed(0)} KB)`);
-  console.log(`✓ ${variablesPath}  (${(variablesPng.length / 1024).toFixed(0)} KB)`);
 
   // Centers + Channels tables from the Data Pass (authoritative 3-state center
   // status and channel circuits from Kaycee's Notion library). Best-effort: a
@@ -389,6 +386,20 @@ async function main() {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   const dataPass = await buildDataPass({ supabase, client: { name: client.name }, chart: hdChart });
   const cap = (t: string) => (t ? t.charAt(0).toUpperCase() + t.slice(1) : "");
+
+  // Variables table: Variable | Color | Direction | Tone, parsed from the same
+  // Data Pass variable headers the Foundation report uses.
+  const varKeys = ["determination", "environment", "motivation", "perspective"] as const;
+  const variableRows = varKeys
+    .map((k) => parseVariableHeader(dataPass.variableHeaders[k]))
+    .filter((p): p is NonNullable<typeof p> => p !== null)
+    .map((p) => [p.variable, p.color, p.direction, p.tone]);
+  const variablesTbl = gridTableSvg("Variables", ["Variable", "Color", "Direction", "Tone"], variableRows);
+  const variablesPath = join(outDir, `${client.name} - Variables.png`);
+  const variablesPng = svgToPng(variablesTbl.svg, { widthPx: variablesTbl.w * 2 });
+  writeFileSync(variablesPath, variablesPng);
+  console.log(`✓ ${variablesPath}  (${(variablesPng.length / 1024).toFixed(0)} KB)`);
+
   const statusByCenter = new Map(dataPass.centers.map((c) => [normCenter(c.name), c.status]));
   const centerRows = CENTER_ORDER.map((cn) => [
     cn === "G" ? "G (Identity)" : cn,
@@ -397,7 +408,7 @@ async function main() {
   ]);
   const channelRows = dataPass.channels.map((ch) => {
     const [circuit, type] = (ch.circuit || "").split(":").map((x) => x.trim());
-    return [ch.name, circuit || "", type || ""];
+    return [`${ch.id} ${ch.name}`, circuit || "", type || ""];
   });
   const centersTbl = gridTableSvg("Centers", ["Center", "Theme", "Status"], centerRows);
   const channelsTbl = gridTableSvg("Channels", ["Name", "Circuit", "Type"], channelRows);
