@@ -19,6 +19,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { renderFullMandala, renderCrossMandala } from "@/lib/render/mandala";
 import { svgToPng } from "@/lib/render/docx";
+import { gateName } from "@/lib/hd/gate-names";
 import type { MandalaChart, Activation, Planet } from "@/lib/render/mandala.types";
 
 const HOST = "https://api.bodygraphchart.com";
@@ -33,6 +34,50 @@ const PLANET_KEY_MAP: Record<string, Planet> = {
   Jupiter: "jupiter", Saturn: "saturn",
   Uranus: "uranus", Neptune: "neptune", Pluto: "pluto",
 };
+
+// Canonical planetary order for the placement columns (matches the chart
+// software's side-of-bodygraph layout).
+const PLANET_ORDER = ["Sun", "Earth", "Moon", "North Node", "South Node", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"];
+const escXml = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+// Standalone planetary placement table (one side) as a brand-styled SVG. These
+// are the columns that flank the bodygraph in the chart software; Kaycee wants
+// them on their own for slides. Personality reads in charcoal, Design in the
+// red the software uses for the design side.
+function placementTableSvg(side: "Personality" | "Design", raw: any): string {
+  const src = side === "Personality" ? raw.Personality : raw.Design;
+  const rows = PLANET_ORDER
+    .map((p) => {
+      const d = src[p];
+      if (!d) return null;
+      const fix = /exalt/i.test(d.FixingState || "") ? " ▲" : /detriment/i.test(d.FixingState || "") ? " ▽" : "";
+      return { planet: p, gl: `${d.Gate}.${d.Line}${fix}`, name: gateName(d.Gate) };
+    })
+    .filter(Boolean) as { planet: string; gl: string; name: string }[];
+  const W = 660, mX = 30, rowH = 44, top = 132;
+  const H = top + rows.length * rowH + 20;
+  const accent = side === "Personality" ? "#333333" : "#B0453C";
+  const purple = "#845095", gray = "#666666";
+  const ff = `font-family="Montserrat, 'Helvetica Neue', Arial, sans-serif"`;
+  const gateX = 330, nameX = 420;
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
+  s += `<rect width="${W}" height="${H}" fill="#ffffff"/>`;
+  s += `<text x="${mX}" y="48" ${ff} font-size="30" font-weight="700" fill="${accent}">${side}</text>`;
+  s += `<text x="${W - mX}" y="48" ${ff} font-size="15" fill="${gray}" text-anchor="end">${escXml(raw.Properties?.Type?.option)}</text>`;
+  s += `<text x="${mX}" y="92" ${ff} font-size="15" font-weight="700" fill="${purple}">PLANET</text>`;
+  s += `<text x="${gateX}" y="92" ${ff} font-size="15" font-weight="700" fill="${purple}">GATE</text>`;
+  s += `<text x="${nameX}" y="92" ${ff} font-size="15" font-weight="700" fill="${purple}">NAME</text>`;
+  s += `<line x1="${mX}" y1="104" x2="${W - mX}" y2="104" stroke="${purple}" stroke-width="1.5"/>`;
+  rows.forEach((r, i) => {
+    const y = top + i * rowH;
+    if (i % 2 === 1) s += `<rect x="${mX - 8}" y="${y - 28}" width="${W - 2 * mX + 16}" height="${rowH}" fill="#f6f2f7"/>`;
+    s += `<text x="${mX}" y="${y}" ${ff} font-size="19" fill="${accent}">${escXml(r.planet)}</text>`;
+    s += `<text x="${gateX}" y="${y}" ${ff} font-size="19" font-weight="600" fill="#222222">${escXml(r.gl)}</text>`;
+    s += `<text x="${nameX}" y="${y}" ${ff} font-size="18" fill="${gray}">${escXml(r.name)}</text>`;
+  });
+  s += `</svg>`;
+  return s;
+}
 
 async function lookupTimezone(query: string): Promise<string> {
   const url = new URL(`${HOST}/v210502/locations`);
@@ -136,6 +181,16 @@ async function main() {
   }
   console.log(`✓ ${fullPath}  (${(fullPng.length / 1024).toFixed(0)} KB)`);
   console.log(`✓ ${crossPath}  (${(crossPng.length / 1024).toFixed(0)} KB)`);
+
+  // Standalone planetary placement tables (Personality + Design) for slides.
+  const persTablePng = svgToPng(placementTableSvg("Personality", raw), { widthPx: 1320 });
+  const desTablePng = svgToPng(placementTableSvg("Design", raw), { widthPx: 1320 });
+  const persTablePath = join(outDir, `${client.name} - Personality Placements.png`);
+  const desTablePath = join(outDir, `${client.name} - Design Placements.png`);
+  writeFileSync(persTablePath, persTablePng);
+  writeFileSync(desTablePath, desTablePng);
+  console.log(`✓ ${persTablePath}  (${(persTablePng.length / 1024).toFixed(0)} KB)`);
+  console.log(`✓ ${desTablePath}  (${(desTablePng.length / 1024).toFixed(0)} KB)`);
 }
 
 main().catch((err) => {
