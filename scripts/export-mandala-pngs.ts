@@ -49,44 +49,59 @@ const escXml = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/<
 // are the columns that flank the bodygraph in the chart software; Kaycee wants
 // them on their own for slides. Personality reads in charcoal, Design in the
 // red the software uses for the design side.
-function placementTableSvg(side: "Personality" | "Design", raw: any): string {
+function placementTableSvg(side: "Personality" | "Design", raw: any, subtitle: string): { svg: string; w: number } {
   const src = side === "Personality" ? raw.Personality : raw.Design;
   const rows = PLANET_ORDER
     .map((p) => {
       const d = src[p];
       if (!d) return null;
-      const fix = /exalt/i.test(d.FixingState || "") ? " ▲" : /detriment/i.test(d.FixingState || "") ? " ▽" : "";
-      return { planet: p, glyph: PLANET_GLYPHS[p] || "", gl: `${d.Gate}.${d.Line}${fix}`, name: gateName(d.Gate) };
+      const fix = /exalt/i.test(d.FixingState || "") ? "▲" : /detriment/i.test(d.FixingState || "") ? "▽" : "";
+      return { planet: p, glyph: PLANET_GLYPHS[p] || "", gl: `${d.Gate}.${d.Line}`, fix, name: gateName(d.Gate) };
     })
-    .filter(Boolean) as { planet: string; glyph: string; gl: string; name: string }[];
+    .filter(Boolean) as { planet: string; glyph: string; gl: string; fix: string; name: string }[];
   // Column x-positions, tuned so text just fits. Width flexes to the longest
-  // gate name so the NAME column never clips and never leaves a wide gutter.
-  const mX = 22, glyphX = 22, planetX = 50, gateX = 196, nameX = 292, rowH = 44, top = 122;
+  // gate name (or the birth/design subtitle) so nothing clips or leaves a gutter.
+  const mX = 22, glyphX = 22, planetX = 50, gateX = 196, nameX = 292, rowH = 44, top = 150;
   const longestName = Math.max(4, ...rows.map((r) => r.name.length));
-  const W = Math.max(430, Math.ceil(nameX + longestName * 9.7 + mX));
+  const W = Math.max(430, Math.ceil(nameX + longestName * 9.7 + mX), Math.ceil(2 * mX + subtitle.length * 7.3));
   const H = top + rows.length * rowH + 16;
-  // Personality reads charcoal; Design uses the chart's own design red.
+  // Personality reads charcoal; the Design image is entirely in the chart's
+  // design red. Column headers/values/name follow that per-side scheme.
   const accent = side === "Design" ? "#e06666" : "#333333";
-  const purple = "#845095", gray = "#666666";
+  const red = "#e06666", purple = "#845095", gray = "#666666";
+  const headerCol = side === "Design" ? red : purple;
+  const gateCol = side === "Design" ? red : "#222222";
+  const nameCol = side === "Design" ? red : gray;
+  const subCol = side === "Design" ? red : gray;
   const ff = `font-family="Montserrat, 'Helvetica Neue', Arial, sans-serif"`;
   const gf = `font-family="'Apple Symbols', 'Segoe UI Symbol', Montserrat, sans-serif"`;
   let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
   s += `<rect width="${W}" height="${H}" fill="#ffffff"/>`;
   s += `<text x="${mX}" y="44" ${ff} font-size="30" font-weight="700" fill="${accent}">${side}</text>`;
-  s += `<text x="${mX}" y="80" ${ff} font-size="14" font-weight="700" fill="${purple}">PLANET</text>`;
-  s += `<text x="${gateX}" y="80" ${ff} font-size="14" font-weight="700" fill="${purple}">GATE</text>`;
-  s += `<text x="${nameX}" y="80" ${ff} font-size="14" font-weight="700" fill="${purple}">NAME</text>`;
-  s += `<line x1="${mX}" y1="92" x2="${W - mX}" y2="92" stroke="${purple}" stroke-width="1.5"/>`;
+  s += `<text x="${mX}" y="72" ${ff} font-size="15" fill="${subCol}">${escXml(subtitle)}</text>`;
+  s += `<text x="${mX}" y="110" ${ff} font-size="14" font-weight="700" fill="${headerCol}">PLANET</text>`;
+  s += `<text x="${gateX}" y="110" ${ff} font-size="14" font-weight="700" fill="${headerCol}">GATE</text>`;
+  s += `<text x="${nameX}" y="110" ${ff} font-size="14" font-weight="700" fill="${headerCol}">NAME</text>`;
+  s += `<line x1="${mX}" y1="122" x2="${W - mX}" y2="122" stroke="${headerCol}" stroke-width="1.5"/>`;
   rows.forEach((r, i) => {
     const y = top + i * rowH;
     if (i % 2 === 1) s += `<rect x="${mX - 8}" y="${y - 28}" width="${W - 2 * mX + 16}" height="${rowH}" fill="#f6f2f7"/>`;
     s += `<text x="${glyphX}" y="${y}" ${gf} font-size="19" fill="${accent}">${escXml(r.glyph)}</text>`;
     s += `<text x="${planetX}" y="${y}" ${ff} font-size="19" fill="${accent}">${escXml(r.planet)}</text>`;
-    s += `<text x="${gateX}" y="${y}" ${ff} font-size="19" font-weight="700" fill="#222222">${escXml(r.gl)}</text>`;
-    s += `<text x="${nameX}" y="${y}" ${ff} font-size="18" fill="${gray}">${escXml(r.name)}</text>`;
+    // Gate.line is its OWN pure-number text element so it always renders bold.
+    // The fixation arrow (▲/▽) is a SEPARATE element positioned after it: mixing
+    // the arrow into the number run makes resvg fall back to a non-bold font for
+    // the whole run (the ▽ glyph isn't in the bold face), which silently dropped
+    // the bold on exactly the fixed placements.
+    s += `<text x="${gateX}" y="${y}" ${ff} font-size="19" font-weight="700" fill="${gateCol}">${escXml(r.gl)}</text>`;
+    if (r.fix) {
+      const glW = [...r.gl].reduce((w, ch) => w + (ch === "." ? 5 : 10.5), 0);
+      s += `<text x="${(gateX + glW + 8).toFixed(1)}" y="${y}" ${gf} font-size="16" fill="${gateCol}">${r.fix}</text>`;
+    }
+    s += `<text x="${nameX}" y="${y}" ${ff} font-size="18" fill="${nameCol}">${escXml(r.name)}</text>`;
   });
   s += `</svg>`;
-  return s;
+  return { svg: s, w: W };
 }
 
 async function lookupTimezone(query: string): Promise<string> {
@@ -193,8 +208,18 @@ async function main() {
   console.log(`✓ ${crossPath}  (${(crossPng.length / 1024).toFixed(0)} KB)`);
 
   // Standalone planetary placement tables (Personality + Design) for slides.
-  const persTablePng = svgToPng(placementTableSvg("Personality", raw), { widthPx: 1320 });
-  const desTablePng = svgToPng(placementTableSvg("Design", raw), { widthPx: 1320 });
+  // Subtitle: Personality shows the local birth date/time + place; Design shows
+  // the design moment (~88 days prior) in the same local timezone.
+  const tz = await lookupTimezone(client.birthPlace);
+  const P = raw.Properties;
+  const dfmt = (iso: string) => new Intl.DateTimeFormat("en-US", { timeZone: tz, month: "long", day: "numeric", year: "numeric" }).format(new Date(iso));
+  const tfmt = (iso: string) => new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(iso));
+  const persSub = `${dfmt(P.BirthDateUtcStandard)} · ${tfmt(P.BirthDateUtcStandard)} · ${client.birthPlace}`;
+  const desSub = `${dfmt(P.DesignDateUtcStandard)} · ${tfmt(P.DesignDateUtcStandard)}`;
+  const pers = placementTableSvg("Personality", raw, persSub);
+  const des = placementTableSvg("Design", raw, desSub);
+  const persTablePng = svgToPng(pers.svg, { widthPx: pers.w * 2 });
+  const desTablePng = svgToPng(des.svg, { widthPx: des.w * 2 });
   const persTablePath = join(outDir, `${client.name} - Personality Placements.png`);
   const desTablePath = join(outDir, `${client.name} - Design Placements.png`);
   writeFileSync(persTablePath, persTablePng);
