@@ -20,6 +20,7 @@ import { join } from "node:path";
 import { renderFullMandala, renderCrossMandala } from "@/lib/render/mandala";
 import { svgToPng } from "@/lib/render/docx";
 import { gateName, GATE_NAMES } from "@/lib/hd/gate-names";
+import { getChart } from "@/lib/mybodygraph";
 import type { MandalaChart, Activation, Planet } from "@/lib/render/mandala.types";
 
 const HOST = "https://api.bodygraphchart.com";
@@ -64,6 +65,33 @@ function uranusGlyphSvg(glyphX: number, y: number, color: string): string {
     + `<line x1="${cx}" y1="${y - 9}" x2="${cx}" y2="${y - 1}"/>`
     + `<circle cx="${cx}" cy="${y + 1.5}" r="2.4" fill="${color}" stroke="none"/>`
     + `</g>`;
+}
+
+// Generic two-column key/value table (Overview, Variables), same brand styling
+// as the placement tables: centered all-caps title, purple labels, alternating
+// row shading. Width flexes to the content.
+function kvTableSvg(title: string, rows: { k: string; v: string }[]): { svg: string; w: number } {
+  const { mX, rowH } = PT;
+  const top = 104;
+  const longestK = Math.max(...rows.map((r) => r.k.length));
+  const valueX = mX + Math.ceil(longestK * 10.6) + 30;
+  const longestV = Math.max(8, ...rows.map((r) => r.v.length));
+  const W = Math.max(430, Math.ceil(valueX + longestV * 9.6 + mX));
+  const H = top + rows.length * rowH + 16;
+  const purple = "#845095", charcoal = "#333333", val = "#222222";
+  const ff = `font-family="Montserrat, 'Helvetica Neue', Arial, sans-serif"`;
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
+  s += `<rect width="${W}" height="${H}" fill="#ffffff"/>`;
+  s += `<text x="${W / 2}" y="46" ${ff} font-size="30" font-weight="700" fill="${charcoal}" text-anchor="middle" letter-spacing="2">${escXml(title.toUpperCase())}</text>`;
+  s += `<line x1="${mX}" y1="70" x2="${W - mX}" y2="70" stroke="${purple}" stroke-width="1.5"/>`;
+  rows.forEach((r, i) => {
+    const y = top + i * rowH;
+    if (i % 2 === 1) s += `<rect x="${mX - 8}" y="${y - 28}" width="${W - 2 * mX + 16}" height="${rowH}" fill="#f6f2f7"/>`;
+    s += `<text x="${mX}" y="${y}" ${ff} font-size="18" font-weight="700" fill="${purple}">${escXml(r.k)}</text>`;
+    s += `<text x="${valueX}" y="${y}" ${ff} font-size="18" fill="${val}">${escXml(r.v)}</text>`;
+  });
+  s += `</svg>`;
+  return { svg: s, w: W };
 }
 
 // Standalone planetary placement table (one side) as a brand-styled SVG. These
@@ -252,6 +280,39 @@ async function main() {
   writeFileSync(desTablePath, desTablePng);
   console.log(`✓ ${persTablePath}  (${(persTablePng.length / 1024).toFixed(0)} KB)`);
   console.log(`✓ ${desTablePath}  (${(desTablePng.length / 1024).toFixed(0)} KB)`);
+
+  // Overview + Variables tables, from getChart so the values (esp. the variable
+  // themes) match the vocabulary the reports use, not the raw API's terms.
+  const hdChart = await getChart({ birthDate: client.birthDate, birthTime: client.birthTime, timezone: tz, locationQuery: client.birthPlace, includeChartImage: false });
+  const overviewRows = [
+    { k: "Type", v: hdChart.type.value },
+    { k: "Profile", v: hdChart.profile.value },
+    { k: "Definition", v: hdChart.definition.value },
+    { k: "Authority", v: hdChart.authority.value },
+    { k: "Strategy", v: hdChart.strategy.value },
+    { k: "Not-Self Theme", v: hdChart.notSelfTheme.value },
+    { k: "Incarnation Cross", v: hdChart.incarnationCross.value },
+  ];
+  const V = hdChart.variables;
+  const arw = (a: string) => (a === "left" ? "◀" : "▶");
+  const variableRows = [
+    { k: "Determination", v: `${arw(V.determination.arrow)}  ${V.determination.theme}` },
+    { k: "Environment", v: `${arw(V.environment.arrow)}  ${V.environment.theme}` },
+    { k: "Motivation", v: `${arw(V.motivation.arrow)}  ${V.motivation.theme}` },
+    { k: "Perspective", v: `${arw(V.perspective.arrow)}  ${V.perspective.theme}` },
+    { k: "Sense", v: V.sense },
+    { k: "Design Sense", v: V.designSense },
+  ];
+  const overview = kvTableSvg("Overview", overviewRows);
+  const variables = kvTableSvg("Variables", variableRows);
+  const overviewPath = join(outDir, `${client.name} - Overview.png`);
+  const variablesPath = join(outDir, `${client.name} - Variables.png`);
+  const overviewPng = svgToPng(overview.svg, { widthPx: overview.w * 2 });
+  const variablesPng = svgToPng(variables.svg, { widthPx: variables.w * 2 });
+  writeFileSync(overviewPath, overviewPng);
+  writeFileSync(variablesPath, variablesPng);
+  console.log(`✓ ${overviewPath}  (${(overviewPng.length / 1024).toFixed(0)} KB)`);
+  console.log(`✓ ${variablesPath}  (${(variablesPng.length / 1024).toFixed(0)} KB)`);
 }
 
 main().catch((err) => {
