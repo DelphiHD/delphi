@@ -96,33 +96,31 @@ function arrowTriangle(x: number, y: number, dir: "left" | "right", color: strin
   const pts = dir === "left" ? `${x + s},${y - s} ${x + s},${y + s} ${x - s},${y}` : `${x - s},${y - s} ${x - s},${y + s} ${x + s},${y}`;
   return `<polygon points="${pts}" fill="${color}"/>`;
 }
-// Build a bodygraph SVG with the four variable arrows and (optionally) center
-// labels overlaid. `arrows` maps each variable to its left/right direction.
+// Build a bodygraph SVG with the four variable arrows overlaid around the head
+// (matching the report cover: Design/red stacked on the left, Personality/black
+// stacked on the right), and optionally center-name labels. `arrows` maps each
+// variable to its left/right direction.
 function overlayBodygraph(svg: string, arrows: Record<"determination" | "environment" | "motivation" | "perspective", "left" | "right">, withLabels: boolean): string {
-  const cen = centerCentroids(gateAnchors(svg));
   const ff = `font-family="Montserrat, Arial, sans-serif"`;
-  const RED = "#e06666", BLACK = "#333333", PURPLE = "#845095";
-  let out = svg.replace(/viewbox="0 0 400 693"/i, `viewBox="-120 -75 640 850"`);
+  const RED = "#e06666", BLACK = "#333333";
+  const s = 13;
   let ov = "";
-  const rows: { x: number; y: number; v: string; dir: "left" | "right"; color: string }[] = [
-    { x: -55, y: 150, v: "Digestion", dir: arrows.determination, color: RED },
-    { x: -55, y: 560, v: "Environment", dir: arrows.environment, color: RED },
-    { x: 455, y: 150, v: "Perspective", dir: arrows.perspective, color: BLACK },
-    { x: 455, y: 560, v: "Motivation", dir: arrows.motivation, color: BLACK },
-  ];
-  for (const r of rows) {
-    ov += arrowTriangle(r.x, r.y, r.dir, r.color, 15);
-    ov += `<text x="${r.x}" y="${r.y + 34}" ${ff} font-size="15" font-weight="700" fill="${r.color}" text-anchor="middle">${r.v}</text>`;
-  }
+  // Left cluster (Design, red): Digestion above Environment.
+  ov += arrowTriangle(70, 72, arrows.determination, RED, s);
+  ov += arrowTriangle(70, 112, arrows.environment, RED, s);
+  // Right cluster (Personality, black): Motivation above Perspective.
+  ov += arrowTriangle(330, 72, arrows.motivation, BLACK, s);
+  ov += arrowTriangle(330, 112, arrows.perspective, BLACK, s);
   if (withLabels) {
+    const cen = centerCentroids(gateAnchors(svg));
     for (const [c, p] of Object.entries(cen)) {
       const name = CENTER_LABEL[c] || c;
-      const w = name.length * 8 + 14;
-      ov += `<rect x="${p.x - w / 2}" y="${p.y - 13}" width="${w}" height="24" rx="12" fill="#ffffff" opacity="0.82"/>`;
-      ov += `<text x="${p.x}" y="${p.y + 5}" ${ff} font-size="14" font-weight="700" fill="${PURPLE}" text-anchor="middle">${name}</text>`;
+      const w = name.length * 6.6 + 12;
+      ov += `<rect x="${p.x - w / 2}" y="${p.y - 10}" width="${w}" height="19" rx="9" fill="#ffffff" opacity="0.8"/>`;
+      ov += `<text x="${p.x}" y="${p.y + 3.5}" ${ff} font-size="12" font-weight="700" fill="#222222" text-anchor="middle">${name}</text>`;
     }
   }
-  return out.replace(/<\/svg>\s*$/, ov + "</svg>");
+  return svg.replace(/<\/svg>\s*$/, ov + "</svg>");
 }
 
 // Herschel "H with a circle" Uranus symbol (⛢), drawn as vectors because that
