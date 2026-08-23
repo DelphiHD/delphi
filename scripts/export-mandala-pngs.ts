@@ -18,6 +18,7 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { renderFullMandala, renderCrossMandala } from "@/lib/render/mandala";
+import { svgToPng } from "@/lib/render/docx";
 import type { MandalaChart, Activation, Planet } from "@/lib/render/mandala.types";
 
 const HOST = "https://api.bodygraphchart.com";
@@ -112,8 +113,10 @@ async function main() {
   const fullPng = rasterize(fullSvg, 1600, "full");
   const crossPng = rasterize(crossSvg, 1600, "cross");
   // Standalone Bodygraph chart image (the Delphi-styled SVG mybodygraph
-  // returns), rasterized on its own for slides and handouts.
-  const bodygraphPng: Buffer | null = raw.SVG ? rasterize(raw.SVG, 1600, "bodygraph") : null;
+  // returns), rasterized on its own for slides and handouts. Use resvg
+  // (fit-to-width, preserves the full portrait height) NOT qlmanage, which
+  // thumbnails the tall bodygraph to a square and crops it to just the head.
+  const bodygraphPng: Buffer | null = raw.SVG ? svgToPng(raw.SVG, { widthPx: 1200 }) : null;
 
   const outDir = clientOutputDir(client);
   mkdirSync(outDir, { recursive: true });
