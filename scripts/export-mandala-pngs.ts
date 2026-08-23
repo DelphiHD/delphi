@@ -19,7 +19,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { renderFullMandala, renderCrossMandala } from "@/lib/render/mandala";
 import { svgToPng } from "@/lib/render/docx";
-import { gateName } from "@/lib/hd/gate-names";
+import { gateName, GATE_NAMES } from "@/lib/hd/gate-names";
 import type { MandalaChart, Activation, Planet } from "@/lib/render/mandala.types";
 
 const HOST = "https://api.bodygraphchart.com";
@@ -41,15 +41,36 @@ const PLANET_ORDER = ["Sun", "Earth", "Moon", "North Node", "South Node", "Mercu
 const PLANET_GLYPHS: Record<string, string> = {
   Sun: "☉", Earth: "⊕", Moon: "☽", "North Node": "☊", "South Node": "☋",
   Mercury: "☿", Venus: "♀", Mars: "♂", Jupiter: "♃", Saturn: "♄",
-  Uranus: "♅", Neptune: "♆", Pluto: "♇",
+  Uranus: "⛢", Neptune: "♆", Pluto: "♇",
 };
 const escXml = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+// Placement-table layout (shared so the width can be standardized in main()).
+const PT = { mX: 22, glyphX: 22, planetX: 50, gateX: 196, nameX: 292, rowH: 44, charW: 9.7 };
+// Standardize the name column to the longest gate name in the catalog so every
+// image (both sides, every client) comes out the same width.
+const LONGEST_GATE_NAME = Math.max(...Object.values(GATE_NAMES).map((n) => n.length));
+
+// Herschel "H with a circle" Uranus symbol (⛢), drawn as vectors because that
+// codepoint isn't in the fonts resvg can reach (it rasterizes as tofu). Clearer
+// than the ♅ variant, and always renders. Positioned to sit like a text glyph
+// whose left edge is at glyphX and whose baseline is y.
+function uranusGlyphSvg(glyphX: number, y: number, color: string): string {
+  const cx = glyphX + 7;
+  return `<g stroke="${color}" stroke-width="2" fill="none" stroke-linecap="round">`
+    + `<line x1="${cx - 6}" y1="${y - 15}" x2="${cx - 6}" y2="${y - 3}"/>`
+    + `<line x1="${cx + 6}" y1="${y - 15}" x2="${cx + 6}" y2="${y - 3}"/>`
+    + `<line x1="${cx - 6}" y1="${y - 9}" x2="${cx + 6}" y2="${y - 9}"/>`
+    + `<line x1="${cx}" y1="${y - 9}" x2="${cx}" y2="${y - 1}"/>`
+    + `<circle cx="${cx}" cy="${y + 1.5}" r="2.4" fill="${color}" stroke="none"/>`
+    + `</g>`;
+}
 
 // Standalone planetary placement table (one side) as a brand-styled SVG. These
 // are the columns that flank the bodygraph in the chart software; Kaycee wants
 // them on their own for slides. Personality reads in charcoal, Design in the
 // red the software uses for the design side.
-function placementTableSvg(side: "Personality" | "Design", raw: any, subtitle: string): { svg: string; w: number } {
+function placementTableSvg(side: "Personality" | "Design", raw: any, subtitle: string, W: number): string {
   const src = side === "Personality" ? raw.Personality : raw.Design;
   const rows = PLANET_ORDER
     .map((p) => {
@@ -59,11 +80,10 @@ function placementTableSvg(side: "Personality" | "Design", raw: any, subtitle: s
       return { planet: p, glyph: PLANET_GLYPHS[p] || "", gl: `${d.Gate}.${d.Line}`, fix, name: gateName(d.Gate) };
     })
     .filter(Boolean) as { planet: string; glyph: string; gl: string; fix: string; name: string }[];
-  // Column x-positions, tuned so text just fits. Width flexes to the longest
-  // gate name (or the birth/design subtitle) so nothing clips or leaves a gutter.
-  const mX = 22, glyphX = 22, planetX = 50, gateX = 196, nameX = 292, rowH = 44, top = 150;
-  const longestName = Math.max(4, ...rows.map((r) => r.name.length));
-  const W = Math.max(430, Math.ceil(nameX + longestName * 9.7 + mX), Math.ceil(2 * mX + subtitle.length * 7.3));
+  // Column x-positions from the shared layout; overall width W is standardized
+  // by the caller (sized to the longest gate name so all images match).
+  const { mX, glyphX, planetX, gateX, nameX, rowH } = PT;
+  const top = 150;
   const H = top + rows.length * rowH + 16;
   // Personality reads charcoal; the Design image is entirely in the chart's
   // design red. Column headers/values/name follow that per-side scheme.
@@ -77,8 +97,8 @@ function placementTableSvg(side: "Personality" | "Design", raw: any, subtitle: s
   const gf = `font-family="'Apple Symbols', 'Segoe UI Symbol', Montserrat, sans-serif"`;
   let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
   s += `<rect width="${W}" height="${H}" fill="#ffffff"/>`;
-  s += `<text x="${mX}" y="44" ${ff} font-size="30" font-weight="700" fill="${accent}">${side}</text>`;
-  s += `<text x="${mX}" y="72" ${ff} font-size="15" fill="${subCol}">${escXml(subtitle)}</text>`;
+  s += `<text x="${W / 2}" y="44" ${ff} font-size="30" font-weight="700" fill="${accent}" text-anchor="middle" letter-spacing="2">${side.toUpperCase()}</text>`;
+  s += `<text x="${W / 2}" y="72" ${ff} font-size="15" fill="${subCol}" text-anchor="middle">${escXml(subtitle)}</text>`;
   s += `<text x="${mX}" y="110" ${ff} font-size="14" font-weight="700" fill="${headerCol}">PLANET</text>`;
   s += `<text x="${gateX}" y="110" ${ff} font-size="14" font-weight="700" fill="${headerCol}">GATE</text>`;
   s += `<text x="${nameX}" y="110" ${ff} font-size="14" font-weight="700" fill="${headerCol}">NAME</text>`;
@@ -86,7 +106,8 @@ function placementTableSvg(side: "Personality" | "Design", raw: any, subtitle: s
   rows.forEach((r, i) => {
     const y = top + i * rowH;
     if (i % 2 === 1) s += `<rect x="${mX - 8}" y="${y - 28}" width="${W - 2 * mX + 16}" height="${rowH}" fill="#f6f2f7"/>`;
-    s += `<text x="${glyphX}" y="${y}" ${gf} font-size="19" fill="${accent}">${escXml(r.glyph)}</text>`;
+    if (r.planet === "Uranus") s += uranusGlyphSvg(glyphX, y, accent);
+    else s += `<text x="${glyphX}" y="${y}" ${gf} font-size="19" fill="${accent}">${escXml(r.glyph)}</text>`;
     s += `<text x="${planetX}" y="${y}" ${ff} font-size="19" fill="${accent}">${escXml(r.planet)}</text>`;
     // Gate.line is its OWN pure-number text element so it always renders bold.
     // The fixation arrow (▲/▽) is a SEPARATE element positioned after it: mixing
@@ -101,7 +122,7 @@ function placementTableSvg(side: "Personality" | "Design", raw: any, subtitle: s
     s += `<text x="${nameX}" y="${y}" ${ff} font-size="18" fill="${nameCol}">${escXml(r.name)}</text>`;
   });
   s += `</svg>`;
-  return { svg: s, w: W };
+  return s;
 }
 
 async function lookupTimezone(query: string): Promise<string> {
@@ -216,10 +237,15 @@ async function main() {
   const tfmt = (iso: string) => new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(iso));
   const persSub = `${dfmt(P.BirthDateUtcStandard)} · ${tfmt(P.BirthDateUtcStandard)} · ${client.birthPlace}`;
   const desSub = `${dfmt(P.DesignDateUtcStandard)} · ${tfmt(P.DesignDateUtcStandard)}`;
-  const pers = placementTableSvg("Personality", raw, persSub);
-  const des = placementTableSvg("Design", raw, desSub);
-  const persTablePng = svgToPng(pers.svg, { widthPx: pers.w * 2 });
-  const desTablePng = svgToPng(des.svg, { widthPx: des.w * 2 });
+  // Standardize width across both images: size the name column to the longest
+  // gate name in the catalog, and never let a long subtitle clip.
+  const W = Math.max(
+    430,
+    Math.ceil(PT.nameX + LONGEST_GATE_NAME * PT.charW + PT.mX),
+    Math.ceil(2 * PT.mX + Math.max(persSub.length, desSub.length) * 7.3),
+  );
+  const persTablePng = svgToPng(placementTableSvg("Personality", raw, persSub, W), { widthPx: W * 2 });
+  const desTablePng = svgToPng(placementTableSvg("Design", raw, desSub, W), { widthPx: W * 2 });
   const persTablePath = join(outDir, `${client.name} - Personality Placements.png`);
   const desTablePath = join(outDir, `${client.name} - Design Placements.png`);
   writeFileSync(persTablePath, persTablePng);
