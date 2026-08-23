@@ -21,6 +21,7 @@ import { renderFullMandala, renderCrossMandala } from "@/lib/render/mandala";
 import { svgToPng } from "@/lib/render/docx";
 import { gateName, GATE_NAMES } from "@/lib/hd/gate-names";
 import { getChart } from "@/lib/mybodygraph";
+import { centerOf } from "@/lib/hd/gate-center";
 import { buildDataPass } from "@/lib/chart/datapass";
 import { createClient } from "@supabase/supabase-js";
 import type { MandalaChart, Activation, Planet } from "@/lib/render/mandala.types";
@@ -63,6 +64,65 @@ function parseVariableHeader(h: string): { variable: string; color: string; dire
   if (!m) return null;
   const arrow = m[4] === "Left" ? "◀" : "▶";
   return { variable: m[1], color: `${m[2]}: ${m[3]}`, direction: `${arrow} ${m[5]}`, tone: `${m[6]}: ${m[7]}` };
+}
+
+// ── Bodygraph overlays: variable arrows + center labels ──────────────────────
+// The Delphi bodygraph SVG is a 400x693 canvas that draws all 64 gate numbers as
+// <text transform="translate(x y)"> elements. We parse those anchors to place
+// center-name labels at each center's centroid, and draw the four PHS variable
+// arrows in the margins (Design/red on the left, Personality/black on the right).
+const CENTER_LABEL: Record<string, string> = {
+  head: "Head", ajna: "Ajna", throat: "Throat", g: "G", heart: "Heart",
+  spleen: "Spleen", sacral: "Sacral", "solar-plexus": "Solar Plexus", root: "Root",
+};
+function gateAnchors(svg: string): Record<number, { x: number; y: number }> {
+  const re = /<text\b[^>]*transform="translate\(([\d.]+)\s+([\d.]+)\)[^>]*>([\s\S]*?)<\/text>/g;
+  const a: Record<number, { x: number; y: number }> = {};
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(svg))) {
+    const n = parseInt(m[3].replace(/<[^>]*>/g, "").trim(), 10);
+    if (n >= 1 && n <= 64) a[n] = { x: +m[1], y: +m[2] };
+  }
+  return a;
+}
+function centerCentroids(a: Record<number, { x: number; y: number }>): Record<string, { x: number; y: number }> {
+  const by: Record<string, { x: number; y: number }[]> = {};
+  for (const [g, p] of Object.entries(a)) (by[centerOf(+g)] ??= []).push(p);
+  const out: Record<string, { x: number; y: number }> = {};
+  for (const [c, ps] of Object.entries(by)) out[c] = { x: ps.reduce((s, p) => s + p.x, 0) / ps.length, y: ps.reduce((s, p) => s + p.y, 0) / ps.length };
+  return out;
+}
+function arrowTriangle(x: number, y: number, dir: "left" | "right", color: string, s = 15): string {
+  const pts = dir === "left" ? `${x + s},${y - s} ${x + s},${y + s} ${x - s},${y}` : `${x - s},${y - s} ${x - s},${y + s} ${x + s},${y}`;
+  return `<polygon points="${pts}" fill="${color}"/>`;
+}
+// Build a bodygraph SVG with the four variable arrows and (optionally) center
+// labels overlaid. `arrows` maps each variable to its left/right direction.
+function overlayBodygraph(svg: string, arrows: Record<"determination" | "environment" | "motivation" | "perspective", "left" | "right">, withLabels: boolean): string {
+  const cen = centerCentroids(gateAnchors(svg));
+  const ff = `font-family="Montserrat, Arial, sans-serif"`;
+  const RED = "#e06666", BLACK = "#333333", PURPLE = "#845095";
+  let out = svg.replace(/viewbox="0 0 400 693"/i, `viewBox="-120 -75 640 850"`);
+  let ov = "";
+  const rows: { x: number; y: number; v: string; dir: "left" | "right"; color: string }[] = [
+    { x: -55, y: 150, v: "Digestion", dir: arrows.determination, color: RED },
+    { x: -55, y: 560, v: "Environment", dir: arrows.environment, color: RED },
+    { x: 455, y: 150, v: "Perspective", dir: arrows.perspective, color: BLACK },
+    { x: 455, y: 560, v: "Motivation", dir: arrows.motivation, color: BLACK },
+  ];
+  for (const r of rows) {
+    ov += arrowTriangle(r.x, r.y, r.dir, r.color, 15);
+    ov += `<text x="${r.x}" y="${r.y + 34}" ${ff} font-size="15" font-weight="700" fill="${r.color}" text-anchor="middle">${r.v}</text>`;
+  }
+  if (withLabels) {
+    for (const [c, p] of Object.entries(cen)) {
+      const name = CENTER_LABEL[c] || c;
+      const w = name.length * 8 + 14;
+      ov += `<rect x="${p.x - w / 2}" y="${p.y - 13}" width="${w}" height="24" rx="12" fill="#ffffff" opacity="0.82"/>`;
+      ov += `<text x="${p.x}" y="${p.y + 5}" ${ff} font-size="14" font-weight="700" fill="${PURPLE}" text-anchor="middle">${name}</text>`;
+    }
+  }
+  return out.replace(/<\/svg>\s*$/, ov + "</svg>");
 }
 
 // Herschel "H with a circle" Uranus symbol (⛢), drawn as vectors because that
@@ -310,11 +370,16 @@ async function main() {
   const crossSvg = renderCrossMandala(chart, { size: 1600 });
   const fullPng = rasterize(fullSvg, 1600, "full");
   const crossPng = rasterize(crossSvg, 1600, "cross");
-  // Standalone Bodygraph chart image (the Delphi-styled SVG mybodygraph
-  // returns), rasterized on its own for slides and handouts. Use resvg
-  // (fit-to-width, preserves the full portrait height) NOT qlmanage, which
-  // thumbnails the tall bodygraph to a square and crops it to just the head.
-  const bodygraphPng: Buffer | null = raw.SVG ? svgToPng(raw.SVG, { widthPx: 1200 }) : null;
+  // Standalone Bodygraph chart image with the four PHS variable arrows overlaid,
+  // plus a centers-labeled variant. Arrow directions come straight from
+  // raw.Variables (no Data Pass needed). Rasterize with resvg (fit-to-width,
+  // preserves the full portrait height) NOT qlmanage, which crops the tall SVG.
+  const bgArrows = raw.SVG ? {
+    determination: raw.Variables.Digestion as "left" | "right",
+    environment: raw.Variables.Environment as "left" | "right",
+    motivation: raw.Variables.Awareness as "left" | "right",
+    perspective: raw.Variables.Perspective as "left" | "right",
+  } : null;
 
   const outDir = clientOutputDir(client);
   mkdirSync(outDir, { recursive: true });
@@ -325,12 +390,17 @@ async function main() {
   writeFileSync(crossPath, crossPng);
 
   console.log("");
-  if (bodygraphPng) {
+  if (raw.SVG && bgArrows) {
     const bodygraphPath = join(outDir, `${client.name} - Bodygraph.png`);
-    writeFileSync(bodygraphPath, bodygraphPng);
-    console.log(`✓ ${bodygraphPath}  (${(bodygraphPng.length / 1024).toFixed(0)} KB)`);
+    const bodygraphLabeledPath = join(outDir, `${client.name} - Bodygraph Labeled.png`);
+    const bgPng = svgToPng(overlayBodygraph(raw.SVG, bgArrows, false), { widthPx: 1500 });
+    const bgLabeledPng = svgToPng(overlayBodygraph(raw.SVG, bgArrows, true), { widthPx: 1500 });
+    writeFileSync(bodygraphPath, bgPng);
+    writeFileSync(bodygraphLabeledPath, bgLabeledPng);
+    console.log(`✓ ${bodygraphPath}  (${(bgPng.length / 1024).toFixed(0)} KB)`);
+    console.log(`✓ ${bodygraphLabeledPath}  (${(bgLabeledPng.length / 1024).toFixed(0)} KB)`);
   } else {
-    console.log(`  ⚠ no bodygraph SVG returned by mybodygraph; skipped Bodygraph.png`);
+    console.log(`  ⚠ no bodygraph SVG returned by mybodygraph; skipped Bodygraph images`);
   }
   console.log(`✓ ${fullPath}  (${(fullPng.length / 1024).toFixed(0)} KB)`);
   console.log(`✓ ${crossPath}  (${(crossPng.length / 1024).toFixed(0)} KB)`);
