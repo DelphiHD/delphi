@@ -345,6 +345,21 @@ soft_warnings: ${softCount}
                       : kind === "planetary"  ? "Planetary Overview"
                       :                         "Quickstart";
 
+    // Standalone assets for the client folder: the Bodygraph chart PNG plus the
+    // Full and Cross Mandala PNGs, nice to have on their own for slides and
+    // handouts. Runs for every tier (placed before the planetary early-return
+    // below). Best-effort: a failure here is logged but never fails the report,
+    // and it only runs for roster clients (the exporter resolves the chart and
+    // output folder from the slug).
+    if (CLIENTS[brief.slug]) {
+      const { spawnSync } = await import("node:child_process");
+      console.log(`\nExporting standalone chart + mandala PNGs…`);
+      const pngRes = spawnSync("./node_modules/.bin/tsx", ["scripts/export-mandala-pngs.ts", brief.slug], { stdio: "inherit", cwd: process.cwd() });
+      if (pngRes.status !== 0) console.log(`  ⚠ standalone PNG export exited ${pngRes.status} (report is unaffected)`);
+    } else {
+      console.log(`\n  (skipping standalone PNG export: slug "${brief.slug}" is not in the roster)`);
+    }
+
     // Planetary Overview: route through scripts/render-planetary-docx.ts,
     // NOT the generic renderer. The PO-specific renderer knows how to expand
     // [[PERSONALITY_PLACEMENTS_TABLE]] / [[DESIGN_PLACEMENTS_TABLE]] markers,
