@@ -38,6 +38,11 @@ const PLANET_KEY_MAP: Record<string, Planet> = {
 // Canonical planetary order for the placement columns (matches the chart
 // software's side-of-bodygraph layout).
 const PLANET_ORDER = ["Sun", "Earth", "Moon", "North Node", "South Node", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"];
+const PLANET_GLYPHS: Record<string, string> = {
+  Sun: "☉", Earth: "⊕", Moon: "☽", "North Node": "☊", "South Node": "☋",
+  Mercury: "☿", Venus: "♀", Mars: "♂", Jupiter: "♃", Saturn: "♄",
+  Uranus: "♅", Neptune: "♆", Pluto: "♇",
+};
 const escXml = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 // Standalone planetary placement table (one side) as a brand-styled SVG. These
@@ -51,28 +56,33 @@ function placementTableSvg(side: "Personality" | "Design", raw: any): string {
       const d = src[p];
       if (!d) return null;
       const fix = /exalt/i.test(d.FixingState || "") ? " ▲" : /detriment/i.test(d.FixingState || "") ? " ▽" : "";
-      return { planet: p, gl: `${d.Gate}.${d.Line}${fix}`, name: gateName(d.Gate) };
+      return { planet: p, glyph: PLANET_GLYPHS[p] || "", gl: `${d.Gate}.${d.Line}${fix}`, name: gateName(d.Gate) };
     })
-    .filter(Boolean) as { planet: string; gl: string; name: string }[];
-  const W = 660, mX = 30, rowH = 44, top = 132;
-  const H = top + rows.length * rowH + 20;
-  const accent = side === "Personality" ? "#333333" : "#B0453C";
+    .filter(Boolean) as { planet: string; glyph: string; gl: string; name: string }[];
+  // Column x-positions, tuned so text just fits. Width flexes to the longest
+  // gate name so the NAME column never clips and never leaves a wide gutter.
+  const mX = 22, glyphX = 22, planetX = 50, gateX = 196, nameX = 292, rowH = 44, top = 122;
+  const longestName = Math.max(4, ...rows.map((r) => r.name.length));
+  const W = Math.max(430, Math.ceil(nameX + longestName * 9.7 + mX));
+  const H = top + rows.length * rowH + 16;
+  // Personality reads charcoal; Design uses the chart's own design red.
+  const accent = side === "Design" ? "#e06666" : "#333333";
   const purple = "#845095", gray = "#666666";
   const ff = `font-family="Montserrat, 'Helvetica Neue', Arial, sans-serif"`;
-  const gateX = 330, nameX = 420;
+  const gf = `font-family="'Apple Symbols', 'Segoe UI Symbol', Montserrat, sans-serif"`;
   let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
   s += `<rect width="${W}" height="${H}" fill="#ffffff"/>`;
-  s += `<text x="${mX}" y="48" ${ff} font-size="30" font-weight="700" fill="${accent}">${side}</text>`;
-  s += `<text x="${W - mX}" y="48" ${ff} font-size="15" fill="${gray}" text-anchor="end">${escXml(raw.Properties?.Type?.option)}</text>`;
-  s += `<text x="${mX}" y="92" ${ff} font-size="15" font-weight="700" fill="${purple}">PLANET</text>`;
-  s += `<text x="${gateX}" y="92" ${ff} font-size="15" font-weight="700" fill="${purple}">GATE</text>`;
-  s += `<text x="${nameX}" y="92" ${ff} font-size="15" font-weight="700" fill="${purple}">NAME</text>`;
-  s += `<line x1="${mX}" y1="104" x2="${W - mX}" y2="104" stroke="${purple}" stroke-width="1.5"/>`;
+  s += `<text x="${mX}" y="44" ${ff} font-size="30" font-weight="700" fill="${accent}">${side}</text>`;
+  s += `<text x="${mX}" y="80" ${ff} font-size="14" font-weight="700" fill="${purple}">PLANET</text>`;
+  s += `<text x="${gateX}" y="80" ${ff} font-size="14" font-weight="700" fill="${purple}">GATE</text>`;
+  s += `<text x="${nameX}" y="80" ${ff} font-size="14" font-weight="700" fill="${purple}">NAME</text>`;
+  s += `<line x1="${mX}" y1="92" x2="${W - mX}" y2="92" stroke="${purple}" stroke-width="1.5"/>`;
   rows.forEach((r, i) => {
     const y = top + i * rowH;
     if (i % 2 === 1) s += `<rect x="${mX - 8}" y="${y - 28}" width="${W - 2 * mX + 16}" height="${rowH}" fill="#f6f2f7"/>`;
-    s += `<text x="${mX}" y="${y}" ${ff} font-size="19" fill="${accent}">${escXml(r.planet)}</text>`;
-    s += `<text x="${gateX}" y="${y}" ${ff} font-size="19" font-weight="600" fill="#222222">${escXml(r.gl)}</text>`;
+    s += `<text x="${glyphX}" y="${y}" ${gf} font-size="19" fill="${accent}">${escXml(r.glyph)}</text>`;
+    s += `<text x="${planetX}" y="${y}" ${ff} font-size="19" fill="${accent}">${escXml(r.planet)}</text>`;
+    s += `<text x="${gateX}" y="${y}" ${ff} font-size="19" font-weight="700" fill="#222222">${escXml(r.gl)}</text>`;
     s += `<text x="${nameX}" y="${y}" ${ff} font-size="18" fill="${gray}">${escXml(r.name)}</text>`;
   });
   s += `</svg>`;
