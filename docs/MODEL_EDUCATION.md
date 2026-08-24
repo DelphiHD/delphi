@@ -50,20 +50,29 @@ layers. Routing is **case by case** (Kaycee's call per correction):
 
 ## Corrections log (append-only)
 
-### MG definition & fabricated Sacral→Throat connection — Foundation — pending
+### MG definition & fabricated Sacral→Throat connection — Foundation — data pass fixed; prose verify + guards pending
 - Observed (Bryan Rodabough): claimed his Sacral connects to the Throat (via
   10-34 through the G, and via 34→20 with a partner's Gate 20) and used that to
   define his MG energy. He has no Sacral→Throat connection and no Gate 20.
-- Correct understanding (Kaycee): MG = defined Sacral AND a connection between
-  any of the four motors and the Throat. Bryan's Sacral is islanded with his G
-  Center; what makes him an MG is that his other three motors (Heart, Root,
-  Solar Plexus) reach the Throat via a long, circuitous path, plus the standalone
-  defined Sacral. The Sacral itself does NOT reach the Throat.
-- Routing (proposed, awaiting Kaycee's confirm): Library (state the MG definition
-  in the Type/MG material) + Prompt (never assert connections/channels beyond the
-  Data Pass; derive MG mechanics from the actual definition) + Validator (flag a
-  channel/gate named as the reader's own that isn't in the Data Pass, with a
-  carve-out for gates explicitly attributed to another person).
+- Correct understanding (Kaycee): MG = defined Sacral AND at least one of the
+  four motors (Sacral, Heart, Solar Plexus, Root) sharing the Throat's defined
+  island — reachable through ANY chain of defined channels, however long (Root →
+  Spleen → Throat counts). The connecting motor need not be the Sacral. Bryan's
+  Sacral is islanded with his G; he is MG because Heart/Root/Solar Plexus reach
+  the Throat, plus the standalone defined Sacral.
+- **Root cause (not a library gap — the canonical MG page is correct):** the
+  Data Pass `typeJustification` hardcoded a Sacral-to-Throat story for every MG
+  and discarded the already-computed motor connectivity, so it fed the model
+  "Sacral ↔ Throat path: PRESENT" for Bryan (false). The model trusted that
+  deterministic fact and elaborated on it.
+- Routing: **Data Pass (code)** — done; + Prompt + Validator — pending.
+- Enforcement: `lib/chart/datapass.ts` MG branch rewritten to the motor-to-Throat
+  rule; reports the actual connecting motor(s) and, when the Sacral is islanded
+  elsewhere, injects an explicit "do NOT describe the Sacral connecting to the
+  Throat" note. Verified deterministically on Bryan (islanded), Izzy (standard
+  MG), Joe (pure Generator). Remaining: re-run Bryan's report to confirm the
+  prose, add a prompt line (use the source's "motor-to-Throat" language; never
+  assert a center-to-center path not in the Data Pass), and a validator net.
 - Notion: https://app.notion.com/p/3c6e3fadcaaa81d99e56fdb4ec230cd1
 
 ### Profile line 4 is the Opportunist, not the Hermit — Foundation — pending
