@@ -429,6 +429,11 @@ ${dataPass.typeJustification}
 This chart's islands (which centers are connected to which): ${islandBlurb}
 This chart's defined channels: ${channelsBlurb || "(none)"}
 
+When you write the Your Type section from the facts above:
+- Do NOT refer to islands by number ("Island 1", "Island 2", "both islands"). The Definition section (written later) is where the island concept is introduced; here, describe the architecture by naming the centers and how they connect (e.g. "the Sacral sits apart, paired with the G center," "the Heart, Solar Plexus, and Root reach the Throat"), never by island number.
+- Name WHICH motor(s) reach the Throat and what each contributes to expression: Sacral = generative response, Solar Plexus = emotional motor, Heart = willpower motor, Root = the motor of pressure and drive. Then say what that combination means for how THIS person manifests (e.g. their manifestation runs through feeling, momentum, and will).
+- If the Sacral is islanded away from the Throat, say plainly that the Sacral is not on the manifestation path, and name the motors that are.
+
 Front matter:
   # Human Design Foundation Report
   ${clientName}

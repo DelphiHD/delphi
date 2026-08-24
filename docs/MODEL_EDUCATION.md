@@ -97,6 +97,25 @@ layers. Routing is **case by case** (Kaycee's call per correction):
   re-run (line 4 now reads Opportunist).
 - Notion: https://app.notion.com/p/3c6e3fadcaaa81ddb414c3f76082a441
 
+### Type section: no island numbers; name the connecting motors + what they bring — Foundation — ENFORCED
+- Observed (Bryan Rodabough): the Your Type section leaned on "Island 1 / Island 2"
+  numbering before the Definition section introduces the island concept, and it
+  named the connecting motors (Heart, Solar Plexus, Root) only in passing without
+  saying what those specific motors reaching the Throat mean.
+- Correct understanding (Kaycee): the Type section must not reference islands by
+  number (Definition comes later); describe the architecture by naming centers
+  and how they connect. Name which motor(s) reach the Throat and what each
+  contributes (Solar Plexus = emotional, Root = pressure/drive, Heart =
+  willpower, Sacral = generative response) and what that means for how the person
+  manifests. If the Sacral is islanded away from the Throat, say plainly it is
+  not on the manifestation path and name the motors that are.
+- Routing: Prompt.
+- Enforcement: `foundation.ts` call 1 (Your Type) now instructs the model to
+  avoid island numbers, name the connecting motors and their contributions, and
+  state plainly when the Sacral is off the manifestation path. (Applied after
+  hand-editing Bryan v6 to this standard.)
+- Notion: https://app.notion.com/p/3c6e3fadcaaa815580a7fffc7a239326
+
 ### Fixing-planet named in prose — Foundation/Planetary — enforced
 - Observed: prose named the planet behind an exaltation/detriment, e.g. "Venus
   exalted at the fifth line," "the Sun in detriment here."
