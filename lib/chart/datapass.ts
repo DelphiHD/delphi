@@ -206,6 +206,27 @@ function canonicalCenter(name: string): CenterName | null {
   return null;
 }
 
+// Presentation form for center names in reports. Notion stores forms like
+// "Ego (Heart, Will)" and "G (Identity)" that leak into placement headers;
+// Kaycee's spec is to display only the canonical short name. Maps the
+// canonical lowercase key to the user-facing display form.
+const CENTER_DISPLAY: Record<CenterName, string> = {
+  "head": "Head",
+  "ajna": "Ajna",
+  "throat": "Throat",
+  "g": "G",
+  "heart": "Heart",
+  "solar plexus": "Solar Plexus",
+  "sacral": "Sacral",
+  "spleen": "Spleen",
+  "root": "Root",
+};
+
+function centerDisplayName(rawName: string): string {
+  const canonical = canonicalCenter(rawName);
+  return canonical ? CENTER_DISPLAY[canonical] : rawName;
+}
+
 // Side abbreviation for activation list strings.
 function sideAbbr(side: "personality" | "design"): string {
   return side === "personality" ? "P" : "D";
@@ -373,7 +394,11 @@ function buildActivationRows(
     if (!meta) {
       warnings.push(`no gate metadata for gate ${p.gate} (${side} ${p.planet})`);
     }
-    const centerName = meta?.centerName ?? "?";
+    // Use the display form for the center name ("Heart" not "Ego (Heart,
+    // Will)", "G" not "G (Identity)"). The canonical-key lookup elsewhere
+    // in the data pass uses canonicalCenter() which still tolerates the
+    // raw Notion form, so this normalization is safe.
+    const centerName = meta?.centerName ? centerDisplayName(meta.centerName) : "?";
 
     // Find which channel (if any) this gate is participating in among the
     // chart's defined channels. A gate's channel partner is in gate.channels;
@@ -581,6 +606,17 @@ function analyzeSplit(
 
 // ─── Public API ─────────────────────────────────────────────────────────────
 
+// Raised when the data pass detects state that would produce a garbage report:
+// empty Notion metadata, unresolved chart channels, or singleton "islands"
+// (one per defined center) — the failure signature of a broken sync. Callers
+// should surface these as fatal errors BEFORE any LLM call is made.
+export class DataPassIntegrityError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DataPassIntegrityError";
+  }
+}
+
 export async function buildDataPass(args: {
   supabase: SupabaseClient;
   client: { name: string };
@@ -592,6 +628,34 @@ export async function buildDataPass(args: {
 
   const { gates, channels, warnings: metaWarnings } = await fetchChunkMetadata(supabase);
   warnings.push(...metaWarnings);
+
+  // ─── Sanity check #1: metadata populated at all ───────────────────────────
+  // If ALL 36 channels or ALL 64 gates have empty metadata, the Notion sync
+  // never populated the metadata JSON column (as happened 2026-07 after a
+  // silent-fail resync). Every downstream feature — island counting, hanging
+  // gates, bridging analysis, per-activation center resolution — will be
+  // wrong. Refuse to build the pass rather than let a bad report ship.
+  if (channels.size === 0) {
+    throw new DataPassIntegrityError(
+      "Channel metadata is empty (0 of 36 channels loaded). The Notion sync populated bodies but not metadata. Run: npx tsx scripts/sync-notion.ts",
+    );
+  }
+  if (gates.size === 0) {
+    throw new DataPassIntegrityError(
+      "Gate metadata is empty (0 of 64 gates loaded). The Notion sync populated bodies but not metadata. Run: npx tsx scripts/sync-notion.ts",
+    );
+  }
+
+  // ─── Sanity check #2: every chart channel resolves ────────────────────────
+  // If ANY of the client's defined channels is missing from the metadata map,
+  // the graph-walking will silently drop that edge and the island count will
+  // be inflated. Refuse rather than emit misleading data.
+  const unresolved = chart.channels.filter((ch) => !channels.get(ch.id));
+  if (unresolved.length > 0) {
+    throw new DataPassIntegrityError(
+      `${unresolved.length} of this chart's ${chart.channels.length} defined channel(s) have no metadata row: ${unresolved.map((c) => c.id).join(", ")}. The metadata for those channels is missing or malformed in Notion. Fix in Notion, then re-run: npx tsx scripts/sync-notion.ts`,
+    );
+  }
 
   const activeChannelIds = new Set(chart.channels.map((c) => c.id));
 
@@ -744,6 +808,23 @@ export async function buildDataPass(args: {
   // Split analysis.
   const split = analyzeSplit(chart, channels, gates);
 
+  // ─── Sanity check #3: island count reflects channel connectivity ─────────
+  // If the chart has at least one channel AND every defined center is its
+  // own singleton "island", the graph-walking added zero edges — the same
+  // failure signature as an empty metadata map. This is an assertion of last
+  // resort: if #1 and #2 pass but the split still looks like singletons,
+  // something subtler is broken (e.g. center-name mismatch). Fail loud.
+  const definedCenterCount = chart.centers.filter((c) => c.defined).length;
+  if (
+    chart.channels.length > 0 &&
+    definedCenterCount > 1 &&
+    split.islandCount === definedCenterCount
+  ) {
+    throw new DataPassIntegrityError(
+      `Island count (${split.islandCount}) equals defined-center count (${definedCenterCount}) with ${chart.channels.length} defined channel(s). This means channel edges are not being added to the connectivity graph — the split analysis will be wrong. Likely cause: center-name mismatch between chart.centers and channel metadata.`,
+    );
+  }
+
   // Cycles (exact returns).
   const cycles = await computeCycles(chart.birth.utcDate, args.nowUtcIso);
 
@@ -843,9 +924,9 @@ export async function buildDataPass(args: {
       if (spDefined && throatDefined && spIsland === throatIsland) lines.push(`Solar Plexus ↔ Throat: connected through a defined channel in the same island ✓.`);
       if (rootDefined && throatDefined && rootIsland === throatIsland) lines.push(`Root ↔ Throat: connected through a defined channel in the same island ✓.`);
     } else if (chart.type.value === "Generator") {
-      lines.push(`Why this Type: defined Sacral, but NO Sacral-to-Throat channel path. The Sacral motor is present, but it does not connect to the Throat through any chain of defined channels in this chart.`);
+      lines.push(`Why this Type: defined Sacral, but NO motor connected to the Throat. None of the four motors (Sacral, Heart, Solar Plexus, Root) reaches the Throat through any chain of defined channels in this chart — that absence is what makes it a pure Generator rather than a Manifesting Generator.`);
       lines.push(`Sacral: ${sacralDefined ? "DEFINED ✓" : "NOT defined (would make this not a Generator)"}.`);
-      lines.push(`Sacral ↔ Throat path: NONE (this is what distinguishes Generator from Manifesting Generator). Sacral is in island ${sacralIsland !== undefined ? sacralIsland + 1 : "(undefined)"}; Throat is in island ${throatIsland !== undefined ? throatIsland + 1 : "(undefined / not defined)"}.`);
+      lines.push(`Motor-to-Throat path: NONE. Sacral is in island ${sacralIsland !== undefined ? sacralIsland + 1 : "(undefined)"}; Throat is in island ${throatIsland !== undefined ? throatIsland + 1 : "(undefined / not defined)"}; no other defined motor shares the Throat's island either.`);
       // Pattern-match trap notes — added per-gate when the chart has the
       // gate that triggers the trap. Paul v1 surfaced the Gate 34 trap.
       // Future traps can be added here as observed (e.g. Gate 20 in
@@ -861,9 +942,26 @@ export async function buildDataPass(args: {
         lines.push(`Pattern-match trap (this chart has Gate 20 in the Throat): the 20-34 channel is one of the classic Sacral-to-Throat paths that would make a chart Manifesting Generator. But the chart does NOT have Gate 34, so that channel cannot complete here. Type stays Generator.`);
       }
     } else if (chart.type.value === "Manifesting Generator") {
-      lines.push(`Why this Type: defined Sacral AND a defined channel chain reaching from the Sacral to the Throat.`);
+      // MG = defined Sacral AND at least one of the four motors (Sacral, Heart,
+      // Solar Plexus, Root) reaches the Throat through any chain of defined
+      // channels (same defined island). The connecting motor need NOT be the
+      // Sacral — a chart is still MG when the Sacral is islanded elsewhere and a
+      // different motor carries the Throat connection (e.g. Root → Spleen →
+      // Throat). We report the actual connecting motor(s) rather than assuming
+      // the Sacral, which was the bug that told the model to fabricate a
+      // Sacral-to-Throat path.
+      const motorsToThroat: string[] = [];
+      if (sacralDefined && sacralIsland !== undefined && sacralIsland === throatIsland) motorsToThroat.push("Sacral");
+      if (heartDefined && heartIsland !== undefined && heartIsland === throatIsland) motorsToThroat.push("Heart");
+      if (spDefined && spIsland !== undefined && spIsland === throatIsland) motorsToThroat.push("Solar Plexus");
+      if (rootDefined && rootIsland !== undefined && rootIsland === throatIsland) motorsToThroat.push("Root");
+      lines.push(`Why this Type: defined Sacral AND at least one motor connected to the Throat through a chain of defined channels (in the same defined island). The connecting motor need NOT be the Sacral, and the path may run through several channels/centers.`);
       lines.push(`Sacral: ${sacralDefined ? "DEFINED ✓" : "NOT defined (contradiction)"}.`);
-      lines.push(`Sacral ↔ Throat path: PRESENT (this is what makes the chart MG rather than pure Generator). Both centers sit in the same defined-channel island.`);
+      lines.push(`Motor(s) reaching the Throat: ${motorsToThroat.length ? motorsToThroat.join(", ") : "(a motor — see the Channels table)"} — in the same defined island as the Throat.`);
+      if (sacralIsland !== undefined && throatIsland !== undefined && sacralIsland !== throatIsland) {
+        const others = motorsToThroat.filter((m) => m !== "Sacral");
+        lines.push(`IMPORTANT — do NOT describe the Sacral as connecting to the Throat in this chart: the Sacral sits in island ${sacralIsland + 1} and the Throat in island ${throatIsland + 1}, so they are NOT connected. This chart is a Manifesting Generator because ${others.length ? others.join(", ") : "another motor"} reaches the Throat while the Sacral is separately defined. Describe the actual path, not a Sacral-to-Throat one.`);
+      }
     } else {
       lines.push(`(Custom Type label: ${chart.type.value}. Verify against chart geometry manually.)`);
     }
