@@ -456,6 +456,13 @@ export function validateReport(text: string, dp: DataPass, tier: ReportTier = "f
     const connRe = /\bsacral\b[\s\S]{0,130}?\b(?:connect(?:s|ing|ed)?|reach(?:es|ing)?|link(?:s|ing|ed)?|runs?\s+(?:up\s+)?(?:to|through)|all\s+the\s+way\s+(?:up\s+)?to|feeds?\s+(?:in)?to)\b[\s\S]{0,90}?\bthroat\b/gi;
     for (const m of text.matchAll(connRe)) {
       const idx = m.index ?? 0;
+      // Skip correct statements: a NEGATED connection ("the Sacral is not
+      // connected to the Throat", "no pipeline from the sacral to the throat")
+      // or a hypothetical BRIDGING description ("when the sacral island is
+      // bridged ... a path to the throat"). Only a bare assertion that the
+      // Sacral IS connected is a fabrication.
+      const span = text.slice(Math.max(0, idx - 34), idx + m[0].length).toLowerCase();
+      if (/\bbridg/.test(span) || /\b(?:no|not|never|without|cannot)\b|n't/.test(span) || /\bwould\b|\bwere\b/.test(span)) continue;
       factsChecked++;
       pushHard({
         section: "(any)",
