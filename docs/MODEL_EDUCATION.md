@@ -8,6 +8,9 @@ model. This is the repo half of a two-part system:
 - **Notion "Model Corrections" database** — where Kaycee authors the HD-content
   corrections (the correct understanding, in her words) and the library
   enrichments. Each Notion entry is cross-linked to its row here.
+  Location: `HD Claude Correction Log` page in the HD Database Directory →
+  https://app.notion.com/p/e7a1101a94194b07875c4e432c6709cc
+  (Sync to Delphi = off; this is a curation log, not retrieved source.)
 
 ## How "educating the model" actually works here
 
@@ -47,14 +50,32 @@ layers. Routing is **case by case** (Kaycee's call per correction):
 
 ## Corrections log (append-only)
 
-### MG (Manifesting Generator) energy — Foundation — pending
-- Observed: errors in Bryan Rodabough's Foundation report pointing to
-  misunderstandings of how MG / Sacral energy works. **Awaiting Kaycee's
-  specifics (which passages, what's wrong, the correct understanding).** This is
-  the correction that opened the project.
-- Correct understanding (Kaycee): _to be provided_
-- Routing: _tbd (likely library enrichment + a prompt framing rule)_
-- Enforcement: _pending_
+### MG definition & fabricated Sacral→Throat connection — Foundation — pending
+- Observed (Bryan Rodabough): claimed his Sacral connects to the Throat (via
+  10-34 through the G, and via 34→20 with a partner's Gate 20) and used that to
+  define his MG energy. He has no Sacral→Throat connection and no Gate 20.
+- Correct understanding (Kaycee): MG = defined Sacral AND a connection between
+  any of the four motors and the Throat. Bryan's Sacral is islanded with his G
+  Center; what makes him an MG is that his other three motors (Heart, Root,
+  Solar Plexus) reach the Throat via a long, circuitous path, plus the standalone
+  defined Sacral. The Sacral itself does NOT reach the Throat.
+- Routing (proposed, awaiting Kaycee's confirm): Library (state the MG definition
+  in the Type/MG material) + Prompt (never assert connections/channels beyond the
+  Data Pass; derive MG mechanics from the actual definition) + Validator (flag a
+  channel/gate named as the reader's own that isn't in the Data Pass, with a
+  carve-out for gates explicitly attributed to another person).
+- Notion: https://app.notion.com/p/3c6e3fadcaaa81d99e56fdb4ec230cd1
+
+### Profile line 4 is the Opportunist, not the Hermit — Foundation — pending
+- Observed (Bryan Rodabough, Design Sun 24.4): called the 4th line the "Hermit"
+  and framed it as "works best in isolation."
+- Correct understanding (Kaycee): line 4 = Opportunist (Hermit is line 2). A 4th
+  line externalizes through its network and relationships; it is not about
+  isolation. Lines: 1 Investigator, 2 Hermit, 3 Martyr, 4 Opportunist, 5 Heretic,
+  6 Role Model.
+- Routing (proposed, awaiting Kaycee's confirm): Validator (line-number ↔
+  archetype consistency check) + Prompt (reinforce the exact mapping).
+- Notion: https://app.notion.com/p/3c6e3fadcaaa81ddb414c3f76082a441
 
 ### Fixing-planet named in prose — Foundation/Planetary — enforced
 - Observed: prose named the planet behind an exaltation/detriment, e.g. "Venus
