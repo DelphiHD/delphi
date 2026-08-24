@@ -50,7 +50,7 @@ layers. Routing is **case by case** (Kaycee's call per correction):
 
 ## Corrections log (append-only)
 
-### MG definition & fabricated Sacral→Throat connection — Foundation — data pass fixed; prose verify + guards pending
+### MG definition & fabricated Sacral→Throat connection — Foundation — ENFORCED (verified on Bryan re-run)
 - Observed (Bryan Rodabough): claimed his Sacral connects to the Throat (via
   10-34 through the G, and via 34→20 with a partner's Gate 20) and used that to
   define his MG energy. He has no Sacral→Throat connection and no Gate 20.
@@ -66,24 +66,35 @@ layers. Routing is **case by case** (Kaycee's call per correction):
   "Sacral ↔ Throat path: PRESENT" for Bryan (false). The model trusted that
   deterministic fact and elaborated on it.
 - Routing: **Data Pass (code)** — done; + Prompt + Validator — pending.
-- Enforcement: `lib/chart/datapass.ts` MG branch rewritten to the motor-to-Throat
-  rule; reports the actual connecting motor(s) and, when the Sacral is islanded
-  elsewhere, injects an explicit "do NOT describe the Sacral connecting to the
-  Throat" note. Verified deterministically on Bryan (islanded), Izzy (standard
-  MG), Joe (pure Generator). Remaining: re-run Bryan's report to confirm the
-  prose, add a prompt line (use the source's "motor-to-Throat" language; never
-  assert a center-to-center path not in the Data Pass), and a validator net.
+- Enforcement (all three layers):
+  1. **Data Pass** (`lib/chart/datapass.ts`): MG branch rewritten to the
+     motor-to-Throat rule; reports the actual connecting motor(s) and, when the
+     Sacral is islanded elsewhere, injects an explicit "do NOT describe the
+     Sacral connecting to the Throat" note.
+  2. **Prompt** (`lib/report/foundation.ts`): the corrected `typeJustification`
+     + island layout + channels are now injected into call 1 (the call that
+     writes Your Type) — they were absent, which is why the fix at first didn't
+     reach the model. Plus a house rule to never assert a connection/channel/gate
+     the chart lacks.
+  3. **Validator** (`lib/report/validate.ts`): `sacral-throat-fabricated` flags
+     a Sacral-to-Throat assertion when the Sacral is not in the Throat's island,
+     skipping negated / bridging statements.
+- Verified on the Bryan re-run: the Type section now reads "at least one motor
+  center connects ... to the Throat," "Island 1 connect[s] the Heart, Solar
+  Plexus, and Root ... into the Throat," and "the Sacral ... sits in its own
+  island, connected to the G center." No fabricated Sacral→Throat path or Gate 20.
 - Notion: https://app.notion.com/p/3c6e3fadcaaa81d99e56fdb4ec230cd1
 
-### Profile line 4 is the Opportunist, not the Hermit — Foundation — pending
+### Profile line 4 is the Opportunist, not the Hermit — Foundation — ENFORCED
 - Observed (Bryan Rodabough, Design Sun 24.4): called the 4th line the "Hermit"
   and framed it as "works best in isolation."
 - Correct understanding (Kaycee): line 4 = Opportunist (Hermit is line 2). A 4th
   line externalizes through its network and relationships; it is not about
   isolation. Lines: 1 Investigator, 2 Hermit, 3 Martyr, 4 Opportunist, 5 Heretic,
   6 Role Model.
-- Routing (proposed, awaiting Kaycee's confirm): Validator (line-number ↔
-  archetype consistency check) + Prompt (reinforce the exact mapping).
+- Enforcement: `validate.ts` `line-archetype-mismatch` flags a line ordinal
+  paired with the wrong archetype. Verified: fired on Bryan v1, gone on the
+  re-run (line 4 now reads Opportunist).
 - Notion: https://app.notion.com/p/3c6e3fadcaaa81ddb414c3f76082a441
 
 ### Fixing-planet named in prose — Foundation/Planetary — enforced
