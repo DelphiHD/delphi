@@ -442,6 +442,55 @@ export function validateReport(text: string, dp: DataPass, tier: ReportTier = "f
     }
   }
 
+  // 2c. Sacral→Throat fabrication. When the chart's Sacral does NOT share the
+  // Throat's defined island, the prose must not describe a Sacral-to-Throat
+  // connection (Bryan v1 fabricated one to explain his MG). Only fires when the
+  // chart genuinely lacks the connection, so it can't false-positive on charts
+  // where the Sacral really does reach the Throat.
+  const normCtr = (s: string) => s.toLowerCase().replace(/\s*center\s*$/i, "").trim();
+  const sacralThroatConnected = dp.split.islands.some((isl) => {
+    const cs = isl.centers.map(normCtr);
+    return cs.includes("sacral") && cs.includes("throat");
+  });
+  if (!sacralThroatConnected) {
+    const connRe = /\bsacral\b[\s\S]{0,130}?\b(?:connect(?:s|ing|ed)?|reach(?:es|ing)?|link(?:s|ing|ed)?|runs?\s+(?:up\s+)?(?:to|through)|all\s+the\s+way\s+(?:up\s+)?to|feeds?\s+(?:in)?to)\b[\s\S]{0,90}?\bthroat\b/gi;
+    for (const m of text.matchAll(connRe)) {
+      const idx = m.index ?? 0;
+      factsChecked++;
+      pushHard({
+        section: "(any)",
+        rule: "sacral-throat-fabricated",
+        message: "Prose asserts a Sacral-to-Throat connection, but this chart's Sacral is not in the Throat's defined island — they do not connect. Describe the actual motor(s) reaching the Throat (per the Type justification), not a Sacral-to-Throat path.",
+        detected: text.slice(idx, Math.min(text.length, idx + m[0].length)).replace(/\n/g, " ").slice(0, 200),
+        expected: "Sacral not connected to Throat in this chart",
+      });
+    }
+  }
+
+  // 2d. Profile line ↔ archetype consistency. The six lines map to fixed
+  // archetypes: 1 Investigator, 2 Hermit, 3 Martyr, 4 Opportunist, 5 Heretic,
+  // 6 Role Model. Catch prose that pairs a line ordinal with the wrong one
+  // (Bryan v1 called the fourth line the "Hermit").
+  const LINE_ARCH: Record<number, string> = { 1: "Investigator", 2: "Hermit", 3: "Martyr", 4: "Opportunist", 5: "Heretic", 6: "Role Model" };
+  const ARCH_LINE: Record<string, number> = { investigator: 1, hermit: 2, martyr: 3, opportunist: 4, heretic: 5, "role model": 6 };
+  const ORD: Record<string, number> = { first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, "1st": 1, "2nd": 2, "3rd": 3, "4th": 4, "5th": 5, "6th": 6 };
+  const lineArchRe = /\b(first|second|third|fourth|fifth|sixth|1st|2nd|3rd|4th|5th|6th)[\s-]line\b[\s\S]{0,30}?\b(Investigator|Hermit|Martyr|Opportunist|Heretic|Role\s+Model)\b/gi;
+  for (const m of text.matchAll(lineArchRe)) {
+    const lineNum = ORD[m[1].toLowerCase()];
+    const archLine = ARCH_LINE[m[2].toLowerCase().replace(/\s+/g, " ")];
+    if (lineNum && archLine && lineNum !== archLine) {
+      const idx = m.index ?? 0;
+      factsChecked++;
+      pushHard({
+        section: "(any)",
+        rule: "line-archetype-mismatch",
+        message: `The ${m[1]} line is the ${LINE_ARCH[lineNum]}, but the prose pairs it with the ${m[2]} (line ${archLine}). Lines: 1 Investigator, 2 Hermit, 3 Martyr, 4 Opportunist, 5 Heretic, 6 Role Model.`,
+        detected: text.slice(idx, Math.min(text.length, idx + m[0].length)).replace(/\n/g, " "),
+        expected: `${m[1]} line = ${LINE_ARCH[lineNum]}`,
+      });
+    }
+  }
+
   // 3. Centers section must include all 9 centers with the correct status.
   // Foundation-only — the other tiers don't render per-center H2/H3s.
   const centersSection = tier === "foundation" ? getH1Section(text, "Your Centers") : null;
