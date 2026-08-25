@@ -86,9 +86,17 @@ left off the public listing. Whoever holds a chart is already a client, which is
 audience the Drop-In is for. Verified both halves: `cal.com/DelphiHumanDesign/drop-in` books
 normally at $50, and the public page lists only Foundation and Relationship.
 
-Still to place: a booking link on the Wix home page. That needs the Wix editor, which needs
-either Kaycee's hands or browser access to the profile she is logged into. Her header already
-has a "Contact Us" button, so the smallest version is repointing that or adding one beside it.
+**The Wix home page carries a Book a Session button**, published 2026-08-25. It sits in the
+header beside the existing Contact Us button, same purple pill, and opens
+`cal.com/DelphiHumanDesign` in a new tab so the site stays open behind it. Contact Us is
+untouched and still points at the contact section. Built by duplicating the Contact Us button
+in the Harmony editor, so it inherits her button style automatically.
+
+Note for anyone editing that header again: **Contact Us is hidden on mobile** and was already
+so before this change; Book a Session is visible there, which is deliberate. Also, on Kaycee's
+1280x800 screen the editor's Link panel is taller than the viewport, so its Done button cannot
+be clicked or scrolled to. Reach it by tabbing from the URL field (past both tab-target radios,
+Advanced SEO Settings, Remove Link and Cancel) and pressing Enter.
 
 The Drop-In link stays out of all public placements.
 
@@ -114,5 +122,4 @@ software on my computer" and needs saying out loud that nothing downloads.
 Cal.com's free plan shows a small Cal.com mark on the booking page, removable for $12/month,
 deferred until money is actually moving through it. Stripe takes roughly 2.9% plus 30 cents
 per transaction. Refund policy on all three event types is Cal.com's default of "never";
-worth revisiting with Kaycee rather than leaving as an unexamined default. Booking links
-still need placing on the Wix home page and on the client chart pages.
+worth revisiting with Kaycee rather than leaving as an unexamined default.
