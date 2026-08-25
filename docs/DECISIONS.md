@@ -299,6 +299,10 @@ This is an opinion based on a close read of OpenBrain's LICENSE.md, not legal ad
 
 **Shipped 2026-08-24.** Migration applied, code pushed (`d4c20dc`) and deployed to production. The Supabase env vars were already present for Production, so nothing had to be added. Bryan's chart verified live end to end: 200 with the privacy headers, byte-identical 1,804,552-byte payload, popups pulling his report text, unknown and malformed tokens 404. Note that the previous production deployment (May 29) had been in an Error state, so this push also restored the site itself.
 
-**Domain.** `delphihd.com` is attached to the project in Vercel (apex only, no www redirect, so links read `delphihd.com/c/...`). It stays "Invalid Configuration" until one DNS record is added at Wix, her registrar: an **A** record, host **@**, value **216.198.79.1**. Until that lands, the same chart is reachable at `delphi-woad.vercel.app/c/<token>`; that alias keeps working afterwards, so a link sent today does not break when the domain switches on.
+**Domain: a subdomain, not the apex.** The apex was attached to the Vercel project first, and pointing it would have been a mistake: `delphihd.com` already serves Kaycee's live Wix website (the apex redirects to `www.delphihd.com`, title "Home | Delphi Human Design"). Repointing the apex A record at Vercel would have taken her site off her own domain. Caught before any DNS was changed; the apex has been removed from the Vercel project so it cannot be pointed by accident.
+
+Client links live at **`charts.delphihd.com/c/<token>`** instead — Kaycee's call, 2026-08-24. Her website is untouched: nothing at Wix is edited or deleted, one record is added. The record Vercel wants is a **CNAME**, host **charts**, value **8795503e42a0869e.vercel-dns-017.com** (its rank-2 fallback is `cname.vercel-dns.com`). Until that lands, the same chart is reachable at `delphi-woad.vercel.app/c/<token>`; that alias keeps working afterwards, so a link sent today does not break when the subdomain switches on.
+
+**Lesson.** Check what a domain is already serving before attaching or pointing it. A registrar record looks like config; on an apex it is the whole business's front door.
 
 **Open.** No cost note: no Claude calls on this path; storage is a fraction of a cent per chart.
