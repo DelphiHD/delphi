@@ -64,6 +64,15 @@ birth data. Recommended lean is render-live, precisely because both named featur
 cases baking handles badly. Kaycee has not decided, and asked for the trade-offs written up
 properly before she does.
 
+**Staging area (2026-08-25).** Kaycee's **Reference Files** database in Notion, under the HD
+Readings page, is where client records are staged for this. It now carries **Birth Date, Birth
+Time and Birth Place** columns (added at her request) plus the existing **Bodygraph Link**, and
+all 28 people on the canonical roster in `scripts/client-roster.ts` have a row with birth data
+and a published chart link. Birth data previously existed only in that code file, where she
+could not see or edit it; the portal's data model should treat the Notion record as the human
+side of the same truth. Twelve older rows predate the current process and have no birth data;
+Kaycee's call whether they join the roster.
+
 Sketched order of work: accounts (email-link sign-in, existing chart links keep working) →
 a per-client home page listing what they already have → restructure storage from one chart
 per person to many → transit overlay → composites → Stripe-automated purchase. Purchase
