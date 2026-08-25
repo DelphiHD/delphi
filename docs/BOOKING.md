@@ -74,10 +74,17 @@ stalls before booking.
 
 ## Where the links go
 
-Every client chart at `charts.delphihd.com` carries a purple **Book a session** button at the
-bottom of its control panel, linking to `cal.com/DelphiHumanDesign`. Anyone holding a chart
-can rebook without going back through Kaycee. Republishing a chart picks it up; charts
-already sent keep their token, so the link a client has is the one that gains the button.
+Every client chart at `charts.delphihd.com` carries a **Book a session** block at the bottom
+of its control panel, listing all three sessions with length and price, each linking straight
+to its own booking page. Anyone holding a chart can rebook without going back through Kaycee.
+Republishing a chart picks it up; charts already sent keep their token, so the link a client
+has is the one that gains the block.
+
+**The Drop-In appears on charts but not on the public page.** No second booking page is needed
+for this: a hidden Cal.com event type stays fully bookable on its direct link, it is only
+left off the public listing. Whoever holds a chart is already a client, which is exactly the
+audience the Drop-In is for. Verified both halves: `cal.com/DelphiHumanDesign/drop-in` books
+normally at $50, and the public page lists only Foundation and Relationship.
 
 Still to place: a booking link on the Wix home page. That needs the Wix editor, which needs
 either Kaycee's hands or browser access to the profile she is logged into. Her header already
