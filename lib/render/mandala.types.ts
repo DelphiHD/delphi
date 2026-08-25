@@ -80,4 +80,7 @@ export interface RenderOptions {
    * a CDN or static asset path instead of inlining base64.
    */
   hexagramResolver?: (gate: number) => string;
+  /** Multiply planet-glyph size. Default 1 (docx). The interactive embed uses a
+   *  larger value so glyphs read clearly when the wheel is shown smaller. */
+  glyphScale?: number;
 }

@@ -25,6 +25,7 @@ import { Client as NotionClient, isFullPage, isFullBlock } from "@notionhq/clien
 import OpenAI from "openai";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { mkdir, writeFile, readFile, stat } from "node:fs/promises";
+import { logFlag } from "@/lib/flags";
 import { dirname } from "node:path";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -168,8 +169,21 @@ function isRetriable(e: any): { yes: boolean; reason: string } {
     const s = e?.status ?? 0;
     if (s === 429 || s === 502 || s === 503 || s === 504) return { yes: true, reason: `http ${s}` };
   }
+  // Raw network / socket failures over a long walk: undici "fetch failed"
+  // (TypeError with a cause), connection resets, DNS blips, timeouts. These
+  // used to crash the whole sync; retrying them is safe and idempotent.
+  const netCodes = ["ECONNRESET", "ETIMEDOUT", "ECONNREFUSED", "EAI_AGAIN", "EPIPE", "UND_ERR_SOCKET", "UND_ERR_CONNECT_TIMEOUT"];
+  const code = e?.code ?? e?.cause?.code;
+  if (code && netCodes.includes(code)) return { yes: true, reason: String(code) };
+  if (/fetch failed|socket hang up|network|terminated/i.test(e?.message ?? "") || /fetch failed|socket hang up/i.test(e?.cause?.message ?? "")) {
+    return { yes: true, reason: "network" };
+  }
   return { yes: false, reason: "" };
 }
+
+// Synced-block source blocks that the integration can't read (their master
+// page isn't shared). Collected across the run so we can report them.
+const inaccessibleBlocks = new Set<string>();
 
 async function getChildren(blockId: string): Promise<any[]> {
   const all: any[] = [];
@@ -192,6 +206,14 @@ async function getChildren(blockId: string): Promise<any[]> {
       // ai_block / linked-database: subtree is opaque. Return what we have.
       if (e?.code === "validation_error" && /not supported via the API/i.test(e?.message ?? "")) {
         console.warn(`  ⚠ block ${blockId.slice(0, 8)}… contains an unsupported block type; skipping (${e.message.replace(/Block type /, "")})`);
+        return all;
+      }
+      // Not shared with the integration (a synced block referencing a master
+      // page the integration can't see). Skip and record it so we can report
+      // exactly which pages need sharing, rather than crashing the whole run.
+      if (e?.code === "object_not_found" || e?.status === 404) {
+        inaccessibleBlocks.add(blockId);
+        console.warn(`  ⚠ block ${blockId.slice(0, 8)}… not shared with the delphi-ingest integration; skipping`);
         return all;
       }
       // Transient infra failures (timeout, 5xx, 429). Exponential backoff.
@@ -233,14 +255,26 @@ async function renderBlocks(blocks: any[]): Promise<string> {
       case "toggle": rendered = `**${text}**`; break;
       case "code": rendered = "```\n" + text + "\n```"; break;
       case "divider": rendered = "---"; break;
-      case "synced_block": rendered = ""; break;
+      case "synced_block": {
+        // A synced block's real content lives in its children. For a DUPLICATE
+        // (reference) synced block the children live under the ORIGINAL block
+        // (synced_from.block_id); for the original, under this block's own id.
+        // Most of Kaycee's Types/Authorities/etc. write-ups sit inside a synced
+        // block, so this MUST be read, not skipped (the old code dropped it,
+        // which is why those entries synced empty while gates did not).
+        const sourceId = obj.synced_from?.block_id ?? b.id;
+        const kids = await getChildren(sourceId);
+        rendered = await renderBlocks(kids);
+        break;
+      }
       case "unsupported": rendered = ""; break;
       default: rendered = text;
     }
     if (rendered) parts.push(rendered);
-    // Don't recurse into block types whose content the API can't return.
-    // unsupported = opaque (e.g., linked databases); synced_block = handled
-    // specially in the Line Companion path or duplicates content elsewhere.
+    // Don't recurse into block types whose content the API can't return, or
+    // that we already handled explicitly above.
+    // unsupported = opaque (e.g. linked databases); synced_block = its children
+    // are fetched inside the case above (avoid double-processing here).
     const skipRecursion = t === "unsupported" || t === "synced_block";
     if (b.has_children && !skipRecursion) {
       const kids = await getChildren(b.id);
@@ -267,8 +301,120 @@ interface Chunk {
   body: string;
   gate_number: number | null;
   line_number: number | null;
+  /** EVERY Notion page property, name -> stringified value. This is the
+   *  structured metadata the model (and the reports) look fields up by, e.g.
+   *  metadata["Function - DBHD - The 9 Centers"]. Also folded into `body` so it
+   *  is searchable/grounded, not just directly addressable. */
+  metadata?: Record<string, string>;
   embedding?: number[];
   tokens?: number;
+}
+
+// Resolve a related Notion page id to its human-readable title, cached across the
+// whole sync run so a relation shared by many rows (e.g. every channel pointing at
+// the same circuit page) costs at most one lookup. A related page that is deleted
+// or not shared with the integration resolves to "" (skipped, never fatal).
+const relationTitleCache = new Map<string, string>();
+async function resolveRelationTitle(id: string): Promise<string> {
+  if (relationTitleCache.has(id)) return relationTitleCache.get(id)!;
+  let title = "";
+  try {
+    const page = await notion.pages.retrieve({ page_id: id });
+    if (isFullPage(page)) title = pageTitle(page);
+  } catch {
+    /* related page unshared / deleted; leave blank */
+  }
+  relationTitleCache.set(id, title);
+  return title;
+}
+
+// Stringify a Notion property value SYNCHRONOUSLY into its readable content. EVERY
+// property type is captured, no exceptions and no judgment about importance, per
+// Kaycee: every field matters. Relations are the one type resolved separately
+// (async, in allProps) because they need a page lookup. Any property type Notion
+// adds in the future is handled by the generic default below, so nothing is ever
+// silently dropped again.
+function propValueToString(p: any): string {
+  if (!p || !p.type) return "";
+  switch (p.type) {
+    case "title": return plainText(p.title);
+    case "rich_text": return plainText(p.rich_text);
+    case "select": return p.select?.name ?? "";
+    case "status": return p.status?.name ?? "";
+    case "multi_select": return (p.multi_select ?? []).map((s: any) => s.name).join(", ");
+    case "number": return p.number != null ? String(p.number) : "";
+    case "checkbox": return p.checkbox ? "yes" : "no";
+    case "date": return [p.date?.start, p.date?.end].filter(Boolean).join(" to ");
+    case "url": return p.url ?? "";
+    case "email": return p.email ?? "";
+    case "phone_number": return p.phone_number ?? "";
+    case "people": return (p.people ?? []).map((u: any) => u.name ?? u.id).filter(Boolean).join(", ");
+    case "files": return (p.files ?? []).map((f: any) => f.name || f.external?.url || f.file?.url).filter(Boolean).join(", ");
+    case "unique_id": return p.unique_id ? [p.unique_id.prefix, p.unique_id.number].filter((x: any) => x != null).join("-") : "";
+    case "created_time": return p.created_time ?? "";
+    case "last_edited_time": return p.last_edited_time ?? "";
+    case "created_by": return p.created_by?.name ?? p.created_by?.id ?? "";
+    case "last_edited_by": return p.last_edited_by?.name ?? p.last_edited_by?.id ?? "";
+    case "verification": return p.verification?.state ?? "";
+    case "formula": {
+      const f = p.formula ?? {};
+      if (f.string) return f.string;
+      if (f.number != null) return String(f.number);
+      if (f.boolean != null) return String(f.boolean);
+      if (f.date?.start) return f.date.start;
+      return "";
+    }
+    case "rollup": {
+      const r = p.rollup ?? {};
+      if (r.type === "array") return (r.array ?? []).map((x: any) => propValueToString(x)).filter(Boolean).join(", ");
+      if (r.type === "number" && r.number != null) return String(r.number);
+      if (r.type === "date" && r.date?.start) return r.date.start;
+      return "";
+    }
+    default: {
+      // Any current or future type not named above: capture whatever readable
+      // value it carries rather than dropping it. `button` and the like have no
+      // value and yield "" (which allProps drops), but a valued type is kept.
+      const v = (p as any)[p.type];
+      if (v == null) return "";
+      if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return String(v);
+      if (typeof v === "object") {
+        if (v.name) return String(v.name);
+        if (v.start) return String(v.start);
+        if (Array.isArray(v)) return v.map((x: any) => x?.name ?? x?.id ?? "").filter(Boolean).join(", ");
+      }
+      return "";
+    }
+  }
+}
+
+// EVERY page property, name -> stringified value (empty values dropped). Async
+// because relation properties resolve to the linked page titles (e.g. a channel's
+// "Circuit" relation becomes "Understanding Circuit"). Kaycee's databases are the
+// source of truth: we capture every property she authored, not a hand-picked few.
+async function allProps(page: any): Promise<Record<string, string>> {
+  const props = page?.properties ?? {};
+  const out: Record<string, string> = {};
+  for (const [name, p] of Object.entries(props) as [string, any][]) {
+    let v: string;
+    if (p?.type === "relation") {
+      const ids = (p.relation ?? []).map((r: any) => r.id).filter(Boolean);
+      const titles: string[] = [];
+      for (const id of ids) { const t = await resolveRelationTitle(id); if (t) titles.push(t); }
+      v = titles.join(", ");
+    } else {
+      v = propValueToString(p);
+    }
+    v = v.trim();
+    if (v) out[name] = v;
+  }
+  return out;
+}
+
+// The property metadata rendered as labeled text, folded into the body so it is
+// searchable/grounded (not just directly addressable via chunk.metadata).
+function metaText(meta: Record<string, string>): string {
+  return Object.entries(meta).map(([k, v]) => `${k}: ${v}`).join("\n");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -289,8 +435,16 @@ async function syncStandardDatabase(
       const title = pageTitle(page);
       const blocks = await getChildren(page.id);
       const rendered = await renderBlocks(blocks);
-      const body = title ? `# ${title}\n\n${rendered}` : rendered;
-      if (!body.trim()) continue;
+      // Capture EVERY property (relations resolved to linked-page names) once,
+      // then use it for both the folded body text and the addressable metadata.
+      const meta = await allProps(page);
+      // Body content lives in the page body for some databases and in text
+      // properties for others; take whichever has content (both if both).
+      const content = [rendered, metaText(meta)].filter((s) => s.trim()).join("\n\n");
+      const body = title ? `# ${title}\n\n${content}` : content;
+      // Keep EVERY page, even an empty one. Kaycee may add content later and must
+      // be able to trust the sync picks it up; a skipped page silently would not.
+      // (An empty page becomes an empty-bodied chunk with its metadata + title.)
       const slug = slugify(title) || page.id.slice(0, 8);
       // Heuristic: pull a leading number from the title as gate_number for
       // gate-like content (e.g., "21 - The Biter").
@@ -308,11 +462,31 @@ async function syncStandardDatabase(
         body,
         gate_number: gate,
         line_number: null,
+        metadata: meta,
       });
     }
     cursor = resp.next_cursor || undefined;
   } while (cursor);
   return chunks;
+}
+
+// Descend through (possibly nested or referenced) synced blocks to find the
+// callout that holds the 7 line toggles. A flat page is `synced_block ->
+// callout`; a nested one (gate 47) is `synced_block -> synced_block -> callout`.
+// For a reference synced block, its children live under synced_from.block_id.
+async function findLineCompanionCallout(blockId: string, depth = 0): Promise<any | null> {
+  if (depth > 4) return null;
+  const kids = await getChildren(blockId);
+  const callout = kids.find((b: any) => b.type === "callout");
+  if (callout) return callout;
+  for (const k of kids) {
+    if (k.type === "synced_block") {
+      const src = k.synced_block?.synced_from?.block_id ?? k.id;
+      const found = await findLineCompanionCallout(src, depth + 1);
+      if (found) return found;
+    }
+  }
+  return null;
 }
 
 // Special: HD The Line Companion. Each row is a gate (e.g. "LC 62"); the body
@@ -336,12 +510,17 @@ async function syncLineCompanion(databaseId: string): Promise<Chunk[]> {
       const synced = topBlocks.find((b: any) => b.type === "synced_block");
       if (!synced) {
         console.warn(`  ⚠ Gate ${gateNumber}: no synced_block on page`);
+        logFlag({ product: "sync", severity: "flag", message: `Line Companion gate ${gateNumber}: no synced block on the page, so no line content came through.`, action: "gate lines skipped" });
         continue;
       }
-      const syncedChildren = await getChildren(synced.id);
-      const callout = syncedChildren.find((b: any) => b.type === "callout");
+      // Descend through nested / referenced synced blocks to find the callout
+      // that holds the toggles. Some pages (e.g. gate 47) wrap the callout in a
+      // second synced block, which a one-level lookup misses.
+      const src0 = synced.synced_block?.synced_from?.block_id ?? synced.id;
+      const callout = await findLineCompanionCallout(src0);
       if (!callout) {
-        console.warn(`  ⚠ Gate ${gateNumber}: no callout inside synced_block`);
+        console.warn(`  ⚠ Gate ${gateNumber}: no callout found inside the synced block(s)`);
+        logFlag({ product: "sync", severity: "flag", message: `Line Companion gate ${gateNumber}: could not find the callout with the line toggles (nested synced block or content on the wrong page in Notion).`, action: "gate lines skipped" });
         continue;
       }
       const toggles = await getChildren(callout.id);
@@ -563,13 +742,85 @@ async function saveCheckpoint(chunks: Chunk[]): Promise<void> {
   );
 }
 
+// Completeness guard. The library must only ever get MORE complete, never
+// silently less. Before overwriting, compare each freshly-walked page to the
+// last good copy on disk. If a page came through THINNER (a fetch failed, a
+// synced block did not resolve, a page got unshared), hold its last-good body
+// (keep the fresh metadata) and flag it for review. If a page that existed is
+// missing entirely, keep the last-good copy. Kaycee reviews the flags and
+// decides whether a shrink was correct (e.g. wrong content removed) or a
+// failure. Nothing is dropped without a loud, visible record.
+async function applyCompletenessGuard(fresh: Chunk[]): Promise<Chunk[]> {
+  let lastGood: Chunk[] = [];
+  try {
+    const data = JSON.parse(await readFile(CHECKPOINT_PATH, "utf8"));
+    lastGood = data.chunks ?? [];
+  } catch {
+    return fresh; // no prior library to guard against
+  }
+  if (!lastGood.length) return fresh;
+
+  const keyOf = (c: Chunk) => `${c.source_kind}|${c.gate_number}|${c.line_number}|${c.slug}`;
+  const lgMap = new Map(lastGood.map((c) => [keyOf(c), c]));
+  const freshKeys = new Set(fresh.map(keyOf));
+  const SHRINK_RATIO = 0.9;   // flag if new body < 90% of last-good
+  const MIN_DROP = 200;       // and dropped more than 200 chars (ignore trivial edits)
+
+  const out: Chunk[] = [];
+  let held = 0;
+  for (const c of fresh) {
+    const lg = lgMap.get(keyOf(c));
+    if (lg) {
+      const nb = String(c.body || "").length;
+      const ob = String(lg.body || "").length;
+      if (nb < ob * SHRINK_RATIO && ob - nb > MIN_DROP) {
+        logFlag({
+          product: "sync",
+          severity: "flag",
+          message: `${c.source_kind} "${c.title}" came through thin (${nb} chars, was ${ob}). Held last-good content pending review: confirm whether the shrink is correct (wrong content removed) or a fetch failure.`,
+          action: "held last-good body, kept fresh metadata",
+        });
+        out.push({ ...c, body: lg.body });
+        held++;
+        continue;
+      }
+    }
+    out.push(c);
+  }
+  // Pages that were in the library but did not come through this run at all
+  // (usually a whole database failed above). Restore them from last-good and
+  // flag ONCE with a summary rather than one flag per page.
+  const missing: Chunk[] = [];
+  for (const lg of lastGood) {
+    if (!freshKeys.has(keyOf(lg))) { out.push(lg); missing.push(lg); }
+  }
+  if (missing.length) {
+    const byKind: Record<string, number> = {};
+    for (const m of missing) byKind[m.source_kind] = (byKind[m.source_kind] ?? 0) + 1;
+    const breakdown = Object.entries(byKind).map(([k, n]) => `${n} ${k}`).join(", ");
+    logFlag({
+      product: "sync",
+      severity: "flag",
+      message: `${missing.length} page(s) did not come through this run (${breakdown}); kept the last-good copies. Usually means a database failed or was empty this run.`,
+      action: "held last-good for missing pages",
+    });
+  }
+  const restored = missing.length;
+  if (held || restored) console.log(`  completeness guard: held ${held} thinned page(s), restored ${restored} missing page(s). See System Health/Flags.md.`);
+  else console.log(`  completeness guard: clean, no page regressed.`);
+  return out;
+}
+
 async function main() {
   console.log("Phase 3 sync starting");
 
   // Resume from a previous Notion walk if one is fresh on disk. Lets us
   // recover from OpenAI / Supabase failures without re-paying the 10-minute
   // Notion roundtrip.
-  let allChunks: Chunk[] | null = await loadCheckpoint();
+  // SYNC_FORCE_WALK forces a fresh Notion read (ignore any checkpoint). We keep
+  // the existing chunks.json in place: saveCheckpoint only overwrites it at the
+  // very end on success, so if the walk crashes, the current library is untouched.
+  let allChunks: Chunk[] | null = process.env.SYNC_FORCE_WALK ? null : await loadCheckpoint();
   if (allChunks) {
     console.log(`Resuming from checkpoint: ${allChunks.length} chunks already extracted`);
   } else {
@@ -584,19 +835,82 @@ async function main() {
     allChunks = [];
     for (const t of targets) {
       process.stdout.write(`  ${t.rowName.padEnd(28)} … `);
-      const chunks = t.isLineCompanion
-        ? await syncLineCompanion(t.databaseId)
-        : await syncStandardDatabase(t.databaseId, t.kind);
-      console.log(`${chunks.length} chunks`);
-      allChunks.push(...chunks);
+      // Per-database isolation: a transient failure on ONE database (a Notion
+      // timeout, a 5xx) must not crash the whole walk and lose everything. On
+      // failure we flag it and leave that database's pages out of the fresh
+      // set; the completeness guard then holds their last-good content. The
+      // sync still completes and the library is preserved.
+      try {
+        const chunks = t.isLineCompanion
+          ? await syncLineCompanion(t.databaseId)
+          : await syncStandardDatabase(t.databaseId, t.kind);
+        console.log(`${chunks.length} chunks`);
+        allChunks.push(...chunks);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.log(`FAILED: ${msg}`);
+        logFlag({ product: "sync", severity: "flag", message: `Database "${t.rowName}" failed this run (${msg}). Its pages were held at last-good content by the guard.`, action: "database skipped this run, last-good held" });
+      }
     }
     console.log(`Total: ${allChunks.length} chunks`);
+    allChunks = await applyCompletenessGuard(allChunks);
     await saveCheckpoint(allChunks);
     console.log(`Checkpoint saved to ${CHECKPOINT_PATH}`);
   }
 
   if (allChunks.length === 0) {
     console.log("Nothing to embed. Exiting.");
+    return;
+  }
+
+  // Health summary: entries whose body came through thin (under 200 chars),
+  // and any blocks the integration could not read (need sharing).
+  const THIN = 200;
+  const thin = allChunks.filter((c) => (c.body || "").length < THIN && (c.metadata == null || Object.keys(c.metadata).length === 0));
+  if (thin.length) {
+    console.log(`\n⚠ ${thin.length} entr${thin.length === 1 ? "y" : "ies"} came through thin (under ${THIN} chars, no metadata):`);
+    for (const c of thin) console.log(`    ${c.source_kind.padEnd(16)} ${c.title} (${(c.body || "").length} chars)`);
+    logFlag({ product: "sync", severity: "flag", message: `${thin.length} entr${thin.length === 1 ? "y" : "ies"} came through thin with no content: ${thin.slice(0, 8).map((c) => `${c.source_kind} "${c.title}"`).join(", ")}${thin.length > 8 ? ", …" : ""}.`, action: "kept in library, needs source content" });
+  } else {
+    console.log(`\n✓ every entry came through with real content.`);
+  }
+  // Relation-resolution guard: relations (like a channel's Circuit) are exactly
+  // the class of field that used to be silently dropped. Assert the ones the
+  // reports depend on actually came through, so a future regression trips HERE,
+  // loudly, instead of surfacing as a blank header in a report days later.
+  const channelChunks = allChunks.filter((c) => c.source_kind === "channel");
+  const missingCircuit = channelChunks.filter(
+    (c) => !Object.entries(c.metadata ?? {}).some(([k, v]) => /circuit/i.test(k) && String(v).trim()),
+  );
+  if (channelChunks.length && missingCircuit.length === 0) {
+    console.log(`\n✓ all ${channelChunks.length} channels carry their Circuit relation.`);
+  } else if (missingCircuit.length) {
+    console.log(`\n⚠ ${missingCircuit.length}/${channelChunks.length} channel(s) came through with NO Circuit:`);
+    for (const c of missingCircuit) console.log(`    ${c.title}`);
+    // Most channels missing => relation capture regressed (loud, notifies).
+    // A few missing => likely a missing Circuit link in Notion for those rows.
+    const regressed = missingCircuit.length >= Math.max(5, channelChunks.length / 2);
+    logFlag({
+      product: "sync",
+      severity: regressed ? "critical" : "flag",
+      message: regressed
+        ? `${missingCircuit.length}/${channelChunks.length} channels synced with NO Circuit. Relation capture has regressed, relations are being dropped again. Check propValueToString/allProps in sync-notion.ts.`
+        : `${missingCircuit.length} channel(s) have no Circuit: ${missingCircuit.slice(0, 6).map((c) => `"${c.title}"`).join(", ")}. Likely a missing Circuit link in Notion for those rows.`,
+      action: regressed ? "relation resolution broken; channel headers blank" : "those channel headers will show no circuit",
+    });
+  }
+
+  if (inaccessibleBlocks.size) {
+    console.log(`\n⚠ ${inaccessibleBlocks.size} synced block(s) not shared with the delphi-ingest integration:`);
+    for (const id of inaccessibleBlocks) console.log(`    ${id}`);
+    logFlag({ product: "sync", severity: "flag", message: `${inaccessibleBlocks.size} synced block(s) are not shared with the delphi-ingest integration, so their content could not be read. Share the master pages with the integration.`, action: "content skipped for those blocks" });
+  }
+
+  // Local-only rebuild: walk Notion and write the complete local library copy
+  // (.cache/chunks.json), skipping OpenAI embeddings and the Supabase upsert.
+  // Used to rebuild the library from Notion when the live database is down.
+  if (process.env.SYNC_LOCAL_ONLY) {
+    console.log(`\nlocal-only mode: ${allChunks.length} chunks written to ${CHECKPOINT_PATH}. Skipping embeddings + Supabase.`);
     return;
   }
 

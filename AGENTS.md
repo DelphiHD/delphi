@@ -19,6 +19,14 @@ When something cannot be done without a human in the loop (e.g., creating an acc
 
 Don't suggest breaks or pauses. Keep forward motion on the problem.
 
+## Change governance: no unilateral structural changes
+
+Structural changes are Kaycee's decision, not the agent's. Before making any structural change, present: (1) what the change is, (2) why, (3) its implications and blast radius (which products and consumers it affects, per docs/ARCHITECTURE.md), and (4) the options. Then WAIT for Kaycee's explicit decision. Do not implement first and explain after.
+
+"Structural" means anything that changes how the system is wired or how data is shaped or flows: the sync (what it captures, dedup, checkpoint/overwrite behavior), the data model / schema / chunk shape / Chart type / migrations, any shared "spine" module in the ARCHITECTURE.md blast-radius table (lib/mybodygraph.ts, lib/transit/sky.ts, lib/render/mandala.ts, lib/llm/core.ts, lib/chart/types.ts, the synced library, scripts/sync-notion.ts), how products connect, dependencies, file/folder organization, scheduled jobs, or a system invariant.
+
+She has the whole picture of the methodology and the business; the agent does not. Surface the implications; let her decide. This overrides "Automation is the default" for structural work: automate the doing, never the deciding. Non-structural work (an isolated bug in one product's own logic, copy tweaks, a typo) proceeds normally.
+
 ## Read first
 
 These docs are the project's ground truth. Read whichever exist:

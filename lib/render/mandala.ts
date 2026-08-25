@@ -214,7 +214,7 @@ function quarterHalo(g: Geometry): string {
   for (let i = 0; i < quarters.length; i++) {
     const q = quarters[i];
     paths.push(
-      `<path d="${annulusSector(g, g.r.outer, g.r.quarterInner, q.start, q.end)}" ` +
+      `<path class="q-sector" d="${annulusSector(g, g.r.outer, g.r.quarterInner, q.start, q.end)}" ` +
         `fill="${q.fill}" fill-opacity="${q.opacity}" stroke="none" />`,
     );
 
@@ -235,7 +235,7 @@ function quarterHalo(g: Geometry): string {
         `fill="none" stroke="none" />`,
     );
     labels.push(
-      `<text font-family="Montserrat, 'Helvetica Neue', sans-serif" ` +
+      `<text class="q-label" data-quarter="${i}" font-family="Montserrat, 'Helvetica Neue', sans-serif" ` +
         `font-size="${fontSize.toFixed(1)}" letter-spacing="6" font-weight="300" ` +
         `fill="${q.labelColor}" dominant-baseline="central">` +
         `<textPath href="#${pathId}" startOffset="50%" text-anchor="middle">${q.label}</textPath>` +
@@ -295,7 +295,7 @@ function hexagramRing(
       // (line 1 at bottom, line 6 at top) reads consistently regardless
       // of position on the wheel. This matches the MM Mandala convention.
       return (
-        `<image href="${url}" x="${(p.x - side / 2).toFixed(2)}" y="${(p.y - side / 2).toFixed(2)}" ` +
+        `<image class="hex-img" data-hex="${range.gate}" href="${url}" x="${(p.x - side / 2).toFixed(2)}" y="${(p.y - side / 2).toFixed(2)}" ` +
         `width="${side.toFixed(2)}" height="${side.toFixed(2)}" opacity="${opacity}" ` +
         `preserveAspectRatio="xMidYMid meet" />`
       );
@@ -333,7 +333,7 @@ function zodiacRing(g: Geometry): string {
   const cells = ZODIAC_SIGNS.map((s, i) => {
     const path = annulusSector(g, g.r.zodiacOuter, g.r.zodiacInner, s.start, s.start + 30);
     const fill = i % 2 === 0 ? fillA : fillB;
-    return `<path d="${path}" fill="${fill}" stroke="#cccccc" stroke-width="0.4" />`;
+    return `<path class="z-cell" data-sign="${i}" d="${path}" fill="${fill}" stroke="#cccccc" stroke-width="0.4" />`;
   }).join("\n");
 
   // Sign names as curved text. CW direction (end → start) so glyph bases
@@ -353,7 +353,7 @@ function zodiacRing(g: Geometry): string {
         `fill="none" stroke="none" />`,
     );
     labels.push(
-      `<text font-family="Montserrat, 'Helvetica Neue', sans-serif" ` +
+      `<text class="z-label" data-sign="${i}" font-family="Montserrat, 'Helvetica Neue', sans-serif" ` +
         `font-size="${fontSize.toFixed(1)}" letter-spacing="1.5" font-weight="300" fill="#555555" ` +
         `dominant-baseline="central">` +
         `<textPath href="#${pathId}" startOffset="50%" text-anchor="middle">${s.name}</textPath>` +
@@ -381,11 +381,13 @@ function gateRing(g: Geometry, activatedGates: ReadonlySet<number>): string {
     const textFill = isActive ? PALETTE.ink : "#555555";
     const textWeight = isActive ? "bold" : "normal";
     return (
-      `<path d="${path}" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-width="${strokeWidth}" />` +
-      `<text x="${labelPos.x.toFixed(2)}" y="${labelPos.y.toFixed(2)}" ` +
+      `<g data-gatecell="${range.gate}">` +
+      `<path class="g-cell" d="${path}" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-width="${strokeWidth}" />` +
+      `<text class="g-num" x="${labelPos.x.toFixed(2)}" y="${labelPos.y.toFixed(2)}" ` +
       `text-anchor="middle" dominant-baseline="middle" ` +
       `font-family="Georgia, serif" font-size="${(g.size * 0.013).toFixed(1)}" ` +
-      `font-weight="${textWeight}" fill="${textFill}">${range.gate}</text>`
+      `font-weight="${textWeight}" fill="${textFill}">${range.gate}</text>` +
+      `</g>`
     );
   });
   const perimeter =
@@ -462,7 +464,8 @@ function activationSpokes(g: Geometry, activations: readonly Activation[]): stri
       const top = pointAt(g, g.r.gateInner, lon);
       const bot = pointAt(g, innerEnd, lon);
       return (
-        `<line x1="${top.x.toFixed(2)}" y1="${top.y.toFixed(2)}" ` +
+        `<line data-side="${a.side}" data-planet="${a.planet}" data-gate="${a.gate}" ` +
+        `x1="${top.x.toFixed(2)}" y1="${top.y.toFixed(2)}" ` +
         `x2="${bot.x.toFixed(2)}" y2="${bot.y.toFixed(2)}" ` +
         `stroke="${color}" stroke-width="1.4" stroke-opacity="0.85" />`
       );
@@ -508,12 +511,14 @@ const PLANET_RING_ORDER = [
   "pluto",
 ] as const;
 
-function activationGlyphs(g: Geometry, activations: readonly Activation[]): string {
+function activationGlyphs(g: Geometry, activations: readonly Activation[], glyphScale = 1): string {
   // Each planet has its own concentric ring within the spoke region.
   // Order matches the solar system: Sun closest to the bodygraph, Pluto
   // farthest out (closest to the gate ring). The planet's identity is
   // encoded by radial position; side (Personality / Design) by color.
-  const fontSize = g.size * 0.0121;
+  // glyphScale (default 1, unchanged for the docx) enlarges the glyphs for the
+  // interactive web embed where the wheel is viewed smaller.
+  const fontSize = g.size * 0.0121 * glyphScale;
   const padOuter = g.size * 0.010;
   const padInner = g.size * 0.010;
   const ringStart = g.r.spokeInner + padInner;
@@ -538,7 +543,8 @@ function activationGlyphs(g: Geometry, activations: readonly Activation[]): stri
       const glyph = PLANET_GLYPH[a.planet] ?? "•";
       const fill = a.side === "design" ? PALETTE.design : PALETTE.personality;
       return (
-        `<text x="${p.x.toFixed(2)}" y="${p.y.toFixed(2)}" ` +
+        `<text data-side="${a.side}" data-planet="${a.planet}" data-gate="${a.gate}" ` +
+        `x="${p.x.toFixed(2)}" y="${p.y.toFixed(2)}" ` +
         `text-anchor="middle" dominant-baseline="central" ` +
         `font-family="'Apple Symbols', 'Segoe UI Symbol', 'DejaVu Sans', serif" ` +
         `font-size="${fontSize.toFixed(1)}" fill="${fill}">${glyph}</text>`
@@ -641,6 +647,46 @@ function svgShell(geometry: Geometry, inner: string): string {
   );
 }
 
+/* ---------- Reusable backdrop (for the transit animation) ---------- */
+
+/**
+ * The mandala's static rings ONLY — quarter halo, hexagram glyphs, zodiac, and
+ * gate cells — with no chart activations, spokes, or center bodygraph. Used as
+ * the backdrop for the animated transit wheel (planets are drawn over it). All
+ * hexagrams render at full opacity; gate cells stay neutral.
+ */
+export function renderMandalaRings(
+  size = 1600,
+  opts: { hexagramResolver?: (gate: number) => string } = {},
+): string {
+  const g = geometry(size);
+  const none = new Set<number>();
+  const all = new Set<number>(GATE_RANGES.map((r) => r.gate));
+  const resolver = opts.hexagramResolver ?? defaultHexagramResolver;
+  return [
+    quarterHalo(g),
+    hexagramRing(g, all, resolver), // all "active" == full opacity glyphs
+    zodiacRing(g),
+    gateRing(g, none),              // neutral cells (no center coloring)
+  ].join("\n");
+}
+
+/**
+ * Geometry accessor so callers (the animation) can place elements on the same
+ * wheel the rings use: identical center, radii, and longitude→point mapping
+ * (VISUAL_TOP_LONGITUDE at 12 o'clock, longitude increasing counter-clockwise).
+ */
+export function mandalaWheelGeometry(size = 1600) {
+  const g = geometry(size);
+  return {
+    size,
+    cx: g.cx,
+    cy: g.cy,
+    r: g.r,
+    pointAt: (radius: number, longitude: number) => pointAt(g, radius, longitude),
+  };
+}
+
 /* ---------- Entry points ---------- */
 
 export function renderFullMandala(
@@ -660,7 +706,7 @@ export function renderFullMandala(
     zodiacRing(g),
     gateRing(g, activated),
     centerHalo(g),
-    activationGlyphs(g, chart.activations),
+    activationGlyphs(g, chart.activations, opts.glyphScale ?? 1),
     bodygraphComposite(g, chart.bodygraphSvg),
   ];
   return svgShell(g, parts.join("\n"));

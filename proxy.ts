@@ -8,9 +8,12 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Match everything except Next.js internals and static assets. The
-  // updateSession helper does the actual auth gating per path.
+  // Match everything except Next.js internals, static assets, and published
+  // client chart links. A chart link is authenticated by its token alone, so it
+  // must not depend on the auth stack: keeping /c out of here means a client's
+  // page serves even if Supabase auth is misconfigured, and saves a session
+  // round-trip on every view.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|css|js)$).*)",
+    "/((?!c/|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|css|js)$).*)",
   ],
 };

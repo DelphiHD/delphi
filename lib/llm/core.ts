@@ -130,99 +130,186 @@ export async function invokeLLM(args: InvokeArgs, opts: InvokeOptions): Promise<
     systemBlocks.push({ type: "text", text: cb.text, cache_control: { type: "ephemeral" } });
   }
 
+  // We use STREAMING (`stream: true`) for two reasons:
+  // 1. Reliability — Anthropic's synchronous endpoint has been observed
+  //    closing the HTTP connection on long-running generations (>15s) without
+  //    delivering the response, while the streaming endpoint stays open and
+  //    delivers content deltas immediately. The intermediate proxy layer
+  //    handles streamed connections more robustly than ones blocked on a
+  //    multi-minute compute.
+  // 2. Long-output support — our planetary calls can generate 17K+ output
+  //    tokens, which take 60-180s to compute. Streaming avoids any
+  //    intermediate timeout. The final usage record arrives in a
+  //    `message_delta` event at the end of the stream.
+  // Shell out to `curl` for the API call.
+  //
+  // Why: Node 22's bundled undici drops the TCP connection mid-stream
+  // (ECONNRESET) on long-running Anthropic streams from our local network
+  // — both raw `fetch()` and the official Anthropic SDK (which uses
+  // undici under the hood) fail the same way. curl's TLS stack and HTTP
+  // implementation don't hit the issue. This sidesteps undici entirely
+  // until that's resolved upstream.
+  //
+  // We use `stream: true` so the API responds with SSE — keeps the
+  // connection productive throughout the multi-minute generation rather
+  // than blocking on a single sync response that an intermediate proxy
+  // can time out.
   const body = {
     model: args.model,
     max_tokens: args.max_tokens,
     system: systemBlocks,
     messages: args.messages,
     temperature: args.temperature ?? 1,
+    stream: true,
   };
+  const bodyJson = JSON.stringify(body);
 
-  // Direct fetch (no SDK) so this module runs in Deno Edge Functions and Node
-  // alike. Anthropic occasionally drops long connections (ECONNRESET); retry
-  // a couple of times with exponential backoff before giving up.
-  let res: Response | null = null;
-  let lastError: unknown = null;
-  for (let attempt = 0; attempt < 3; attempt++) {
+  // Write the body to a temp file and have curl read from it. Piping
+  // ~500KB through stdin into a child process hangs intermittently on
+  // macOS — using a file path avoids the OS pipe-buffer dance entirely.
+  const { spawn } = await import("node:child_process");
+  const fs = await import("node:fs");
+  const os = await import("node:os");
+  const path = await import("node:path");
+  const tmpBody = path.join(os.tmpdir(), `anthropic-body-${Date.now()}-${Math.floor(Math.random() * 1e6)}.json`);
+  fs.writeFileSync(tmpBody, bodyJson);
+
+  // Inner helper: one streaming attempt against the API. Returns the parsed
+  // text + usage on success, or throws on any curl-level or stream-level
+  // failure. We force HTTP/1.1 (--http1.1) because intermediate proxies
+  // have been observed terminating HTTP/2 streams partway through the
+  // multi-minute generation; HTTP/1.1 chunked transfer is more resilient.
+  async function runOneAttempt(): Promise<{ text: string; usage: UsageRecord; stopReason?: string }> {
+    const proc = spawn("curl", [
+      "-s", "--no-buffer",
+      "--http1.1",
+      "-X", "POST",
+      "--max-time", "1200",
+      // Stall detection: if the byte rate drops below 100 B/s for 60s,
+      // abort. A live Anthropic SSE stream emits far more than that; a
+      // stalled one emits zero. Without this, a silent stream that keeps
+      // TCP alive will eat the full 20-minute --max-time before failing,
+      // turning a single bad attempt into a 20-80 minute hang (×4 retries).
+      "--speed-limit", "100", "--speed-time", "60",
+      "-H", `x-api-key: ${apiKey}`,
+      "-H", "anthropic-version: 2023-06-01",
+      "-H", "content-type: application/json",
+      "--data-binary", `@${tmpBody}`,
+      "https://api.anthropic.com/v1/messages",
+    ], { stdio: ["ignore", "pipe", "pipe"] });
+
+    let textOut = "";
+    const usage: UsageRecord = {
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: 0,
+    };
+    let stopReason: string | undefined;
+    let streamError: string | undefined;
+    let buf = "";
+
+    proc.stdout.setEncoding("utf8");
+    let rawOut = "";
+    for await (const chunk of proc.stdout as AsyncIterable<string>) {
+      buf += chunk;
+      rawOut += chunk;
+      const events = buf.split("\n\n");
+      buf = events.pop() ?? "";
+      for (const ev of events) {
+        const dataLine = ev.split("\n").find((l) => l.startsWith("data:"));
+        if (!dataLine) continue;
+        const dataStr = dataLine.slice(5).trim();
+        if (!dataStr) continue;
+        let parsed: any;
+        try { parsed = JSON.parse(dataStr); } catch { continue; }
+        switch (parsed.type) {
+          case "message_start": {
+            const u = parsed.message?.usage;
+            if (u) {
+              usage.input_tokens = u.input_tokens ?? 0;
+              usage.cache_creation_input_tokens = u.cache_creation_input_tokens ?? 0;
+              usage.cache_read_input_tokens = u.cache_read_input_tokens ?? 0;
+              usage.output_tokens = u.output_tokens ?? 0;
+            }
+            break;
+          }
+          case "content_block_delta": {
+            const delta = parsed.delta;
+            if (delta?.type === "text_delta" && typeof delta.text === "string") {
+              textOut += delta.text;
+            }
+            break;
+          }
+          case "message_delta": {
+            if (parsed.usage?.output_tokens != null) {
+              usage.output_tokens = parsed.usage.output_tokens;
+            }
+            if (parsed.delta?.stop_reason) {
+              stopReason = parsed.delta.stop_reason;
+            }
+            break;
+          }
+          case "error": {
+            streamError = JSON.stringify(parsed.error).slice(0, 500);
+            break;
+          }
+        }
+      }
+    }
+
+    let stderrBuf = "";
+    proc.stderr.setEncoding("utf8");
+    for await (const chunk of proc.stderr as AsyncIterable<string>) {
+      stderrBuf += chunk;
+    }
+    const exitCode: number = await new Promise((resolve) => {
+      proc.on("close", (code) => resolve(code ?? 0));
+    });
+
+    if (streamError) throw new Error(`Anthropic stream error: ${streamError}`);
+    if (exitCode !== 0) throw new Error(`curl exited ${exitCode}: ${stderrBuf.slice(0, 500)}`);
+    if (!textOut && !usage.output_tokens) {
+      // A non-streaming error (invalid key, LOW CREDIT BALANCE, unknown model,
+      // rate limit) comes back as a plain JSON error body, not SSE, so nothing
+      // above parsed it. Surface the real message instead of "empty stream".
+      try {
+        const j = JSON.parse(rawOut.trim());
+        if (j?.type === "error" && j.error?.message) throw new Error(`Anthropic API error: ${j.error.message}`);
+      } catch (e) {
+        if (e instanceof Error && e.message.startsWith("Anthropic API error:")) throw e;
+      }
+      throw new Error(`Anthropic returned empty stream. curl stderr: ${stderrBuf.slice(0, 500)}`);
+    }
+    return { text: textOut, usage, stopReason };
+  }
+
+  // Retry loop: long streaming connections occasionally get cut by an
+  // intermediate proxy partway through (curl exit 56 = recv error,
+  // exit 28 = timeout, exit 18 = partial transfer). Re-running the
+  // request from scratch is safe; the API hits the prompt cache on the
+  // second attempt and is significantly cheaper than the first.
+  let lastErr: unknown = null;
+  let streamResult: { text: string; usage: UsageRecord; stopReason?: string } | null = null;
+  for (let attempt = 0; attempt < 4; attempt++) {
     try {
-      res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
+      streamResult = await runOneAttempt();
       break;
     } catch (e) {
-      lastError = e;
-      // ECONNRESET, socket hang up, etc. Retry with backoff.
-      if (attempt === 2) throw e;
-      const waitMs = 2000 * Math.pow(2, attempt); // 2s, 4s
-      await new Promise((r) => setTimeout(r, waitMs));
-    }
-  }
-  if (!res) throw lastError instanceof Error ? lastError : new Error("fetch failed");
-
-  // 5xx and 429: retry with backoff. For 429 the Anthropic API returns a
-  // `retry-after` header (seconds) — honor it. Without that header, default
-  // to 65s (one full minute past the input-TPM window). Up to 5 retries
-  // total before giving up.
-  if (!res.ok && (res.status === 429 || res.status >= 500)) {
-    for (let attempt = 0; attempt < 5; attempt++) {
-      let waitMs: number;
-      if (res.status === 429) {
-        const retryAfterHeader = res.headers.get("retry-after");
-        const retryAfterSec = retryAfterHeader ? Number(retryAfterHeader) : NaN;
-        waitMs = Number.isFinite(retryAfterSec) && retryAfterSec > 0
-          ? Math.max(retryAfterSec * 1000 + 2000, 5000) // +2s slack for clock skew
-          : 65_000; // default: wait past the next 1-minute TPM bucket
-      } else {
-        waitMs = 3000 * Math.pow(2, attempt); // 3s, 6s, 12s, 24s, 48s for 5xx
-      }
-      await new Promise((r) => setTimeout(r, waitMs));
-      res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
-      if (res.ok || (res.status !== 429 && res.status < 500)) break;
+      lastErr = e;
+      if (attempt === 3) break;
+      const backoffMs = 3000 * Math.pow(2, attempt); // 3s, 6s, 12s
+      await new Promise((r) => setTimeout(r, backoffMs));
     }
   }
 
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Anthropic ${res.status} ${res.statusText}: ${errText.slice(0, 500)}`);
-  }
+  try { fs.unlinkSync(tmpBody); } catch { /* ignore */ }
 
-  const data = await res.json() as {
-    content: Array<{ type: string; text?: string }>;
-    usage: {
-      input_tokens: number;
-      output_tokens: number;
-      cache_creation_input_tokens?: number;
-      cache_read_input_tokens?: number;
-    };
-    stop_reason?: string;
-  };
+  if (!streamResult) throw lastErr instanceof Error ? lastErr : new Error("invokeLLM: all retries failed");
 
-  // Concatenate all text blocks (in normal use there is exactly one).
-  const text = data.content
-    .filter((c) => c.type === "text" && c.text)
-    .map((c) => c.text as string)
-    .join("");
-
-  const usage: UsageRecord = {
-    input_tokens: data.usage.input_tokens,
-    output_tokens: data.usage.output_tokens,
-    cache_creation_input_tokens: data.usage.cache_creation_input_tokens ?? 0,
-    cache_read_input_tokens: data.usage.cache_read_input_tokens ?? 0,
-  };
+  void streamResult.stopReason;
+  const text = streamResult.text;
+  const usage = streamResult.usage;
 
   const cents = costInCents(args.model, usage);
 

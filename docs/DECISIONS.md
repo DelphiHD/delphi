@@ -2,6 +2,18 @@
 
 Append-only log of why-we-chose-X. New entries go at the top. Each entry: date, decision, why, alternatives considered, and any open questions.
 
+## 2026-07-29 — Transit report: channel headers, consolidated Who Feels It Most, Sky-in-Motion removed
+
+**Decision.** Three consolidations to the daily transit report at Kaycee's request. (1) The Channels sub-section in The Weather Today now gives each active channel a standardized document header, `Name | Type | Centers | Keynote`, matching the per-placement header pattern. Name/Type/Keynote come from the synced HD Channels metadata (new `channel()` accessor on `LibraryNames`); the two centers are derived from the gate pair. The model writes a bare `#### Channel {id}` heading plus a grounded description; `injectChannelHeaders()` rewrites the heading. (2) "Who Feels It Most" and the separate ranked appendix are merged into ONE section: the full roster, ranked, each person a synthesis paragraph followed by their exact ranking data. (3) The embedded "Sky in Motion" mandala is removed from the daily report (the animated chart is delivered separately).
+
+**Cost note (new Claude path: `buildPersonReads`).** One Haiku 4.5 call per batch of 6 people, roster ~16 so ~3 calls. Input per batch is the person's completions plus the grounded library bodies for the channels/gates involved (a few thousand tokens), with IDENTITY/VOICE cached across batches; output is ~60-70 words per person. Estimated ~$0.02 per report on top of the existing narrative + syntheses spend, well under the run's ceiling. Replaces nothing in cost (the old top-few prose was inside the one narrative call) but buys a grounded read for every person instead of the top few.
+
+**Why.** The channel headers make the collective channels scannable like the placements. The merged Who section is what Kaycee reads for her daily analysis: she wanted a read for everyone, not just the top few, each next to its driving data. Sky-in-Motion was not relevant to this report and cost a 5-minute subprocess per run.
+
+**Open.** Channel Type is shown verbatim from the library (for example "PROJECTED" title-cased to "Projected"); if Kaycee prefers circuit names (Individual / Tribal / Collective) instead, that is a one-line metadata swap.
+
+---
+
 ## 2026-05-27 — Delphi mandala chart is a programmatic SVG renderer
 
 **Decision.** The Delphi mandala chart, embedded in the Planetary Overview report, is a programmatic SVG renderer driven by chart data. Two outputs ship in Phase 1:
@@ -169,3 +181,120 @@ This is an opinion based on a close read of OpenBrain's LICENSE.md, not legal ad
 **Open.** Branch protection, default-branch policy, and team permissions on the DelphiHD org are not yet configured. Decide before Phase 1 ships.
 
 ---
+
+## 2026-07-13 — Daily transit report: new Claude path (cost note)
+
+**Decision.** A new local script (`scripts/transit-report.ts`) generates a daily collective Human Design transit report. It casts the live sky via mybodygraph, scans the day for gate/line shifts, scores the client roster for who is most impacted, and calls Claude once to write the narrative. This is the first transit-flavored Claude path; it predates the Phase 6 portal build and is a standalone operator tool for now.
+
+**Cost note (required by CLAUDE.md).** One Claude call per report on **Haiku 4.5**. Input is small: the static system prompt plus IDENTITY/VOICE (cached blocks) plus a compact deterministic brief (active sky table, shift timeline, roster impact), on the order of 2-4k input tokens. Output is capped at 3,500 tokens and lands around 1,200-1,500 words. Measured first run: **$0.0089** total. Cache hit rate is low here (the daily brief changes every run and IDENTITY/VOICE are still stubs), but the absolute cost is trivial at Haiku pricing. A hard 40-cent per-call ceiling is enforced. mybodygraph is the larger call-count cost (about 26 calls per run after natal charts cache: 25 day-scan samples at 60-min resolution plus one live cast; the 15 natal charts are cached to `.cache/charts/` on first run). Coarsen with `TRANSIT_INTERVAL_MIN` if the mybodygraph quota matters.
+
+**Why.** Kaycee asked for a daily transit report showing what is active, what shifts through the day, who is most impacted, and the collective read. The wheel geometry (`lib/hd/gate-longitude.ts`) and roster already existed; this assembles them.
+
+**How to apply.** Run `npx tsx scripts/transit-report.ts` (defaults to today, Mountain time). Output lands in `~/Desktop/HD Reports/Transits/`. Gate names (`lib/hd/gate-names.ts`) and channel names (`lib/hd/channels.ts`) are Ra-standard placeholders pending Kaycee's Black Book verification. Markdown-first by decision; branded `.docx` render and Notion-sourced gate names are the natural v2.
+
+**Open.** Center-definition modeling reports the transit-side center only, not both centers a completed channel spans. Day-scan transition times are accurate to the sampling interval, not the minute.
+
+---
+
+## 2026-07-13 — Transit report: branded .docx + resvg rasterizer + daily schedule
+
+**Decision.** The daily transit report now also emits a Delphi-branded `.docx` (Montserrat, purple, logo cover) and runs automatically every morning. The `.docx` uses NO mandala; instead it shows the transit sky as a BODYGRAPH at each Moon phase of the day (`scripts/render-transit-docx.ts`), so the reader watches the chart change from morning to evening. Both `.md` and `.docx` land in `~/Desktop/HD Reports/Transits/`.
+
+**Bodygraph SVG.** The branded bodygraph is the `design=delphi` inline SVG from mybodygraph (`raw.SVG`), cast for a moment rather than a birth. Two gotchas were resolved: (1) the wrapper now supports `brandedSvg: true` and exposes `chart.bodygraphSvg`; (2) that SVG ships with an INVALID lowercase `viewbox` and no width/height, so it is normalized (`lib/transit/sky.ts` `normalizeBodygraphSvg`) before rasterizing.
+
+**Rasterizer.** Switched bodygraph SVG→PNG from `qlmanage` to **`@resvg/resvg-js`** (added as a dependency; it was already referenced by `scripts/check-render.ts` but not installed). `qlmanage` forces a square canvas and clips the lower centers, which is exactly where the fast-moving Moon's gate lives, so every phase rasterized identically. resvg honors the viewBox and renders true portrait at an exact width. The Planetary Overview renderer still uses `qlmanage` for its square mandala; only the transit bodygraph needed resvg.
+
+**Schedule.** A LaunchAgent (`~/Library/LaunchAgents/com.delphihd.transit-report.plist`, label `com.delphihd.transit-report`) runs `scripts/run-transit-report.sh` daily at 06:00 local, mirroring the existing `com.delphihd.delphi-pull` agent. `RunAtLoad` is false (calendar only). Logs to `~/Library/Logs/com.delphihd.transit-report.log`. Cost impact is unchanged from the note above: one Haiku call (~$0.01) plus a handful of extra `design=delphi` casts for the cover and phase bodygraphs.
+
+**Open.** Gate/channel names still Ra-standard placeholders pending Kaycee's Black Book verification. `.docx` visual layout verified structurally (valid package, six distinct embedded images, headings/tables present) but not yet eyeballed as a rendered page (no LibreOffice on the box to auto-convert to PDF).
+
+---
+
+## 2026-07-13 — Transit bodygraphs: personality-only, with placements
+
+**Decision.** The transit `.docx` bodygraphs now show the PERSONALITY side only (the live sky), and each bodygraph is paired with its planetary placements list to the right (glyph, planet, gate.line, gate name).
+
+**Why.** A transit chart's Design side is the meaningless ~88-day-prior sky; drawing it (red) alongside the live Personality activations (black) clutters the chart and inflates center definition. Kaycee asked for personality-only plus a placements column.
+
+**How.** The delphi bodygraph SVG draws both sides, coloring Personality black and Design red (#e06666) on both halves of each activated gate leg. `lib/transit/sky.ts` `personalityOnly()` rewrites the SVG data-driven from the known personality gates: every activation element (gate leg, channel connector, gate-number circle+numeral) survives only if all of its gates are personality-activated (recolored black), everything else is hidden, and any center not defined by a complete personality channel is re-opened to white (#ffffff). `castTransitBodygraph()` returns the transformed SVG plus the personality placements. Verified visually: red fully removed, centers recompute correctly (e.g., Sacral re-opens; Ajna/Throat stay defined via personality channel 17-62, Root/Solar-Plexus via 39-55).
+
+---
+
+## 2026-07-13 — Transit deliverable switched from .docx to branded HTML
+
+**Decision.** The rich transit deliverable is now a self-contained **HTML** file (`scripts/render-transit-html.ts`), not `.docx`. `render-transit-docx.ts` was deleted. The `.md` is still written; the LaunchAgent is unchanged (same script now emits `.html`).
+
+**Why.** Kaycee wanted the Genetic-Matrix-style layout: bodygraphs side by side, each with a compact vertical shorthand placement column (planet glyph + gate.line), personality side only. HTML embeds the personality-only SVG natively (no rasterizing, always crisp), makes the little placement boxes trivial with CSS, wraps the charts side by side, and matches the interactive-chart medium she already likes. docx tables made all of this fight the tool.
+
+**How.** `renderTransitHtml()` builds one page: Delphi logo header, the narrative (a small markdown→HTML pass), a "sky right now" card, a wrapping grid of one card per Moon phase, and the deterministic data tables. Each card = inline personality-only bodygraph SVG + a `.cols` column of `.pbox` boxes (glyph + gate.line, exalted ▲ / detriment ▽). Inline SVG ids are namespaced per card (`namespaceSvg`) to avoid cross-chart id collisions. Brand tokens (purple #845095, gold, Montserrat) mirror the interactive chart. Verified in-browser: layout matches the Genetic Matrix reference, phases visibly differ (Solar Plexus lights via 39-55 in the Moon-39 phase). @resvg/resvg-js is no longer used by the transit path (still a dep, referenced by `scripts/check-render.ts`).
+
+**Open.** Shorthand shows gate.line (e.g., 62.1) to match the reference; drop the line if Kaycee wants bare gate numbers. The narrative's own "As The Day Moves" text and the bodygraph grid are separate sections rather than interleaved. No Word/`.docx` output anymore (easy to re-add if a shareable Word file is ever needed).
+
+---
+
+## 2026-07-13 — Transit report: established names, changed-gate highlight, split shifts, babies section
+
+**Decision.** Four refinements to the HTML transit report, all from Kaycee's feedback.
+
+1. **Established names.** Gate and line names now come from her synced Notion library (`.cache/chunks.json`) via `lib/hd/library-names.ts` `loadLibraryNames()` (same source the interactive chart uses), with the static `gate-names.ts` as fallback. Threaded through the LLM brief (so the narrative speaks her vocabulary, e.g. "gate 52, Keeping Still (Mountain)", line "Routine"), the shorthand tooltips, all appendix tables, and the impact prose.
+2. **Changed-gate highlight.** In the phase bodygraph shorthand columns, a placement box turns Delphi purple when that planet has changed gate since the previous chart (`.pbox.chg`), with a legend. Driven by passing the prior phase's positions into `shorthandColumn`.
+3. **Shifts delineated.** The "shifts across the day" is now two tables: **Gate changes** (always visible, the field's theme turning over, "Enters" in purple) and **Line movements** (collapsed `<details>`, the finer within-gate shifts). Replaces the single mixed table.
+4. **Babies Born on This Day.** New section: a FULL natal chart (both sides, not personality-only) cast for 12:00 UTC via `castNatalChart()`, shown as the branded bodygraph plus a Type/Strategy/Authority/Profile/Definition/Cross facts row and a short overview reading. The reading is a second Haiku 4.5 call, `buildBabyOverview()` in `lib/report/transit.ts`, ~180-260 words, with a one-line caveat that the exact birth hour can shift Profile/Definition.
+
+**Cost.** Adds one Haiku call per run (~$0.002). Total per run now ~$0.012 in Claude spend plus the mybodygraph casts (one extra noon-UTC cast for the baby chart).
+
+**Open.** Baby chart uses noon UTC as the representative snapshot (Profile can differ earlier/later in the day). Line-name coverage depends on the library cache being present and current (`.cache/chunks.json`); falls back to Ra gate names and blank line names if absent.
+
+---
+
+## 2026-07-13 — Baby charts per interval as clickable tabs; from/to columns; em-dash sanitizer
+
+**Decision.** Three more refinements from Kaycee.
+
+1. **Baby charts per interval, clickable.** Instead of one noon-UTC chart, the "Babies Born on This Day" section now casts one full natal chart per day-phase interval (the same Moon-phase times as "The Bodygraph Through the Day"), each with its own Haiku overview. They render as birth-time tabs (`.btab` + a small inline `<script>` toggling `.tabpanel[hidden]`); clicking a birth time shows that chart and reading. Value confirmed: on 2026-07-13 the profile shifts from 1/3 (morning) to 2/4 (evening), so the tabs actually differ. `buildBabyOverview` now takes the birth time and speaks to it.
+2. **From/To columns.** Both shift tables (gate changes, line movements) now have explicit "Moving from" and "Moving to" columns, from left to right.
+3. **Em-dash sanitizer.** Found a leak: the narrative lint only checked the collective text, but the baby overviews (a separate Haiku call) contained em dashes. Fixed at the source, `stripEmDashes()` in `lib/report/transit.ts` runs on every model output (em dash between words becomes a comma; en dashes in time ranges are left alone). Also fixed two hardcoded em dashes in our own copy (the HTML `<title>` and the "quiet day" impact line). The end-of-run lint now scans the published `.md` and `.html` files for em dashes rather than just the narrative string, so any future leak (including from a library name) is caught.
+
+**Cost.** Now one collective narrative + N baby overviews per run (N = day phases, typically 3), all Haiku. Roughly $0.017 per run on 2026-07-13.
+
+**Open.** Baby intervals follow the Moon phases (so their spacing is Moon-driven, not a fixed 3-hour grid like the Genetic Matrix rectification report); switch to fixed intervals if Kaycee wants that cadence.
+
+---
+
+## 2026-07-16 — Transit automation reliability (retries + backup run)
+
+**Symptom.** The 6am LaunchAgent fired on 2026-07-16 (at 06:12, after wake) but exited 1: a transient `ECONNRESET` / "fetch failed" during the day scan aborted the whole run, so no report was produced. The morning automation was real but fragile.
+
+**Fix.** (1) `lib/mybodygraph.ts` now wraps every API call in `fetchWithRetry` (4 attempts, 1s/2s/4s backoff, retrying thrown network errors and 429/5xx). This is the primary fix: a run makes dozens of sequential chart calls and any single blip used to kill it. (2) `scanDay` now skips a sample that still fails after retries instead of aborting (a missing sample only widens a shift-detection gap). (3) The LaunchAgent gained a second `StartCalendarInterval` at 07:30 as a backup, and `run-transit-report.sh` is now idempotent (exits early if today's HTML already exists), so the backup is a no-op after a successful 6am run and a real retry after a failed one.
+
+**Open.** Idempotency keys on the machine's local date, which matches the default TRANSIT_TZ (America/Denver); revisit if the two ever diverge. Still Mac-local (needs the local Desktop path + env), so it only runs when the machine is on; launchd runs a missed calendar job once on wake.
+
+---
+
+## 2026-07-13 — Clickable placement columns (transit charts)
+
+**Decision.** The shorthand placement columns on the transit bodygraphs (the "sky right now" card and each Moon-phase card) are now clickable. Clicking a placement box highlights that gate on the same card's bodygraph in brand gold (#c79a2e) and shows a readout below the chart: planet glyph, name, gate.line (purple), gate keynote, and line name. Clicking again clears it. Same teaching interaction as the interactive chart, scoped per card.
+
+**How.** Each `.pbox` carries `data-gate/planet/gl/glyph/gname/lname`. A small inline `<script>` iterates `.chart` cards; on click it toggles `.sel` on the box, adds `.hl` (gold stroke) to the bodygraph elements whose namespaced id ends with `_<gate>` (the gate circle) or `personality-<gate>` (the personality leg), and fills the `.readout`. The `personality-<gate>` suffix match deliberately excludes the hidden `design-<gate>` legs so the personality-only chart does not sprout phantom gold outlines. No new dependency, no build step; it is plain DOM JS in the self-contained file. The babies section charts have no placement column, so they are unaffected.
+
+**Open.** The appendix "Active sky right now" table is not clickable (it has no adjacent bodygraph to drive); only the per-chart columns are.
+
+---
+
+## 2026-07-13 — Baby overview: outer-planet (generational) paragraph
+
+**Decision.** Each baby overview now includes a dedicated paragraph on the outer-planet influences (Uranus, Neptune, Pluto). The report passes their gate.line on both Personality and Design sides (with established names) into the facts, and `BABY_SYSTEM` now asks for a 4-paragraph reading whose third paragraph covers these as the slow, generational current the child shares with everyone born around that time, framed as collective backdrop, not individual. Length bumped to 210-300 words. Verified: all three overviews name the outer-planet gates and keynotes and explicitly mark them as shared. Adds ~$0.001 per baby (longer output); still under $0.02/run total.
+
+---
+
+## 2026-08-24 — Client chart links (delphihd.com/c/<token>)
+
+**Decision.** A client's interactive chart can be published as a plain link on Kaycee's own domain: `https://delphihd.com/c/<token>`, no sign-in for the client, live until she pulls it. Chosen over emailing the .html (Drive and most mail clients will not render a shared HTML file, so it arrives as raw code or a download) and over the Claude artifact link (private to her workspace, so a client may not be able to open it at all). Kaycee's call, 2026-08-24: plain link, her domain, no expiry.
+
+**How.** New `public.client_charts` table: one row per client, holding a 128-bit hex token, the client slug and name, and the path of the built HTML in a **private** `charts` storage bucket. RLS is on with **no policies**, so neither the anon key nor a signed-in user can read the table; the only reader is `/c/<token>`, a dynamic route that uses the service role, treats an unknown or revoked token as a plain 404, and streams the file with `X-Robots-Tag: noindex, nofollow, noarchive`, `Referrer-Policy: no-referrer` and `Cache-Control: private, no-store`. `/c/` and `/portal/` are disallowed in robots.txt. `scripts/energy-flow-diagram.ts <slug> --publish` uploads and prints the link, reusing the client's existing token so a link already sent keeps working and shows the newest build; `--unpublish` sets `revoked_at` and the link goes dead.
+
+**Security model.** The token is the credential, as with a Google Docs "anyone with the link" share. Not guessable, not crawlable (nothing links to it, and it is marked noindex), no referrer leakage (the page has no outbound links). The real exposure is forwarding, which revocation answers. If that stops being enough, the next step is a second factor the client knows (birth date or a short code), not a full login.
+
+**Also fixed to get here.** The app did not build: `middleware.ts` had survived alongside its Next 16 replacement `proxy.ts` (same semantics, `proxy.ts` wins), and the production type check was failing on pre-existing errors in operator scripts. Removed the dead middleware file, and pointed the Next build at `tsconfig.build.json`, which excludes `scripts/**`. Those scripts are still checked by `npm run typecheck`; they are dev tools run with tsx and are not part of the deployed app, so an unrelated script error should never block a deploy. The four pre-existing script errors are untouched and still need a decision: two of them (`italic` should be `italics` in the docx runs) would change report output, so they are Kaycee's call, not a silent fix.
+
+**Open.** Needs three one-time steps only Kaycee can do: apply the migration, put `SUPABASE_SERVICE_ROLE_KEY` in the Vercel project, and point delphihd.com at Vercel. No cost note: no Claude calls on this path; storage is a fraction of a cent per chart.

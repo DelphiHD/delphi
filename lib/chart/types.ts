@@ -145,4 +145,11 @@ export interface Chart {
   // Optional SVG of the bodygraph for portal display, populated only when the
   // wrapper is called with { includeChartImage: true }.
   chartImageUrl?: string;
+
+  // Inline branded (design=delphi) bodygraph SVG string, populated when the
+  // wrapper is called with { brandedSvg: true } (or { includeChartImage: true }).
+  // Used to render the transit sky / mandala / composite as a bodygraph image.
+  // Both field names carry the same SVG; callers may read either.
+  bodygraphSvg?: string;
+  chartImageSvg?: string;
 }

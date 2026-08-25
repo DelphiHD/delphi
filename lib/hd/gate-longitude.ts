@@ -99,3 +99,25 @@ export function wheelIndexOf(gate: number): number {
   }
   return i;
 }
+
+/**
+ * Reconstruct a planet's exact ecliptic longitude from its full Human Design
+ * fixing (gate.line.color.tone.base). Each level subdivides the one above by 6:
+ * a line spans 0.9375°, a color 1/6 of that, a tone 1/6 of a color, a base 1/6
+ * of a tone, so the fixing pins longitude to ~0.0007°. This lets the transit
+ * animation interpolate smooth planetary motion from a handful of samples
+ * instead of casting the sky hundreds of times.
+ */
+export function longitudeOf(
+  gate: number,
+  line: number,
+  color = 1,
+  tone = 1,
+  base = 1,
+): number {
+  const range = RANGE_BY_GATE.get(gate);
+  if (!range) throw new Error(`gate ${gate} is not in 1..64`);
+  const lineStart = range.lines[line - 1];
+  const fracIntoLine = (color - 1) / 6 + (tone - 1) / 36 + (base - 1) / 216;
+  return normalize(lineStart + fracIntoLine * LINE_ARC_DEGREES);
+}

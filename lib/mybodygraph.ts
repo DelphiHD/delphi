@@ -83,8 +83,12 @@ export interface GetChartArgs {
   latitude?: number;
   longitude?: number;
   locationQuery?: string;
-  // Set true to populate chart.chartImageUrl with the API's SVG.
+  // Set true to populate the inline branded (design=delphi) bodygraph SVG.
+  // Both names work and mean the same thing; `brandedSvg` is what the transit /
+  // mandala / composite callers use, `includeChartImage` is the older name.
+  // Accepting both prevents a one-sided rename from silently breaking callers.
   includeChartImage?: boolean;
+  brandedSvg?: boolean;
 }
 
 export async function getChart(args: GetChartArgs): Promise<Chart> {
@@ -95,7 +99,12 @@ export async function getChart(args: GetChartArgs): Promise<Chart> {
   url.searchParams.set("timezone", timezone);
   if (args.latitude !== undefined) url.searchParams.set("lat", String(args.latitude));
   if (args.longitude !== undefined) url.searchParams.set("long", String(args.longitude));
-  if (args.includeChartImage) url.searchParams.set("design", "1");
+  // mybodygraph's `design` parameter selects the bodygraph visual template.
+  // Only "default" and "delphi" return an inline SVG (probed 2026-05-24);
+  // numeric / "classic" / "rave" / etc. all return empty. We use "delphi" so
+  // the chart matches the rest of the deliverable's branding.
+  const wantSvg = args.includeChartImage || args.brandedSvg;
+  if (wantSvg) url.searchParams.set("design", "delphi");
 
   const res = await fetch(url, { method: "GET" });
   if (!res.ok) {
@@ -144,6 +153,7 @@ interface MybodygraphResponse {
     DesignSense: MybodygraphProperty;
   };
   ChartUrl?: string;
+  SVG?: string;
   Personality: Record<string, MybodygraphPlanet>;
   Design: Record<string, MybodygraphPlanet>;
   DefinedCenters: string[];
@@ -328,6 +338,11 @@ function mapResponseToChart(
     channels,
     variables,
     activations: { personality, design },
-    chartImageUrl: args.includeChartImage ? raw.ChartUrl : undefined,
+    chartImageUrl: (args.includeChartImage || args.brandedSvg) ? raw.ChartUrl : undefined,
+    // Populate BOTH field names so either convention works. Callers read
+    // `bodygraphSvg` (transit/mandala/composite); `chartImageSvg` is kept as an
+    // alias so a future rename on either side does not break the branded chart.
+    bodygraphSvg: (args.includeChartImage || args.brandedSvg) ? raw.SVG : undefined,
+    chartImageSvg: (args.includeChartImage || args.brandedSvg) ? raw.SVG : undefined,
   };
 }

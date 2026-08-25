@@ -27,7 +27,7 @@ loadEnv({ path: ".env.local", override: true });
 
 import { renderFullMandala, renderCrossMandala } from "@/lib/render/mandala";
 import type { MandalaChart, Activation, Planet } from "@/lib/render/mandala.types";
-import { mkdirSync, writeFileSync, readFileSync, unlinkSync, existsSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, unlinkSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -43,27 +43,34 @@ import {
 const API_KEY = process.env.MYBODYGRAPH_API_KEY!;
 const HOST = "https://api.bodygraphchart.com";
 const HEXAGRAM_DIR = "/Users/dorothygale/Desktop/Delphi Brand Assets/sections/hexagrams";
+const BRAND_DIR = "/Users/dorothygale/Desktop/Delphi Brand Assets/brand";
+const LOGO_DELPHI_PATH = join(BRAND_DIR, "Delphi.png");
+const LOGO_KNOWTHYSELF_PATH = join(BRAND_DIR, "knowthyself.png");
 
-interface ClientBrief {
-  slug: string;
-  name: string;
-  birthDate: string;
-  birthTime: string;
-  birthPlace: string;
+// Canonical HD profile names. 1=Investigator, 2=Hermit, 3=Martyr,
+// 4=Opportunist, 5=Heretic, 6=Role Model. Profile is rendered as
+// "<P>/<D> <Personality-line-name> <Design-line-name>" — e.g. "5/1 Heretic
+// Investigator" — on the cover. Mirrors profileSpelledOut() in
+// lib/report/planetary.ts; kept local to avoid a cross-file import for
+// a tiny lookup.
+const PROFILE_LINE_NAMES: Record<number, string> = {
+  1: "Investigator",
+  2: "Hermit",
+  3: "Martyr",
+  4: "Opportunist",
+  5: "Heretic",
+  6: "Role Model",
+};
+
+function profileSpelledOut(profile: string): string {
+  const m = (profile || "").trim().match(/^([1-6])\s*\/\s*([1-6])$/);
+  if (!m) return profile;
+  const p = parseInt(m[1], 10);
+  const d = parseInt(m[2], 10);
+  return `${p}/${d} ${PROFILE_LINE_NAMES[p]} ${PROFILE_LINE_NAMES[d]}`;
 }
 
-const CLIENTS: Record<string, ClientBrief> = {
-  matt: { slug: "matt", name: "Matt Hollingshead", birthDate: "1984-04-08", birthTime: "07:15", birthPlace: "Bountiful, Utah, United States" },
-  chris: { slug: "chris", name: "Chris Kulish", birthDate: "1988-06-03", birthTime: "11:37", birthPlace: "Johnstown, Pennsylvania, United States" },
-  sean: { slug: "sean", name: "Sean Preetorious", birthDate: "1985-01-19", birthTime: "23:02", birthPlace: "San Diego, California, United States" },
-  meelad: { slug: "meelad", name: "Meelad Kharazian", birthDate: "1986-02-09", birthTime: "01:02", birthPlace: "Lodi, California, United States" },
-  tennyson: { slug: "tennyson", name: "Tennyson", birthDate: "1993-01-06", birthTime: "07:51", birthPlace: "Orem, Utah, United States" },
-  kaycee: { slug: "kaycee", name: "Kaycee Vandenberg", birthDate: "1983-06-17", birthTime: "06:29", birthPlace: "Ogden, Utah, United States" },
-  paul: { slug: "paul", name: "Paul", birthDate: "1978-11-07", birthTime: "15:10", birthPlace: "Bountiful, Utah, United States" },
-  tiff: { slug: "tiff", name: "Tiff", birthDate: "1981-12-01", birthTime: "15:05", birthPlace: "Saratoga Springs, New York, United States" },
-  michael: { slug: "michael", name: "Michael", birthDate: "1958-08-29", birthTime: "07:33", birthPlace: "Gary, Indiana, United States" },
-  brit: { slug: "brit", name: "Brit", birthDate: "1988-03-21", birthTime: "13:27", birthPlace: "Payson, Utah, United States" },
-};
+import { CLIENTS, clientFromSlug, clientOutputDir, type ClientBrief } from "./client-roster";
 
 const PLANET_KEY_MAP: Record<string, Planet> = {
   Sun: "sun", Earth: "earth", Moon: "moon",
@@ -180,19 +187,51 @@ function parseInline(text: string, opts: { size?: number; color?: string; bold?:
 // Paragraph builders — Montserrat, justified by default
 // ─────────────────────────────────────────────────────────────────────────────
 
+// H1 renders ALL CAPS with a thin purple horizontal divider underneath, and
+// is set to keepNext so it never orphans at the bottom of a page above
+// its body. Kaycee's v5 PDF edits established this style as the
+// standardized section break across all reports.
 function makeH1(text: string): Paragraph {
   return new Paragraph({
-    spacing: { before: 360, after: 240 },
+    spacing: { before: 360, after: 0 },
     heading: HeadingLevel.HEADING_1,
-    children: [new TextRun({ text, font: FONT, size: H1_SIZE, bold: true, color: PURPLE })],
+    keepNext: true,
+    border: {
+      bottom: { style: BorderStyle.SINGLE, size: 8, color: PURPLE, space: 4 },
+    },
+    children: [new TextRun({ text: text.toUpperCase(), font: FONT, size: H1_SIZE, bold: true, color: PURPLE })],
   });
 }
 
 function makeH2(text: string): Paragraph {
   return new Paragraph({
-    spacing: { before: 280, after: 200 },
+    spacing: { before: 280, after: 120 },
     heading: HeadingLevel.HEADING_2,
+    keepNext: true,
     children: [new TextRun({ text, font: FONT, size: H2_SIZE, bold: true, color: PURPLE })],
+  });
+}
+
+// Two-line placement H2: primary line (purple bold, same size as makeH2,
+// "P-Sun | 51.5: The Arousing, Symmetry | Exalted") plus an italicized
+// gray subtitle (smaller, "Heart | Initiation | Channel of Initiation").
+// Both are keepNext so the header pair stays with the first body paragraph.
+function makeH2PlacementPrimary(text: string): Paragraph {
+  return new Paragraph({
+    // Zero after-spacing so the subtitle paragraph sits flush against the
+    // primary, matching Kaycee's PDF.
+    spacing: { before: 280, after: 0 },
+    heading: HeadingLevel.HEADING_2,
+    keepNext: true,
+    children: [new TextRun({ text, font: FONT, size: H2_SIZE, bold: true, color: PURPLE })],
+  });
+}
+
+function makeH2PlacementSubtitle(text: string): Paragraph {
+  return new Paragraph({
+    spacing: { before: 0, after: 120 },
+    keepNext: true,
+    children: [new TextRun({ text, font: FONT, size: H3_SIZE, italics: true, color: HEADER_GRAY })],
   });
 }
 
@@ -317,13 +356,18 @@ function buildPlacementsTable(side: "Personality" | "Design", rows: PlacementRow
       new TextRun({ text: glyph ? `${glyph}  ` : "", font: FONT, size: TABLE_BODY_SIZE, color: H3_GRAY }),
       new TextRun({ text: r.planet, font: FONT, size: TABLE_BODY_SIZE, color: H3_GRAY }),
     ];
-    // Gate column: "51.5 ▲" (gate.line + fixation glyph if present)
-    const gateText = r.fixation
-      ? `${r.gate}.${r.line} ${r.fixation}`
-      : `${r.gate}.${r.line}`;
-    const gateRuns = [
-      new TextRun({ text: gateText, font: FONT, size: TABLE_BODY_SIZE, color: H3_GRAY }),
+    // Gate column: gate.line on the first line; fixation glyph (▲/▽) on a
+    // second line beneath it. Matches Kaycee's v5 PDF format.
+    const gateParagraphs: Paragraph[] = [
+      new Paragraph({ spacing: { before: 40, after: 0 }, children: [
+        new TextRun({ text: `${r.gate}.${r.line}`, font: FONT, size: TABLE_BODY_SIZE, color: H3_GRAY }),
+      ]}),
     ];
+    if (r.fixation) {
+      gateParagraphs.push(new Paragraph({ spacing: { before: 0, after: 40 }, children: [
+        new TextRun({ text: r.fixation, font: FONT, size: TABLE_BODY_SIZE, color: H3_GRAY }),
+      ]}));
+    }
     // Name column: gate name + line name on two lines
     const nameParagraphs = [
       new Paragraph({ spacing: { before: 40, after: 0 }, children: [
@@ -340,7 +384,7 @@ function buildPlacementsTable(side: "Personality" | "Design", rows: PlacementRow
     return new TableRow({
       children: [
         tableCell([cellPara(planetCellRuns)], { widthIdx: 0 }),
-        tableCell([cellPara(gateRuns)], { widthIdx: 1 }),
+        tableCell(gateParagraphs, { widthIdx: 1 }),
         tableCell(nameParagraphs, { widthIdx: 2 }),
         tableCell(descParagraphs, { widthIdx: 3 }),
       ],
@@ -481,6 +525,12 @@ function markdownToBlocks(markdown: string, ctx: RenderContext): DocChild[] {
   const lines = markdown.split("\n");
   const out: DocChild[] = [];
   let skipUntilDivider = true;
+  // When a placement H2 is encountered, the hexagram image is NOT emitted as
+  // its own paragraph. Instead it's deferred and attached as a floating
+  // anchor to the FIRST body paragraph that follows the H2/subtitle/TLDR.
+  // Word's text-wrap then flows the paragraph (and continues into
+  // subsequent paragraphs) around the image to the right.
+  let pendingHexImage: Buffer | null = null;
 
   function emitTableSection(side: "Personality" | "Design") {
     const chartRows = placementRowsFromChart(ctx.raw, side);
@@ -541,8 +591,20 @@ function markdownToBlocks(markdown: string, ctx: RenderContext): DocChild[] {
         continue;
       }
 
-      // Full Cross Synthesis triggers a page break + cross mandala inserted right after H1.
-      if (/^full incarnation cross synthesis\s*$/i.test(text)) {
+      // Incarnation Cross H1 triggers a page break + cross mandala inserted
+      // right after H1.
+      //
+      // v3 H1 was the literal "# Full Incarnation Cross Synthesis". v4 uses
+      // the cross's thematic name itself as the H1, with a pipe-delimited
+      // gate parenthetical at the end:
+      //   "# The Left Angle Cross of The Clarion | (51/57 | 61/62)"
+      // The renderer detects the v4 form via the "(N/N | N/N)" parenthetical
+      // pattern. Both forms continue to be supported so v3 markdown still
+      // renders.
+      if (
+        /^full incarnation cross synthesis\s*$/i.test(text) ||
+        /\(\s*\d+\s*\/\s*\d+\s*\|\s*\d+\s*\/\s*\d+\s*\)/.test(text)
+      ) {
         out.push(new Paragraph({ children: [new PageBreak()] }));
         out.push(makeH1(text));
         out.push(makeMandalaImage(ctx.crossPng, ctx.mandalaPx, "cross-mandala"));
@@ -557,26 +619,33 @@ function markdownToBlocks(markdown: string, ctx: RenderContext): DocChild[] {
 
     if (/^##\s+/.test(line)) {
       const text = line.replace(/^##\s+/, "").trim();
-      out.push(makeH2(text));
-
-      // For PLACEMENT H2 headers (containing "Gate.Line" pattern), insert the
-      // hexagram image centered immediately below the H2. Inline (not floating)
-      // for Word compatibility.
       const place = parseH2PlacementHeader(text);
+
       if (place) {
-        const hexPng = loadHexagramImage(place.gate, place.line);
-        if (hexPng) {
-          out.push(new Paragraph({
-            alignment: AlignmentType.LEFT,
-            spacing: { before: 40, after: 80 },
-            children: [new ImageRun({
-              data: hexPng,
-              transformation: { width: ctx.hexPx, height: ctx.hexPx },
-              type: "png",
-              altText: { name: `hex-${place.gate}-${place.line}`, description: "", title: "", id: nextDrawingId() },
-            })],
-          }));
+        // Placement H2: two-line styled header. Split on pipes:
+        //   parts[0] = "P-Sun"
+        //   parts[1] = "51.5: The Arousing, Symmetry ▲"
+        //   parts[2+] = center | quarter | channel
+        // Primary line uses parts[0..2] as a Heading-2 styled run; subtitle
+        // uses parts[2+] joined as an italic gray subtitle paragraph.
+        const segments = text.split("|").map((s) => s.trim()).filter((s) => s.length > 0);
+        if (segments.length >= 3) {
+          const primary = `${segments[0]} | ${segments[1]}`;
+          const subtitle = segments.slice(2).join(" | ");
+          out.push(makeH2PlacementPrimary(primary));
+          out.push(makeH2PlacementSubtitle(subtitle));
+        } else {
+          // Defensive: malformed header (fewer than 3 pipe segments).
+          // Emit the whole line as the primary; no subtitle.
+          out.push(makeH2PlacementPrimary(text));
         }
+
+        // Defer the hexagram image so it floats next to the FIRST body
+        // paragraph, not below the H2.
+        pendingHexImage = loadHexagramImage(place.gate, place.line);
+      } else {
+        // Non-placement H2 (synthesis, timeline beat, conjunction, etc.).
+        out.push(makeH2(text));
       }
 
       i += 1;
@@ -616,7 +685,17 @@ function markdownToBlocks(markdown: string, ctx: RenderContext): DocChild[] {
       buf.push(next);
       j += 1;
     }
-    out.push(makeParagraph(buf.join(" "), { justified: true }));
+    const paragraphText = buf.join(" ");
+    if (pendingHexImage) {
+      // Anchor the floating hexagram image to this paragraph. Word's
+      // wrapSquare will flow this paragraph's text to the right of the
+      // image and continue wrapping subsequent paragraphs until the
+      // image height is exhausted.
+      out.push(makeHexagramParagraph(pendingHexImage, ctx.hexPx, paragraphText, "hexagram"));
+      pendingHexImage = null;
+    } else {
+      out.push(makeParagraph(paragraphText, { justified: true }));
+    }
     i = j;
   }
   return out;
@@ -642,7 +721,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`\n=== Rendering ${client.name}'s Planetary Overview as docx (v3) ===\n`);
+  console.log(`\n=== Rendering ${client.name}'s Planetary Overview as docx ===\n`);
   console.log(`Reading markdown: ${reportPath}`);
   const markdown = readFileSync(reportPath, "utf8");
 
@@ -680,12 +759,14 @@ async function main() {
     raw, crossPng, mandalaPx: MANDALA_PX, hexPx: HEX_PX, placementMeta,
   });
 
+  // Default running header for pages 2+ — non-italic gray text on the right
+  // edge, with the website appended. v6 dropped italics per Kaycee's PDF.
   const pageHeader = new Header({
     children: [
       new Paragraph({
         alignment: AlignmentType.RIGHT,
         children: [
-          new TextRun({ text: `${client.name}  |  Planetary Overview`, font: FONT, size: META_SIZE, italics: true, color: HEADER_GRAY }),
+          new TextRun({ text: `${client.name}  |  Planetary Overview  |  www.delphihd.com`, font: FONT, size: META_SIZE, color: HEADER_GRAY }),
         ],
       }),
     ],
@@ -702,27 +783,72 @@ async function main() {
     ],
   });
 
+  // Cover page (page 1) gets its own first-page header + footer carrying the
+  // brand logos: Delphi top-left, Know Thyself bottom-right. The cover does
+  // NOT show the running text header or the page number.
+  const delphiLogoPng = readFileSync(LOGO_DELPHI_PATH);
+  const knowthyselfLogoPng = readFileSync(LOGO_KNOWTHYSELF_PATH);
+
+  const coverHeader = new Header({
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.LEFT,
+        children: [new ImageRun({
+          data: delphiLogoPng,
+          // Delphi.png aspect ratio is 2:1 (6250x3125). Render ~110pt wide.
+          transformation: { width: 110, height: 55 },
+          type: "png",
+          altText: { name: "Delphi Human Design", description: "Delphi Human Design logo", title: "Delphi", id: nextDrawingId() },
+        })],
+      }),
+    ],
+  });
+
+  const coverFooter = new Footer({
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.RIGHT,
+        children: [new ImageRun({
+          data: knowthyselfLogoPng,
+          // knowthyself.png aspect ratio is 4:1 (3250x813). Render ~110pt wide.
+          transformation: { width: 110, height: 28 },
+          type: "png",
+          altText: { name: "know thyself", description: "know thyself", title: "know thyself", id: nextDrawingId() },
+        })],
+      }),
+    ],
+  });
+
+  // Cover body: client name (large purple bold), "Planetary Overview Report"
+  // (italic gray smaller), full mandala centered, then Type / Profile spelled
+  // out / Cross with parenthetical on three lines below.
+  const profileLineText = profileSpelledOut(raw.Properties.Profile.option);
   const coverParas: Paragraph[] = [
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 720, after: 240 },
+      spacing: { before: 1200, after: 120 },
       children: [new TextRun({ text: client.name, font: FONT, size: 44, bold: true, color: PURPLE })],
     }),
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { after: 480 },
-      children: [new TextRun({ text: "Planetary Overview", font: FONT, size: 28, italics: true, color: H3_GRAY })],
+      spacing: { after: 320 },
+      children: [new TextRun({ text: "Planetary Overview Report", font: FONT, size: 28, italics: true, color: H3_GRAY })],
     }),
     makeMandalaImage(fullPng, MANDALA_PX, "full-mandala"),
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 360 },
-      children: [
-        new TextRun({
-          text: `${raw.Properties.Type.option}  ·  ${raw.Properties.Profile.option}  ·  ${raw.Properties.IncarnationCross.option}`,
-          font: FONT, size: 20, color: H3_GRAY,
-        }),
-      ],
+      spacing: { before: 200, after: 60 },
+      children: [new TextRun({ text: raw.Properties.Type.option, font: FONT, size: 22, color: H3_GRAY })],
+    }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 60 },
+      children: [new TextRun({ text: profileLineText, font: FONT, size: 22, color: H3_GRAY })],
+    }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 60 },
+      children: [new TextRun({ text: raw.Properties.IncarnationCross.option, font: FONT, size: 22, color: H3_GRAY })],
     }),
     new Paragraph({ children: [new PageBreak()] }),
   ];
@@ -737,18 +863,31 @@ async function main() {
             size: { width: 12240, height: 15840, orientation: PageOrientation.PORTRAIT },
             margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
           },
+          // titlePage flag enables the first-page header/footer override; the
+          // cover gets logos, pages 2+ get the running text header.
+          titlePage: true,
         },
-        headers: { default: pageHeader },
-        footers: { default: pageFooter },
+        headers: { default: pageHeader, first: coverHeader },
+        footers: { default: pageFooter, first: coverFooter },
         children: [...coverParas, ...bodyBlocks],
       },
     ],
   });
 
   const buf = await Packer.toBuffer(doc);
-  const outDir = `/Users/dorothygale/Desktop/Benchmark Reports/Phase 4 Output`;
+  const outDir = clientOutputDir(client);
   mkdirSync(outDir, { recursive: true });
-  const outPath = join(outDir, `${client.name} - Planetary Overview - Phase 4 v3.docx`);
+
+  // Auto-bump version suffix. Scan outDir for existing
+  // "<Name> - Planetary Overview - v<N>.docx" files and write v<N+1>.
+  const docxPrefix = `${client.name} - Planetary Overview - v`;
+  let nextV = 1;
+  for (const f of readdirSync(outDir)) {
+    if (!f.startsWith(docxPrefix) || !f.endsWith(".docx")) continue;
+    const m = f.slice(docxPrefix.length, -5).match(/^(\d+)/);
+    if (m) nextV = Math.max(nextV, parseInt(m[1], 10) + 1);
+  }
+  const outPath = join(outDir, `${docxPrefix}${nextV}.docx`);
   writeFileSync(outPath, buf);
 
   const sizeKB = Math.round(buf.length / 1024);
