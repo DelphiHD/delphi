@@ -2023,8 +2023,14 @@ body.notables .ptable { display:none; }
 .viewdock.docked .sec { margin:0 0 7px; }
 .viewdock.docked .row { flex-direction:column; align-items:stretch; margin-top:6px; gap:6px; }
 .viewdock.docked button { width:100%; text-align:center; }
-#viewrow button.on { background:#111111; color:#fff; }
-#viewrow button.on:hover { background:#111111; }
+/* the three views are a mode switch, one at a time, so they read in the ink
+   family rather than the purple one: charcoal when off, black when on. The
+   purple pills below them are independent filters. Selected also takes full
+   white and more weight, because black against charcoal alone is too small a
+   step to tell at a glance. */
+#viewrow button { background:#4d4d55; color:rgba(255,255,255,.82); }
+#viewrow button:hover { background:#3d3d45; color:#fff; }
+#viewrow button.on, #viewrow button.on:hover { background:#111111; color:#fff; font-weight:600; }
 button.gold { background:#c79a2e; color:#fff; }
 button.gold:hover { background:#b0871f; }
 .booknote { margin-top:10px; border-top:1px solid rgba(132,80,149,.18); padding-top:8px; }
