@@ -1747,10 +1747,6 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, fonts: Map<n
       <button id="vBody">Circuits</button>
       <button id="vMandala">Mandala</button>
     </div>
-    <div class="row" id="actrow" hidden>
-      <button id="reset" class="gold">Reset</button>
-      <button id="snap">Save image</button>
-    </div>
     <div class="row" id="hangrow" hidden>
       <button id="defined" class="on">Defined channels</button>
       <button id="hang" class="on">Hanging gates</button>
@@ -1758,6 +1754,10 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, fonts: Map<n
     <div class="row" id="siderow" hidden>
       <button id="sideP" class="on">Personality</button>
       <button id="sideD" class="on">Design</button>
+    </div>
+    <div class="row" id="actrow" hidden>
+      <button id="reset" class="gold">Reset</button>
+      <button id="snap">Save image</button>
     </div>`;
   const face = [...fonts.entries()].map(([w, buf]) =>
     `@font-face{font-family:Montserrat;font-style:normal;font-weight:${w};font-display:swap;` +
@@ -2016,12 +2016,15 @@ body.notables .ptable { display:none; }
 #viewrow button, #actrow button, #hangrow button, #siderow button { font-size:10.5px; padding:5px 8px; }
 /* client charts: the view controls sit in the stage's empty lower-left corner
    rather than in the panel, so the panel only carries the reading itself */
-.viewdock.docked { position:absolute; left:0; bottom:2px; z-index:5; width:240px;
+.viewdock.docked { position:absolute; left:0; bottom:2px; z-index:5; width:154px;
   padding:8px 10px 10px; border-radius:12px; background:rgba(255,255,255,.93);
   border:1px solid rgba(132,80,149,.18); backdrop-filter:blur(3px);
   box-shadow:0 6px 18px rgba(60,40,80,.08); }
-.viewdock.docked .sec { margin:0 0 6px; }
-.viewdock.docked .row { margin-top:5px; gap:6px; }
+.viewdock.docked .sec { margin:0 0 7px; }
+.viewdock.docked .row { flex-direction:column; align-items:stretch; margin-top:6px; gap:6px; }
+.viewdock.docked button { width:100%; text-align:center; }
+#viewrow button.on { background:#111111; color:#fff; }
+#viewrow button.on:hover { background:#111111; }
 button.gold { background:#c79a2e; color:#fff; }
 button.gold:hover { background:#b0871f; }
 .booknote { margin-top:10px; border-top:1px solid rgba(132,80,149,.18); padding-top:8px; }
