@@ -46,6 +46,29 @@ A self-sustaining reading practice with a meaningful subscriber base and a growi
 - **Deepen:** richer personalization, a chart-conversation feature, compatibility/partnership readings, and cross-system synthesis (HD with I-Ching, Gene Keys, A Course in Miracles).
 - **Widen:** a platform other Human Design practitioners can use, and/or **[CONFIRM]** a social app that Kaycee has named as the eventual destination. The near-term job is to keep the content pipeline and data model clean and complete enough that this remains possible without a rebuild.
 
+## Client portal is the destination (stated 2026-08-25)
+
+The token-linked chart pages at `charts.delphihd.com` are a stepping stone, not the end
+state. Kaycee's words: "These prototype pages are great, but I'll want everything housed in
+a portal eventually." A client should log in and find everything of theirs in one place:
+their chart, their reports, their audio, any charts they later buy, plus **transit overlays**
+and **composite charts**, both of which she named as required features.
+
+Nothing is scheduled. Do not treat the current chart links as the finished shape of client
+delivery, and do not invest in them in ways that would have to be unwound.
+
+The one architectural fork to settle before building it: charts are currently **baked files**,
+which suits a natal chart that never changes but not transits (change daily) or composites
+(one file per possible pairing). The alternative is rendering charts live inside the app from
+birth data. Recommended lean is render-live, precisely because both named features are the
+cases baking handles badly. Kaycee has not decided, and asked for the trade-offs written up
+properly before she does.
+
+Sketched order of work: accounts (email-link sign-in, existing chart links keep working) →
+a per-client home page listing what they already have → restructure storage from one chart
+per person to many → transit overlay → composites → Stripe-automated purchase. Purchase
+automation is last on purpose: she can sell a composite through her booking page today.
+
 ## The next strategic decisions we expect to face
 
 1. **Pricing model.** Option A (three fixed report lengths: Single $49 / Deep $79 / Full $129) vs Option B (base $49 plus $7 go-deeper sections plus optional $19/month). Recorded lean is **[CONFIRM]** in DECISIONS.md; needs a final call before Phase 2 ships.
