@@ -187,3 +187,22 @@ Seeded from Kaycee. Add freely; we triage before building.
 - Built for laptop/desktop landscape. iPad/narrow-screen stacking is a future task.
 - Channel highlight currently rings both endpoint gates and thickens the channel
   group stroke. If a stronger channel glow is wanted, that's a refinement.
+
+## Panel layout (2026-08-25)
+
+On a client chart the view controls (Bodygraph / Circuits / Mandala, Reset / Save image,
+Defined channels / Hanging gates, Personality / Design) are docked into the empty lower-left
+corner of the stage rather than sitting in the side panel. Kaycee's idea, and it is what
+finally made the panel fit a laptop: the panel carries only the reading itself, and its
+content dropped from 719px to 521px. The controls sit in four tidy rows in a 240px card,
+which is why panel button padding is 5px 8px: at 10px the rows wrap.
+
+The panel also scrolls internally (`overflow-y:auto`, `min-height:0`) instead of growing the
+page, so a short window can never push the bodygraph out of view to reach what is below.
+
+Known trade-off: in mandala view the dock overlaps the lower-left arc of the wheel, covering
+part of the Initiation quarter label and a few outer cells. The card is opaque enough to stay
+legible. Fix if it starts to bother her: shrink the mandala slightly or shift it right of the
+dock in that view only.
+
+The teaching diagram keeps its controls in the panel; it has the room.

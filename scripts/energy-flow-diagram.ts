@@ -1710,6 +1710,27 @@ function mandalaView(d: SceneData): string {
 function buildHtml(d: SceneData, canvases: string, mandala: string, fonts: Map<number, Buffer>): string {
   const logoSrc = brandMark("Delphi Logo.svg");
   const knowSrc = brandMark("Know Thyself.svg");
+  // On a client chart these dock into the empty corner of the stage instead of
+  // the panel, which is where the panel's height was coming from. The teaching
+  // diagram has room, so there they stay in the panel.
+  const viewControls = `<div class="sec" id="viewsec" hidden>VIEW</div>
+    <div class="row" id="viewrow" hidden>
+      <button id="vPlain" class="on">Bodygraph</button>
+      <button id="vBody">Circuits</button>
+      <button id="vMandala">Mandala</button>
+    </div>
+    <div class="row" id="actrow" hidden>
+      <button id="reset" class="gold">Reset</button>
+      <button id="snap">Save image</button>
+    </div>
+    <div class="row" id="hangrow" hidden>
+      <button id="defined" class="on">Defined channels</button>
+      <button id="hang" class="on">Hanging gates</button>
+    </div>
+    <div class="row" id="siderow" hidden>
+      <button id="sideP" class="on">Personality</button>
+      <button id="sideD" class="on">Design</button>
+    </div>`;
   const face = [...fonts.entries()].map(([w, buf]) =>
     `@font-face{font-family:Montserrat;font-style:normal;font-weight:${w};font-display:swap;` +
     `src:url(data:font/ttf;base64,${buf.toString("base64")}) format('truetype');}`,
@@ -1963,7 +1984,15 @@ body.off-s-design .prow[data-side="design"] { opacity:.3; }
 body.chart svg.canvas .gnum { fill:var(--gnum-off); font-weight:400; }
 body.chart svg.canvas .gnum.lit { fill:var(--gnum-on); font-weight:600; }
 body.notables .ptable { display:none; }
-#viewrow button, #hangrow button, #siderow button { font-size:10.5px; padding:5px 10px; }
+#viewrow button, #actrow button, #hangrow button, #siderow button { font-size:10.5px; padding:5px 8px; }
+/* client charts: the view controls sit in the stage's empty lower-left corner
+   rather than in the panel, so the panel only carries the reading itself */
+.viewdock.docked { position:absolute; left:0; bottom:2px; z-index:5; width:240px;
+  padding:8px 10px 10px; border-radius:12px; background:rgba(255,255,255,.93);
+  border:1px solid rgba(132,80,149,.18); backdrop-filter:blur(3px);
+  box-shadow:0 6px 18px rgba(60,40,80,.08); }
+.viewdock.docked .sec { margin:0 0 6px; }
+.viewdock.docked .row { margin-top:5px; gap:6px; }
 button.gold { background:#c79a2e; color:#fff; }
 button.gold:hover { background:#b0871f; }
 .booknote { margin-top:10px; border-top:1px solid rgba(132,80,149,.18); padding-top:8px; }
@@ -2024,7 +2053,7 @@ body.view-mandala .mandala svg { max-height:calc(100vh - 28px); width:auto; heig
 <body class="skin-paper${d.client ? " chart" : ""}">
 <div class="wrap">
   ${logoSrc ? `<img class="brandmark logo" src="${logoSrc}" alt="Delphi">` : ""}
-  <div class="stage">${canvases}${mandala}<div class="tip" id="tip" hidden></div><div class="card" id="card" hidden></div>${knowSrc ? `<img class="brandmark know" src="${knowSrc}" alt="Know thyself">` : ""}</div>
+  <div class="stage">${canvases}${mandala}<div class="tip" id="tip" hidden></div><div class="card" id="card" hidden></div>${knowSrc ? `<img class="brandmark know" src="${knowSrc}" alt="Know thyself">` : ""}${d.client ? `<div class="viewdock docked">${viewControls}</div>` : ""}</div>
   <aside class="panel">
 ${d.client ? "" : `<h1 id="ptitle">Centers, function, and flow</h1>
     <p class="sub" id="psub">Nine centers, each labeled with what it does. The moving light follows every channel toward the Throat, the only center that turns energy into expression.</p>`}
@@ -2034,22 +2063,7 @@ ${d.client ? "" : `<h1 id="ptitle">Centers, function, and flow</h1>
       <button class="tabbtn" data-tab="stats">Stats</button>
     </div>
 
-    <div class="sec" id="viewsec" hidden>VIEW</div>
-    <div class="row" id="viewrow" hidden>
-      <button id="vPlain" class="on">Bodygraph</button>
-      <button id="vBody">Circuits</button>
-      <button id="vMandala">Mandala</button>
-      <button id="reset" class="gold">Reset</button>
-      <button id="snap">Save image</button>
-    </div>
-    <div class="row" id="hangrow" hidden>
-      <button id="defined" class="on">Defined channels</button>
-      <button id="hang" class="on">Hanging gates</button>
-    </div>
-    <div class="row" id="siderow" hidden>
-      <button id="sideP" class="on">Personality</button>
-      <button id="sideD" class="on">Design</button>
-    </div>
+${d.client ? "" : viewControls}
 
     <div id="tab-dates" class="pane" hidden></div>
     <div id="tab-stats" class="pane" hidden></div>
@@ -2510,6 +2524,7 @@ if (DATA.client) {
   document.getElementById('siderow').hidden = false;
   document.getElementById('viewsec').hidden = false;
   document.getElementById('viewrow').hidden = false;
+  document.getElementById('actrow').hidden = false;
   document.title = DATA.client.name + ' - Delphi Human Design';
 
   // planet checkboxes drive the tables, the marks on the chart and the mandala
