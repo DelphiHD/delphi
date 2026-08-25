@@ -162,6 +162,10 @@ const MANDALA_PLANET: Record<string, Planet> = {
 };
 const DESIGN_RED = "#e06666";
 
+// Kaycee's booking page. Client charts carry a link to it so anyone holding a
+// chart can book without going back through her.
+const BOOKING_URL = "https://cal.com/DelphiHumanDesign";
+
 const TABLE_W = 132, TABLE_GAP = 22;
 const TUBE = 8.7;                       // channel width in the delphi design
 
@@ -1950,6 +1954,10 @@ body.notables .ptable { display:none; }
 #viewrow button, #hangrow button, #siderow button { font-size:10.5px; padding:5px 10px; }
 button.gold { background:#c79a2e; color:#fff; }
 button.gold:hover { background:#b0871f; }
+.booknote { margin-top:14px; border-top:1px solid rgba(132,80,149,.18); padding-top:12px; }
+.booknote a { display:block; text-align:center; text-decoration:none; padding:9px 12px; border-radius:9px;
+  background:var(--purple); color:#fff; font-size:11.5px; font-weight:600; letter-spacing:.02em; }
+.booknote a:hover { background:#6d3f7c; }
 .bridge { opacity:0; transition:opacity .2s; pointer-events:none; }
 body.show-bridges .bridge { opacity:1; filter: drop-shadow(0 0 4px rgba(210,77,255,.75));
   animation:hlpulse 1.8s ease-in-out infinite; }
@@ -2063,6 +2071,7 @@ ${d.client ? "" : `<h1 id="ptitle">Centers, function, and flow</h1>
     </details>
 
     </div>
+${d.client ? `<div class="booknote"><a href="${BOOKING_URL}" target="_blank" rel="noopener">Book a session</a></div>` : ""}
 ${d.client ? "" : `<div class="readout" id="readout"><b>Hover the bodygraph</b><span class="meta">Click to pin a description over the chart.</span></div>
     <p class="hint">Arrows point the way energy travels: toward the Throat, hop by hop. Click a channel or a center to pin its description over the bodygraph.</p>`}
   </aside>
@@ -3005,7 +3014,8 @@ document.addEventListener('mousemove', function (e) {
 // The token is created once per client and reused, so republishing refreshes
 // what a link already sent shows, rather than minting a new address.
 
-const SITE = process.env.DELPHI_SITE_URL ?? "https://delphihd.com";
+// charts.delphihd.com, never the apex: delphihd.com serves Kaycee's Wix site.
+const SITE = process.env.DELPHI_SITE_URL ?? "https://charts.delphihd.com";
 
 async function publishChart(client: ClientCtx, html: string): Promise<string> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

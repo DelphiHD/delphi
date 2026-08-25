@@ -74,9 +74,16 @@ stalls before booking.
 
 ## Where the links go
 
-Booking links belong on the Wix home page, at the bottom of every client chart page at
-`charts.delphihd.com`, and anywhere Kaycee wants to paste them. The Drop-In link stays out
-of all public placements.
+Every client chart at `charts.delphihd.com` carries a purple **Book a session** button at the
+bottom of its control panel, linking to `cal.com/DelphiHumanDesign`. Anyone holding a chart
+can rebook without going back through Kaycee. Republishing a chart picks it up; charts
+already sent keep their token, so the link a client has is the one that gains the button.
+
+Still to place: a booking link on the Wix home page. That needs the Wix editor, which needs
+either Kaycee's hands or browser access to the profile she is logged into. Her header already
+has a "Contact Us" button, so the smallest version is repointing that or adding one beside it.
+
+The Drop-In link stays out of all public placements.
 
 ## Live as of 2026-08-25
 
