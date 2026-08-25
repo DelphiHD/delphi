@@ -1855,7 +1855,12 @@ body.view-plain #circdrop, body.view-mandala #circdrop { display:none; }
 /* the traditional chart carries its own coloring: leave the gate numbers alone */
 body.view-plain svg.canvas .gnum { fill:inherit; font-weight:inherit; }
 .panel { flex:0 0 306px; align-self:stretch; padding:18px 16px; border-radius:16px;
-  background:rgba(132,80,149,.06); border:1px solid rgba(132,80,149,.22); }
+  background:rgba(132,80,149,.06); border:1px solid rgba(132,80,149,.22);
+  /* the panel matches the bodygraph's height, so on a short laptop screen its
+     content used to push the page taller and scroll the chart out of view.
+     Scrolling inside the panel instead keeps the bodygraph whole and keeps the
+     booking links reachable at any window size. */
+  min-height:0; overflow-y:auto; scrollbar-width:thin; }
 .panel h1 { font-size:16px; margin:0 0 4px; font-weight:600; letter-spacing:.01em; }
 .panel p.sub { font-size:11.5px; line-height:1.5; margin:0 0 16px; opacity:.72; }
 details.drop { margin-top:12px; border-top:1px solid rgba(132,80,149,.18); padding-top:8px; }
@@ -1878,13 +1883,13 @@ details.drop[open] > summary::after { content:" \\25B4"; }
 .card .body h4 { margin:12px 0 5px; font-size:11px; font-weight:600; letter-spacing:.1em;
   text-transform:uppercase; opacity:.62; }
 .card .body h4:first-child { margin-top:0; }
-.sec { font-size:9.5px; letter-spacing:.18em; font-weight:600; opacity:.6; margin:16px 0 8px; }
+.sec { font-size:9.5px; letter-spacing:.18em; font-weight:600; opacity:.6; margin:12px 0 6px; }
 .grp { font-size:10.5px; letter-spacing:.1em; opacity:.55; margin:10px 0 4px; font-weight:600; }
 label.cc { display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer; padding:3px 0; }
 label.cc input { accent-color:var(--purple); cursor:pointer; }
 .sw { width:20px; height:4px; border-radius:2px; flex:0 0 20px; }
-.row { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
-button { font-family:inherit; font-size:11.5px; padding:6px 12px; border-radius:20px; border:1px solid transparent;
+.row { display:flex; gap:7px; flex-wrap:wrap; margin-top:6px; }
+button { font-family:inherit; font-size:11px; padding:5px 10px; border-radius:20px; border:1px solid transparent;
   cursor:pointer; background:rgba(132,80,149,.2); color:inherit; transition:all .15s; }
 button:hover { background:rgba(132,80,149,.34); }
 button.on { background:var(--purple); color:#fff; }
@@ -1961,15 +1966,14 @@ body.notables .ptable { display:none; }
 #viewrow button, #hangrow button, #siderow button { font-size:10.5px; padding:5px 10px; }
 button.gold { background:#c79a2e; color:#fff; }
 button.gold:hover { background:#b0871f; }
-.booknote { margin-top:14px; border-top:1px solid rgba(132,80,149,.18); padding-top:10px; }
+.booknote { margin-top:10px; border-top:1px solid rgba(132,80,149,.18); padding-top:8px; }
 .booknote .booklab { font-size:9.5px; letter-spacing:.18em; font-weight:600; opacity:.62;
-  text-transform:uppercase; margin-bottom:7px; }
+  text-transform:uppercase; margin-bottom:5px; }
 .booknote a { display:flex; justify-content:space-between; align-items:baseline; gap:8px;
-  text-decoration:none; color:var(--purple); font-size:11.5px; font-weight:600; padding:6px 9px;
-  border-radius:8px; border:1px solid rgba(132,80,149,.22); margin-bottom:5px; }
-.booknote a:last-child { margin-bottom:0; }
-.booknote a:hover { background:rgba(132,80,149,.10); }
-.booknote a em { font-style:normal; font-weight:500; font-size:10.5px; opacity:.62; }
+  text-decoration:none; color:var(--purple); font-size:11px; font-weight:600; padding:3px 7px;
+  border-radius:7px; margin-bottom:1px; }
+.booknote a:hover { background:rgba(132,80,149,.12); }
+.booknote a em { font-style:normal; font-weight:500; font-size:10px; opacity:.6; }
 .bridge { opacity:0; transition:opacity .2s; pointer-events:none; }
 body.show-bridges .bridge { opacity:1; filter: drop-shadow(0 0 4px rgba(210,77,255,.75));
   animation:hlpulse 1.8s ease-in-out infinite; }
