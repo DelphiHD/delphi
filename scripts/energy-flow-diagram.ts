@@ -1217,6 +1217,33 @@ function brandMark(file: string): string {
   return `data:image/svg+xml;base64,${readFileSync(path).toString("base64")}`;
 }
 
+// The Delphi D as the browser tab icon. The brand file is a 750x750 canvas with
+// the letter sitting off-centre on a white background that overruns the canvas,
+// which at 16px would render as a speck in a white field. So: lift the glyph out
+// and re-mount it on a square cropped to the letter, with a white rounded plate
+// behind it so it stays legible on a dark tab strip as well as a light one. The
+// crop is measured from this specific file; if the logo is ever redrawn, the
+// icon needs re-measuring, and the fallback below keeps it merely ugly, never
+// broken.
+const FAVICON_BOX = "112 95 556 556";
+
+function favicon(): string {
+  const path = join(BRAND_DIR, "Delphi Small Logo.svg");
+  if (!existsSync(path)) {
+    console.warn("  (brand mark missing: Delphi Small Logo.svg)");
+    return "";
+  }
+  const src = readFileSync(path, "utf8");
+  const glyph = /<path[^>]*\sd="([^"]+)"/.exec(src)?.[1];
+  const svg = glyph
+    ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${FAVICON_BOX}">` +
+      `<rect x="112" y="95" width="556" height="556" rx="98" fill="#ffffff"/>` +
+      `<g transform="translate(140,0)"><g transform="translate(4.588807,587.006321)">` +
+      `<path fill="#845095" d="${glyph}"/></g></g></svg>`
+    : src;
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+}
+
 // ── brand font (Montserrat), cached locally so reruns are offline ───────────
 const FONT_DIR = ".cache/fonts";
 const FONT_WEIGHTS = [400, 600];
@@ -1710,6 +1737,7 @@ function mandalaView(d: SceneData): string {
 function buildHtml(d: SceneData, canvases: string, mandala: string, fonts: Map<number, Buffer>): string {
   const logoSrc = brandMark("Delphi Logo.svg");
   const knowSrc = brandMark("Know Thyself.svg");
+  const iconSrc = favicon();
   // On a client chart these dock into the empty corner of the stage instead of
   // the panel, which is where the panel's height was coming from. The teaching
   // diagram has room, so there they stay in the panel.
@@ -1830,6 +1858,7 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, fonts: Map<n
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(d.client ? `${d.client.name} - Delphi Human Design` : "The Nine Centers and the Flow to the Throat")}</title>
+${iconSrc ? `<link rel="icon" href="${iconSrc}">` : ""}
 <style>
 ${face}
 :root { --period: 9s; --purple: #845095; --gnum-off: #6b6790; --gnum-on: #845095; }
