@@ -1747,17 +1747,17 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, fonts: Map<n
       <button id="vBody">Circuits</button>
       <button id="vMandala">Mandala</button>
     </div>
-    <div class="row" id="hangrow" hidden>
-      <button id="defined" class="on">Defined channels</button>
-      <button id="hang" class="on">Hanging gates</button>
-    </div>
     <div class="row" id="siderow" hidden>
       <button id="sideP" class="on">Personality</button>
       <button id="sideD" class="on">Design</button>
     </div>
+    <div class="row" id="hangrow" hidden>
+      <button id="defined" class="on">Defined Channels</button>
+      <button id="hang" class="on">Hanging Gates</button>
+    </div>
     <div class="row" id="actrow" hidden>
       <button id="reset" class="gold">Reset</button>
-      <button id="snap">Save image</button>
+      <button id="snap">Save Image</button>
     </div>`;
   const face = [...fonts.entries()].map(([w, buf]) =>
     `@font-face{font-family:Montserrat;font-style:normal;font-weight:${w};font-display:swap;` +
@@ -2028,6 +2028,11 @@ body.notables .ptable { display:none; }
    purple pills below them are independent filters. Selected also takes full
    white and more weight, because black against charcoal alone is too small a
    step to tell at a glance. */
+.viewdock.docked #viewrow { gap:0; }
+.viewdock.docked #viewrow button { border-radius:0; }
+.viewdock.docked #viewrow button:first-child { border-radius:10px 10px 0 0; }
+.viewdock.docked #viewrow button:last-child { border-radius:0 0 10px 10px; }
+.viewdock.docked #viewrow button + button { border-top-color:rgba(255,255,255,.18); }
 #viewrow button { background:#4d4d55; color:rgba(255,255,255,.82); }
 #viewrow button:hover { background:#3d3d45; color:#fff; }
 #viewrow button.on, #viewrow button.on:hover { background:#111111; color:#fff; font-weight:600; }
