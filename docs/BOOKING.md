@@ -78,9 +78,27 @@ Booking links belong on the Wix home page, at the bottom of every client chart p
 `charts.delphihd.com`, and anywhere Kaycee wants to paste them. The Drop-In link stays out
 of all public placements.
 
+## Live as of 2026-08-25
+
+Booking page: **cal.com/DelphiHumanDesign**. Drop-In is hidden and reachable only at
+`cal.com/DelphiHumanDesign/drop-in`.
+
+Stripe is connected and payment is taken **on booking** for all three sessions ($200 / $300
+/ $50). Google Calendar (`hello@delphihd.com`) connected itself when Kaycee signed up with
+Google, so bookings write into her business calendar and existing events block slots.
+Verified from the public booking page as a client would see it: correct price, duration,
+Google Meet location, and every intake question rendering.
+
+Setup note for next time: the Stripe OAuth links minted from the API carry a short-lived
+state token, so handing one to Kaycee and then talking for an hour guarantees a blank page
+or an error. Send her to `app.cal.com/apps/stripe` and have her click Install instead; that
+mints the link at click time. Cal.com calling the button "Install" reads as "install
+software on my computer" and needs saying out loud that nothing downloads.
+
 ## Open
 
-Kaycee creates the Cal.com and Stripe accounts (account creation and bank details are hers
-alone); everything after that is configured for her. Cal.com's free plan shows a small
-Cal.com mark on the booking page, removable for $12/month, deferred until money is actually
-moving through it. Stripe takes roughly 2.9% plus 30 cents per transaction.
+Cal.com's free plan shows a small Cal.com mark on the booking page, removable for $12/month,
+deferred until money is actually moving through it. Stripe takes roughly 2.9% plus 30 cents
+per transaction. Refund policy on all three event types is Cal.com's default of "never";
+worth revisiting with Kaycee rather than leaving as an unexamined default. Booking links
+still need placing on the Wix home page and on the client chart pages.
