@@ -1035,6 +1035,11 @@ function centerFunctions(chunks: Chunk[]): Record<Center, string[]> {
   return out;
 }
 
+/** Defined, undefined and open are three different things in Human Design, not
+ *  two: undefined means the centre carries an activated gate but no completed
+ *  channel, open means it carries nothing at all. Kaycee writes all three. */
+interface CenterStates { theme: string; defined: string; undefined: string; open: string }
+
 interface GateMeta { name: string; keynote: string; func: string; circuit: string; quarter: string }
 /** Per-gate detail from her HD Gates database, for the gate popups. */
 function gateMeta(chunks: Chunk[]): Record<number, GateMeta> {
@@ -1055,19 +1060,34 @@ function gateMeta(chunks: Chunk[]): Record<number, GateMeta> {
   return out;
 }
 
-/** Not-self themes and the undefined-center dynamics, straight from HD Centers. */
-function centerNotSelf(chunks: Chunk[]): Record<Center, { theme: string; undefinedText: string; talk: string }> {
+/** The three states of a centre in Kaycee's own words. Her HD Centers database
+ *  carries both her fields and the Definitive Book's: the DBHD ones open with an
+ *  all-caps banner and a population percentage and are written about a reader in
+ *  the third person, hers are written to the person holding the chart. The chart
+ *  is a client-facing document, so it uses hers. */
+/** The opening n sentences of a passage, for somewhere too small to hold it all. */
+function firstSentences(text: string, n: number): string {
+  const clean = (text ?? "").replace(/\s+/g, " ").trim();
+  const m = clean.match(new RegExp(`^(?:[^.!?]+[.!?]+){1,${n}}`));
+  return (m ? m[0] : clean).trim();
+}
+
+function centerStates(chunks: Chunk[]): Record<Center, CenterStates> {
   const byTitle = new Map<string, Chunk>();
   for (const c of chunks) if (c.source_kind === "center") byTitle.set((c.title ?? "").trim(), c);
-  const out = {} as Record<Center, { theme: string; undefinedText: string; talk: string }>;
+  const out = {} as Record<Center, CenterStates>;
   for (const [center, title] of Object.entries(CENTER_LIB_TITLE) as [Center, string][]) {
     const m = byTitle.get(title)?.metadata ?? {};
-    // her metadata often opens with an all-caps banner line; drop it
-    const strip = (t: string) => t.replace(/^[A-Z0-9 ,'\u2019()\-]{10,}\s*/, "").trim();
+    const field = (key: string) => {
+      const t = (m[key] ?? "").trim();
+      if (!t) throw new Error(`HD Centers: "${title}" has no ${key}. The chart has nothing to say about that state.`);
+      return t;
+    };
     out[center] = {
-      theme: strip((m["Not Self Themes"] ?? "").trim()),
-      undefinedText: strip((m["When Undefined"] ?? m["Delphi Undefined Basic"] ?? "").trim()),
-      talk: strip((m["Not Self Talk"] ?? "").trim()),
+      theme: (m["Not Self Themes"] ?? "").trim(),
+      defined: field("Delphi Defined Basic"),
+      undefined: field("Delphi Undefined Basic"),
+      open: field("Delphi Open Basic"),
     };
   }
   return out;
@@ -1111,12 +1131,10 @@ function tagInfo(chunks: Chunk[]): Record<string, string> {
   };
   for (const [k, v] of Object.entries(QUARTERS_STOPGAP)) if (!out[k]) out[k] = v;
 
-  // defined / open, in her own words from HD Centers
-  const anyCenter = chunks.find((c) => c.source_kind === "center");
-  if (anyCenter?.metadata) {
-    put("Defined", anyCenter.metadata["When Defined"] ?? "");
-    put("Open", anyCenter.metadata["When Undefined"] ?? "");
-  }
+  // No generic tooltip for the Defined / Undefined / Open pills. It used to be
+  // the Definitive Book's text taken off whichever centre the library happened
+  // to list first, which meant the Throat's "Defined" pill explained the Root.
+  // Each centre's card now carries Kaycee's own text for the state it is in.
   return out;
 }
 
@@ -1530,7 +1548,7 @@ interface SceneData {
   biology: Record<Center, string>;
   tagInfo: Record<string, string>;
   gateInfo: Record<number, GateMeta>;
-  notSelf: Record<Center, { theme: string; undefinedText: string; talk: string }>;
+  states: Record<Center, CenterStates>;
   lineName: (g: number, l: number) => string;
   anchors: Record<number, { x: number; y: number }>;
 }
@@ -2127,14 +2145,26 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, fonts: Map<n
       live: !d.client || d.client.channels.has(c.key),
       report: d.client?.report.channels[c.key] ?? "",
     })),
-    centers: (Object.keys(CENTER_SVG_ID) as Center[]).map((c) => ({
-      id: c, name: CENTER_DISPLAY[c], fns: d.fn[c], biology: d.biology[c],
-      defined: d.client ? d.client.centers.has(c) : null,
-      report: d.client?.report.centers[c] ?? "",
-      notSelf: d.notSelf[c].theme,
-      whenUndefined: d.notSelf[c].undefinedText,
-      notSelfTalk: d.notSelf[c].talk,
-    })),
+    centers: (Object.keys(CENTER_SVG_ID) as Center[]).map((c) => {
+      // Undefined and open are not the same centre. Undefined carries an
+      // activated gate with no channel completing it; open carries nothing at
+      // all, and is conditioned far more indiscriminately. The chart used to
+      // call both "Open", which loses the distinction Kaycee teaches.
+      const defined = d.client ? d.client.centers.has(c) : null;
+      const carries = d.client ? [...d.client.gates].some((g) => centerOf(g) === c) : false;
+      const state = defined === null ? null : defined ? "defined" : carries ? "undefined" : "open";
+      return {
+        id: c, name: CENTER_DISPLAY[c], fns: d.fn[c], biology: d.biology[c],
+        defined, state,
+        stateLabel: state ? state.charAt(0).toUpperCase() + state.slice(1) : "",
+        stateText: state ? d.states[c][state] : "",
+        // the tooltip is 250px wide, so the hover gets the opening sentences and
+        // the card gets the rest
+        stateShort: state ? firstSentences(d.states[c][state], 2) : "",
+        report: d.client?.report.centers[c] ?? "",
+        notSelf: d.states[c].theme,
+      };
+    }),
     placements: d.client
       ? d.client.acts.map((a) => ({
           side: a.side, planet: a.planet, pid: planetId(a.planet),
@@ -2278,6 +2308,7 @@ details.drop[open] > summary::after { content:" \\25B4"; }
   box-shadow:0 8px 22px rgba(60,40,80,.18); max-width:250px; }
 .tip[hidden] { display:none; }
 .tip b { display:block; font-size:12px; }
+.tip .tipbody { display:block; margin-top:5px; font-size:10.5px; line-height:1.5; }
 .halo > *:not(:last-child) { opacity:0; transition:opacity .2s; }
 .halo.on > *:not(:last-child) { opacity:1; }
 .halo.on .hl-fill { opacity:.28; }
@@ -2999,7 +3030,7 @@ if (DATA.client) {
         sub = (DATA.groupInfo || {})[el.dataset.key] || '';
       } else if (el.dataset.kind === 'center') {
         var c = DATA.centers.filter(function (x) { return x.name === el.dataset.key; })[0];
-        if (c) sub = c.fns.join(' + ') + (c.defined === null ? '' : ' &middot; ' + (c.defined ? 'Defined' : 'Open')) +
+        if (c) sub = c.fns.join(' + ') + (c.stateLabel ? ' &middot; ' + c.stateLabel : '') +
           (c.biology ? '. ' + c.biology : '');
       }
       var gl = list.map(function (p) { return p.gate + '.' + p.line; }).join(', ');
@@ -3771,15 +3802,16 @@ function chanHtml(c) {
 }
 function ctrHtml(k) {
   var t = k.fns.map(function (f) { return { text: f, bg: fnColor[f] }; });
-  if (k.defined !== null) t.push({ text: k.defined ? 'Defined' : 'Open' });
+  if (k.stateLabel) t.push({ text: k.stateLabel });
   var extra = '';
-  if (k.defined === false) {
-    if (k.notSelf) extra += '<span class="meta"><i>Not-self theme:</i> ' + esc(k.notSelf) + '</span>';
-    if (k.notSelfTalk) extra += '<span class="meta"><i>Not-self talk:</i> ' + esc(k.notSelfTalk) + '</span>';
+  if (k.state && k.state !== 'defined' && k.notSelf) {
+    extra += '<span class="meta"><i>Not-self theme:</i> ' + esc(k.notSelf) + '</span>';
   }
+  // their own reading first when this chart has one, Kaycee's general text for
+  // the state otherwise, so a centre always says something
   return '<b>' + esc(k.name) + '</b>' + tags(t) +
     (k.biology ? '<span class="meta">' + esc(k.biology) + '</span>' : '') + extra +
-    prose(k.report || (k.defined === false ? k.whenUndefined : ''));
+    prose(k.report || k.stateText);
 }
 function gateHtml(p) {
   var sideName = p.side === 'design' ? 'Design' : 'Personality';
@@ -3972,10 +4004,12 @@ document.addEventListener('mousemove', function (e) {
   if (ct && ctrByID[ct.dataset.center]) {
     var k = ctrByID[ct.dataset.center];
     hot(null); litGate(gatesInCenter(ct.dataset.center)); markCenter(ct.dataset.center); markRows(ct.dataset.center);
-    showTip(e, '<b>' + esc(k.name) + '</b>' + k.fns.join(' + ') +
-      (k.defined === null ? '' : ' · ' + (k.defined ? 'Defined' : 'Open')));
-    show('<b>' + esc(k.name) + '</b><span class="meta">' + k.fns.join(' + ') +
-      (k.biology ? '<br>' + esc(k.biology) : '') + '</span>');
+    showTip(e, '<b>' + esc(k.name) + (k.stateLabel ? ' &middot; ' + k.stateLabel : '') + '</b>' +
+      '<span style="opacity:.68">' + k.fns.join(' + ') + '</span>' +
+      (k.stateShort ? '<span class="tipbody">' + esc(k.stateShort) + '</span>' : ''));
+    show('<b>' + esc(k.name) + (k.stateLabel ? ' &middot; ' + k.stateLabel : '') +
+      '</b><span class="meta">' + k.fns.join(' + ') +
+      (k.biology ? '<br>' + esc(k.biology) : '') + '</span>' + prose(k.stateText));
     return;
   }
   hot(null); litGate(null); markRows(null); tip.hidden = true;
@@ -4128,7 +4162,7 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
   const libNames = loadLibraryNames();
   const gateInfo = gateMeta(chunks);
   const tags = tagInfo(chunks);
-  const notSelf = centerNotSelf(chunks);
+  const states = centerStates(chunks);
   const anchors = gateAnchors(raw);
   if (client && Object.keys(anchors).length < 64) {
     console.warn(`  only ${Object.keys(anchors).length}/64 gate anchors parsed; some placement marks will be missing`);
@@ -4176,7 +4210,7 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
     client, inner, plain: client ? plainInner(raw, definitionMap({ client, channels } as SceneData).bridges.map((b) => b.gate)) : undefined,
     transit: transitInnerSvg, sky, read: dayRead, reads: allReads,
     channels, slots, centerBox, fn, biology, anchors,
-    gateInfo, notSelf, tagInfo: tags, lineName: (g, l) => libNames.line(g, l),
+    gateInfo, states, tagInfo: tags, lineName: (g, l) => libNames.line(g, l),
   };
   const fonts = await montserrat();
 
