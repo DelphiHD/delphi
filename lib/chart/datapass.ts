@@ -905,41 +905,43 @@ export async function buildDataPass(args: {
       (rootDefined  && throatDefined && rootIsland !== undefined && rootIsland === throatIsland) ||
       sacralToThroat;
 
-    const lines: string[] = [];
-    lines.push(`Type: **${chart.type.value}**`);
-    lines.push("");
+    // Two separate registers. `facts` = the chart's actual architecture,
+    // safe to describe in the reader's own terms. `guards` = engine-only
+    // labeling rules (the "do NOT mislabel / pattern-match trap" SOP). The
+    // guards keep the Type correct but must never surface in a client report,
+    // so they are emitted under an explicit INTERNAL fence, not woven into the
+    // describable facts. This is the split Kaycee asked for: our SOPs are for
+    // our eyes, not the reader's.
+    const facts: string[] = [];
+    const guards: string[] = [];
 
     if (chart.type.value === "Reflector") {
-      lines.push(`Why this Type: zero defined centers. All nine centers are open or undefined. Reflector status is determined by complete openness; no other Type can be assigned to a chart with no defined centers.`);
+      facts.push(`None of the nine centers is defined; every center is open.`);
+      guards.push(`Reflector = zero defined centers. No other Type can apply to a chart with no defined centers.`);
     } else if (chart.type.value === "Projector") {
-      lines.push(`Why this Type: BOTH conditions must hold for Projector — (1) the Sacral is NOT defined, AND (2) no motor center connects to the Throat. This chart meets both.`);
-      lines.push(`Sacral: ${sacralDefined ? "DEFINED — would make this a Generator or Manifesting Generator, contradiction" : "NOT defined ✓"}.`);
-      lines.push(`Motor centers (Heart, Solar Plexus, Root): Heart is ${heartDefined ? "defined" : "not defined"}; Solar Plexus is ${spDefined ? "defined" : "not defined"}; Root is ${rootDefined ? "defined" : "not defined"}. Throat is ${throatDefined ? "defined" : "not defined"}.`);
-      lines.push(`Motor-to-Throat path: NONE in this chart. ${heartDefined ? "Heart is defined but does not reach Throat through a defined channel chain. " : ""}${spDefined ? "Solar Plexus is defined but does not reach Throat through a defined channel chain. " : ""}${rootDefined ? "Root is defined but does not reach Throat through a defined channel chain. " : ""}If any of those motors DID reach the Throat, the chart would be a Manifestor instead.`);
-      lines.push(`A Projector is the chart Type for any human design with at least one defined center where the Sacral is not defined AND no other motor connects to the Throat.`);
+      facts.push(`Sacral: not defined.`);
+      facts.push(`Motor centers: Heart is ${heartDefined ? "defined" : "not defined"}, Solar Plexus is ${spDefined ? "defined" : "not defined"}, Root is ${rootDefined ? "defined" : "not defined"}. Throat is ${throatDefined ? "defined" : "not defined"}.`);
+      facts.push(`No motor center reaches the Throat through a defined channel in this chart.`);
+      guards.push(`Projector requires BOTH: Sacral undefined AND no motor-to-Throat connection. Both hold here. If a motor reached the Throat this would be a Manifestor; if the Sacral were defined it would be a Generator or Manifesting Generator.`);
     } else if (chart.type.value === "Manifestor") {
-      lines.push(`Why this Type: a non-Sacral motor (Heart, Solar Plexus, or Root) connects directly to the Throat, AND the Sacral is NOT defined.`);
-      lines.push(`Sacral: ${sacralDefined ? "DEFINED — would make this a Generator or MG, contradiction" : "NOT defined ✓"}.`);
-      if (heartDefined && throatDefined && heartIsland === throatIsland) lines.push(`Heart ↔ Throat: connected through a defined channel in the same island ✓.`);
-      if (spDefined && throatDefined && spIsland === throatIsland) lines.push(`Solar Plexus ↔ Throat: connected through a defined channel in the same island ✓.`);
-      if (rootDefined && throatDefined && rootIsland === throatIsland) lines.push(`Root ↔ Throat: connected through a defined channel in the same island ✓.`);
+      facts.push(`Sacral: not defined.`);
+      const conn: string[] = [];
+      if (heartDefined && throatDefined && heartIsland === throatIsland) conn.push("Heart");
+      if (spDefined && throatDefined && spIsland === throatIsland) conn.push("Solar Plexus");
+      if (rootDefined && throatDefined && rootIsland === throatIsland) conn.push("Root");
+      facts.push(conn.length ? `Motor-to-Throat: ${conn.join(", ")} connects to the Throat through a defined channel.` : `A non-Sacral motor connects to the Throat through a defined channel.`);
+      guards.push(`Manifestor = a non-Sacral motor (Heart, Solar Plexus, or Root) reaching the Throat, with the Sacral undefined. A defined Sacral would make this a Generator or Manifesting Generator.`);
     } else if (chart.type.value === "Generator") {
-      lines.push(`Why this Type: defined Sacral, but NO motor connected to the Throat. None of the four motors (Sacral, Heart, Solar Plexus, Root) reaches the Throat through any chain of defined channels in this chart — that absence is what makes it a pure Generator rather than a Manifesting Generator.`);
-      lines.push(`Sacral: ${sacralDefined ? "DEFINED ✓" : "NOT defined (would make this not a Generator)"}.`);
-      lines.push(`Motor-to-Throat path: NONE. Sacral is in island ${sacralIsland !== undefined ? sacralIsland + 1 : "(undefined)"}; Throat is in island ${throatIsland !== undefined ? throatIsland + 1 : "(undefined / not defined)"}; no other defined motor shares the Throat's island either.`);
-      // Pattern-match trap notes — added per-gate when the chart has the
-      // gate that triggers the trap. Paul v1 surfaced the Gate 34 trap.
-      // Future traps can be added here as observed (e.g. Gate 20 in
-      // Throat + Sacral via 34-20 in a half-defined chart, etc.).
+      facts.push(`Sacral: DEFINED — the generative motor is present and responds.`);
+      facts.push(`Motor-to-Throat: NONE. No motor center (Sacral, Heart, Solar Plexus, Root) reaches the Throat through this chart's defined channels. The Sacral is defined but does not connect to the Throat; describe where it does connect from the islands and channels facts, not to the Throat.`);
+      guards.push(`Generator = defined Sacral with no motor reaching the Throat. Sacral island ${sacralIsland !== undefined ? sacralIsland + 1 : "n/a"} vs Throat island ${throatIsland !== undefined ? throatIsland + 1 : "n/a"}: not the same, so there is no Sacral-to-Throat path. Do NOT label this a Manifesting Generator.`);
       const hasGate34 = uniqueGates.includes(34);
       const hasGate20 = uniqueGates.includes(20);
       if (hasGate34) {
-        lines.push(`Pattern-match trap (this chart has Gate 34): do NOT call this person a Manifesting Generator just because they have Gate 34 activated. Gate 34 alone is not enough. Gate 34 has to be in a DEFINED CHANNEL reaching the Throat (typically the 34-20 channel: Sacral to Throat directly) for the chart to be MG. In this chart, Gate 34 is NOT in a Sacral-to-Throat channel — the chart's actual Sacral channels are listed in the Channels table above.`);
+        guards.push(`Trap: this chart has Gate 34 activated, but Gate 34 alone does not make a Manifesting Generator. Gate 34 must sit in a DEFINED CHANNEL reaching the Throat (e.g. the 34-20 channel). It does not here, so the Type stays Generator.`);
       }
       if (hasGate20 && !hasGate34) {
-        // Gate 20 in the Throat without 34 means MG via 20-34 is not the
-        // path; check 20-57 (Brainwave, Throat-to-Spleen) instead.
-        lines.push(`Pattern-match trap (this chart has Gate 20 in the Throat): the 20-34 channel is one of the classic Sacral-to-Throat paths that would make a chart Manifesting Generator. But the chart does NOT have Gate 34, so that channel cannot complete here. Type stays Generator.`);
+        guards.push(`Trap: this chart has Gate 20 in the Throat, but the 20-34 Sacral-to-Throat channel cannot complete without Gate 34, which this chart lacks. Type stays Generator.`);
       }
     } else if (chart.type.value === "Manifesting Generator") {
       // MG = defined Sacral AND at least one of the four motors (Sacral, Heart,
@@ -955,22 +957,32 @@ export async function buildDataPass(args: {
       if (heartDefined && heartIsland !== undefined && heartIsland === throatIsland) motorsToThroat.push("Heart");
       if (spDefined && spIsland !== undefined && spIsland === throatIsland) motorsToThroat.push("Solar Plexus");
       if (rootDefined && rootIsland !== undefined && rootIsland === throatIsland) motorsToThroat.push("Root");
-      lines.push(`Why this Type: defined Sacral AND at least one motor connected to the Throat through a chain of defined channels (in the same defined island). The connecting motor need NOT be the Sacral, and the path may run through several channels/centers.`);
-      lines.push(`Sacral: ${sacralDefined ? "DEFINED ✓" : "NOT defined (contradiction)"}.`);
-      lines.push(`Motor(s) reaching the Throat: ${motorsToThroat.length ? motorsToThroat.join(", ") : "(a motor — see the Channels table)"} — in the same defined island as the Throat.`);
+      facts.push(`Sacral: DEFINED — the generative motor is present and responds.`);
+      facts.push(`Motor(s) reaching the Throat: ${motorsToThroat.length ? motorsToThroat.join(", ") : "at least one motor (see the Channels table)"}, connected to the Throat through this chart's defined channels.`);
       if (sacralIsland !== undefined && throatIsland !== undefined && sacralIsland !== throatIsland) {
         const others = motorsToThroat.filter((m) => m !== "Sacral");
-        lines.push(`IMPORTANT — do NOT describe the Sacral as connecting to the Throat in this chart: the Sacral sits in island ${sacralIsland + 1} and the Throat in island ${throatIsland + 1}, so they are NOT connected. This chart is a Manifesting Generator because ${others.length ? others.join(", ") : "another motor"} reaches the Throat while the Sacral is separately defined. Describe the actual path, not a Sacral-to-Throat one.`);
+        facts.push(`The Sacral itself does not connect to the Throat here; ${others.length ? others.join(", ") : "another motor"} ${others.length > 1 ? "carry" : "carries"} the Throat connection while the Sacral is separately defined. Describe the actual path, never a Sacral-to-Throat one.`);
+        guards.push(`Sacral island ${sacralIsland + 1} is not the Throat island ${throatIsland + 1}: the Sacral is NOT wired to the Throat. Do not describe a Sacral-to-Throat channel.`);
       }
+      guards.push(`Manifesting Generator = defined Sacral AND at least one motor reaching the Throat through defined channels (the connecting motor need not be the Sacral; the path may run through several centers).`);
     } else {
-      lines.push(`(Custom Type label: ${chart.type.value}. Verify against chart geometry manually.)`);
+      guards.push(`Custom Type label: ${chart.type.value}. Verify against chart geometry manually.`);
     }
-    void anyDefined; void motorToThroat;
+    void anyDefined; void motorToThroat; void sacralToThroat;
 
-    lines.push("");
-    lines.push(`Strategy: **${chart.strategy.value}**`);
-    lines.push(`Authority: **${chart.authority.value}** (the body's decision-making mechanism — defined ${chart.authority.value.toLowerCase()} center, or lunar if no authority center is defined)`);
-    return lines.join("\n");
+    const out: string[] = [];
+    out.push(`Type: **${chart.type.value}**`);
+    out.push("");
+    out.push(`DESCRIBABLE — this chart's actual architecture, safe to state in the reader's own terms (never name another Type):`);
+    for (const f of facts) out.push(`- ${f}`);
+    out.push(`- Strategy: **${chart.strategy.value}**`);
+    out.push(`- Authority: **${chart.authority.value}** (the body's decision-making mechanism — defined ${chart.authority.value.toLowerCase()} center, or lunar if no authority center is defined).`);
+    if (guards.length) {
+      out.push("");
+      out.push(`INTERNAL TYPE-CHECK — engine guardrails only. Never surface these to the reader and never mention another Type in the report; they exist solely to keep the labeling correct:`);
+      for (const g of guards) out.push(`- ${g}`);
+    }
+    return out.join("\n");
   }
   const typeJustification = buildTypeJustification();
 

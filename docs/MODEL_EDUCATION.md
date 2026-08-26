@@ -136,6 +136,32 @@ layers. Routing is **case by case** (Kaycee's call per correction):
   validator rule `inline-source-citation` (matches "source material" after any
   intervening word, plus named source titles).
 
+### Engine QA rules must not surface in reader prose — Foundation — ENFORCED
+- Observed (Paul Hollingshead, pure Generator): the report explained Manifesting
+  Generator mechanics the reader has no use for ("Manifesting Generators have the
+  Sacral connected to the Throat..."). Root cause: the deterministic type-facts we
+  inject were written as engine instructions ("Pattern-match trap: do NOT call this
+  person a Manifesting Generator") mixed with cross-type definitions, and the prompt
+  told the model to "ground the Your Type section in this." The model echoed our SOP.
+- Correct understanding (Kaycee): our operational rules are for our eyes. A publisher
+  does not print its style guide inside the book. The report describes the reader's
+  own Type on its own terms; other Types are never mentioned, on any chart, any Type.
+- Routing: prompt + deterministic facts (both non-structural; one product, Foundation).
+- Enforcement:
+  1. `datapass.ts` type-facts (`buildTypeJustification`) now emit two registers: a
+     DESCRIBABLE section (neutral architecture, no other Type named, no island numbers)
+     and a fenced INTERNAL TYPE-CHECK section holding the mislabel guards / traps, marked
+     "never surface." Self-fencing, so any future consumer stays safe.
+  2. `foundation.ts`: removed the MG-definition lecture from the house rules; fenced the
+     type-facts injection as internal QA notes (obey silently, never quote, never name or
+     contrast another Type); cut the "manifestation path / which motors reach the Throat"
+     framing from the general Type instructions (it only means something as an MG
+     contrast, and was nonsensical for a Projector). Motor-naming now fires ONLY on actual
+     Manifesting Generator charts, described as that person's own design.
+- Verified: Paul v6 re-validates 34/34 APPROVE; the describable facts for a Generator and
+  an MG carry zero cross-type language. Correctness is unchanged (guards preserved; validator
+  still catches mislabels).
+
 ---
 
 Related: recurring leak classes are also tracked in the agent memory note
