@@ -8,7 +8,10 @@
 //   npx tsx scripts/add-client.ts --name "Jane Doe" \
 //       --born "1990-05-04 14:22" --place "Denver, Colorado, United States"
 //
-//   npx tsx scripts/add-client.ts --file ~/Desktop/new-clients.csv
+//   npx tsx scripts/add-client.ts                  # asks you, one at a time
+//   npx tsx scripts/add-client.ts --from-notion    # everyone in Notion who has
+//                                                  # birth data and no chart yet
+//   npx tsx scripts/add-client.ts --file people.csv
 //
 // The CSV wants a header row and these columns, in any order:
 //   name, birth date, birth time, birth place        (slug optional)
@@ -25,6 +28,7 @@
 import { config as loadEnv } from "dotenv";
 loadEnv({ path: ".env.local", override: true });
 
+import { createInterface } from "node:readline/promises";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { CLIENTS, clientOutputDir, type ClientBrief } from "./client-roster";
@@ -94,6 +98,75 @@ function fromFile(path: string): Incoming[] {
     if (!row.name) throw new Error(`${path} line ${n + 2}: no name`);
     return row;
   });
+}
+
+/** Just ask. No spreadsheet, no file to save, no format to remember. Blank name
+ *  ends the list. */
+async function askFor(): Promise<Incoming[]> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const rows: Incoming[] = [];
+  try {
+    console.log("\nAdding clients. Press Return on an empty name when you are done.\n");
+    for (;;) {
+      const name = (await rl.question(`Name${rows.length ? " (or Return to finish)" : ""}: `)).trim();
+      if (!name) break;
+      const birthDate = (await rl.question("  Birth date (YYYY-MM-DD): ")).trim();
+      const birthTime = (await rl.question("  Birth time (e.g. 14:22 or 2:22 pm): ")).trim();
+      const birthPlace = (await rl.question("  Birth place (city, state, country): ")).trim();
+      try {
+        normalise({ name, birthDate, birthTime, birthPlace });
+        rows.push({ name, birthDate, birthTime, birthPlace });
+        console.log("  ok\n");
+      } catch (e) {
+        // tell her now, while she still has the birth certificate open
+        console.log(`  ${e instanceof Error ? e.message : e}\n  Not added. Try that one again.\n`);
+      }
+    }
+  } finally {
+    rl.close();
+  }
+  return rows;
+}
+
+/** Everyone in Notion who has birth data and no chart yet. Kaycee already
+ *  creates the client there, so this is the fewest keystrokes there are: fill
+ *  in the birth columns on the row, run this, done. */
+async function fromNotion(): Promise<Incoming[]> {
+  const token = process.env.NOTION_TOKEN;
+  if (!token) throw new Error("NOTION_TOKEN is not set");
+  const res = await fetch(`https://api.notion.com/v1/databases/${NOTION_DB}/query`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Notion-Version": "2022-06-28", "Content-Type": "application/json" },
+    body: JSON.stringify({ page_size: 100 }),
+  });
+  if (!res.ok) throw new Error(`Notion query failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
+  const { results } = await res.json();
+  const text = (p: any) => (p?.rich_text ?? []).map((t: any) => t.plain_text).join("").trim();
+  const rows: Incoming[] = [];
+  const incomplete: string[] = [];
+  for (const page of results ?? []) {
+    const p = page.properties ?? {};
+    const titleParts = (p.Name?.title ?? []).map((t: any) => t.plain_text).join("").trim();
+    if (!titleParts) continue;
+    if (p["Bodygraph Link"]?.url) continue;                 // already has a chart
+    if (/^composite/i.test(titleParts)) continue;           // not an individual
+    // Notion files people "Surname, First"; the roster wants them the way round
+    // a person says their own name
+    const name = titleParts.includes(",")
+      ? `${titleParts.split(",")[1].trim()} ${titleParts.split(",")[0].trim()}`
+      : titleParts;
+    const birthDate = (p["Birth Date"]?.date?.start ?? "").slice(0, 10);
+    const birthTime = text(p["Birth Time"]);
+    const birthPlace = text(p["Birth Place"]);
+    if (!birthDate || !birthTime || !birthPlace) { incomplete.push(titleParts); continue; }
+    rows.push({ name, birthDate, birthTime, birthPlace });
+  }
+  if (incomplete.length) {
+    console.log(`\nSkipped ${incomplete.length} row(s) in Notion with no chart and incomplete birth data:`);
+    incomplete.forEach((n) => console.log("  " + n));
+    console.log("Fill in Birth Date, Birth Time and Birth Place on those rows and run this again.");
+  }
+  return rows;
 }
 
 // ── validation ──────────────────────────────────────────────────────────────
@@ -205,7 +278,10 @@ async function main() {
   const status = typeof f.status === "string" ? f.status : STATUS_DEFAULT;
 
   let incoming: Incoming[];
-  if (typeof f.file === "string") {
+  if (f["from-notion"]) {
+    incoming = await fromNotion();
+    if (!incoming.length) { console.log("\nNobody in Notion is waiting for a chart.\n"); return; }
+  } else if (typeof f.file === "string") {
     incoming = fromFile(f.file);
   } else if (typeof f.name === "string") {
     const born = typeof f.born === "string" ? f.born : "";
@@ -218,9 +294,8 @@ async function main() {
       slug: typeof f.slug === "string" ? f.slug : undefined,
     }];
   } else {
-    console.error(readFileSync(__filename, "utf8").split("\n").slice(0, 22)
-      .filter((l) => l.startsWith("//")).map((l) => l.slice(3)).join("\n"));
-    process.exit(1);
+    incoming = await askFor();
+    if (!incoming.length) { console.log("\nNobody entered. Nothing changed.\n"); return; }
   }
 
   // Validate every row before touching anything. A batch that fails on row four
