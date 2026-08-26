@@ -441,15 +441,14 @@ function paintCenters(
 }
 
 // ── transit overlay ─────────────────────────────────────────────────────────
-// Kaycee's colours: the client in a light Delphi purple, today's sky in
-// charcoal. Gold stays reserved for highlights, so nothing on the chart is
+// Kaycee's colours: the client in island teal, today's sky in island orange. Gold stays reserved for highlights, so nothing on the chart is
 // permanently wearing the colour that means "you are pointing at this".
 // Because every
 // gate's leg is its own shape, a channel that one of each completes comes out
 // two-toned on its own, which is the point: you can see it is a temporary
 // bridge rather than part of their design.
-const CLIENT_TINT = "#e2aaf4";
-const TRANSIT_INK = "#33333b";
+const CLIENT_TINT = "#0d9488";
+const TRANSIT_INK = "#c2410c";
 
 // What the Delphi design fills a DEFINED centre with. Harvested from the
 // roster's own charts rather than guessed: pressure and motor centres grey,
@@ -501,7 +500,7 @@ function transitInner(
     s = s.replace(new RegExp(`(<text[^>]*?)fill="[^"]*"([^>]*class="pnum" data-gate="${gate}")`),
       (_m, a: string, b: string) => `${a}fill="${col}"${b}`);
   };
-  for (const g of natal) setNum(g, "#1c1a2e");
+  for (const g of natal) setNum(g, "#ffffff");
   for (const g of transit) if (!natal.has(g)) setNum(g, "#ffffff");
 
   // 3. a centre defined only by a transit-completed channel has to show as
@@ -1524,6 +1523,72 @@ function placementTable(
   return s + `</g>`;
 }
 
+/** The transit view's own columns, as Kaycee laid them out: the client's two
+ *  sides folded into one on the left with the planet glyph between the two
+ *  numbers, and the sky on the right with its glyph on the outside. One row per
+ *  planet, so the eye can run straight across from their placement to today's. */
+function mergedClientTable(client: ClientCtx, skin: Skin, x: number, y: number): string {
+  const zebra = skin.id === "night" ? "rgba(255,255,255,.045)" : "#f6f2f7";
+  const rowH = 30, W = TABLE_W + 18;
+  const byP = new Map(client.acts.filter((a) => a.side === "personality").map((a) => [a.planet, a]));
+  const byD = new Map(client.acts.filter((a) => a.side === "design").map((a) => [a.planet, a]));
+  let s = `<g class="ptable" data-side="merged" transform="translate(${x},${y})">`;
+  s += `<text x="${W / 2}" y="0" text-anchor="middle" font-size="12" font-weight="600" ` +
+    `letter-spacing=".16em" fill="${CLIENT_TINT}">${esc(client.name.toUpperCase())}</text>`;
+  const headY = 18;
+  s += `<line x1="6" y1="${headY}" x2="${W - 6}" y2="${headY}" stroke="${CLIENT_TINT}" stroke-width="1.6"></line>`;
+  PLANET_ROWS.forEach((planet, i) => {
+    const d = byD.get(planet), pp = byP.get(planet);
+    if (!d && !pp) return;
+    const ry = headY + 28 + i * rowH;
+    s += `<g class="prow" data-planet="${planetId(planet)}" data-side="merged"` +
+      `${pp ? ` data-gate="${pp.gate}" data-line="${pp.line}"` : ""}>`;
+    s += `<rect x="2" y="${ry - 19}" width="${W - 4}" height="${rowH}" rx="7" ` +
+      `fill="${i % 2 === 1 ? zebra : "transparent"}"></rect>`;
+    if (d) s += `<text x="${W / 2 - 22}" y="${ry}" text-anchor="end" font-size="14" font-weight="600" ` +
+      `fill="${DESIGN_RED}">${d.gate}.${d.line}</text>`;
+    s += planet === "Uranus"
+      ? uranusGlyph(W / 2 - 8, ry, skin.ink, 1.05)
+      : `<text x="${W / 2}" y="${ry}" text-anchor="middle" font-size="16" fill="${skin.ink}">${esc(PLANET_GLYPHS[planet])}</text>`;
+    if (pp) s += `<text x="${W / 2 + 22}" y="${ry}" font-size="14" font-weight="600" ` +
+      `fill="${skin.ink}">${pp.gate}.${pp.line}</text>`;
+    s += `</g>`;
+  });
+  return s + `</g>`;
+}
+
+/** Today's sky, one row per body, glyph on the outside edge. Carries the same
+ *  exaltation and detriment marks the client's own columns do. */
+function transitTable(sky: NonNullable<SceneData["sky"]>, skin: Skin, x: number, y: number): string {
+  const zebra = skin.id === "night" ? "rgba(255,255,255,.045)" : "#f6f2f7";
+  const rowH = 30, W = TABLE_W;
+  const byPlanet = new Map(sky.positions.map((p) => [p.planet, p]));
+  const fixMark = (f: string) => (f === "Exalted" ? "\u25B2" : f === "Detriment" ? "\u25BC" : "");
+  let s = `<g class="ptable" data-side="transit" transform="translate(${x},${y})">`;
+  s += `<text x="${W / 2}" y="0" text-anchor="middle" font-size="12" font-weight="600" ` +
+    `letter-spacing=".16em" fill="${TRANSIT_INK}">TRANSIT</text>`;
+  s += `<text x="${W / 2}" y="15" text-anchor="middle" font-size="8.5" fill="${skin.muted}">` +
+    `${esc(sky.date)} \u00b7 ${esc(sky.time)} UTC</text>`;
+  const headY = 22;
+  s += `<line x1="6" y1="${headY}" x2="${W - 6}" y2="${headY}" stroke="${TRANSIT_INK}" stroke-width="1.6"></line>`;
+  PLANET_ROWS.forEach((planet, i) => {
+    const a = byPlanet.get(planet);
+    if (!a) return;
+    const ry = headY + 28 + i * rowH;
+    s += `<g class="trow" data-planet="${planetId(planet)}" data-gate="${a.gate}" data-line="${a.line}">`;
+    s += `<rect x="2" y="${ry - 19}" width="${W - 4}" height="${rowH}" rx="7" ` +
+      `fill="${i % 2 === 1 ? zebra : "transparent"}"></rect>`;
+    const mark = fixMark(a.fixingState);
+    if (mark) s += `<text x="12" y="${ry}" font-size="11" fill="${TRANSIT_INK}">${mark}</text>`;
+    s += `<text x="30" y="${ry}" font-size="15" font-weight="600" fill="${TRANSIT_INK}">${a.gate}.${a.line}</text>`;
+    s += planet === "Uranus"
+      ? uranusGlyph(W - 26, ry, TRANSIT_INK, 1.15)
+      : `<text x="${W - 18}" y="${ry}" font-size="17" fill="${TRANSIT_INK}">${esc(PLANET_GLYPHS[planet])}</text>`;
+    s += `</g>`;
+  });
+  return s + `</g>`;
+}
+
 /** The four PHS variable arrows around the head, same placement, size and
  *  colors as the standalone bodygraph image Kaycee already hands out
  *  (scripts/export-mandala-pngs.ts): Design red on the left, Personality black
@@ -1635,8 +1700,11 @@ function buildCanvas(
   const H = LY.h;
   OX = LY.tables ? TABLE_W + TABLE_GAP : 0;
   const tableMarkup = d.client
-    ? placementTable("Design", d.client, skin, 12, 96) +
-      placementTable("Personality", d.client, skin, OX + LY.coreW + TABLE_GAP - 10, 96)
+    ? (opts.transit && d.sky
+        ? mergedClientTable(d.client, skin, 4, 96) +
+          transitTable(d.sky, skin, OX + LY.coreW + TABLE_GAP - 10, 96)
+        : placementTable("Design", d.client, skin, 12, 96) +
+          placementTable("Personality", d.client, skin, OX + LY.coreW + TABLE_GAP - 10, 96))
     : "";
   const spots = placeLabels(d.centerBox, H - (opts.legend ? 190 : 40));
 
@@ -1982,8 +2050,8 @@ body.view-transit .bridge, body.view-transit .halo { display:none; }
 /* The client tint is a light purple and the awareness centres are a mid purple,
    so a gate disc sitting on the spleen or the solar plexus disappears into it.
    A thin dark rim gives every disc an edge on any centre colour. */
-svg.canvas.transit .gdisc { stroke:#4a3357; stroke-width:1.1; }
-svg.canvas.transit .tdisc { stroke:#15151a; stroke-width:1.1; }
+svg.canvas.transit .gdisc { stroke:#0a5f57; stroke-width:1.1; }
+svg.canvas.transit .tdisc { stroke:#7c2708; stroke-width:1.1; }
 body.view-plain { background:#ffffff; color:#1c1a2e; }
 body.view-transit .panel, body.view-plain .panel { background:rgba(132,80,149,.06); border-color:rgba(132,80,149,.22); }
 body.view-transit .card, body.view-plain .card { background:rgba(255,255,255,.98); border-color:rgba(132,80,149,.28);
@@ -2264,6 +2332,7 @@ ${d.client ? "" : `<div class="readout" id="readout"><b>Hover the bodygraph</b><
 </div>
 <script>
 var DATA = ${JSON.stringify(payload)};
+var CLIENT_TINT_JS = ${JSON.stringify(CLIENT_TINT)};
 // the brand font again, so a saved image carries it too (an SVG drawn into a
 // canvas cannot reach the page's fonts)
 var FONTCSS = ${JSON.stringify(face)};
@@ -2868,6 +2937,11 @@ function relight() {
     var col = el.dataset.fill === 'red' ? '#e06666' : '#000000';
     if (el.dataset.fill === 'black' && !liveP[g] && liveD[g]) col = '#e06666';
     if (el.dataset.fill === 'red' && !liveD[g] && liveP[g]) col = '#000000';
+    // On the overlay the client is ONE colour, not two: this repaint runs on
+    // load and on every toggle, and without this it puts the traditional black
+    // and red straight back over the overlay's own fills.
+    var sv = el.closest ? el.closest('svg.canvas') : null;
+    if (sv && sv.classList.contains('transit')) col = CLIENT_TINT_JS;
     el.setAttribute('fill', col);
   });
   [].forEach.call(document.querySelectorAll('.gdisc'), function (el) {
