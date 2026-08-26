@@ -956,9 +956,21 @@ export async function buildPlanetaryOverview(args: BuildArgs): Promise<BuildResu
       });
       if (blames.length === 0) break;
 
-      const failsForRetry = blames.slice(0, 6).map((i) => `  - ${i.rule}: ${i.message}${i.expected ? ` (Expected: ${i.expected})` : ""}`).join("\n");
+      // Include the exact detected text next to each failure so the model
+      // has a concrete sentence to remove rather than an abstract rule to
+      // re-follow. Cleaning `detected` of newlines/JSON noise so it stays
+      // readable inside the prompt.
+      const failsForRetry = blames.slice(0, 6).map((i) => {
+        const detected = (i.detected || "").replace(/\s+/g, " ").trim().slice(0, 200);
+        const lines = [
+          `  - ${i.rule}: ${i.message}`,
+          i.expected ? `    Expected: ${i.expected}` : "",
+          detected ? `    Detected in current draft: "${detected}"` : "",
+        ].filter(Boolean);
+        return lines.join("\n");
+      }).join("\n\n");
       const attemptLabel = attempt === 0 ? "first retry" : `retry #${attempt + 1}`;
-      const nudge = `\n\nIMPORTANT (${attemptLabel}): a validator just rejected a draft of this section with the following hard failures. Rewrite the section from scratch correcting EVERY failure. The Data Pass above is canonical. Do not introduce new failures of the same kind.\n${failsForRetry}\n`;
+      const nudge = `\n\nIMPORTANT (${attemptLabel}): a validator just rejected a draft of this section with the hard failures listed below. For EACH failure, the exact violating text from your prior draft is shown as "Detected in current draft" — you MUST REMOVE that specific phrasing from your rewrite. Rewrite the section from scratch, keeping the placement's mechanic and voice, but stripping out every "Detected" snippet and any equivalent phrasing. The Data Pass above is canonical. Do not introduce new failures of the same kind.\n\n${failsForRetry}\n`;
       const retry = await generateSection(section, nudge);
       text = retry.text;
       combinedCost = Math.round((combinedCost + retry.result.cost_cents) * 10000) / 10000;
