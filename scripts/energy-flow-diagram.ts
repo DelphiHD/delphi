@@ -413,6 +413,8 @@ function tagChart(svg: string): string {
 function bridgeLegs(tagged: string, bridgeGates: number[]): string {
   let s = tagged;
   for (const g of new Set(bridgeGates)) {
+    s = s.replace(new RegExp(`(<text[^>]*class="pnum)(" data-gate="${g}")`),
+      (_m, a: string, b: string) => `${a} bnum${b}`);
     s = s.replace(new RegExp(`(<[a-z]+ id="personality-${g}"[^>]*?)fill="[^"]*"`),
       (_m, head: string) => `${head.replace('id="', 'class="bleg" data-gate="' + g + '" id="')}fill="none"`);
   }
@@ -1782,11 +1784,13 @@ function gateHalos(d: SceneData, skin: Skin): string {
     const a = d.anchors[g];
     if (!a) return "";
     const x = toCanvasX(a.x + 4.5), y = toCanvasY(a.y - 3.5);
+    // One solid pink disc carrying its own number. The disc is drawn over the
+    // chart, so the gate's own number would sit underneath it: it is hidden
+    // while bridges are on and this one takes its place.
     return `<g class="bridge" data-gate="${g}">` +
-      `<circle cx="${r2(x)}" cy="${r2(y)}" r="12.5" fill="#ffffff" opacity=".55"></circle>` +
-      `<circle cx="${r2(x)}" cy="${r2(y)}" r="12.5" fill="none" stroke="#ffffff" stroke-width="5.5"></circle>` +
-      `<circle cx="${r2(x)}" cy="${r2(y)}" r="12.5" fill="none" stroke="#d24dff" ` +
-      `stroke-width="3.4" stroke-dasharray="4 3"></circle></g>`;
+      `<circle cx="${r2(x)}" cy="${r2(y)}" r="11" fill="#d24dff"></circle>` +
+      `<text x="${r2(x)}" y="${r2(y + 3.9)}" text-anchor="middle" font-size="11" ` +
+      `font-weight="600" fill="#ffffff">${g}</text></g>`;
   }).join("");
   return `<g class="bridges">${bridgeRings}</g><g class="halos">` + gates.map((g) => {
     const a = d.anchors[g];
@@ -2389,11 +2393,11 @@ body.view-transit #placements, body.view-transit #chandrop, body.view-transit #d
    colour, the missing leg in pink. Only while Bridge gates is on. */
 .bleg { fill:none; transition:fill .2s; }
 body.show-bridges .bleg { fill:#d24dff !important; opacity:.62; }
+body.show-bridges .pnum.bnum { opacity:0; }
 body.show-bridges .bleg.on { fill:#d24dff !important; opacity:1; }
-body.show-bridges .bridge { opacity:1; filter: drop-shadow(0 0 4px rgba(210,77,255,.75));
-  animation:hlpulse 1.8s ease-in-out infinite; }
-.bridge.on { opacity:1 !important; filter: drop-shadow(0 0 4px rgba(210,77,255,.95));
-  animation:hlpulse 1.2s ease-in-out infinite; }
+body.show-bridges .bridge { opacity:1; }
+.bridge.on { opacity:1 !important; }
+.bridge.on circle { stroke:#f1c232; stroke-width:3; }
 .isle { font-size:11.5px; line-height:1.6; padding:3px 0; }
 .isle b { font-weight:600; }
 .isle .brg { cursor:pointer; border-bottom:1px dotted rgba(132,80,149,.6); }
