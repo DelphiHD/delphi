@@ -440,6 +440,58 @@ function paintCenters(
   return `<defs>${grads.join("")}</defs>${s}`;
 }
 
+// ── the day's read, lifted from Kaycee's own transit report ─────────────────
+// The morning report already writes a grounded paragraph for every person on
+// the roster, followed by the exact completions driving it. Rather than
+// generating anything new (which would cost a Claude call per view and say
+// something different from what she read at breakfast), the chart page quotes
+// that report. The completions list is what makes hovering the prose reliable:
+// it names the gates and channels the paragraph is about, so nothing has to be
+// guessed out of free text.
+interface DayRead {
+  date: string;
+  writtenAt: string;              // the report's own generated_at, ISO
+  paragraph: string;
+  completions: {
+    planet: string; transitGate: number; natalGate: number;
+    channel: string; channelName: string; bridges: boolean; center: string; duration: string;
+  }[];
+}
+
+function loadDayRead(clientName: string, date: string): DayRead | null {
+  const path = join(process.env.HOME ?? "", "Desktop", "HD Reports", "Transits",
+    `${date} - Daily Transit Report.md`);
+  if (!existsSync(path)) return null;
+  const md = readFileSync(path, "utf8");
+  const writtenAt = /generated_at:\s*(\S+)/.exec(md)?.[1] ?? "";
+
+  // "### 3. Bryan Rodabough · Split Definition (simple) (impact 74.25)"
+  const heads = [...md.matchAll(/^### \d+\.\s+(.+?)\s+·\s+.*$/gm)];
+  const mine = heads.find((h) => h[1].trim() === clientName);
+  if (!mine) return null;
+  const start = mine.index! + mine[0].length;
+  const next = heads.find((h) => h.index! > mine.index!);
+  const body = md.slice(start, next ? next.index! : undefined);
+
+  const lines = body.split("\n");
+  const paragraph = lines.filter((l) => l.trim() && !l.trim().startsWith("-")).join(" ").trim();
+
+  // "- Sun in 59 (Dispersion) completes 6-59 Mating with natal 6 (Conflict); bridges their split; sacral center [days]"
+  const completions: DayRead["completions"] = [];
+  for (const l of lines) {
+    const m = /^-\s+(\w[\w ]*?) in (\d+) \([^)]*\) completes (\d+-\d+) (.+?) with natal (\d+) \([^)]*\)(.*?)\[(\w+)\]/.exec(l.trim());
+    if (!m) continue;
+    completions.push({
+      planet: m[1].trim(), transitGate: +m[2], channel: m[3], channelName: m[4].trim(),
+      natalGate: +m[5], bridges: /bridges their split/.test(m[6]),
+      center: (/;\s*(?:lights their open\s+)?([a-z- ]+?) center/.exec(m[6])?.[1] ?? "").trim(),
+      duration: m[7],
+    });
+  }
+  if (!paragraph) return null;
+  return { date, writtenAt, paragraph, completions };
+}
+
 // ── transit overlay ─────────────────────────────────────────────────────────
 // Kaycee's colours: the client in island teal, today's sky in neutral
 // charcoal. Charcoal rather than a colour on purpose: the two awareness
@@ -502,9 +554,12 @@ function transitInner(
   // numbers on its black discs; white on gold is about 2:1 and unreadable, and
   // the transit's own gates start as dark numbers on nothing.
   const setNum = (gate: number, col: string) => {
-    s = s.replace(new RegExp(`(<text[^>]*?)fill="[^"]*"([^>]*class="pnum" data-gate="${gate}")`),
-      (_m, a: string, b: string) => `${a}fill="${col}"${b}`);
+    s = s.replace(new RegExp(`(<text[^>]*?)fill="[^"]*"([^>]*class="pnum)("\\s+data-gate="${gate}")`),
+      (_m, a: string, b: string, c: string) => `${a}fill="${col}"${b} on-disc${c}`);
   };
+  // Every disc on this view is dark, teal or charcoal, so every number sitting
+  // on one is white. The marker class matters because the page dims the numbers
+  // of gates the client does not carry, which would darken the transit's own.
   for (const g of natal) setNum(g, "#ffffff");
   for (const g of transit) if (!natal.has(g)) setNum(g, "#ffffff");
 
@@ -1370,6 +1425,7 @@ interface SceneData {
   plain?: string;                           // the chart as the design draws it
   transit?: string;                         // the same chart with today's sky over it
   sky?: { date: string; time: string; positions: { planet: string; gate: number; line: number; fixingState: string }[] };
+  read?: DayRead;
   channels: ChannelGeom[];
   slots: number;
   centerBox: Record<Center, BBox>;
@@ -1919,6 +1975,7 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, fonts: Map<n
   ).join("");
 
   const payload = {
+    read: d.read ?? null,
     client: d.client
       ? { name: d.client.name,
           dates: {
@@ -2056,6 +2113,7 @@ body.view-transit .bridge, body.view-transit .halo { display:none; }
    so a gate disc sitting on the spleen or the solar plexus disappears into it.
    A thin dark rim gives every disc an edge on any centre colour. */
 svg.canvas.transit .gdisc { stroke:#0a5f57; stroke-width:1.1; }
+svg.canvas.transit .pnum.on-disc, svg.canvas.transit .pnum.on-disc.off { fill:#ffffff !important; opacity:1 !important; }
 svg.canvas.transit .tdisc { stroke:#101014; stroke-width:1.1; }
 body.view-plain { background:#ffffff; color:#1c1a2e; }
 body.view-transit .panel, body.view-plain .panel { background:rgba(132,80,149,.06); border-color:rgba(132,80,149,.22); }
@@ -2222,6 +2280,31 @@ body.notables .ptable { display:none; }
 #viewrow button.on, #viewrow button.on:hover { background:#111111; color:#fff; font-weight:600; }
 button.gold { background:#c79a2e; color:#fff; }
 button.gold:hover { background:#b0871f; }
+.todaysec { display:none; margin-top:10px; border-top:1px solid rgba(132,80,149,.18); padding-top:9px; }
+body.view-transit .todaysec { display:block; }
+/* in the transit view the panel is about today, not about their design */
+body.view-transit #placements, body.view-transit #chandrop, body.view-transit #defdrop { display:none; }
+.todaylab { font-size:9.5px; letter-spacing:.18em; font-weight:600; opacity:.62;
+  text-transform:uppercase; margin-bottom:6px; }
+.todayread { font-size:11.5px; line-height:1.62; }
+.rref { border-bottom:1px dotted rgba(132,80,149,.55); cursor:pointer; }
+.rref:hover, .rref.on { background:rgba(241,194,50,.30); border-bottom-color:#c79a2e; }
+.todaylist { margin-top:8px; font-size:10.5px; line-height:1.5; }
+.todaylist .cmp { padding:3px 6px; margin:0 -6px; border-radius:6px; cursor:pointer; }
+.todaylist .cmp:hover { background:rgba(241,194,50,.22); }
+.todaylist .cmp b { font-weight:600; }
+.todaylist .brdg { color:#0d9488; font-weight:600; }
+.survey { margin-top:11px; border-top:1px solid rgba(132,80,149,.14); padding-top:9px; }
+.survey .qlab { font-size:11px; font-weight:600; margin-bottom:6px; }
+.survey .qrow { display:flex; gap:5px; }
+.survey .qbtn { flex:1; font-size:10.5px; padding:5px 4px; }
+.survey .qbtn.on { background:var(--purple); color:#fff; }
+.survey .qnote { width:100%; margin-top:6px; font-family:inherit; font-size:11px; padding:5px 7px;
+  border-radius:7px; border:1px solid rgba(132,80,149,.25); background:rgba(255,255,255,.7);
+  color:inherit; resize:vertical; }
+.survey .qsend { display:flex; align-items:center; gap:8px; margin-top:6px; }
+.survey .qgo { font-size:10.5px; padding:5px 12px; background:#c79a2e; color:#fff; }
+.survey .qmsg { font-size:10.5px; opacity:.75; }
 .booknote { margin-top:10px; border-top:1px solid rgba(132,80,149,.18); padding-top:8px; }
 .booknote .booklab { font-size:9.5px; letter-spacing:.18em; font-weight:600; opacity:.62;
   text-transform:uppercase; margin-bottom:5px; }
@@ -2313,6 +2396,21 @@ ${d.client ? "" : viewControls}
       <div class="row"><button id="pAll">All</button><button id="pNone">None</button></div>
     </details>
 
+    <div class="todaysec" id="todaysec">
+      <div class="todaylab" id="todaylab">TODAY</div>
+      <div class="todayread" id="todayread"></div>
+      <div class="todaylist" id="todaylist"></div>
+      <div class="survey" id="survey">
+        <div class="qlab">Does this land?</div>
+        <div class="qrow">
+          <button class="qbtn" data-a="Yes">Yes</button>
+          <button class="qbtn" data-a="Sort of">Sort of</button>
+          <button class="qbtn" data-a="Not really">Not really</button>
+        </div>
+        <textarea class="qnote" id="qnote" rows="2" placeholder="Anything you'd add? (optional)"></textarea>
+        <div class="qsend"><button class="qgo" id="qgo">Send</button><span class="qmsg" id="qmsg"></span></div>
+      </div>
+    </div>
     <details class="drop" id="chandrop" hidden>
       <summary>Channels</summary>
       <div id="chanlist"></div>
@@ -2763,6 +2861,132 @@ if (DATA.client) {
   cl.addEventListener('mouseleave', function () {
     if (!pinned) { hot(null); litGate(null); markRowsFor(null); }
   });
+  // ── today's read ────────────────────────────────────────────────────────
+  // The paragraph is quoted from Kaycee's morning report. A phrase only becomes
+  // hoverable when it names something in that day's completions, so nothing is
+  // guessed out of free text: a number that is not a gate in play stays plain.
+  // Written without regular expressions on purpose. This script lives inside a
+  // template literal, which eats single backslashes, so every escape class here
+  // would silently become a literal letter.
+  if (DATA.read) {
+    var R = DATA.read;
+    var gateOf = {}, chById = {}, chByName = {};
+    R.completions.forEach(function (c) {
+      gateOf[c.transitGate] = 1; gateOf[c.natalGate] = 1;
+      chById[c.channel] = c.channel;
+      if (c.channelName) chByName[c.channelName.toLowerCase()] = c.channel;
+    });
+    var isDigit = function (ch) { return ch >= '0' && ch <= '9'; };
+    var isWordCh = function (ch) { return !!ch && /[A-Za-z0-9]/.test(ch); };
+
+    var lab = document.getElementById('todaylab');
+    var written = R.writtenAt ? new Date(R.writtenAt) : null;
+    lab.textContent = 'TODAY · ' + R.date +
+      (written ? ' · read written ' + written.toISOString().slice(11, 16) + ' UTC' : '');
+
+    // one pass over the text, wrapping gate numbers and channel ids
+    var src = R.paragraph, out = '', i = 0;
+    while (i < src.length) {
+      var ch = src[i];
+      if (isDigit(ch)) {
+        var j = i; while (j < src.length && isDigit(src[j])) j++;
+        var num = src.slice(i, j);
+        // "12-22" style channel id
+        if (src[j] === '-' && isDigit(src[j + 1] || '')) {
+          var k = j + 1; while (k < src.length && isDigit(src[k])) k++;
+          var pair = src.slice(i, k);
+          if (chById[pair]) {
+            out += '<span class="rref" data-ch="' + pair + '">' + pair + '</span>';
+            i = k; continue;
+          }
+        }
+        if (gateOf[+num] && !isWordCh(src[j])) {
+          out += '<span class="rref" data-gate="' + num + '">' + num + '</span>';
+          i = j; continue;
+        }
+        out += esc(num); i = j; continue;
+      }
+      out += esc(ch); i++;
+    }
+
+    // channel names, matched literally: they are plain words like "Mating"
+    Object.keys(chByName).forEach(function (name) {
+      var key = chByName[name], lower = out.toLowerCase(), at = 0, acc = '';
+      while (true) {
+        var p = lower.indexOf(name, at);
+        if (p < 0) { acc += out.slice(at); break; }
+        var before = p === 0 ? ' ' : out[p - 1], after = out[p + name.length] || ' ';
+        var inTag = out.lastIndexOf('<', p) > out.lastIndexOf('>', p);
+        if (!isWordCh(before) && !isWordCh(after) && !inTag) {
+          acc += out.slice(at, p) + '<span class="rref" data-ch="' + key + '">' +
+            out.slice(p, p + name.length) + '</span>';
+        } else {
+          acc += out.slice(at, p + name.length);
+        }
+        at = p + name.length;
+      }
+      out = acc;
+    });
+    document.getElementById('todayread').innerHTML = out;
+
+    document.getElementById('todaylist').innerHTML = R.completions.map(function (c) {
+      return '<div class="cmp" data-ch="' + c.channel + '" data-gate="' + c.transitGate + '">' +
+        '<b>' + esc(c.planet) + '</b> in ' + c.transitGate +
+        ' completes <b>' + esc(c.channel) + '</b> ' + esc(c.channelName) +
+        ' with their ' + c.natalGate +
+        (c.bridges ? ' <span class="brdg">bridges the split</span>' : '') +
+        (c.center ? ' · ' + esc(c.center) : '') +
+        ' [' + esc(c.duration) + ']</div>';
+    }).join('');
+
+    // hovering the prose or a completion lights exactly what the rest of the
+    // panel lights, so the read and the chart behave as one object
+    var liveRef = function (el) {
+      if (!el) { hot(null); litGate(null); markRowsFor(null); return; }
+      var chk = el.dataset.ch, g = el.dataset.gate;
+      var c = chk ? chByKey[chk] : null;
+      if (c) { hot(chk); litGate([c.srcGate, c.tgtGate]); }
+      else if (g) { hot(null); litGate(+g); }
+      markRowsFor((DATA.placements || []).filter(function (p) {
+        return c ? (p.gate === c.srcGate || p.gate === c.tgtGate) : p.gate === +g;
+      }));
+    };
+    var sec = document.getElementById('todaysec');
+    sec.addEventListener('mousemove', function (e) {
+      var el = e.target.closest ? e.target.closest('.rref, .cmp') : null;
+      if (!pinned) liveRef(el);
+    });
+    sec.addEventListener('mouseleave', function () { if (!pinned) liveRef(null); });
+
+    // ── the survey ────────────────────────────────────────────────────────
+    var picked = null;
+    var msg = document.getElementById('qmsg');
+    [].forEach.call(document.querySelectorAll('.qbtn'), function (b) {
+      b.onclick = function () {
+        picked = b.dataset.a;
+        [].forEach.call(document.querySelectorAll('.qbtn'), function (o) {
+          o.classList.toggle('on', o === b);
+        });
+      };
+    });
+    document.getElementById('qgo').onclick = function () {
+      if (!picked) { msg.textContent = 'Pick one first.'; return; }
+      var parts = location.pathname.split('/c/');
+      var tok = parts.length > 1 ? parts[1].split('/')[0] : '';
+      if (tok.length !== 32) { msg.textContent = 'Only works on your shared link.'; return; }
+      msg.textContent = 'Sending…';
+      fetch('/api/chart-feedback', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: tok, answer: picked, readDate: R.date,
+          comment: document.getElementById('qnote').value,
+        }),
+      }).then(function (r) { return r.json(); }).then(function (j) {
+        msg.textContent = j && j.ok ? 'Thank you.' : 'That did not send, sorry.';
+      }).catch(function () { msg.textContent = 'That did not send, sorry.'; });
+    };
+  }
+
   document.getElementById('siderow').hidden = false;
   document.getElementById('viewsec').hidden = false;
   document.getElementById('viewrow').hidden = false;
@@ -3442,6 +3666,7 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
   // what the overlay must draw.
   let transitInnerSvg: string | undefined;
   let sky: SceneData["sky"];
+  let dayRead: DayRead | undefined;
   if (client) {
     const now = new Date();
     const date = now.toISOString().slice(0, 10);
@@ -3459,6 +3684,10 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
         planet: p.planet, gate: p.gate, line: p.line, fixingState: p.fixingState,
       })),
     };
+    dayRead = loadDayRead(client.name, date) ?? undefined;
+    console.log(dayRead
+      ? `Today's read: ${dayRead.paragraph.split(" ").length} words, ${dayRead.completions.length} completion(s) from ${date}`
+      : `Today's read: none found for ${date} (no transit report yet)`);
     const newlyDefined = [...definedNow].filter((c) => !client.centers.has(c));
     console.log(`Transit (${date} ${time} UTC): ${tGates.size} gates` +
       `, ${liveChannels.length - channels.filter((c) => client.channels.has(c.key)).length} channel(s) completed` +
@@ -3467,7 +3696,7 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
 
   const scene: SceneData = {
     client, inner, plain: client ? plainInner(raw) : undefined,
-    transit: transitInnerSvg, sky,
+    transit: transitInnerSvg, sky, read: dayRead,
     channels, slots, centerBox, fn, biology, anchors,
     gateInfo, notSelf, tagInfo: tags, lineName: (g, l) => libNames.line(g, l),
   };
