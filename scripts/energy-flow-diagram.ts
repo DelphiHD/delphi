@@ -2076,7 +2076,12 @@ ${face}
 * { box-sizing: border-box; }
 [hidden] { display:none !important; }
 body { margin:0; font-family:${FONT_STACK}; background:#ffffff; color:#1c1a2e; }
-.wrap { display:flex; gap:18px; padding:12px; min-height:100vh; align-items:flex-start; position:relative; }
+/* The wrap is exactly one screen tall, never taller. It used to be min-height,
+   so a tall panel grew the page and the bodygraph scrolled away with it. Fixed
+   height means the panel overflows inside itself instead, and the chart holds
+   still while the reading scrolls beside it. box-sizing is border-box globally,
+   so the padding is already inside the 100vh. */
+.wrap { display:flex; gap:18px; padding:12px; height:100vh; align-items:flex-start; position:relative; }
 .brandmark { position:absolute; pointer-events:none; user-select:none; }
 .brandmark.logo { left:14px; top:10px; width:132px; opacity:.92; }
 .brandmark.know { right:6px; bottom:4px; width:170px; opacity:.75; }
@@ -2305,6 +2310,14 @@ body.view-transit #placements, body.view-transit #chandrop, body.view-transit #d
 .survey .qsend { display:flex; align-items:center; gap:8px; margin-top:6px; }
 .survey .qgo { font-size:10.5px; padding:5px 12px; background:#c79a2e; color:#fff; }
 .survey .qmsg { font-size:10.5px; opacity:.75; }
+/* a sent response replaces the form rather than sitting under it, so it is
+   obvious it went and there is nothing left to press twice */
+.survey .qdone { display:none; }
+.survey.sent .qlab, .survey.sent .qrow, .survey.sent .qnote, .survey.sent .qsend { display:none; }
+.survey.sent .qdone { display:flex; align-items:center; gap:7px; font-size:13.5px; font-weight:600;
+  color:#0d9488; padding:9px 10px; border-radius:9px; background:rgba(13,148,136,.10);
+  border:1px solid rgba(13,148,136,.30); }
+.survey.sent .qdone::before { content:"\\2713"; font-size:15px; }
 .booknote { margin-top:10px; border-top:1px solid rgba(132,80,149,.18); padding-top:8px; }
 .booknote .booklab { font-size:9.5px; letter-spacing:.18em; font-weight:600; opacity:.62;
   text-transform:uppercase; margin-bottom:5px; }
@@ -2409,6 +2422,7 @@ ${d.client ? "" : viewControls}
         </div>
         <textarea class="qnote" id="qnote" rows="2" placeholder="Anything you'd add? (optional)"></textarea>
         <div class="qsend"><button class="qgo" id="qgo">Send</button><span class="qmsg" id="qmsg"></span></div>
+        <div class="qdone" id="qdone">Thank you. That has been sent.</div>
       </div>
     </div>
     <details class="drop" id="chandrop" hidden>
@@ -2982,7 +2996,8 @@ if (DATA.client) {
           comment: document.getElementById('qnote').value,
         }),
       }).then(function (r) { return r.json(); }).then(function (j) {
-        msg.textContent = j && j.ok ? 'Thank you.' : 'That did not send, sorry.';
+        if (j && j.ok) { msg.textContent = ''; document.getElementById('survey').classList.add('sent'); }
+        else { msg.textContent = 'That did not send, sorry.'; }
       }).catch(function () { msg.textContent = 'That did not send, sorry.'; });
     };
   }
