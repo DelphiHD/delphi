@@ -441,14 +441,19 @@ function paintCenters(
 }
 
 // ── transit overlay ─────────────────────────────────────────────────────────
-// Kaycee's colours: the client in island teal, today's sky in island orange. Gold stays reserved for highlights, so nothing on the chart is
+// Kaycee's colours: the client in island teal, today's sky in neutral
+// charcoal. Charcoal rather than a colour on purpose: the two awareness
+// centres are purple, so indigo and magenta discs sink into them, and the warm
+// end is already spoken for by the design red in the columns. Neutral dark is
+// the only family free on this chart, and "the weather" should not look like a
+// second identity anyway. Gold stays reserved for highlights, so nothing on the chart is
 // permanently wearing the colour that means "you are pointing at this".
 // Because every
 // gate's leg is its own shape, a channel that one of each completes comes out
 // two-toned on its own, which is the point: you can see it is a temporary
 // bridge rather than part of their design.
 const CLIENT_TINT = "#0d9488";
-const TRANSIT_INK = "#c2410c";
+const TRANSIT_INK = "#2b2b33";
 
 // What the Delphi design fills a DEFINED centre with. Harvested from the
 // roster's own charts rather than guessed: pressure and motor centres grey,
@@ -2051,7 +2056,7 @@ body.view-transit .bridge, body.view-transit .halo { display:none; }
    so a gate disc sitting on the spleen or the solar plexus disappears into it.
    A thin dark rim gives every disc an edge on any centre colour. */
 svg.canvas.transit .gdisc { stroke:#0a5f57; stroke-width:1.1; }
-svg.canvas.transit .tdisc { stroke:#7c2708; stroke-width:1.1; }
+svg.canvas.transit .tdisc { stroke:#101014; stroke-width:1.1; }
 body.view-plain { background:#ffffff; color:#1c1a2e; }
 body.view-transit .panel, body.view-plain .panel { background:rgba(132,80,149,.06); border-color:rgba(132,80,149,.22); }
 body.view-transit .card, body.view-plain .card { background:rgba(255,255,255,.98); border-color:rgba(132,80,149,.28);
