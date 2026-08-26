@@ -179,7 +179,9 @@ function normalise(row: Incoming): Incoming {
   const name = row.name.trim().replace(/\s+/g, " ");
   const date = row.birthDate.trim();
   let time = row.birthTime.trim();
-  const place = row.birthPlace.trim().replace(/\s+/g, " ");
+  const place = row.birthPlace.trim().replace(/\s+/g, " ")
+    .replace(/,\s*(USA|U\.S\.A\.|US|U\.S\.)$/i, ", United States")
+    .replace(/,\s*UK$/i, ", United Kingdom");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error(`${name}: birth date "${date}" is not YYYY-MM-DD`);
   const m = /^(\d{1,2}):(\d{2})\s*(am|pm)?$/i.exec(time);
   if (!m) throw new Error(`${name}: birth time "${time}" is not HH:MM`);
@@ -191,9 +193,9 @@ function normalise(row: Incoming): Incoming {
   if (hour > 23 || +m[2] > 59) throw new Error(`${name}: birth time "${time}" is not a real time`);
   time = `${String(hour).padStart(2, "0")}:${m[2]}`;
   if (Number.isNaN(new Date(`${date}T${time}:00Z`).getTime())) throw new Error(`${name}: ${date} ${time} is not a real moment`);
-  if (place.split(",").filter((p) => p.trim()).length < 3) {
-    throw new Error(`${name}: birth place "${place}" needs city, state or region, and country, ` +
-      `like "Boise, Idaho, United States"`);
+  if (place.split(",").filter((p) => p.trim()).length < 2) {
+    throw new Error(`${name}: birth place "${place}" needs at least a city and a country, ` +
+      `like "Bogota, Colombia" or "Boise, Idaho, United States"`);
   }
   return { name, birthDate: date, birthTime: time, birthPlace: place, slug: row.slug?.trim() };
 }
@@ -232,7 +234,7 @@ function run(script: string, args: string[]): string {
   });
 }
 
-async function notionUpsert(b: ClientBrief, link: string, status: string) {
+async function notionUpsert(b: ClientBrief, link: string, status: string, statusGiven: boolean) {
   const token = process.env.NOTION_TOKEN;
   if (!token) throw new Error("NOTION_TOKEN is not set");
   const head = {
@@ -256,9 +258,11 @@ async function notionUpsert(b: ClientBrief, link: string, status: string) {
     "Birth Place": { rich_text: [{ text: { content: b.birthPlace } }] },
     "Bodygraph Link": { url: link },
     "Analysis Type": { select: { name: "Individual" } },
-    Status: { select: { name: status } },
   };
   if (!existing) properties.Name = { title: [{ text: { content: title } }] };
+  // Status is where Kaycee is with someone, not something this knows. A new row
+  // needs one; a row she already has keeps hers unless it was asked for.
+  if (!existing || statusGiven) properties.Status = { select: { name: status } };
 
   const res = existing
     ? await fetch(`https://api.notion.com/v1/pages/${existing}`, {
@@ -369,8 +373,10 @@ async function main() {
       console.log(`  link      ${link}`);
 
       if (doNotion) {
-        const what = await notionUpsert(b, link, status);
-        console.log(`  notion    row ${what}, status "${status}"`);
+        const what = await notionUpsert(b, link, status, typeof f.status === "string");
+        console.log(`  notion    row ${what}` +
+          (what === "created" || typeof f.status === "string"
+            ? `, status "${status}"` : ", status left as you had it"));
       }
       done.push(`${b.name} → ${link}`);
     } catch (e) {
