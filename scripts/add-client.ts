@@ -20,6 +20,7 @@
 //   --no-reports   skip the Foundation and Planetary Overview generation
 //   --no-notion    skip writing the Notion row
 //   --dry-run      say what would happen, change nothing
+//   --yes          do not stop to confirm (for unattended runs)
 //   --status X     Notion Status for new rows (default "Ready for Reports")
 //
 // Safe to re-run. Somebody already on the roster is picked up where they are
@@ -190,8 +191,9 @@ function normalise(row: Incoming): Incoming {
   if (hour > 23 || +m[2] > 59) throw new Error(`${name}: birth time "${time}" is not a real time`);
   time = `${String(hour).padStart(2, "0")}:${m[2]}`;
   if (Number.isNaN(new Date(`${date}T${time}:00Z`).getTime())) throw new Error(`${name}: ${date} ${time} is not a real moment`);
-  if (place.split(",").length < 2) {
-    throw new Error(`${name}: birth place "${place}" needs at least city and country, comma separated`);
+  if (place.split(",").filter((p) => p.trim()).length < 3) {
+    throw new Error(`${name}: birth place "${place}" needs city, state or region, and country, ` +
+      `like "Boise, Idaho, United States"`);
   }
   return { name, birthDate: date, birthTime: time, birthPlace: place, slug: row.slug?.trim() };
 }
@@ -328,6 +330,18 @@ async function main() {
     ? "\nReports: Foundation and Planetary Overview will be generated (Sonnet 4.6; roughly a dollar or two each)."
     : "\nReports: skipped (--no-reports).");
   if (dry) { console.log("\n--dry-run: nothing changed.\n"); return; }
+
+  // Reports cost real money and the roster, the Desktop, Supabase and Notion
+  // all get written to. Nothing starts until somebody says so.
+  if (!f.yes && process.stdin.isTTY) {
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    const answer = (await rl.question("\nGo ahead? (y/n) ")).trim().toLowerCase();
+    rl.close();
+    if (answer !== "y" && answer !== "yes") {
+      console.log("\nStopped. Nothing changed.\n");
+      return;
+    }
+  }
 
   const done: string[] = [], failed: string[] = [];
   for (const b of briefs) {
