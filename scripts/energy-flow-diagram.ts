@@ -43,7 +43,7 @@ import { loadLibraryNames } from "@/lib/hd/library-names";
 import { renderFullMandala } from "@/lib/render/mandala";
 import type { ChartSide, Planet } from "@/lib/render/mandala.types";
 import { getChart, getTimezoneForLocation } from "@/lib/mybodygraph";
-import { clientFromSlug, clientOutputDir, type ClientBrief } from "./client-roster";
+import { CLIENTS, clientFromSlug, clientOutputDir, type ClientBrief } from "./client-roster";
 import { castSkyAt } from "@/lib/transit/sky";
 
 // ── palettes ────────────────────────────────────────────────────────────────
@@ -479,6 +479,48 @@ interface DayRead {
   }[];
 }
 
+/** Every archived read for this client, newest first. Ten kilobytes for a
+ *  couple of weeks, so they are baked into the chart rather than fetched: the
+ *  reports live on Kaycee's laptop, and a baked read needs no request and no
+ *  server to be up. Each morning's run adds one. */
+function loadAllReads(clientName: string): Record<string, DayRead> {
+  const dir = join(process.env.HOME ?? "", "Desktop", "HD Reports", "Transits");
+  if (!existsSync(dir)) return {};
+  const out: Record<string, DayRead> = {};
+  for (const f of readdirSync(dir)) {
+    const m = /^(\d{4}-\d{2}-\d{2}) - Daily Transit Report\.md$/.exec(f);
+    if (!m) continue;
+    const r = loadDayRead(clientName, m[1]);
+    if (r) out[m[1]] = r;
+  }
+  return out;
+}
+
+/** A report already on disk was written under whatever the roster called that
+ *  person that morning, so renaming someone orphans every read they have.
+ *
+ *  Resolve it against the report itself rather than guessing. Headings that
+ *  match a roster name exactly are spoken for. A leftover heading can then only
+ *  belong to someone whose first name it is AND who has no heading of their own
+ *  in that same report, and only when exactly one person fits: "Sarah" in a
+ *  report that already names Sarah Marie must be the other Sarah, but "Sarah"
+ *  in a report naming neither is left unmatched rather than handed to whichever
+ *  one sorts first. */
+function headingByRename(
+  heads: RegExpMatchArray[], clientName: string,
+): RegExpMatchArray | undefined {
+  const first = clientName.split(" ")[0];
+  if (!first || first === clientName) return undefined;
+  const present = new Set(heads.map((h) => h[1].trim()));
+  if (!present.has(first)) return undefined;
+
+  const roster = Object.values(CLIENTS).map((c) => c.name);
+  // anyone already named outright in this report is answered for
+  const claimants = roster.filter((n) => n.split(" ")[0] === first && !present.has(n));
+  if (claimants.length !== 1 || claimants[0] !== clientName) return undefined;
+  return heads.find((h) => h[1].trim() === first);
+}
+
 function loadDayRead(clientName: string, date: string): DayRead | null {
   const path = join(process.env.HOME ?? "", "Desktop", "HD Reports", "Transits",
     `${date} - Daily Transit Report.md`);
@@ -488,7 +530,7 @@ function loadDayRead(clientName: string, date: string): DayRead | null {
 
   // "### 3. Bryan Rodabough · Split Definition (simple) (impact 74.25)"
   const heads = [...md.matchAll(/^### \d+\.\s+(.+?)\s+·\s+.*$/gm)];
-  const mine = heads.find((h) => h[1].trim() === clientName);
+  const mine = heads.find((h) => h[1].trim() === clientName) ?? headingByRename(heads, clientName);
   if (!mine) return null;
   const start = mine.index! + mine[0].length;
   const next = heads.find((h) => h.index! > mine.index!);
@@ -583,16 +625,21 @@ function transitInner(
   // 2. the sky's own gates. A transit is a single activation, so it takes the
   //    full-width personality leg. Gates the client already carries stay gold:
   //    the transit is reinforcing something of theirs, not adding to it.
-  for (const g of transit) {
-    if (natal.has(g)) continue;
+  // Tag every gate the client does not carry, not just today's, so the page can
+  // repaint itself for any date the picker asks for.
+  const paintable = new Set<number>();
+  for (let g = 1; g <= 64; g++) if (!natal.has(g)) paintable.add(g);
+  for (const g of paintable) {
+    const lit = transit.has(g);
     // The design writes "empty" three different ways: none, #ffffff and
     // rgba(0, 0, 0, 0). These gates are unactivated in the client's chart by
     // definition, so replace whatever fill is there rather than matching one
     // spelling of nothing.
+    const fill = lit ? TRANSIT_INK : "none";
     s = s.replace(new RegExp(`(<[a-z]+ id="personality-${g}"[^>]*?)fill="[^"]*"`),
-      (_m, head: string) => `${head.replace('id="', 'class="tleg" data-gate="' + g + '" id="')}fill="${TRANSIT_INK}"`);
+      (_m, head: string) => `${head.replace('id="', 'class="tleg" data-gate="' + g + '" id="')}fill="${fill}"`);
     s = s.replace(new RegExp(`(<path id="_${g}"[^>]*?)fill="[^"]*"`),
-      (_m, head: string) => `${head.replace('id="', 'class="tdisc" data-gate="' + g + '" id="')}fill="${TRANSIT_INK}"`);
+      (_m, head: string) => `${head.replace('id="', 'class="tdisc" data-gate="' + g + '" id="')}fill="${fill}"`);
   }
 
   // The gate number has to flip with the disc under it. The design writes white
@@ -603,17 +650,21 @@ function transitInner(
       (_m, a: string, b: string, c: string) => `${a}fill="${col}"${b} on-disc${c}`);
   };
   // Every disc on this view is dark, teal or charcoal, so every number sitting
-  // on one is white. The marker class matters because the page dims the numbers
-  // of gates the client does not carry, which would darken the transit's own.
+  // on one is white. A gate with no disc under it keeps its ordinary dark
+  // number: the date picker adds and removes the class as days change.
   for (const g of natal) setNum(g, "#ffffff");
   for (const g of transit) if (!natal.has(g)) setNum(g, "#ffffff");
 
   // 3. a centre defined only by a transit-completed channel has to show as
   //    defined, or the chart says the opposite of what the overlay means
-  for (const [center, id] of Object.entries(CENTER_SVG_ID) as [Center, string][]) {
-    if (!definedNow.has(center)) continue;
-    s = s.replace(new RegExp(`(<path class="cshape" data-center="${center}"[^>]*?)fill="[^"]*"`),
-      (_m, head: string) => `${head}fill="${DEFINED_CENTER_FILL[center]}"`);
+  // Each centre keeps the fill it wears when open, so stepping to a date where
+  // nothing completes there can put it back. Captured before anything is
+  // repainted, or "open" would just mean "however today happened to look".
+  for (const center of Object.keys(CENTER_SVG_ID) as Center[]) {
+    s = s.replace(new RegExp(`(<path class="cshape" data-center="${center}"[^>]*?)fill="([^"]*)"`),
+      (_m, head: string, open: string) =>
+        `${head}data-openfill="${open}" data-litfill="${DEFINED_CENTER_FILL[center]}" ` +
+        `fill="${definedNow.has(center) ? DEFINED_CENTER_FILL[center] : open}"`);
   }
   return s.replace(/^[\s\S]*?<svg\b[^>]*>/, "").replace(/<\/svg>\s*$/, "");
 }
@@ -1471,6 +1522,7 @@ interface SceneData {
   transit?: string;                         // the same chart with today's sky over it
   sky?: { date: string; time: string; positions: { planet: string; gate: number; line: number; fixingState: string }[] };
   read?: DayRead;
+  reads?: Record<string, DayRead>;
   channels: ChannelGeom[];
   slots: number;
   centerBox: Record<Center, BBox>;
@@ -1663,6 +1715,15 @@ function mergedClientTable(client: ClientCtx, skin: Skin, x: number, y: number):
   return s + `</g>`;
 }
 
+/** "2026-08-26" reads as a serial number. Which day the column is showing is
+ *  the one thing a client has to be able to see at a glance, so it is spelled. */
+const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function shortDate(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return `${SHORT_MONTHS[m - 1]} ${d}, ${y}`;
+}
+
 /** Today's sky, one row per body, glyph on the outside edge. Carries the same
  *  exaltation and detriment marks the client's own columns do. */
 function transitTable(sky: NonNullable<SceneData["sky"]>, skin: Skin, x: number, y: number): string {
@@ -1673,9 +1734,9 @@ function transitTable(sky: NonNullable<SceneData["sky"]>, skin: Skin, x: number,
   let s = `<g class="ptable" data-side="transit" transform="translate(${x},${y})">`;
   s += `<text x="${W / 2}" y="0" text-anchor="middle" font-size="12" font-weight="600" ` +
     `letter-spacing=".16em" fill="${TRANSIT_INK}">TRANSIT</text>`;
-  s += `<text x="${W / 2}" y="15" text-anchor="middle" font-size="8.5" fill="${skin.muted}">` +
-    `${esc(sky.date)} \u00b7 ${esc(sky.time)} UTC</text>`;
-  const headY = 22;
+  s += `<text class="tdate" x="${W / 2}" y="18" text-anchor="middle" font-size="13.5" ` +
+    `font-weight="700" fill="${TRANSIT_INK}">${esc(shortDate(sky.date))}</text>`;
+  const headY = 26;
   s += `<line x1="6" y1="${headY}" x2="${W - 6}" y2="${headY}" stroke="${TRANSIT_INK}" stroke-width="1.6"></line>`;
   PLANET_ROWS.forEach((planet, i) => {
     const a = byPlanet.get(planet);
@@ -1684,9 +1745,10 @@ function transitTable(sky: NonNullable<SceneData["sky"]>, skin: Skin, x: number,
     s += `<g class="trow" data-planet="${esc(planet)}" data-gate="${a.gate}" data-line="${a.line}">`;
     s += `<rect x="2" y="${ry - 19}" width="${W - 4}" height="${rowH}" rx="7" ` +
       `fill="${i % 2 === 1 ? zebra : "transparent"}"></rect>`;
-    const mark = fixMark(a.fixingState);
-    if (mark) s += `<text x="12" y="${ry}" font-size="11" fill="${TRANSIT_INK}">${mark}</text>`;
-    s += `<text x="30" y="${ry}" font-size="15" font-weight="600" fill="${TRANSIT_INK}">${a.gate}.${a.line}</text>`;
+    s += `<text class="tfx" data-planet="${esc(planet)}" x="12" y="${ry}" font-size="11" ` +
+      `fill="${TRANSIT_INK}">${fixMark(a.fixingState)}</text>`;
+    s += `<text class="tgl" data-planet="${esc(planet)}" x="30" y="${ry}" font-size="15" ` +
+      `font-weight="600" fill="${TRANSIT_INK}">${a.gate}.${a.line}</text>`;
     s += planet === "Uranus"
       ? uranusGlyph(W - 26, ry, TRANSIT_INK, 1.15)
       : `<text x="${W - 18}" y="${ry}" font-size="17" fill="${TRANSIT_INK}">${esc(PLANET_GLYPHS[planet])}</text>`;
@@ -2023,6 +2085,8 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, fonts: Map<n
 
   const payload = {
     read: d.read ?? null,
+    reads: d.reads ?? {},
+    cycles: d.client?.report.cycles ?? [],
     client: d.client
       ? { name: d.client.name,
           dates: {
@@ -2104,6 +2168,10 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, fonts: Map<n
         center: CENTER_DISPLAY[centerOf(g)], cid: centerOf(g),
       }]),
     ),
+    sky: d.sky ? { date: d.sky.date, positions: d.sky.positions.map((p) => ({
+      planet: p.planet, gate: p.gate, line: p.line, fixingState: p.fixingState,
+    })) } : null,
+    natalGates: d.client ? [...new Set(d.client.acts.map((a) => a.gate))].sort((a, b) => a - b) : [],
     planets: PLANET_ROWS.map((p) => ({ id: planetId(p), name: p })),
     functions: FUNCTION_ORDER.map((f) => ({ name: f, color: FUNCTIONS[f] })),
   };
@@ -2166,10 +2234,16 @@ body.view-transit .bridge, body.view-transit .halo { display:none; }
    A thin dark rim gives every disc an edge on any centre colour. */
 svg.canvas.transit .gdisc { stroke:#0a5f57; stroke-width:1.1; }
 svg.canvas.transit .pnum.on-disc, svg.canvas.transit .pnum.on-disc.off { fill:#ffffff !important; opacity:1 !important; }
-svg.canvas.transit .tdisc { stroke:#101014; stroke-width:1.1; }
+/* Only a disc with something in it gets a rim. Every gate the client does not
+   carry is a paintable transit disc now, so rimming them all drew a black ring
+   around every unactivated gate on the chart. */
+svg.canvas.transit .tdisc:not([fill="none"]) { stroke:#101014; stroke-width:1.1; }
 /* a transit gate lit from its column or from the read */
 svg.canvas.transit .tleg.lit { fill:#f1c232 !important; }
 svg.canvas.transit .tdisc.lit { stroke:#f1c232 !important; stroke-width:3 !important; }
+/* and the client's own gates light exactly the same way, so hovering their
+   column rings the gate rather than covering it */
+svg.canvas.transit .gdisc.lit { stroke:#f1c232 !important; stroke-width:3 !important; }
 body.view-plain { background:#ffffff; color:#1c1a2e; }
 body.view-transit .panel, body.view-plain .panel { background:rgba(132,80,149,.06); border-color:rgba(132,80,149,.22); }
 body.view-transit .card, body.view-plain .card { background:rgba(255,255,255,.98); border-color:rgba(132,80,149,.28);
@@ -2205,7 +2279,6 @@ details.drop[open] > summary::after { content:" \\25B4"; }
 .halo > *:not(:last-child) { opacity:0; transition:opacity .2s; }
 .halo.on > *:not(:last-child) { opacity:1; }
 .halo.on .hl-fill { opacity:.28; }
-.halo.on, .hubring.on { filter: drop-shadow(0 0 3px rgba(255,204,0,.95)); }
 .card .body { max-height:46vh; overflow-y:auto; margin-top:8px; }
 .card .body p { margin:0 0 8px; }
 .card .body h4 { margin:12px 0 5px; font-size:11px; font-weight:600; letter-spacing:.1em;
@@ -2348,6 +2421,14 @@ body.view-transit .todaysec, body.view-transit .datesec { display:block; }
   border-radius:7px; border:1px solid rgba(132,80,149,.25); background:rgba(255,255,255,.7); color:inherit; }
 .dtoday { font-size:10px; padding:4px 8px; visibility:hidden; }
 .dtoday.show { visibility:visible; }
+.cycrow { display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
+.cycpill { font-size:10px; padding:4px 9px; border-radius:999px; line-height:1.1;
+  border:1px solid rgba(132,80,149,.34); background:transparent; color:inherit;
+  font-family:inherit; cursor:pointer; }
+.cycpill:hover { border-color:var(--purple); }
+.cycpill.on { background:var(--purple); border-color:var(--purple); color:#fff; font-weight:600; }
+.datesec.loading .datepick, .datesec.loading .cycrow { opacity:.45; pointer-events:none; }
+.noread { font-size:11.5px; opacity:.62; line-height:1.5; margin-top:6px; }
 /* in the transit view the panel is about today, not about their design */
 body.view-transit #placements, body.view-transit #chandrop, body.view-transit #defdrop { display:none; }
 .todaylab { font-size:9.5px; letter-spacing:.18em; font-weight:600; opacity:.62;
@@ -2959,8 +3040,35 @@ if (DATA.client) {
   // Written without regular expressions on purpose. This script lives inside a
   // template literal, which eats single backslashes, so every escape class here
   // would silently become a literal letter.
-  if (DATA.read) {
-    var R = DATA.read;
+  var SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function shortDate(iso) {
+    var b = String(iso).split('-');
+    return SHORT_MONTHS[+b[1] - 1] + ' ' + (+b[2]) + ', ' + b[0];
+  }
+
+  /** Paint one day's read into the TODAY section. Called for the day the chart
+   *  was built with, and again whenever the date picker lands on a day Kaycee
+   *  has written a report for. */
+  function renderRead(R, forDate) {
+    var lab0 = document.getElementById('todaylab');
+    var readEl = document.getElementById('todayread');
+    var listEl = document.getElementById('todaylist');
+    var survey = document.getElementById('survey');
+    if (!lab0) return;
+    var today = (DATA.sky || {}).date;
+    var day = (R && R.date) || forDate || today;
+    // Kaycee writes one of these each morning, so a day she has not written is
+    // ordinary rather than an error. The survey asks whether the read landed:
+    // with no read there is nothing to answer, so it goes away.
+    if (survey) survey.style.display = R ? '' : 'none';
+    if (!R) {
+      lab0.textContent = shortDate(day);
+      readEl.innerHTML = '<div class="noread">No written read for this day. ' +
+        "The chart above still shows that day's sky.</div>";
+      listEl.innerHTML = '';
+      return;
+    }
     var gateOf = {}, chById = {}, chByName = {};
     R.completions.forEach(function (c) {
       gateOf[c.transitGate] = 1; gateOf[c.natalGate] = 1;
@@ -2970,9 +3078,9 @@ if (DATA.client) {
     var isDigit = function (ch) { return ch >= '0' && ch <= '9'; };
     var isWordCh = function (ch) { return !!ch && /[A-Za-z0-9]/.test(ch); };
 
-    var lab = document.getElementById('todaylab');
+    var lab = lab0;
     var written = R.writtenAt ? new Date(R.writtenAt) : null;
-    lab.textContent = 'TODAY · ' + R.date +
+    lab.textContent = (R.date === today ? 'TODAY · ' : '') + shortDate(R.date) +
       (written ? ' · read written ' + written.toISOString().slice(11, 16) + ' UTC' : '');
 
     // one pass over the text, wrapping gate numbers and channel ids
@@ -3018,9 +3126,9 @@ if (DATA.client) {
       }
       out = acc;
     });
-    document.getElementById('todayread').innerHTML = out;
+    readEl.innerHTML = out;
 
-    document.getElementById('todaylist').innerHTML = R.completions.map(function (c) {
+    listEl.innerHTML = R.completions.map(function (c) {
       return '<div class="cmp" data-ch="' + c.channel + '" data-gate="' + c.transitGate + '">' +
         '<b>' + esc(c.planet) + '</b> in ' + c.transitGate +
         ' completes <b>' + esc(c.channel) + '</b> ' + esc(c.channelName) +
@@ -3029,6 +3137,10 @@ if (DATA.client) {
         (c.center ? ' · ' + esc(c.center) : '') +
         ' [' + esc(c.duration) + ']</div>';
     }).join('');
+  }
+
+  if (DATA.read || Object.keys(DATA.reads || {}).length) {
+    renderRead(DATA.read, (DATA.sky || {}).date);
 
     // hovering the prose or a completion lights exactly what the rest of the
     // panel lights, so the read and the chart behave as one object
@@ -3082,6 +3194,166 @@ if (DATA.client) {
   document.getElementById('siderow').hidden = false;
   document.getElementById('viewsec').hidden = false;
   document.getElementById('viewrow').hidden = false;
+  // ── the date picker ───────────────────────────────────────────────────────
+  // The chart is a baked file, so stepping to another day cannot re-render it
+  // on the server. Instead the page asks for that day's sky and repaints the
+  // transit canvas in place: legs, discs, gate numbers, centres and the transit
+  // column. The words that go with a day are baked in rather than fetched,
+  // because they come out of Kaycee's own morning reports.
+  //
+  // The pills are the client's own cycle dates, read straight off their
+  // Foundation report's timeline, so looking ahead to a Saturn return is one
+  // click rather than arithmetic.
+  (function () {
+    var sec = document.getElementById('datesec');
+    if (!sec || !DATA.sky) return;
+    var TODAY = DATA.sky.date;
+    var field = document.getElementById('dfield');
+    var todayBtn = document.getElementById('dtoday');
+    var cur = TODAY, busy = false;
+    var cache = {};
+    cache[TODAY] = DATA.sky.positions;
+    var natal = {};
+    (DATA.natalGates || []).forEach(function (g) { natal[g] = 1; });
+    var UP = String.fromCharCode(0x25B2), DOWN = String.fromCharCode(0x25BC);
+    var INK = '#2b2b33', DIM = '#6b6790';
+    var MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july',
+      'august', 'september', 'october', 'november', 'december'];
+
+    function pad(n) { return (n < 10 ? '0' : '') + n; }
+    function ymd(d) {
+      return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
+    }
+    function parse(s) { return new Date(s + 'T12:00:00Z'); }
+    function shift(s, days) {
+      var d = parse(s);
+      d.setUTCDate(d.getUTCDate() + days);
+      return ymd(d);
+    }
+    // "January 26, 2015" out of the report, without a regular expression: this
+    // script lives in a template literal that eats the backslashes one needs.
+    function fromLongDate(txt) {
+      if (!txt) return null;
+      var bits = String(txt).replace(',', ' ').split(' ').filter(Boolean);
+      if (bits.length < 3) return null;
+      var mi = MONTHS.indexOf(bits[0].toLowerCase());
+      var day = parseInt(bits[1], 10), year = parseInt(bits[2], 10);
+      if (mi < 0 || !day || !year) return null;
+      return year + '-' + pad(mi + 1) + '-' + pad(day);
+    }
+
+    // ── the cycle pills ──────────────────────────────────────────────────────
+    var pills = ((DATA.client || {}).cycles || []).map(function (c) {
+      return { label: c.label, date: fromLongDate(c.date), status: c.status };
+    }).filter(function (c) { return !!c.date; });
+    if (pills.length) {
+      var wrap = document.createElement('div');
+      wrap.className = 'cycrow';
+      wrap.innerHTML = pills.map(function (c, i) {
+        return '<button class="cycpill" data-i="' + i + '" title="' + esc(c.label) +
+          ' · ' + esc(c.date) + '">' + esc(c.label) + '</button>';
+      }).join('');
+      sec.appendChild(wrap);
+      wrap.addEventListener('click', function (e) {
+        var b = e.target.closest ? e.target.closest('.cycpill') : null;
+        if (b) go(pills[+b.dataset.i].date);
+      });
+    }
+
+    // ── painting one day onto the chart ──────────────────────────────────────
+    function repaint(date, positions) {
+      var lit = {};
+      positions.forEach(function (p) { lit[p.gate] = 1; });
+
+      // the sky's own gates: charcoal when the transit is there, empty when not
+      [].forEach.call(document.querySelectorAll('svg.canvas.transit .tleg, svg.canvas.transit .tdisc'),
+        function (el) {
+          el.setAttribute('fill', lit[el.dataset.gate] ? INK : 'none');
+        });
+      // a number is only white while there is a disc under it to sit on
+      [].forEach.call(document.querySelectorAll('svg.canvas.transit .pnum[data-gate]'), function (n) {
+        var g = n.dataset.gate;
+        if (natal[g]) return;
+        var on = !!lit[g];
+        n.classList.toggle('on-disc', on);
+        n.setAttribute('fill', on ? '#ffffff' : DIM);
+      });
+
+      // a centre a transit has just defined has to read as defined, and a
+      // centre that was only defined by yesterday's transit has to open again
+      var have = {};
+      Object.keys(natal).forEach(function (g) { have[g] = 1; });
+      Object.keys(lit).forEach(function (g) { have[g] = 1; });
+      var def = {};
+      (DATA.channels || []).forEach(function (c) {
+        if (have[c.srcGate] && have[c.tgtGate]) { def[c.cFrom] = 1; def[c.cTo] = 1; }
+      });
+      [].forEach.call(document.querySelectorAll('svg.canvas.transit .cshape'), function (el) {
+        var open = el.getAttribute('data-openfill'), on = el.getAttribute('data-litfill');
+        if (open == null) return;
+        el.setAttribute('fill', def[el.dataset.center] ? on : open);
+      });
+
+      // the transit column, row by row, so the eye can still run across
+      var byP = {};
+      positions.forEach(function (p) { byP[p.planet] = p; });
+      [].forEach.call(document.querySelectorAll('.trow'), function (r) {
+        var p = byP[r.dataset.planet];
+        if (!p) return;
+        r.dataset.gate = p.gate;
+        r.dataset.line = p.line;
+      });
+      [].forEach.call(document.querySelectorAll('.tgl'), function (t) {
+        var p = byP[t.dataset.planet];
+        if (p) t.textContent = p.gate + '.' + p.line;
+      });
+      [].forEach.call(document.querySelectorAll('.tfx'), function (t) {
+        var p = byP[t.dataset.planet];
+        if (p) t.textContent = p.fixingState === 'Exalted' ? UP : p.fixingState === 'Detriment' ? DOWN : '';
+      });
+      [].forEach.call(document.querySelectorAll('.tdate'), function (t) { t.textContent = shortDate(date); });
+
+      // and the words, when Kaycee has written any for that day
+      renderRead((DATA.reads || {})[date] || (date === TODAY ? DATA.read : null), date);
+      litGate(null);
+    }
+
+    // ── moving between days ──────────────────────────────────────────────────
+    function go(date) {
+      if (busy || !date || date === cur) return;
+      cur = date;
+      field.value = date;
+      todayBtn.classList.toggle('show', date !== TODAY);
+      [].forEach.call(document.querySelectorAll('.cycpill'), function (b) {
+        b.classList.toggle('on', pills[+b.dataset.i].date === date);
+      });
+      if (cache[date]) { repaint(date, cache[date]); return; }
+      busy = true;
+      sec.classList.add('loading');
+      fetch('/api/sky?date=' + date).then(function (r) { return r.json(); }).then(function (j) {
+        if (!j || !j.ok) throw new Error(j && j.error ? j.error : 'no sky');
+        cache[date] = j.positions;
+        if (cur === date) repaint(date, j.positions);
+      }).catch(function () {
+        // loud rather than a chart that quietly shows the wrong day
+        var read = document.getElementById('todayread');
+        document.getElementById('todaylab').textContent = 'TODAY';
+        if (read) read.innerHTML = '<div class="noread">Could not reach the sky for ' +
+          esc(date) + '. The chart is still showing ' + esc(cur === date ? TODAY : cur) + '.</div>';
+        document.getElementById('todaylist').innerHTML = '';
+      }).then(function () {
+        busy = false;
+        sec.classList.remove('loading');
+      });
+    }
+
+    field.value = TODAY;
+    field.addEventListener('change', function () { if (field.value) go(field.value); });
+    document.getElementById('dprev').addEventListener('click', function () { go(shift(cur, -1)); });
+    document.getElementById('dnext').addEventListener('click', function () { go(shift(cur, 1)); });
+    todayBtn.addEventListener('click', function () { go(TODAY); });
+  })();
+
   document.getElementById('actrow').hidden = false;
   document.title = DATA.client.name + ' - Delphi Human Design';
 
@@ -3337,7 +3609,7 @@ function litGate(gates) {
   });
   // the sky's own gates have no halo, because the client does not carry them:
   // their leg and disc take the highlight directly
-  [].forEach.call(document.querySelectorAll('.tleg, .tdisc, .bleg'), function (e) {
+  [].forEach.call(document.querySelectorAll('.tleg, .tdisc, .bleg, .gdisc'), function (e) {
     e.classList.toggle('lit', !!want[e.dataset.gate]);
   });
   // the transit column follows the same set, whatever asked for it
@@ -3668,8 +3940,13 @@ async function publishChart(client: ClientCtx, html: string): Promise<string> {
   const token = existing?.token ?? randomBytes(16).toString("hex");
   const path = existing?.storage_path ?? `${slug}/${token}.html`;
 
+  // Storage caches an object for an hour by default, so a republished chart
+  // would keep serving yesterday's file to the client holding the link. The
+  // link is the same address every time, so the file behind it has to be the
+  // one just uploaded.
   const up = await db.storage.from("charts").upload(path, Buffer.from(html, "utf8"), {
     contentType: "text/html; charset=utf-8",
+    cacheControl: "0",
     upsert: true,
   });
   if (up.error) throw new Error(`upload failed: ${up.error.message}`);
@@ -3792,6 +4069,7 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
   let transitInnerSvg: string | undefined;
   let sky: SceneData["sky"];
   let dayRead: DayRead | undefined;
+  let allReads: Record<string, DayRead> = {};
   if (client) {
     const now = new Date();
     const date = now.toISOString().slice(0, 10);
@@ -3809,10 +4087,14 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
         planet: p.planet, gate: p.gate, line: p.line, fixingState: p.fixingState,
       })),
     };
-    dayRead = loadDayRead(client.name, date) ?? undefined;
+    allReads = loadAllReads(client.name);
+    dayRead = allReads[date];
+    const readDates = Object.keys(allReads).sort();
     console.log(dayRead
       ? `Today's read: ${dayRead.paragraph.split(" ").length} words, ${dayRead.completions.length} completion(s) from ${date}`
       : `Today's read: none found for ${date} (no transit report yet)`);
+    console.log(`Archived reads baked in: ${readDates.length}` +
+      (readDates.length ? ` (${readDates[0]} to ${readDates[readDates.length - 1]})` : ""));
     const newlyDefined = [...definedNow].filter((c) => !client.centers.has(c));
     console.log(`Transit (${date} ${time} UTC): ${tGates.size} gates` +
       `, ${liveChannels.length - channels.filter((c) => client.channels.has(c.key)).length} channel(s) completed` +
@@ -3821,7 +4103,7 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
 
   const scene: SceneData = {
     client, inner, plain: client ? plainInner(raw, definitionMap({ client, channels } as SceneData).bridges.map((b) => b.gate)) : undefined,
-    transit: transitInnerSvg, sky, read: dayRead,
+    transit: transitInnerSvg, sky, read: dayRead, reads: allReads,
     channels, slots, centerBox, fn, biology, anchors,
     gateInfo, notSelf, tagInfo: tags, lineName: (g, l) => libNames.line(g, l),
   };

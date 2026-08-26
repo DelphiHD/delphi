@@ -184,6 +184,14 @@ Seeded from Kaycee. Add freely; we triage before building.
 
 ## Notes / open questions
 
+- **People are identified by their display name in three places at once** (the roster, the
+  transit report headings, and the charts that read those headings back), so renaming
+  anyone breaks the link to everything written before the rename. Hit twice on 2026-08-26:
+  Paul Hollingshead and Sarah Gallardo. `headingByRename` patches it; a real identifier
+  would fix it. Options put to Kaycee, awaiting her call: put the slug in the report
+  headings (cheap, only helps reports written from now on), give everyone a stable id
+  across roster/reports/Notion (clean, wide blast radius), or leave it. Structural, so it
+  is her decision, not the agent's.
 - Built for laptop/desktop landscape. iPad/narrow-screen stacking is a future task.
 - Channel highlight currently rings both endpoint gates and thickens the channel
   group stroke. If a stronger channel glow is wanted, that's a refinement.
@@ -206,3 +214,48 @@ legible. Fix if it starts to bother her: shrink the mandala slightly or shift it
 dock in that view only.
 
 The teaching diagram keeps its controls in the panel; it has the room.
+
+## Date picker on the Transit view (2026-08-26)
+
+Above the TODAY section the transit view carries a date row: back and forward arrows, a
+date field, a Today link that appears only when you have moved off today, and a row of
+pills for that person's own life cycles (Saturn Return, Uranus Opposition, Chiron Return,
+Second Saturn Return), read straight off their Foundation report's timeline chapter.
+Clicking a pill jumps the chart to that date. Kaycee's requirement was that clients be
+able to look ahead, not only back.
+
+The chart is a baked HTML file, so it cannot be re-rendered on the server for a new date.
+Instead the page fetches `/api/sky?date=YYYY-MM-DD` (12:00 UTC anchor, matching the daily
+report) and repaints the transit canvas in place: transit legs and discs, the gate numbers
+that sit on them, any centre that a transit defines or stops defining, and every row of the
+transit column. Every gate the client does not carry is tagged as a paintable transit disc
+at build time so any day's sky can be drawn, not just the day the file was built.
+
+The words are baked, not fetched: `loadAllReads` pulls every archived
+`~/Desktop/HD Reports/Transits/<date> - Daily Transit Report.md` for that person into the
+payload. Roughly 20 days each, a few kilobytes, and no dependency on a laptop being awake.
+A day with no report shows the sky plus a note saying so, and the survey hides itself
+because there is nothing to say landed.
+
+### Two traps worth remembering
+
+**Names are not identifiers.** Reports on disk carry whatever the roster called someone
+that morning, so renaming a client orphans every read they have. `headingByRename` resolves
+this against the report itself: headings that match a roster name exactly are spoken for,
+and a leftover heading matches only someone whose first name it is who has no heading of
+their own in that same report, and only when exactly one person fits. "Sarah" in a report
+that already names Sarah Marie is the other Sarah; "Sarah" in a report naming neither is
+left unmatched rather than guessed at. This is a patch, not a fix: see the open question
+below about giving people real identifiers.
+
+**Storage caches uploads for an hour by default.** `publishChart` sets `cacheControl: "0"`,
+without which a republished chart keeps serving the previous file to the client holding the
+link, which would also silently break any nightly refresh.
+
+### Highlight styling
+
+One gold ring, everywhere. Hovering a gate anywhere (client column, transit column, read,
+channel list) draws a 3px `#f1c232` / `#ffcc00` stroke around the gate disc and nothing
+else: no fill, no pill, no drop-shadow. A filled pill was tried for the client column and
+rejected on sight, correctly, because it made that one highlight behave unlike every other
+highlight on the chart. Solid colour, never a glow.
