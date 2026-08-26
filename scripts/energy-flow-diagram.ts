@@ -43,7 +43,7 @@ import { loadLibraryNames } from "@/lib/hd/library-names";
 import { renderFullMandala } from "@/lib/render/mandala";
 import type { ChartSide, Planet } from "@/lib/render/mandala.types";
 import { getChart, getTimezoneForLocation } from "@/lib/mybodygraph";
-import { clientFromSlug, clientOutputDir, type ClientBrief } from "./client-roster";
+import { clientFromSlug, clientOutputDir, type ClientBrief, placeForLookup } from "./client-roster";
 import { loadDayRead, type DayRead } from "@/lib/transit/reads";
 import { castSkyAt } from "@/lib/transit/sky";
 
@@ -627,10 +627,10 @@ function profileWithLines(value: string): string {
 }
 
 async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
-  const tz = await getTimezoneForLocation(brief.birthPlace);
+  const tz = await getTimezoneForLocation(placeForLookup(brief));
   const chart = await getChart({
     birthDate: brief.birthDate, birthTime: brief.birthTime, timezone: tz,
-    locationQuery: brief.birthPlace, brandedSvg: true,
+    locationQuery: placeForLookup(brief), brandedSvg: true,
   });
   const svg = chart.bodygraphSvg ?? chart.chartImageSvg;
   if (!svg || !svg.includes("<svg")) {

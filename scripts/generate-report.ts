@@ -29,7 +29,7 @@ import { buildQuickstart } from "@/lib/report/quickstart";
 import { renderReportDocx, svgToPng } from "@/lib/render/docx";
 import { renderCrossMandala } from "@/lib/render/mandala";
 import type { Activation as MandalaActivation, MandalaChart, Planet as MandalaPlanet } from "@/lib/render/mandala.types";
-import { CLIENTS, type ClientBrief } from "./client-roster";
+import { CLIENTS, type ClientBrief, placeForLookup } from "./client-roster";
 
 function must(name: string): string {
   const v = process.env[name];
@@ -108,15 +108,15 @@ async function main() {
   console.log(`\n=== ${kindLabel} for ${brief.name} ===\n`);
 
   // 1. Resolve timezone + fetch chart.
-  console.log(`Resolving timezone for "${brief.birthPlace}"…`);
-  const tz = await getTimezoneForLocation(brief.birthPlace);
+  console.log(`Resolving timezone for "${placeForLookup(brief)}"…`);
+  const tz = await getTimezoneForLocation(placeForLookup(brief));
   console.log(`  ${tz}`);
   console.log(`Fetching chart from mybodygraph…`);
   const chart = await getChart({
     birthDate: brief.birthDate,
     birthTime: brief.birthTime,
     timezone: tz,
-    locationQuery: brief.birthPlace,
+    locationQuery: placeForLookup(brief),
     includeChartImage: renderDocx, // pulls the Delphi-styled bodygraph SVG
   });
   console.log(`  ${chart.type.value} | ${chart.profile.value} | ${chart.authority.value} | ${chart.definition.value}`);

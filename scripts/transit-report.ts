@@ -35,7 +35,7 @@ import { rankImpacts, type ClientImpact } from "@/lib/transit/impact";
 import { buildTransitReport, buildBabyOverview, buildSyntheses, buildPersonReads } from "@/lib/report/transit";
 import { renderTransitHtml, type BabyEntry } from "./render-transit-html";
 
-import { CLIENTS, type ClientBrief } from "./client-roster";
+import { CLIENTS, type ClientBrief, placeForLookup } from "./client-roster";
 
 function must(name: string): string {
   const v = process.env[name];
@@ -64,12 +64,12 @@ async function loadNatalChart(client: ClientBrief): Promise<Chart> {
   if (existsSync(path)) {
     return JSON.parse(readFileSync(path, "utf8")) as Chart;
   }
-  const tz = await getTimezoneForLocation(client.birthPlace);
+  const tz = await getTimezoneForLocation(placeForLookup(client));
   const chart = await getChart({
     birthDate: client.birthDate,
     birthTime: client.birthTime,
     timezone: tz,
-    locationQuery: client.birthPlace,
+    locationQuery: placeForLookup(client),
   });
   writeFileSync(path, JSON.stringify(chart));
   return chart;

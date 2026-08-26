@@ -7,7 +7,22 @@ export interface ClientBrief {
   name: string;
   birthDate: string;   // YYYY-MM-DD
   birthTime: string;   // HH:MM (24h)
-  birthPlace: string;  // free-form, must resolve via mybodygraph /locations
+  birthPlace: string;  // what the chart prints, and the truth about where they were born
+  /** Only when birthPlace is a town the chart provider has never heard of. The
+   *  provider's gazetteer stops at fairly large places, so a birth in Salmon,
+   *  Idaho has to be looked up as somewhere it knows in the same timezone. The
+   *  chart is identical either way, because only the instant matters; this
+   *  exists so a small town still prints on the client's own chart instead of
+   *  being quietly replaced by the nearest city. */
+  lookupPlace?: string;
+}
+
+/** The place to ASK the chart provider about, which is not always the place
+ *  someone was born. Everything that resolves a timezone or casts a chart goes
+ *  through here; everything that shows a person where they were born uses
+ *  birthPlace. */
+export function placeForLookup(c: ClientBrief): string {
+  return c.lookupPlace ?? c.birthPlace;
 }
 
 export const CLIENTS: Record<string, ClientBrief> = {
@@ -39,6 +54,9 @@ export const CLIENTS: Record<string, ClientBrief> = {
   jack:     { slug: "jack",     name: "Jack Hollingshead",  birthDate: "2007-03-21", birthTime: "20:32", birthPlace: "American Fork, Utah, United States" },
   bryan:    { slug: "bryan",    name: "Bryan Rodabough",    birthDate: "1986-08-01", birthTime: "10:41", birthPlace: "Bountiful, Utah, United States" },
   sarahco:  { slug: "sarahco",  name: "Sarah Gallardo",     birthDate: "1981-10-28", birthTime: "10:51", birthPlace: "Colorado Springs, Colorado, United States" },
+  lance:    { slug: "lance", name: "Lance Wall", birthDate: "1980-06-13", birthTime: "03:54", birthPlace: "Salt Lake City, Utah, United States" },
+  daniela:  { slug: "daniela", name: "Daniela Montoya", birthDate: "1990-01-30", birthTime: "06:30", birthPlace: "Bogota, Colombia" },
+  david:    { slug: "david", name: "David Whiting", birthDate: "1983-06-15", birthTime: "15:45", birthPlace: "Salmon, Idaho, United States", lookupPlace: "Idaho Falls, Idaho, United States" },
 };
 
 /** Resolve a slug to a ClientBrief or exit with usage. */

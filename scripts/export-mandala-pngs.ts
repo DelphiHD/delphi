@@ -29,7 +29,7 @@ import type { MandalaChart, Activation, Planet } from "@/lib/render/mandala.type
 const HOST = "https://api.bodygraphchart.com";
 const API_KEY = process.env.MYBODYGRAPH_API_KEY!;
 
-import { CLIENTS, clientFromSlug, clientOutputDir, type ClientBrief } from "./client-roster";
+import { CLIENTS, clientFromSlug, clientOutputDir, type ClientBrief, placeForLookup } from "./client-roster";
 
 const PLANET_KEY_MAP: Record<string, Planet> = {
   Sun: "sun", Earth: "earth", Moon: "moon",
@@ -300,7 +300,7 @@ async function lookupTimezone(query: string): Promise<string> {
 }
 
 async function fetchChart(c: ClientBrief): Promise<any> {
-  const tz = await lookupTimezone(c.birthPlace);
+  const tz = await lookupTimezone(placeForLookup(c));
   const url = new URL(`${HOST}/v221006/hd-data`);
   url.searchParams.set("api_key", API_KEY);
   url.searchParams.set("date", `${c.birthDate} ${c.birthTime}`);
