@@ -1996,6 +1996,7 @@ body.nomotion .beam { display:none; }
 /* Every drawn shape, at any depth: the legs sit inside nested groups, and a
    fill on a group never beats a fill attribute on the path inside it, so a
    direct-child selector recolours only half the channel. */
+svg.canvas.plain .gdisc.in-isle { fill:var(--isle) !important; }
 svg.canvas.plain .chgrp.in-isle path, svg.canvas.plain .chgrp.in-isle polygon,
 svg.canvas.plain .chgrp.in-isle rect { fill:var(--isle) !important; }
 svg.canvas:not(.plain) .ch.in-isle path, svg.canvas:not(.plain) .ch.in-isle polygon,
@@ -2192,7 +2193,10 @@ if (DATA.client) {
   document.getElementById('defdrop').hidden = false;
 
   // definition: the islands, and the gates that would join them
-  var ISLE_COLORS = ['#845095', '#17c9c0', '#ff9f1c', '#ef4b4b'];
+  // Island colours. Deliberately dark enough that the white gate number on a
+// filled disc stays readable: the old bright teal gave white text about 2:1,
+// which looked washed out at chart size.
+  var ISLE_COLORS = ['#1d4ed8', '#0d9488', '#c2410c', '#be123c'];
   var isles = DATA.client.islands || [];
   var bridges = DATA.client.bridges || [];
   var centerName = {};
@@ -2252,6 +2256,13 @@ if (DATA.client) {
       var i = isleOfChannel[el.dataset.ch];
       var col = (on && i !== undefined) ? ISLE_COLORS[i % 4] : '';
       el.style.filter = '';
+      if (col) el.style.setProperty('--isle', col); else el.style.removeProperty('--isle');
+      el.classList.toggle('in-isle', !!col);
+    });
+    // the gate discs at each end of those channels are part of the island
+    [].forEach.call(document.querySelectorAll('.gdisc'), function (el) {
+      var i = isleOfGate[el.dataset.gate];
+      var col = (on && i !== undefined) ? ISLE_COLORS[i % 4] : '';
       if (col) el.style.setProperty('--isle', col); else el.style.removeProperty('--isle');
       el.classList.toggle('in-isle', !!col);
     });
