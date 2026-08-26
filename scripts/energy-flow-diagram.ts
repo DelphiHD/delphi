@@ -2417,14 +2417,18 @@ body.view-transit .todaysec, body.view-transit .datesec { display:block; }
 .todaysec > summary::-webkit-details-marker { display:none; }
 .todaysec > summary::after { content:" \\25B4"; color:var(--purple); font-size:12px; }
 .todaysec:not([open]) > summary::after { content:" \\25BE"; }
-.datepick { display:flex; align-items:center; gap:5px; }
-.dstep { font-size:14px; line-height:1; padding:3px 9px; }
+.datepick { display:flex; align-items:center; gap:4px; }
+.dstep { flex:0 0 auto; font-size:13px; line-height:1; padding:3px 6px; }
 .dfield { flex:1 1 auto; min-width:0; font-family:inherit; font-size:11px; padding:4px 6px;
   border-radius:7px; border:1px solid rgba(132,80,149,.25); background:rgba(255,255,255,.7); color:inherit; }
-.dtoday { font-size:10px; padding:4px 8px; visibility:hidden; }
+.dtoday { flex:0 0 auto; font-size:9.5px; padding:4px 7px; visibility:hidden; }
 .dtoday.show { visibility:visible; }
-.tfield { flex:0 0 auto; width:104px; }
-.tzlab { flex:1 1 auto; font-size:10px; opacity:.55; letter-spacing:.06em; }
+.tfield { flex:0 0 auto; width:82px; }
+/* The native pickers' own calendar and clock glyphs cost about 20px each and
+   buy nothing: both fields are typed into or stepped with the arrows, and the
+   whole row only fits on one line without them. */
+.dfield::-webkit-calendar-picker-indicator { display:none; }
+.dfield::-webkit-inner-spin-button { display:none; }
 .cycrow { display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
 .cycpill { font-size:10px; padding:4px 9px; border-radius:999px; line-height:1.1;
   border:1px solid rgba(132,80,149,.34); background:transparent; color:inherit;
@@ -2568,11 +2572,8 @@ ${d.client ? "" : viewControls}
         <button class="dstep" id="dprev" title="Previous day">&#8249;</button>
         <input class="dfield" id="dfield" type="date">
         <button class="dstep" id="dnext" title="Next day">&#8250;</button>
-      </div>
-      <div class="datepick">
         <input class="dfield tfield" id="tfield" type="time" step="60">
-        <span class="tzlab" id="tzlab"></span>
-        <button class="dtoday" id="dtoday">Now</button>
+        <button class="dtoday" id="dtoday" title="Jump to right now">Now</button>
       </div>
     </div>
     <details class="todaysec drop" id="todaysec" open>
@@ -3271,7 +3272,7 @@ if (DATA.client) {
       } catch (e) { /* older browser: the zone label is a nicety, not the data */ }
       return '';
     })();
-    document.getElementById('tzlab').textContent = TZ;
+    if (TZ) tfield.title = 'Your local time (' + TZ + ')';
 
     // the moment the file was built, as the viewer's own clock reads it
     var baked = new Date(DATA.sky.date + 'T' + DATA.sky.time + ':00Z');
