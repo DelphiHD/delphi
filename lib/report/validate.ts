@@ -382,6 +382,12 @@ export function validateReport(text: string, dp: DataPass, tier: ReportTier = "f
         if (/\b(unlike|not a|not an|not the|rather than|in contrast to|whereas a|whereas an)\s*$/i.test(beforeWindow)) continue;
         // Skip generic-teaching: "A Manifestor chart runs", "An MG design produces"
         if (/\b(?:a|an)\s*$/i.test(beforeWindow) && /^\s*(?:chart|design|configuration|person|type|kind)\b/i.test(afterWindowType)) continue;
+        // Skip a general statement about the OTHER type-group that uses its own
+        // pronoun (their/they/them) and does not address the reader (you/your):
+        // "Manifesting Generators have the Sacral connected to the Throat, which
+        // changes THEIR relationship to action" is a contrastive definition on a
+        // Generator chart, not a claim that the reader is that type.
+        if (/\b(?:their|they|them)\b/.test(afterWindowType) && !/\b(?:you|your)\b/.test(afterWindowType)) continue;
         factsChecked++;
         pushHard({
           section: "(any)",
@@ -461,8 +467,12 @@ export function validateReport(text: string, dp: DataPass, tier: ReportTier = "f
       // or a hypothetical BRIDGING description ("when the sacral island is
       // bridged ... a path to the throat"). Only a bare assertion that the
       // Sacral IS connected is a fabrication.
-      const span = text.slice(Math.max(0, idx - 34), idx + m[0].length).toLowerCase();
+      const span = text.slice(Math.max(0, idx - 42), idx + m[0].length).toLowerCase();
       if (/\bbridg/.test(span) || /\b(?:no|not|never|without|cannot)\b|n't/.test(span) || /\bwould\b|\bwere\b/.test(span)) continue;
+      // Skip a general statement about Manifesting Generators (a contrastive
+      // definition, e.g. "Manifesting Generators have the Sacral connected to
+      // the Throat"), which describes the MG type, not the reader's chart.
+      if (/manifesting generator/.test(span)) continue;
       factsChecked++;
       pushHard({
         section: "(any)",
