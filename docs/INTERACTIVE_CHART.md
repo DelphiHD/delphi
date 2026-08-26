@@ -192,6 +192,14 @@ Seeded from Kaycee. Add freely; we triage before building.
   headings (cheap, only helps reports written from now on), give everyone a stable id
   across roster/reports/Notion (clean, wide blast radius), or leave it. Structural, so it
   is her decision, not the agent's.
+- **Twelve of the 28 have no cycle pills** (Brit, Chris Kulish, Jason, Kaycee, Matt
+  Hollingshead, Max Jones, Meelad Kharazian, Michael, Sarah Marie, Sean Preetorious,
+  Tennyson, Tiff): their Foundation report has no timeline chapter for `report.cycles` to
+  read. A gap in the source document, not the chart. Regenerating those reports would fill
+  it in; Kaycee's call whether it is worth it.
+- An hourly ephemeris grid like Maia Mechanics' is within reach: `scanDay()` already exists
+  and the picker was the harder half. The open question is the source of positions, one API
+  call per hour versus a local Swiss Ephemeris. Structural, so Kaycee's call.
 - Built for laptop/desktop landscape. iPad/narrow-screen stacking is a future task.
 - Channel highlight currently rings both endpoint gates and thickens the channel
   group stroke. If a stronger channel glow is wanted, that's a refinement.
@@ -224,9 +232,16 @@ Second Saturn Return), read straight off their Foundation report's timeline chap
 Clicking a pill jumps the chart to that date. Kaycee's requirement was that clients be
 able to look ahead, not only back.
 
-The chart is a baked HTML file, so it cannot be re-rendered on the server for a new date.
-Instead the page fetches `/api/sky?date=YYYY-MM-DD` (12:00 UTC anchor, matching the daily
-report) and repaints the transit canvas in place: transit legs and discs, the gate numbers
+A second row carries the **time**, with the viewer's timezone beside it and a Now button.
+The Moon changes line several times a day, so a client who knows when something happened
+wants the sky at that hour rather than at an anchor hour someone else picked. Date and time
+are the viewer's own local clock; the page converts to the UTC instant before asking, so
+the route never has to reason about anybody's timezone. The written read still belongs to
+the calendar day, because that is the unit Kaycee writes in.
+
+The chart is a baked HTML file, so it cannot be re-rendered on the server for a new moment.
+Instead the page fetches `/api/sky?date=YYYY-MM-DD&time=HH:MM` (UTC; 12:00 without a time,
+matching the daily report's anchor) and repaints the transit canvas in place: transit legs and discs, the gate numbers
 that sit on them, any centre that a transit defines or stops defining, and every row of the
 transit column. Every gate the client does not carry is tagged as a paintable transit disc
 at build time so any day's sky can be drawn, not just the day the file was built.
@@ -247,6 +262,16 @@ their own in that same report, and only when exactly one person fits. "Sarah" in
 that already names Sarah Marie is the other Sarah; "Sarah" in a report naming neither is
 left unmatched rather than guessed at. This is a patch, not a fix: see the open question
 below about giving people real identifiers.
+
+**The overlay's centres are not the natal chart's centres.** The load-and-toggle repaint
+computes definition from the client's own gates alone and will paint every transit-defined
+centre back to open if let near the transit canvas. It skips that canvas; the date picker
+owns those fills. This bit twice, once for the channel legs and once for the centres.
+
+**A deployed route can be older than the page asking it.** `/api/sky` echoes the date and
+time it actually cast, and the page refuses to repaint on anything else. Without that, a
+server that does not know about `time` answers for its own anchor hour and says nothing
+about it: the right clock over the wrong sky, with no way for the viewer to tell.
 
 **Storage caches uploads for an hour by default.** `publishChart` sets `cacheControl: "0"`,
 without which a republished chart keeps serving the previous file to the client holding the
