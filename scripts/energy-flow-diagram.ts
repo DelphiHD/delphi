@@ -407,12 +407,20 @@ function tagChart(svg: string): string {
  *  nothing on the chart to point at. Tagging it means the Bridge gates toggle
  *  can draw the missing half, and the whole channel becomes visible: their leg
  *  in its own colour, the gate they lack in bridge pink. */
-function plainInner(svg: string, bridgeGates: number[] = []): string {
-  let s = tagChart(svg);
+/** Tag the legs of gates the client does not carry but which would bridge their
+ *  split, so the Bridge gates toggle has something to paint. Shared by the
+ *  traditional chart and the small bodygraph at the centre of the mandala. */
+function bridgeLegs(tagged: string, bridgeGates: number[]): string {
+  let s = tagged;
   for (const g of new Set(bridgeGates)) {
     s = s.replace(new RegExp(`(<[a-z]+ id="personality-${g}"[^>]*?)fill="[^"]*"`),
       (_m, head: string) => `${head.replace('id="', 'class="bleg" data-gate="' + g + '" id="')}fill="none"`);
   }
+  return s;
+}
+
+function plainInner(svg: string, bridgeGates: number[] = []): string {
+  const s = bridgeLegs(tagChart(svg), bridgeGates);
   return s.replace(/^[\s\S]*?<svg\b[^>]*>/, "").replace(/<\/svg>\s*$/, "");
 }
 
@@ -502,6 +510,30 @@ function loadDayRead(clientName: string, date: string): DayRead | null {
   if (!paragraph) return null;
   return { date, writtenAt, paragraph, completions };
 }
+
+/** The sky for one date, cached on disk. A past moment never changes, so it is
+ *  cast once and reused for every client and every rebuild after. Kaycee's plan
+ *  has unlimited charts, so this is about speed, not money. */
+async function skyForDate(date: string, time: string): Promise<{ planet: string; gate: number; line: number; fixingState: string }[]> {
+  const dir = join(".cache", "transits");
+  const file = join(dir, `sky-${date}-${time.replace(":", "")}.json`);
+  if (existsSync(file)) {
+    try { return JSON.parse(readFileSync(file, "utf8")); } catch { /* fall through and re-cast */ }
+  }
+  const moment = await castSkyAt(date, time, "UTC");
+  const out = moment.positions.map((p) => ({
+    planet: p.planet, gate: p.gate, line: p.line, fixingState: p.fixingState,
+  }));
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(file, JSON.stringify(out));
+  return out;
+}
+
+const shiftDate = (date: string, days: number) => {
+  const d = new Date(date + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+};
 
 // ── transit overlay ─────────────────────────────────────────────────────────
 // Kaycee's colours: the client in island teal, today's sky in neutral
@@ -1647,7 +1679,7 @@ function transitTable(sky: NonNullable<SceneData["sky"]>, skin: Skin, x: number,
     const a = byPlanet.get(planet);
     if (!a) return;
     const ry = headY + 28 + i * rowH;
-    s += `<g class="trow" data-planet="${planetId(planet)}" data-gate="${a.gate}" data-line="${a.line}">`;
+    s += `<g class="trow" data-planet="${esc(planet)}" data-gate="${a.gate}" data-line="${a.line}">`;
     s += `<rect x="2" y="${ry - 19}" width="${W - 4}" height="${rowH}" rx="7" ` +
       `fill="${i % 2 === 1 ? zebra : "transparent"}"></rect>`;
     const mark = fixMark(a.fixingState);
@@ -1933,7 +1965,7 @@ function mandalaView(d: SceneData): string {
         designSun: pick("design", "Sun"),
         designEarth: pick("design", "Earth"),
       },
-      bodygraphSvg: tagChart(d.client.svg),
+      bodygraphSvg: bridgeLegs(tagChart(d.client.svg), definitionMap(d).bridges.map((b) => b.gate)),
     },
     { size: 1200, glyphScale: 1.8 },
   );
@@ -2131,6 +2163,9 @@ body.view-transit .bridge, body.view-transit .halo { display:none; }
 svg.canvas.transit .gdisc { stroke:#0a5f57; stroke-width:1.1; }
 svg.canvas.transit .pnum.on-disc, svg.canvas.transit .pnum.on-disc.off { fill:#ffffff !important; opacity:1 !important; }
 svg.canvas.transit .tdisc { stroke:#101014; stroke-width:1.1; }
+/* a transit gate lit from its column or from the read */
+svg.canvas.transit .tleg.lit { fill:#f1c232 !important; }
+svg.canvas.transit .tdisc.lit { stroke:#f1c232 !important; stroke-width:3 !important; }
 body.view-plain { background:#ffffff; color:#1c1a2e; }
 body.view-transit .panel, body.view-plain .panel { background:rgba(132,80,149,.06); border-color:rgba(132,80,149,.22); }
 body.view-transit .card, body.view-plain .card { background:rgba(255,255,255,.98); border-color:rgba(132,80,149,.28);
@@ -2296,8 +2331,19 @@ body.notables .ptable { display:none; }
 #viewrow button.on, #viewrow button.on:hover { background:#111111; color:#fff; font-weight:600; }
 button.gold { background:#c79a2e; color:#fff; }
 button.gold:hover { background:#b0871f; }
-.todaysec { display:none; margin-top:10px; border-top:1px solid rgba(132,80,149,.18); padding-top:9px; }
-body.view-transit .todaysec { display:block; }
+.todaysec, .datesec { display:none; margin-top:10px; border-top:1px solid rgba(132,80,149,.18); padding-top:9px; }
+body.view-transit .todaysec, body.view-transit .datesec { display:block; }
+.todaysec > summary { font-size:9.5px; letter-spacing:.18em; font-weight:600; opacity:.62; cursor:pointer;
+  text-transform:uppercase; padding:3px 0; list-style:none; }
+.todaysec > summary::-webkit-details-marker { display:none; }
+.todaysec > summary::after { content:" \\25B4"; color:var(--purple); font-size:12px; }
+.todaysec:not([open]) > summary::after { content:" \\25BE"; }
+.datepick { display:flex; align-items:center; gap:5px; }
+.dstep { font-size:14px; line-height:1; padding:3px 9px; }
+.dfield { flex:1 1 auto; min-width:0; font-family:inherit; font-size:11px; padding:4px 6px;
+  border-radius:7px; border:1px solid rgba(132,80,149,.25); background:rgba(255,255,255,.7); color:inherit; }
+.dtoday { font-size:10px; padding:4px 8px; visibility:hidden; }
+.dtoday.show { visibility:visible; }
 /* in the transit view the panel is about today, not about their design */
 body.view-transit #placements, body.view-transit #chandrop, body.view-transit #defdrop { display:none; }
 .todaylab { font-size:9.5px; letter-spacing:.18em; font-weight:600; opacity:.62;
@@ -2383,7 +2429,8 @@ body.show-bridges .bridge { opacity:1; filter: drop-shadow(0 0 4px rgba(210,77,2
 .pgrid label { font-size:11.5px; }
 .side-d { color:${DESIGN_RED}; }
 .prow rect { transition:fill .12s; }
-.prow.hi rect { fill:rgba(132,80,149,.32); }
+.prow.hi rect, .trow.hi rect { fill:rgba(132,80,149,.32); }
+.trow { cursor:pointer; }
 .mandala { display:none; }
 body.view-mandala .mandala { display:block; }
 body.view-mandala svg.canvas { display:none !important; }
@@ -2426,8 +2473,17 @@ ${d.client ? "" : viewControls}
       <div class="row"><button id="pAll">All</button><button id="pNone">None</button></div>
     </details>
 
-    <div class="todaysec" id="todaysec">
-      <div class="todaylab" id="todaylab">TODAY</div>
+    <div class="datesec" id="datesec">
+      <div class="todaylab">Date</div>
+      <div class="datepick">
+        <button class="dstep" id="dprev" title="Previous day">&#8249;</button>
+        <input class="dfield" id="dfield" type="date">
+        <button class="dstep" id="dnext" title="Next day">&#8250;</button>
+        <button class="dtoday" id="dtoday">Today</button>
+      </div>
+    </div>
+    <details class="todaysec drop" id="todaysec" open>
+      <summary id="todaylab">TODAY</summary>
       <div class="todayread" id="todayread"></div>
       <div class="todaylist" id="todaylist"></div>
       <div class="survey" id="survey">
@@ -2441,7 +2497,7 @@ ${d.client ? "" : viewControls}
         <div class="qsend"><button class="qgo" id="qgo">Send</button><span class="qmsg" id="qmsg"></span></div>
         <div class="qdone" id="qdone">Thank you. That has been sent.</div>
       </div>
-    </div>
+    </details>
     <details class="drop" id="chandrop" hidden>
       <summary>Channels</summary>
       <div id="chanlist"></div>
@@ -3248,10 +3304,17 @@ function gatesInCenter(cid) {
   return (DATA.placements || []).filter(function (p) { return p.cid === cid; })
     .map(function (p) { return p.gate; });
 }
+function sidesOf(r) {
+  // a merged row stands for both of the client's sides at once
+  if (r.dataset.side === 'merged') {
+    return [placeBy['personality|' + r.dataset.planet], placeBy['design|' + r.dataset.planet]].filter(Boolean);
+  }
+  var one = placeBy[r.dataset.side + '|' + r.dataset.planet];
+  return one ? [one] : [];
+}
 function markRows(cid) {
   [].forEach.call(document.querySelectorAll('.prow'), function (r) {
-    var p = placeBy[r.dataset.side + '|' + r.dataset.planet];
-    r.classList.toggle('hi', !!cid && !!p && p.cid === cid);
+    r.classList.toggle('hi', !!cid && sidesOf(r).some(function (p) { return p.cid === cid; }));
   });
 }
 /** Highlight exactly these placements in the columns. */
@@ -3259,7 +3322,7 @@ function markRowsFor(list) {
   var want = {};
   (list || []).forEach(function (p) { want[p.side + '|' + p.pid] = 1; });
   [].forEach.call(document.querySelectorAll('.prow'), function (r) {
-    r.classList.toggle('hi', !!want[r.dataset.side + '|' + r.dataset.planet]);
+    r.classList.toggle('hi', sidesOf(r).some(function (p) { return want[p.side + '|' + p.pid]; }));
   });
 }
 function litGate(gates) {
@@ -3267,6 +3330,15 @@ function litGate(gates) {
   if (gates != null) [].concat(gates).forEach(function (g) { want[g] = 1; });
   [].forEach.call(document.querySelectorAll('.halo'), function (h) {
     h.classList.toggle('on', !!want[h.dataset.gate]);
+  });
+  // the sky's own gates have no halo, because the client does not carry them:
+  // their leg and disc take the highlight directly
+  [].forEach.call(document.querySelectorAll('.tleg, .tdisc, .bleg'), function (e) {
+    e.classList.toggle('lit', !!want[e.dataset.gate]);
+  });
+  // the transit column follows the same set, whatever asked for it
+  [].forEach.call(document.querySelectorAll('.trow'), function (r) {
+    r.classList.toggle('hi', !!want[+r.dataset.gate]);
   });
   // the wheel and the bodygraph at its hub follow the same highlight
   [].forEach.call(document.querySelectorAll('.hubring'), function (h) {
@@ -3507,7 +3579,24 @@ document.addEventListener('mousemove', function (e) {
     if (HL) showTip(e, '<b>Gate ' + hg.dataset.gate + '</b>' + esc(HL.name));
     return;
   }
+  var trow = e.target.closest ? e.target.closest('.trow') : null;
+  if (trow) {
+    var tg = +trow.dataset.gate, TL = (DATA.gateLib || {})[tg] || {};
+    hot(null); markRows(null); litGate(tg);
+    showTip(e, '<b>Transit ' + esc(trow.dataset.planet) + '</b>' +
+      esc(tg + '.' + trow.dataset.line) + (TL.name ? ' ' + esc(TL.name) : ''));
+    return;
+  }
   var row = e.target.closest ? e.target.closest('.prow') : null;
+  if (row && row.dataset.side === 'merged') {
+    var both = sidesOf(row);
+    if (!both.length) return;
+    litGate(both.map(function (x) { return x.gate; }));
+    showTip(e, '<b>' + esc(both[0].planet) + '</b>' + both.map(function (x) {
+      return (x.side === 'design' ? 'Design ' : 'Personality ') + x.gate + '.' + x.line;
+    }).join(' \u00b7 '));
+    return;
+  }
   if (row) {
     var p = placeBy[row.dataset.side + '|' + row.dataset.planet];
     if (!p) return;
