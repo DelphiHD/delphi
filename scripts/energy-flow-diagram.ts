@@ -400,9 +400,20 @@ function tagChart(svg: string): string {
   return s;
 }
 
-/** The tagged chart without its wrapper, for dropping into the canvas. */
-function plainInner(svg: string): string {
-  return tagChart(svg).replace(/^[\s\S]*?<svg\b[^>]*>/, "").replace(/<\/svg>\s*$/, "");
+/** The tagged chart without its wrapper, for dropping into the canvas.
+ *
+ *  Bridge gates get their legs tagged on the way through. A bridge gate is one
+ *  the client does NOT carry, so the design leaves its leg unfilled and there is
+ *  nothing on the chart to point at. Tagging it means the Bridge gates toggle
+ *  can draw the missing half, and the whole channel becomes visible: their leg
+ *  in its own colour, the gate they lack in bridge pink. */
+function plainInner(svg: string, bridgeGates: number[] = []): string {
+  let s = tagChart(svg);
+  for (const g of new Set(bridgeGates)) {
+    s = s.replace(new RegExp(`(<[a-z]+ id="personality-${g}"[^>]*?)fill="[^"]*"`),
+      (_m, head: string) => `${head.replace('id="', 'class="bleg" data-gate="' + g + '" id="')}fill="none"`);
+  }
+  return s.replace(/^[\s\S]*?<svg\b[^>]*>/, "").replace(/<\/svg>\s*$/, "");
 }
 
 /** Center shapes: skin fill blended with the center's function color, neutral
@@ -2327,6 +2338,12 @@ body.view-transit #placements, body.view-transit #chandrop, body.view-transit #d
 .booknote a:hover { background:rgba(132,80,149,.12); }
 .booknote a em { font-style:normal; font-weight:500; font-size:10px; opacity:.6; }
 .bridge { opacity:0; transition:opacity .2s; pointer-events:none; }
+/* The half of the channel the client does not carry, drawn in the same pink as
+   the bridge ring so the whole channel reads as one shape: their leg in its own
+   colour, the missing leg in pink. Only while Bridge gates is on. */
+.bleg { fill:none; transition:fill .2s; }
+body.show-bridges .bleg { fill:#d24dff !important; opacity:.62; }
+body.show-bridges .bleg.on { fill:#d24dff !important; opacity:1; }
 body.show-bridges .bridge { opacity:1; filter: drop-shadow(0 0 4px rgba(210,77,255,.75));
   animation:hlpulse 1.8s ease-in-out infinite; }
 .bridge.on { opacity:1 !important; filter: drop-shadow(0 0 4px rgba(210,77,255,.95));
@@ -3710,7 +3727,7 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
   }
 
   const scene: SceneData = {
-    client, inner, plain: client ? plainInner(raw) : undefined,
+    client, inner, plain: client ? plainInner(raw, definitionMap({ client, channels } as SceneData).bridges.map((b) => b.gate)) : undefined,
     transit: transitInnerSvg, sky, read: dayRead,
     channels, slots, centerBox, fn, biology, anchors,
     gateInfo, notSelf, tagInfo: tags, lineName: (g, l) => libNames.line(g, l),
