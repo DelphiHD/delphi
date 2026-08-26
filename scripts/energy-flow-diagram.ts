@@ -1734,9 +1734,11 @@ function transitTable(sky: NonNullable<SceneData["sky"]>, skin: Skin, x: number,
   let s = `<g class="ptable" data-side="transit" transform="translate(${x},${y})">`;
   s += `<text x="${W / 2}" y="0" text-anchor="middle" font-size="12" font-weight="600" ` +
     `letter-spacing=".16em" fill="${TRANSIT_INK}">TRANSIT</text>`;
-  s += `<text class="tdate" x="${W / 2}" y="18" text-anchor="middle" font-size="13.5" ` +
+  s += `<text class="tdate" x="${W / 2}" y="17" text-anchor="middle" font-size="13" ` +
     `font-weight="700" fill="${TRANSIT_INK}">${esc(shortDate(sky.date))}</text>`;
-  const headY = 26;
+  s += `<text class="ttime" x="${W / 2}" y="29" text-anchor="middle" font-size="10.5" ` +
+    `font-weight="600" fill="${TRANSIT_INK}" opacity=".72">${esc(sky.time)} UTC</text>`;
+  const headY = 36;
   s += `<line x1="6" y1="${headY}" x2="${W - 6}" y2="${headY}" stroke="${TRANSIT_INK}" stroke-width="1.6"></line>`;
   PLANET_ROWS.forEach((planet, i) => {
     const a = byPlanet.get(planet);
@@ -2168,7 +2170,7 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, fonts: Map<n
         center: CENTER_DISPLAY[centerOf(g)], cid: centerOf(g),
       }]),
     ),
-    sky: d.sky ? { date: d.sky.date, positions: d.sky.positions.map((p) => ({
+    sky: d.sky ? { date: d.sky.date, time: d.sky.time, positions: d.sky.positions.map((p) => ({
       planet: p.planet, gate: p.gate, line: p.line, fixingState: p.fixingState,
     })) } : null,
     natalGates: d.client ? [...new Set(d.client.acts.map((a) => a.gate))].sort((a, b) => a - b) : [],
@@ -2421,6 +2423,8 @@ body.view-transit .todaysec, body.view-transit .datesec { display:block; }
   border-radius:7px; border:1px solid rgba(132,80,149,.25); background:rgba(255,255,255,.7); color:inherit; }
 .dtoday { font-size:10px; padding:4px 8px; visibility:hidden; }
 .dtoday.show { visibility:visible; }
+.tfield { flex:0 0 auto; width:104px; }
+.tzlab { flex:1 1 auto; font-size:10px; opacity:.55; letter-spacing:.06em; }
 .cycrow { display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
 .cycpill { font-size:10px; padding:4px 9px; border-radius:999px; line-height:1.1;
   border:1px solid rgba(132,80,149,.34); background:transparent; color:inherit;
@@ -2564,7 +2568,11 @@ ${d.client ? "" : viewControls}
         <button class="dstep" id="dprev" title="Previous day">&#8249;</button>
         <input class="dfield" id="dfield" type="date">
         <button class="dstep" id="dnext" title="Next day">&#8250;</button>
-        <button class="dtoday" id="dtoday">Today</button>
+      </div>
+      <div class="datepick">
+        <input class="dfield tfield" id="tfield" type="time" step="60">
+        <span class="tzlab" id="tzlab"></span>
+        <button class="dtoday" id="dtoday">Now</button>
       </div>
     </div>
     <details class="todaysec drop" id="todaysec" open>
@@ -3042,6 +3050,10 @@ if (DATA.client) {
   // would silently become a literal letter.
   var SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  var TODAY_LOCAL = (function () {
+    var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  })();
   function shortDate(iso) {
     var b = String(iso).split('-');
     return SHORT_MONTHS[+b[1] - 1] + ' ' + (+b[2]) + ', ' + b[0];
@@ -3056,7 +3068,7 @@ if (DATA.client) {
     var listEl = document.getElementById('todaylist');
     var survey = document.getElementById('survey');
     if (!lab0) return;
-    var today = (DATA.sky || {}).date;
+    var today = TODAY_LOCAL;
     var day = (R && R.date) || forDate || today;
     // Kaycee writes one of these each morning, so a day she has not written is
     // ordinary rather than an error. The survey asks whether the read landed:
@@ -3140,7 +3152,7 @@ if (DATA.client) {
   }
 
   if (DATA.read || Object.keys(DATA.reads || {}).length) {
-    renderRead(DATA.read, (DATA.sky || {}).date);
+    renderRead((DATA.reads || {})[TODAY_LOCAL] || DATA.read, TODAY_LOCAL);
 
     // hovering the prose or a completion lights exactly what the rest of the
     // panel lights, so the read and the chart behave as one object
@@ -3194,12 +3206,18 @@ if (DATA.client) {
   document.getElementById('siderow').hidden = false;
   document.getElementById('viewsec').hidden = false;
   document.getElementById('viewrow').hidden = false;
-  // ── the date picker ───────────────────────────────────────────────────────
-  // The chart is a baked file, so stepping to another day cannot re-render it
-  // on the server. Instead the page asks for that day's sky and repaints the
+  // ── the date and time picker ──────────────────────────────────────────────
+  // The chart is a baked file, so moving to another moment cannot re-render it
+  // on the server. Instead the page asks for that moment's sky and repaints the
   // transit canvas in place: legs, discs, gate numbers, centres and the transit
   // column. The words that go with a day are baked in rather than fetched,
   // because they come out of Kaycee's own morning reports.
+  //
+  // Date AND time, because the Moon changes line several times a day and a
+  // client who knows when something happened wants the sky at that hour, not at
+  // an anchor hour someone else picked. The fields are the viewer's own local
+  // clock, labelled with their zone; the instant is converted to UTC before it
+  // is asked for, so the server never has to reason about anybody's timezone.
   //
   // The pills are the client's own cycle dates, read straight off their
   // Foundation report's timeline, so looking ahead to a Saturn return is one
@@ -3207,12 +3225,9 @@ if (DATA.client) {
   (function () {
     var sec = document.getElementById('datesec');
     if (!sec || !DATA.sky) return;
-    var TODAY = DATA.sky.date;
-    var field = document.getElementById('dfield');
-    var todayBtn = document.getElementById('dtoday');
-    var cur = TODAY, busy = false;
-    var cache = {};
-    cache[TODAY] = DATA.sky.positions;
+    var dfield = document.getElementById('dfield');
+    var tfield = document.getElementById('tfield');
+    var nowBtn = document.getElementById('dtoday');
     var natal = {};
     (DATA.natalGates || []).forEach(function (g) { natal[g] = 1; });
     var UP = String.fromCharCode(0x25B2), DOWN = String.fromCharCode(0x25BC);
@@ -3221,14 +3236,19 @@ if (DATA.client) {
       'august', 'september', 'october', 'november', 'december'];
 
     function pad(n) { return (n < 10 ? '0' : '') + n; }
-    function ymd(d) {
-      return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
+    function localDate(d) {
+      return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
     }
-    function parse(s) { return new Date(s + 'T12:00:00Z'); }
-    function shift(s, days) {
-      var d = parse(s);
-      d.setUTCDate(d.getUTCDate() + days);
-      return ymd(d);
+    function localTime(d) { return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+    // a local wall clock reading, back to the instant it names
+    function instant(ymd, hm) {
+      var a = ymd.split('-'), b = hm.split(':');
+      return new Date(+a[0], +a[1] - 1, +a[2], +b[0], +b[1], 0, 0);
+    }
+    function clock12(hm) {
+      var b = hm.split(':'), h = +b[0], ap = h < 12 ? 'AM' : 'PM';
+      h = h % 12; if (h === 0) h = 12;
+      return h + ':' + b[1] + ' ' + ap;
     }
     // "January 26, 2015" out of the report, without a regular expression: this
     // script lives in a template literal that eats the backslashes one needs.
@@ -3241,6 +3261,23 @@ if (DATA.client) {
       if (mi < 0 || !day || !year) return null;
       return year + '-' + pad(mi + 1) + '-' + pad(day);
     }
+    var TZ = (function () {
+      try {
+        var parts = new Intl.DateTimeFormat(undefined, { timeZoneName: 'short' })
+          .formatToParts(new Date());
+        for (var i = 0; i < parts.length; i++) {
+          if (parts[i].type === 'timeZoneName') return parts[i].value;
+        }
+      } catch (e) { /* older browser: the zone label is a nicety, not the data */ }
+      return '';
+    })();
+    document.getElementById('tzlab').textContent = TZ;
+
+    // the moment the file was built, as the viewer's own clock reads it
+    var baked = new Date(DATA.sky.date + 'T' + DATA.sky.time + ':00Z');
+    var curD = localDate(baked), curT = localTime(baked);
+    var cache = {};
+    cache[DATA.sky.date + 'T' + DATA.sky.time] = DATA.sky.positions;
 
     // ── the cycle pills ──────────────────────────────────────────────────────
     var pills = ((DATA.client || {}).cycles || []).map(function (c) {
@@ -3251,17 +3288,17 @@ if (DATA.client) {
       wrap.className = 'cycrow';
       wrap.innerHTML = pills.map(function (c, i) {
         return '<button class="cycpill" data-i="' + i + '" title="' + esc(c.label) +
-          ' · ' + esc(c.date) + '">' + esc(c.label) + '</button>';
+          ' &middot; ' + esc(c.status) + '">' + esc(c.label) + '</button>';
       }).join('');
       sec.appendChild(wrap);
       wrap.addEventListener('click', function (e) {
         var b = e.target.closest ? e.target.closest('.cycpill') : null;
-        if (b) go(pills[+b.dataset.i].date);
+        if (b) go(pills[+b.dataset.i].date, curT);
       });
     }
 
-    // ── painting one day onto the chart ──────────────────────────────────────
-    function repaint(date, positions) {
+    // ── painting one moment onto the chart ───────────────────────────────────
+    function repaint(d, t, positions) {
       var lit = {};
       positions.forEach(function (p) { lit[p.gate] = 1; });
 
@@ -3280,7 +3317,7 @@ if (DATA.client) {
       });
 
       // a centre a transit has just defined has to read as defined, and a
-      // centre that was only defined by yesterday's transit has to open again
+      // centre that was only defined a moment ago has to open again
       var have = {};
       Object.keys(natal).forEach(function (g) { have[g] = 1; });
       Object.keys(lit).forEach(function (g) { have[g] = 1; });
@@ -3311,47 +3348,68 @@ if (DATA.client) {
         var p = byP[t.dataset.planet];
         if (p) t.textContent = p.fixingState === 'Exalted' ? UP : p.fixingState === 'Detriment' ? DOWN : '';
       });
-      [].forEach.call(document.querySelectorAll('.tdate'), function (t) { t.textContent = shortDate(date); });
+      [].forEach.call(document.querySelectorAll('.tdate'), function (e) { e.textContent = shortDate(d); });
+      [].forEach.call(document.querySelectorAll('.ttime'), function (e) {
+        e.textContent = clock12(t) + (TZ ? ' ' + TZ : '');
+      });
 
-      // and the words, when Kaycee has written any for that day
-      renderRead((DATA.reads || {})[date] || (date === TODAY ? DATA.read : null), date);
-      litGate(null);
+      // and the words, which belong to the calendar day rather than the hour
+      renderRead((DATA.reads || {})[d] || null, d);
     }
 
-    // ── moving between days ──────────────────────────────────────────────────
-    function go(date) {
-      if (busy || !date || date === cur) return;
-      cur = date;
-      field.value = date;
-      todayBtn.classList.toggle('show', date !== TODAY);
+    // ── moving between moments ───────────────────────────────────────────────
+    function go(d, t) {
+      if (busyFlag || !d || !t || (d === curD && t === curT)) return;
+      curD = d; curT = t;
+      dfield.value = d;
+      tfield.value = t;
       [].forEach.call(document.querySelectorAll('.cycpill'), function (b) {
-        b.classList.toggle('on', pills[+b.dataset.i].date === date);
+        b.classList.toggle('on', pills[+b.dataset.i].date === d);
       });
-      if (cache[date]) { repaint(date, cache[date]); return; }
-      busy = true;
+      var iso = instant(d, t).toISOString();
+      var utcD = iso.slice(0, 10), utcT = iso.slice(11, 16), key = utcD + 'T' + utcT;
+      if (cache[key]) { repaint(d, t, cache[key]); litGate(null); return; }
+      busyFlag = true;
       sec.classList.add('loading');
-      fetch('/api/sky?date=' + date).then(function (r) { return r.json(); }).then(function (j) {
+      fetch('/api/sky?date=' + utcD + '&time=' + utcT).then(function (r) { return r.json(); }).then(function (j) {
         if (!j || !j.ok) throw new Error(j && j.error ? j.error : 'no sky');
-        cache[date] = j.positions;
-        if (cur === date) repaint(date, j.positions);
+        cache[key] = j.positions;
+        if (curD === d && curT === t) { repaint(d, t, j.positions); litGate(null); }
       }).catch(function () {
-        // loud rather than a chart that quietly shows the wrong day
+        // loud rather than a chart that quietly shows the wrong moment
+        document.getElementById('todaylab').textContent = shortDate(d);
         var read = document.getElementById('todayread');
-        document.getElementById('todaylab').textContent = 'TODAY';
         if (read) read.innerHTML = '<div class="noread">Could not reach the sky for ' +
-          esc(date) + '. The chart is still showing ' + esc(cur === date ? TODAY : cur) + '.</div>';
+          esc(shortDate(d)) + ' at ' + esc(clock12(t)) + '. Nothing on the chart has changed.</div>';
         document.getElementById('todaylist').innerHTML = '';
       }).then(function () {
-        busy = false;
+        busyFlag = false;
         sec.classList.remove('loading');
       });
     }
+    var busyFlag = false;
 
-    field.value = TODAY;
-    field.addEventListener('change', function () { if (field.value) go(field.value); });
-    document.getElementById('dprev').addEventListener('click', function () { go(shift(cur, -1)); });
-    document.getElementById('dnext').addEventListener('click', function () { go(shift(cur, 1)); });
-    todayBtn.addEventListener('click', function () { go(TODAY); });
+    function shiftDay(days) {
+      var d = instant(curD, curT);
+      d.setDate(d.getDate() + days);
+      go(localDate(d), localTime(d));
+    }
+
+    dfield.value = curD;
+    tfield.value = curT;
+    nowBtn.classList.add('show');
+    renderRead((DATA.reads || {})[curD] || null, curD);
+    [].forEach.call(document.querySelectorAll('.ttime'), function (e) {
+      e.textContent = clock12(curT) + (TZ ? ' ' + TZ : '');
+    });
+    dfield.addEventListener('change', function () { if (dfield.value) go(dfield.value, curT); });
+    tfield.addEventListener('change', function () { if (tfield.value) go(curD, tfield.value.slice(0, 5)); });
+    document.getElementById('dprev').addEventListener('click', function () { shiftDay(-1); });
+    document.getElementById('dnext').addEventListener('click', function () { shiftDay(1); });
+    nowBtn.addEventListener('click', function () {
+      var n = new Date();
+      go(localDate(n), localTime(n));
+    });
   })();
 
   document.getElementById('actrow').hidden = false;
@@ -3512,6 +3570,12 @@ function relight() {
     defCenters[c.cFrom] = 1; defCenters[c.cTo] = 1;
   });
   [].forEach.call(document.querySelectorAll('.cshape'), function (el) {
+    // The overlay's definition is natal PLUS whatever the sky is completing,
+    // and it changes with the date picker. This repaint only knows the natal
+    // chart, so left alone it runs on load and paints every transit-defined
+    // centre back to open. The transit canvas owns its own centres.
+    var sv = el.closest ? el.closest('svg.canvas') : null;
+    if (sv && sv.classList.contains('transit')) return;
     var on = !!defCenters[el.dataset.center];
     el.setAttribute('fill', on ? el.dataset.on : el.dataset.off);
     el.classList.toggle('open', !on);

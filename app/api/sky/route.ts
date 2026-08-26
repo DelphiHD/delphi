@@ -9,7 +9,9 @@
 // twice is one call to the chart provider, ever. Her plan has unlimited charts,
 // so this is about speed rather than money.
 //
-// Anchored at 12:00 UTC, matching the anchor her daily report uses, so the
+// Times are UTC. The page does the local-time arithmetic and sends the instant,
+// so this route never has to reason about anybody's timezone. With no time
+// given it answers for 12:00 UTC, the anchor her daily report uses, so the
 // chart and the read describe the same moment.
 
 import { createClient } from "@supabase/supabase-js";
@@ -18,7 +20,7 @@ import { castSkyAt } from "@/lib/transit/sky";
 
 export const dynamic = "force-dynamic";
 
-const ANCHOR = "12:00";
+const DEFAULT_TIME = "12:00";
 // Wide enough for a second Saturn return either side of a working life, narrow
 // enough that nobody can walk the provider through the entire ephemeris.
 const MIN_YEAR = 1900;
@@ -28,12 +30,16 @@ const bad = (msg: string, code = 400) =>
   NextResponse.json({ ok: false, error: msg }, { status: code });
 
 export async function GET(request: Request) {
-  const date = new URL(request.url).searchParams.get("date") ?? "";
+  const params = new URL(request.url).searchParams;
+  const date = params.get("date") ?? "";
+  const time = params.get("time") ?? DEFAULT_TIME;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return bad("date must be YYYY-MM-DD");
-  const when = new Date(date + "T12:00:00Z");
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return bad("time must be HH:MM, 24 hour");
+  const when = new Date(`${date}T${time}:00Z`);
   if (Number.isNaN(when.getTime())) return bad("not a real date");
   const year = +date.slice(0, 4);
   if (year < MIN_YEAR || year > MAX_YEAR) return bad(`date must be between ${MIN_YEAR} and ${MAX_YEAR}`);
+  const at = when.toISOString();
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -42,32 +48,31 @@ export async function GET(request: Request) {
     : null;
 
   if (db) {
-    const { data } = await db.from("sky_cache").select("positions").eq("date", date).maybeSingle();
+    const { data } = await db.from("sky_cache").select("positions").eq("at", at).maybeSingle();
     if (data?.positions) {
-      return NextResponse.json({ ok: true, date, anchor: ANCHOR, positions: data.positions, cached: true });
+      return NextResponse.json({ ok: true, date, time, at, positions: data.positions, cached: true });
     }
   }
 
   let positions;
   try {
-    const moment = await castSkyAt(date, ANCHOR, "UTC");
+    const moment = await castSkyAt(date, time, "UTC");
     positions = moment.positions.map((p) => ({
       planet: p.planet, gate: p.gate, line: p.line, fixingState: p.fixingState,
     }));
   } catch (e) {
-    console.error("sky: cast failed", date, e);
+    console.error("sky: cast failed", at, e);
     return bad("could not read the sky for that date", 502);
   }
 
   // best effort: a failed cache write must not fail the request
   if (db) {
-    const { error } = await db.from("sky_cache").upsert({ date, positions });
-    if (error) console.error("sky: cache write failed", date, error.message);
+    const { error } = await db.from("sky_cache").upsert({ at, positions });
+    if (error) console.error("sky: cache write failed", at, error.message);
   }
 
-  return NextResponse.json({
-    ok: true, date, anchor: ANCHOR, positions, cached: false,
-    // a day's sky never changes, so this is safe to hold onto for a long time
-    headers: undefined,
-  }, { headers: { "Cache-Control": "public, max-age=31536000, immutable" } });
+  // a past or future instant never changes, so this is safe to hold onto
+  return NextResponse.json(
+    { ok: true, date, time, at, positions, cached: false },
+    { headers: { "Cache-Control": "public, max-age=31536000, immutable" } });
 }
