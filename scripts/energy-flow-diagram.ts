@@ -161,6 +161,9 @@ const MANDALA_PLANET: Record<string, Planet> = {
   Pluto: "pluto",
 };
 const DESIGN_RED = "#e06666";
+// Solid highlight gold. Kaycee's pick, and the same gold the transit overlay
+// uses for client placements, so a lit channel and a client transit read alike.
+const HL_GOLD = "#f1c232";
 
 // Kaycee's booking page. Client charts link straight to the individual sessions
 // so anyone holding a chart can book without going back through her. Drop-In is
@@ -1981,13 +1984,30 @@ body.nomotion .beam { display:none; }
 .hubring.on { opacity:1; }
 .varrow:hover { opacity:.75; }
 @keyframes hlpulse { 0%,100% { opacity:1; } 50% { opacity:.5; } }
-/* the hovered channel lights up rather than everything else going dark. A glow
-   around the whole shape, never a stroke per half: stroking each leg drew a
-   hard line where the two halves meet and outlined the ends. */
-.ch.hot { filter: drop-shadow(0 0 1.5px #ffcc00) drop-shadow(0 0 6px rgba(255,204,0,.9)); }
-/* a gate's own leg glows the same way */
-.leg.lit, .pleg.lit[data-full] { filter: drop-shadow(0 0 1.5px #ffcc00) drop-shadow(0 0 6px rgba(255,204,0,.85));
-  animation:hlpulse 1.2s ease-in-out infinite; }
+/* A highlighted channel takes a solid colour, never a glow.
+   A drop-shadow traces EVERY edge inside the group, including the seam where
+   the two legs meet and the notches where they join the gate discs, so it reads
+   as a smudge around a black bar rather than a lit channel. It also never
+   recolours the channel itself, and its radius is in screen pixels so its
+   weight drifts with the window size. Filling the legs is unambiguous at any
+   zoom and has no soft edge that can be subtly wrong.
+   Plain view: the real legs live in .chgrp (from the branded SVG) and .ch is
+   only a transparent hit area. Circuit view: .ch carries the drawn shapes. */
+/* Every drawn shape, at any depth: the legs sit inside nested groups, and a
+   fill on a group never beats a fill attribute on the path inside it, so a
+   direct-child selector recolours only half the channel. */
+svg.canvas.plain .chgrp.in-isle path, svg.canvas.plain .chgrp.in-isle polygon,
+svg.canvas.plain .chgrp.in-isle rect { fill:var(--isle) !important; }
+svg.canvas:not(.plain) .ch.in-isle path, svg.canvas:not(.plain) .ch.in-isle polygon,
+svg.canvas:not(.plain) .ch.in-isle rect { fill:var(--isle) !important; }
+svg.canvas.plain .chgrp.hot path, svg.canvas.plain .chgrp.hot polygon,
+svg.canvas.plain .chgrp.hot rect { fill:${HL_GOLD} !important; }
+svg.canvas:not(.plain) .ch.hot path, svg.canvas:not(.plain) .ch.hot polygon,
+svg.canvas:not(.plain) .ch.hot rect { fill:${HL_GOLD} !important; }
+/* a single gate's leg lights the same way, solid rather than glowing */
+svg.canvas:not(.plain) .leg.lit path, svg.canvas:not(.plain) .leg.lit polygon,
+svg.canvas:not(.plain) .leg.lit rect { fill:${HL_GOLD} !important; }
+svg.canvas.plain .pleg.lit { fill:${HL_GOLD} !important; }
 .cshape.lit { stroke:#ffcc00 !important; stroke-width:3.4 !important;
   filter: drop-shadow(0 0 3px rgba(255,204,0,.85)); }
 /* and the wheel echoes it */
@@ -2218,19 +2238,9 @@ if (DATA.client) {
         el.style.strokeWidth = '';
       }
     });
-    // the channels inside each island get the same color: an outline on the
-    // traditional chart, a glow on the circuit view (whose legs are already
-    // colored and would gain an inner line from a stroke)
-    // The casing is drawn as a filter on the channel's whole group, so its
-    // silhouette is both legs together and no seam appears where they meet.
-    var casing = function (col) {
-      var o = '2.2px';
-      return 'drop-shadow(' + o + ' 0 0 ' + col + ') drop-shadow(-' + o + ' 0 0 ' + col + ') ' +
-        'drop-shadow(0 ' + o + ' 0 ' + col + ') drop-shadow(0 -' + o + ' 0 ' + col + ') ' +
-        'drop-shadow(1.6px 1.6px 0 ' + col + ') drop-shadow(-1.6px 1.6px 0 ' + col + ') ' +
-        'drop-shadow(1.6px -1.6px 0 ' + col + ') drop-shadow(-1.6px -1.6px 0 ' + col + ') ' +
-        'drop-shadow(0 0 7px ' + col + ')';
-    };
+    // The channels inside an island take that island's colour as a solid fill.
+    // This used to be a casing faked from nine stacked drop-shadows, which is
+    // a blurry approximation of an outline and was the thing that looked wrong.
     var isleOfChannel = {};
     DATA.channels.forEach(function (c) {
       if (!DATA.client.defined || DATA.client.defined.indexOf(c.key) < 0) return;
@@ -2240,7 +2250,10 @@ if (DATA.client) {
     });
     [].forEach.call(document.querySelectorAll('.chgrp, .ch'), function (el) {
       var i = isleOfChannel[el.dataset.ch];
-      el.style.filter = (on && i !== undefined) ? casing(ISLE_COLORS[i % 4]) : '';
+      var col = (on && i !== undefined) ? ISLE_COLORS[i % 4] : '';
+      el.style.filter = '';
+      if (col) el.style.setProperty('--isle', col); else el.style.removeProperty('--isle');
+      el.classList.toggle('in-isle', !!col);
     });
   };
   var bIsl = document.getElementById('tIslands');
@@ -2768,10 +2781,10 @@ if (DATA.client && DATA.client.variables) {
 function esc(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
 function show(html) { if (readout) readout.innerHTML = html; }
 function hot(key) {
-  [].forEach.call(document.querySelectorAll('.ch'), function (g) {
+  // .chgrp holds the drawn legs in the plain view, .ch in the circuit view
+  [].forEach.call(document.querySelectorAll('.ch, .chgrp'), function (g) {
     g.classList.toggle('hot', !!key && g.dataset.ch === key);
   });
-  body.classList.toggle('dimmed', !!key);
 }
 function markCenter(cid) {
   // a center outlines even when it holds no activated gate
