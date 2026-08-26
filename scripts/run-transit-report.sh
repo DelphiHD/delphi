@@ -12,12 +12,25 @@ cd "$(dirname "$0")/.." || exit 1
 # (missing images, empty gate popups, etc.) has status FAIL, so the backup
 # regenerates it instead of leaving the broken one. Uses the machine's local
 # date, which matches TRANSIT_TZ (America/Denver) here.
+# Files the day's reads in Supabase so every chart shows them without being
+# rebuilt. Runs whether or not the report was generated on this pass: a pass
+# that skipped because the report already existed may still be the first pass
+# since the database came back, and the push is idempotent.
+push_reads() {
+  ./node_modules/.bin/tsx scripts/push-transit-reads.ts --today || {
+    echo "WARNING: reads were not pushed; charts will show the read they were built with"
+    return 1
+  }
+}
+
 DAY=$(date +%Y-%m-%d)
 OUT="$HOME/Desktop/HD Reports/Transits/${DAY} - Daily Transit Report.html"
 STATUS=".cache/transits/${DAY}.status"
 if [ -f "$OUT" ] && [ "$(cat "$STATUS" 2>/dev/null)" = "PASS" ]; then
   echo "already generated and self-check PASSED: $OUT"
+  push_reads
   exit 0
 fi
 
-exec ./node_modules/.bin/tsx scripts/transit-report.ts
+./node_modules/.bin/tsx scripts/transit-report.ts || exit 1
+push_reads

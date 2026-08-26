@@ -15,6 +15,6 @@ export const config = {
   // response files, even if Supabase auth is misconfigured, and it saves a
   // session round-trip on every view.
   matcher: [
-    "/((?!c/|api/chart-feedback|api/sky|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|css|js)$).*)",
+    "/((?!c/|api/chart-feedback|api/sky|api/read|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|css|js)$).*)",
   ],
 };

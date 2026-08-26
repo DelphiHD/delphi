@@ -43,7 +43,8 @@ import { loadLibraryNames } from "@/lib/hd/library-names";
 import { renderFullMandala } from "@/lib/render/mandala";
 import type { ChartSide, Planet } from "@/lib/render/mandala.types";
 import { getChart, getTimezoneForLocation } from "@/lib/mybodygraph";
-import { CLIENTS, clientFromSlug, clientOutputDir, type ClientBrief } from "./client-roster";
+import { clientFromSlug, clientOutputDir, type ClientBrief } from "./client-roster";
+import { loadDayRead, type DayRead } from "@/lib/transit/reads";
 import { castSkyAt } from "@/lib/transit/sky";
 
 // ── palettes ────────────────────────────────────────────────────────────────
@@ -469,91 +470,6 @@ function paintCenters(
 // that report. The completions list is what makes hovering the prose reliable:
 // it names the gates and channels the paragraph is about, so nothing has to be
 // guessed out of free text.
-interface DayRead {
-  date: string;
-  writtenAt: string;              // the report's own generated_at, ISO
-  paragraph: string;
-  completions: {
-    planet: string; transitGate: number; natalGate: number;
-    channel: string; channelName: string; bridges: boolean; center: string; duration: string;
-  }[];
-}
-
-/** Every archived read for this client, newest first. Ten kilobytes for a
- *  couple of weeks, so they are baked into the chart rather than fetched: the
- *  reports live on Kaycee's laptop, and a baked read needs no request and no
- *  server to be up. Each morning's run adds one. */
-function loadAllReads(clientName: string): Record<string, DayRead> {
-  const dir = join(process.env.HOME ?? "", "Desktop", "HD Reports", "Transits");
-  if (!existsSync(dir)) return {};
-  const out: Record<string, DayRead> = {};
-  for (const f of readdirSync(dir)) {
-    const m = /^(\d{4}-\d{2}-\d{2}) - Daily Transit Report\.md$/.exec(f);
-    if (!m) continue;
-    const r = loadDayRead(clientName, m[1]);
-    if (r) out[m[1]] = r;
-  }
-  return out;
-}
-
-/** A report already on disk was written under whatever the roster called that
- *  person that morning, so renaming someone orphans every read they have.
- *
- *  Resolve it against the report itself rather than guessing. Headings that
- *  match a roster name exactly are spoken for. A leftover heading can then only
- *  belong to someone whose first name it is AND who has no heading of their own
- *  in that same report, and only when exactly one person fits: "Sarah" in a
- *  report that already names Sarah Marie must be the other Sarah, but "Sarah"
- *  in a report naming neither is left unmatched rather than handed to whichever
- *  one sorts first. */
-function headingByRename(
-  heads: RegExpMatchArray[], clientName: string,
-): RegExpMatchArray | undefined {
-  const first = clientName.split(" ")[0];
-  if (!first || first === clientName) return undefined;
-  const present = new Set(heads.map((h) => h[1].trim()));
-  if (!present.has(first)) return undefined;
-
-  const roster = Object.values(CLIENTS).map((c) => c.name);
-  // anyone already named outright in this report is answered for
-  const claimants = roster.filter((n) => n.split(" ")[0] === first && !present.has(n));
-  if (claimants.length !== 1 || claimants[0] !== clientName) return undefined;
-  return heads.find((h) => h[1].trim() === first);
-}
-
-function loadDayRead(clientName: string, date: string): DayRead | null {
-  const path = join(process.env.HOME ?? "", "Desktop", "HD Reports", "Transits",
-    `${date} - Daily Transit Report.md`);
-  if (!existsSync(path)) return null;
-  const md = readFileSync(path, "utf8");
-  const writtenAt = /generated_at:\s*(\S+)/.exec(md)?.[1] ?? "";
-
-  // "### 3. Bryan Rodabough · Split Definition (simple) (impact 74.25)"
-  const heads = [...md.matchAll(/^### \d+\.\s+(.+?)\s+·\s+.*$/gm)];
-  const mine = heads.find((h) => h[1].trim() === clientName) ?? headingByRename(heads, clientName);
-  if (!mine) return null;
-  const start = mine.index! + mine[0].length;
-  const next = heads.find((h) => h.index! > mine.index!);
-  const body = md.slice(start, next ? next.index! : undefined);
-
-  const lines = body.split("\n");
-  const paragraph = lines.filter((l) => l.trim() && !l.trim().startsWith("-")).join(" ").trim();
-
-  // "- Sun in 59 (Dispersion) completes 6-59 Mating with natal 6 (Conflict); bridges their split; sacral center [days]"
-  const completions: DayRead["completions"] = [];
-  for (const l of lines) {
-    const m = /^-\s+(\w[\w ]*?) in (\d+) \([^)]*\) completes (\d+-\d+) (.+?) with natal (\d+) \([^)]*\)(.*?)\[(\w+)\]/.exec(l.trim());
-    if (!m) continue;
-    completions.push({
-      planet: m[1].trim(), transitGate: +m[2], channel: m[3], channelName: m[4].trim(),
-      natalGate: +m[5], bridges: /bridges their split/.test(m[6]),
-      center: (/;\s*(?:lights their open\s+)?([a-z- ]+?) center/.exec(m[6])?.[1] ?? "").trim(),
-      duration: m[7],
-    });
-  }
-  if (!paragraph) return null;
-  return { date, writtenAt, paragraph, completions };
-}
 
 /** The sky for one date, cached on disk. A past moment never changes, so it is
  *  cast once and reused for every client and every rebuild after. Kaycee's plan
@@ -1540,7 +1456,6 @@ interface SceneData {
   transit?: string;                         // the same chart with today's sky over it
   sky?: { date: string; time: string; positions: { planet: string; gate: number; line: number; fixingState: string }[] };
   read?: DayRead;
-  reads?: Record<string, DayRead>;
   channels: ChannelGeom[];
   slots: number;
   centerBox: Record<Center, BBox>;
@@ -2105,7 +2020,6 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, fonts: Map<n
 
   const payload = {
     read: d.read ?? null,
-    reads: d.reads ?? {},
     cycles: d.client?.report.cycles ?? [],
     client: d.client
       ? { name: d.client.name,
@@ -3091,6 +3005,38 @@ if (DATA.client) {
     return SHORT_MONTHS[+b[1] - 1] + ' ' + (+b[2]) + ', ' + b[0];
   }
 
+  // The read is not baked into the chart any more, apart from the day it was
+  // built for, which stays as an offline fallback. Everything else is fetched,
+  // so this morning's words reach every chart the moment Kaycee's report runs
+  // rather than waiting for all 28 to be rebuilt and republished.
+  var readCache = {}, readWanted = null;
+  if (DATA.read && DATA.read.date) readCache[DATA.read.date] = DATA.read;
+  function chartToken() {
+    var parts = location.pathname.split('/c/');
+    var t = parts.length > 1 ? parts[1].split('/')[0] : '';
+    return t.length === 32 ? t : '';
+  }
+  function fetchRead(d) {
+    readWanted = d;
+    if (readCache[d] !== undefined) { renderRead(readCache[d], d); return; }
+    var tok = chartToken();
+    // opened as a file rather than through the link: only the baked day exists
+    if (!tok) { renderRead(null, d); return; }
+    renderRead(null, d);
+    fetch('/api/read?token=' + tok + '&date=' + d).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || !j.ok) throw new Error('no read');
+      readCache[d] = j.read || null;
+      if (readWanted === d) renderRead(j.read || null, d);
+    }).catch(function () {
+      // a read that cannot be fetched is not a read that does not exist, and
+      // saying so wrongly would have a client think Kaycee skipped their day
+      if (readWanted !== d) return;
+      var el = document.getElementById('todayread');
+      if (el) el.innerHTML = '<div class="noread">Could not load the reading for ' +
+        esc(shortDate(d)) + '. The chart above is still that day&rsquo;s sky.</div>';
+    });
+  }
+
   /** Paint one day's read into the TODAY section. Called for the day the chart
    *  was built with, and again whenever the date picker lands on a day Kaycee
    *  has written a report for. */
@@ -3183,8 +3129,8 @@ if (DATA.client) {
     }).join('');
   }
 
-  if (DATA.read || Object.keys(DATA.reads || {}).length) {
-    renderRead((DATA.reads || {})[TODAY_LOCAL] || DATA.read, TODAY_LOCAL);
+  if (DATA.sky) {
+    renderRead(DATA.read, TODAY_LOCAL);
 
     // hovering the prose or a completion lights exactly what the rest of the
     // panel lights, so the read and the chart behave as one object
@@ -3386,7 +3332,7 @@ if (DATA.client) {
       });
 
       // and the words, which belong to the calendar day rather than the hour
-      renderRead((DATA.reads || {})[d] || null, d);
+      fetchRead(d);
     }
 
     // ── moving between moments ───────────────────────────────────────────────
@@ -3436,7 +3382,7 @@ if (DATA.client) {
     dfield.value = curD;
     tfield.value = curT;
     nowBtn.classList.add('show');
-    renderRead((DATA.reads || {})[curD] || null, curD);
+    fetchRead(curD);
     [].forEach.call(document.querySelectorAll('.ttime'), function (e) {
       e.textContent = clock12(curT) + (TZ ? ' ' + TZ : '');
     });
@@ -4174,7 +4120,6 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
   let transitInnerSvg: string | undefined;
   let sky: SceneData["sky"];
   let dayRead: DayRead | undefined;
-  let allReads: Record<string, DayRead> = {};
   if (client) {
     const now = new Date();
     const date = now.toISOString().slice(0, 10);
@@ -4192,14 +4137,11 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
         planet: p.planet, gate: p.gate, line: p.line, fixingState: p.fixingState,
       })),
     };
-    allReads = loadAllReads(client.name);
-    dayRead = allReads[date];
-    const readDates = Object.keys(allReads).sort();
+    dayRead = loadDayRead(client.name, date) ?? undefined;
     console.log(dayRead
       ? `Today's read: ${dayRead.paragraph.split(" ").length} words, ${dayRead.completions.length} completion(s) from ${date}`
       : `Today's read: none found for ${date} (no transit report yet)`);
-    console.log(`Archived reads baked in: ${readDates.length}` +
-      (readDates.length ? ` (${readDates[0]} to ${readDates[readDates.length - 1]})` : ""));
+    console.log("Reads: fetched from /api/read; today's is baked in as a fallback.");
     const newlyDefined = [...definedNow].filter((c) => !client.centers.has(c));
     console.log(`Transit (${date} ${time} UTC): ${tGates.size} gates` +
       `, ${liveChannels.length - channels.filter((c) => client.channels.has(c.key)).length} channel(s) completed` +
@@ -4208,7 +4150,7 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
 
   const scene: SceneData = {
     client, inner, plain: client ? plainInner(raw, definitionMap({ client, channels } as SceneData).bridges.map((b) => b.gate)) : undefined,
-    transit: transitInnerSvg, sky, read: dayRead, reads: allReads,
+    transit: transitInnerSvg, sky, read: dayRead,
     channels, slots, centerBox, fn, biology, anchors,
     gateInfo, states, tagInfo: tags, lineName: (g, l) => libNames.line(g, l),
   };
