@@ -1997,6 +1997,7 @@ body.nomotion .beam { display:none; }
    fill on a group never beats a fill attribute on the path inside it, so a
    direct-child selector recolours only half the channel. */
 svg.canvas.plain .gdisc.in-isle { fill:var(--isle) !important; }
+svg.canvas.plain .pleg.in-isle { fill:var(--isle) !important; }
 svg.canvas.plain .chgrp.in-isle path, svg.canvas.plain .chgrp.in-isle polygon,
 svg.canvas.plain .chgrp.in-isle rect { fill:var(--isle) !important; }
 svg.canvas:not(.plain) .ch.in-isle path, svg.canvas:not(.plain) .ch.in-isle polygon,
@@ -2256,6 +2257,17 @@ if (DATA.client) {
       var i = isleOfChannel[el.dataset.ch];
       var col = (on && i !== undefined) ? ISLE_COLORS[i % 4] : '';
       el.style.filter = '';
+      if (col) el.style.setProperty('--isle', col); else el.style.removeProperty('--isle');
+      el.classList.toggle('in-isle', !!col);
+    });
+    // The integration gates (57, 20, 34, 10) share a single group in the branded
+    // SVG, because each belongs to more than one channel. Nothing keyed by
+    // channel can reach inside it, so their legs are painted per gate. Every
+    // other gate's leg sits in its channel's own group and is already handled,
+    // but painting by gate is correct for those too and keeps one code path.
+    [].forEach.call(document.querySelectorAll('.pleg'), function (el) {
+      var i = isleOfGate[el.dataset.gate];
+      var col = (on && i !== undefined) ? ISLE_COLORS[i % 4] : '';
       if (col) el.style.setProperty('--isle', col); else el.style.removeProperty('--isle');
       el.classList.toggle('in-isle', !!col);
     });
