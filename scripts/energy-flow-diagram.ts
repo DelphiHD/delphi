@@ -44,6 +44,7 @@ import { renderFullMandala } from "@/lib/render/mandala";
 import type { ChartSide, Planet } from "@/lib/render/mandala.types";
 import { getChart, getTimezoneForLocation } from "@/lib/mybodygraph";
 import { clientFromSlug, clientOutputDir, type ClientBrief } from "./client-roster";
+import { castSkyAt } from "@/lib/transit/sky";
 
 // ── palettes ────────────────────────────────────────────────────────────────
 // Circuit colors: saturated, they carry the moving light.
@@ -437,6 +438,77 @@ function paintCenters(
     s = s.replace(tag[0], cleaned);
   }
   return `<defs>${grads.join("")}</defs>${s}`;
+}
+
+// ── transit overlay ─────────────────────────────────────────────────────────
+// Kaycee's colours: the client in gold, today's sky in charcoal. Because every
+// gate's leg is its own shape, a channel that one of each completes comes out
+// two-toned on its own, which is the point: you can see it is a temporary
+// bridge rather than part of their design.
+const CLIENT_GOLD = "#f1c232";
+const TRANSIT_INK = "#33333b";
+
+// What the Delphi design fills a DEFINED centre with. Harvested from the
+// roster's own charts rather than guessed: pressure and motor centres grey,
+// awareness centres purple, throat and G yellow. Needed because a transit can
+// define a centre that is open in the client's chart, and the client's own SVG
+// only knows the colour of the centres they already have.
+const DEFINED_CENTER_FILL: Record<Center, string> = {
+  head: "#bcbcbc", ajna: "#a86bbd", throat: "#fbf7b2", g: "#fbf7b2",
+  heart: "#bcbcbc", "solar-plexus": "#a86bbd", sacral: "#bcbcbc",
+  spleen: "#a86bbd", root: "#bcbcbc",
+};
+
+/** The client's chart with a moment's sky laid over it. */
+function transitInner(
+  raw: string,
+  natal: Set<number>,
+  transit: Set<number>,
+  definedNow: Set<Center>,
+): string {
+  let s = tagChart(raw);
+
+  // 1. the client's own legs and discs turn gold, keeping exactly the legs the
+  //    design drew: recolour what is already filled, never add a leg, or we
+  //    would invent an activation they do not have.
+  s = s.replace(/(<[a-z]+ class="pleg" data-gate="\d+"[^>]*?)fill="(?:#000000|#e06666)"/g,
+    (_m, head: string) => `${head}fill="${CLIENT_GOLD}"`);
+  s = s.replace(/(<path class="gdisc" data-gate="\d+"[^>]*?)fill="#000000"/g,
+    (_m, head: string) => `${head}fill="${CLIENT_GOLD}"`);
+
+  // 2. the sky's own gates. A transit is a single activation, so it takes the
+  //    full-width personality leg. Gates the client already carries stay gold:
+  //    the transit is reinforcing something of theirs, not adding to it.
+  for (const g of transit) {
+    if (natal.has(g)) continue;
+    // The design writes "empty" three different ways: none, #ffffff and
+    // rgba(0, 0, 0, 0). These gates are unactivated in the client's chart by
+    // definition, so replace whatever fill is there rather than matching one
+    // spelling of nothing.
+    s = s.replace(new RegExp(`(<[a-z]+ id="personality-${g}"[^>]*?)fill="[^"]*"`),
+      (_m, head: string) => `${head.replace('id="', 'class="tleg" data-gate="' + g + '" id="')}fill="${TRANSIT_INK}"`);
+    s = s.replace(new RegExp(`(<path id="_${g}"[^>]*?)fill="[^"]*"`),
+      (_m, head: string) => `${head.replace('id="', 'class="tdisc" data-gate="' + g + '" id="')}fill="${TRANSIT_INK}"`);
+  }
+
+  // The gate number has to flip with the disc under it. The design writes white
+  // numbers on its black discs; white on gold is about 2:1 and unreadable, and
+  // the transit's own gates start as dark numbers on nothing.
+  const setNum = (gate: number, col: string) => {
+    s = s.replace(new RegExp(`(<text[^>]*?)fill="[^"]*"([^>]*class="pnum" data-gate="${gate}")`),
+      (_m, a: string, b: string) => `${a}fill="${col}"${b}`);
+  };
+  for (const g of natal) setNum(g, "#1c1a2e");
+  for (const g of transit) if (!natal.has(g)) setNum(g, "#ffffff");
+
+  // 3. a centre defined only by a transit-completed channel has to show as
+  //    defined, or the chart says the opposite of what the overlay means
+  for (const [center, id] of Object.entries(CENTER_SVG_ID) as [Center, string][]) {
+    if (!definedNow.has(center)) continue;
+    s = s.replace(new RegExp(`(<path class="cshape" data-center="${center}"[^>]*?)fill="[^"]*"`),
+      (_m, head: string) => `${head}fill="${DEFINED_CENTER_FILL[center]}"`);
+  }
+  return s.replace(/^[\s\S]*?<svg\b[^>]*>/, "").replace(/<\/svg>\s*$/, "");
 }
 
 // ── color helpers ───────────────────────────────────────────────────────────
@@ -1289,6 +1361,8 @@ interface SceneData {
   client?: ClientCtx;                       // set when rendering a real chart
   inner: Record<string, string>;            // skin id -> neutralized bodygraph markup
   plain?: string;                           // the chart as the design draws it
+  transit?: string;                         // the same chart with today's sky over it
+  sky?: { date: string; time: string; positions: { planet: string; gate: number; line: number; fixingState: string }[] };
   channels: ChannelGeom[];
   slots: number;
   centerBox: Record<Center, BBox>;
@@ -1552,7 +1626,7 @@ function gateHalos(d: SceneData, skin: Skin): string {
 }
 
 function buildCanvas(
-  skin: Skin, d: SceneData, opts: { animate: boolean; legend: boolean; plain?: boolean },
+  skin: Skin, d: SceneData, opts: { animate: boolean; legend: boolean; plain?: boolean; transit?: boolean },
 ): string {
   LY = layoutFor(!!d.client, opts.legend);
   const H = LY.h;
@@ -1676,7 +1750,7 @@ function buildCanvas(
       `Every channel carries its energy toward the Throat, the only center that can manifest. ` +
       `Color shows which circuit the channel belongs to.</text>`;
   return (
-    `<svg class="canvas${opts.plain ? " plain" : ""}" data-skin="${opts.plain ? "plain" : skin.id}" viewBox="0 0 ${r2(W)} ${r2(H)}" ` +
+    `<svg class="canvas${opts.plain ? " plain" : ""}${opts.transit ? " transit" : ""}" data-skin="${opts.transit ? "transit" : opts.plain ? "plain" : skin.id}" viewBox="0 0 ${r2(W)} ${r2(H)}" ` +
     `data-vb-wide="0 0 ${r2(W)} ${r2(H)}" data-vb-core="${r2(OX)} 0 ${r2(LY.coreW)} ${r2(H)}" ` +
     `xmlns="http://www.w3.org/2000/svg" font-family="${FONT_STACK}">` +
     `<rect x="0" y="0" width="${r2(W)}" height="${r2(H)}" fill="${skin.bg}"></rect>` +
@@ -1684,7 +1758,7 @@ function buildCanvas(
     header +
     tableMarkup +
     `<g class="labels">${labels}</g>` +
-    `<g transform="translate(${OX + LY.tx},${LY.ty}) scale(${LY.sc})">${opts.plain ? d.plain : d.inner[skin.id]}<g class="flows">${flows}</g>${variableArrows(d)}</g>` +
+    `<g transform="translate(${OX + LY.tx},${LY.ty}) scale(${LY.sc})">${opts.transit ? d.transit : opts.plain ? d.plain : d.inner[skin.id]}<g class="flows">${flows}</g>${variableArrows(d)}</g>` +
     gateHalos(d, skin) +
     (opts.legend ? `<g class="legend">${legendBlock(OX + 30, H - (d.client ? 170 : 96), skin, !!d.client)}</g>` : "") +
     `</svg>`
@@ -1749,6 +1823,7 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, fonts: Map<n
       <button id="vPlain" class="on">Bodygraph</button>
       <button id="vBody">Circuits</button>
       <button id="vMandala">Mandala</button>
+      <button id="vTransit">Transit</button>
     </div>
     <div class="row" id="siderow" hidden>
       <button id="sideP" class="on">Personality</button>
@@ -1894,19 +1969,25 @@ svg.canvas.plain { display:none; }
 svg.canvas { display:none; max-height:calc(100vh - 28px); max-width:100%; width:auto; height:auto; margin:0 auto; }
 body.skin-paper svg.canvas[data-skin="paper"] { display:block; }
 body.view-plain svg.canvas[data-skin="paper"] { display:none !important; }
-body.view-plain svg.canvas.plain { display:block; }
+body.view-plain svg.canvas.plain:not(.transit) { display:block; }
+svg.canvas.transit { display:none; }
+body.view-transit svg.canvas[data-skin="paper"] { display:none !important; }
+body.view-transit svg.canvas.plain:not(.transit) { display:none !important; }
+body.view-transit svg.canvas.transit { display:block; }
+body.view-transit { background:#ffffff; color:#1c1a2e; }
+body.view-transit .bridge, body.view-transit .halo { display:none; }
 body.view-plain { background:#ffffff; color:#1c1a2e; }
-body.view-plain .panel { background:rgba(132,80,149,.06); border-color:rgba(132,80,149,.22); }
-body.view-plain .card { background:rgba(255,255,255,.98); border-color:rgba(132,80,149,.28);
+body.view-transit .panel, body.view-plain .panel { background:rgba(132,80,149,.06); border-color:rgba(132,80,149,.22); }
+body.view-transit .card, body.view-plain .card { background:rgba(255,255,255,.98); border-color:rgba(132,80,149,.28);
   color:#1c1a2e; box-shadow:0 14px 34px rgba(60,40,80,.18); }
-body.view-plain .tip { background:rgba(255,255,255,.98); color:#1c1a2e; border-color:rgba(132,80,149,.25); }
+body.view-transit .tip, body.view-plain .tip { background:rgba(255,255,255,.98); color:#1c1a2e; border-color:rgba(132,80,149,.25); }
 /* circuit colouring means nothing on the other two views; the defined and
    hanging buttons still do, except on the mandala */
-body.view-plain #circdrop, body.view-mandala #circdrop { display:none; }
+body.view-plain #circdrop, body.view-mandala #circdrop, body.view-transit #circdrop { display:none; }
 /* a gate number sitting on a hidden disc has to come back to dark */
 .pnum.off { fill:#1c1a2e !important; }
 /* the traditional chart carries its own coloring: leave the gate numbers alone */
-body.view-plain svg.canvas .gnum { fill:inherit; font-weight:inherit; }
+body.view-plain svg.canvas .gnum, body.view-transit svg.canvas .gnum { fill:inherit; font-weight:inherit; }
 .panel { flex:0 0 306px; align-self:stretch; padding:18px 16px; border-radius:16px;
   background:rgba(132,80,149,.06); border:1px solid rgba(132,80,149,.22);
   /* the panel matches the bodygraph's height, so on a short laptop screen its
@@ -2675,14 +2756,19 @@ if (DATA.client) {
   var view = function (id) {
     body.classList.toggle('view-mandala', id === 'mandala');
     body.classList.toggle('view-plain', id === 'plain');
+    body.classList.toggle('view-transit', id === 'transit');
     document.getElementById('vBody').classList.toggle('on', id === 'body');
     document.getElementById('vPlain').classList.toggle('on', id === 'plain');
     document.getElementById('vMandala').classList.toggle('on', id === 'mandala');
+    var vt = document.getElementById('vTransit');
+    if (vt) vt.classList.toggle('on', id === 'transit');
   };
   document.getElementById('vBody').onclick = function () { view('body'); };
   view('plain');
   document.getElementById('vPlain').onclick = function () { view('plain'); };
   document.getElementById('vMandala').onclick = function () { view('mandala'); };
+  var vt0 = document.getElementById('vTransit');
+  if (vt0) vt0.onclick = function () { view('transit'); };
 }
 
 
@@ -3263,8 +3349,38 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
   if (client && Object.keys(anchors).length < 64) {
     console.warn(`  only ${Object.keys(anchors).length}/64 gate anchors parsed; some placement marks will be missing`);
   }
+  // Today's sky, laid over the client's chart. A transit gate completes a
+  // channel with one of their natal gates, and that channel defines a centre
+  // even when the centre is open in their own design, so the combined set is
+  // what the overlay must draw.
+  let transitInnerSvg: string | undefined;
+  let sky: SceneData["sky"];
+  if (client) {
+    const now = new Date();
+    const date = now.toISOString().slice(0, 10);
+    const time = now.toISOString().slice(11, 16);
+    const moment = await castSkyAt(date, time, "UTC");
+    const tGates = new Set(moment.positions.map((p) => p.gate));
+    const both = new Set<number>([...client.gates, ...tGates]);
+    const liveChannels = channels.filter((c) => both.has(c.srcGate) && both.has(c.tgtGate));
+    const definedNow = new Set<Center>();
+    for (const c of liveChannels) { definedNow.add(c.source); definedNow.add(c.target); }
+    transitInnerSvg = transitInner(raw, client.gates, tGates, definedNow);
+    sky = {
+      date, time,
+      positions: moment.positions.map((p) => ({
+        planet: p.planet, gate: p.gate, line: p.line, fixingState: p.fixingState,
+      })),
+    };
+    const newlyDefined = [...definedNow].filter((c) => !client.centers.has(c));
+    console.log(`Transit (${date} ${time} UTC): ${tGates.size} gates` +
+      `, ${liveChannels.length - channels.filter((c) => client.channels.has(c.key)).length} channel(s) completed` +
+      `, centers newly defined: ${newlyDefined.join(", ") || "(none)"}`);
+  }
+
   const scene: SceneData = {
     client, inner, plain: client ? plainInner(raw) : undefined,
+    transit: transitInnerSvg, sky,
     channels, slots, centerBox, fn, biology, anchors,
     gateInfo, notSelf, tagInfo: tags, lineName: (g, l) => libNames.line(g, l),
   };
@@ -3295,7 +3411,8 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
   const canvases = [PAPER]
     .map((sk) => buildCanvas(sk, scene, { animate: true, legend: false }))
     .join("\n") +
-    (client ? "\n" + buildCanvas(PAPER, scene, { animate: false, legend: false, plain: true }) : "");
+    (client ? "\n" + buildCanvas(PAPER, scene, { animate: false, legend: false, plain: true }) : "") +
+    (client ? "\n" + buildCanvas(PAPER, scene, { animate: false, legend: false, plain: true, transit: true }) : "");
   const htmlPath = join(outDir, `${stem}.html`);
   const html = buildHtml(scene, canvases, mandalaView(scene), fonts);
   writeFileSync(htmlPath, html);
