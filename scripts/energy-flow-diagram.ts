@@ -441,11 +441,14 @@ function paintCenters(
 }
 
 // ── transit overlay ─────────────────────────────────────────────────────────
-// Kaycee's colours: the client in gold, today's sky in charcoal. Because every
+// Kaycee's colours: the client in a light Delphi purple, today's sky in
+// charcoal. Gold stays reserved for highlights, so nothing on the chart is
+// permanently wearing the colour that means "you are pointing at this".
+// Because every
 // gate's leg is its own shape, a channel that one of each completes comes out
 // two-toned on its own, which is the point: you can see it is a temporary
 // bridge rather than part of their design.
-const CLIENT_GOLD = "#f1c232";
+const CLIENT_TINT = "#e2aaf4";
 const TRANSIT_INK = "#33333b";
 
 // What the Delphi design fills a DEFINED centre with. Harvested from the
@@ -472,9 +475,9 @@ function transitInner(
   //    design drew: recolour what is already filled, never add a leg, or we
   //    would invent an activation they do not have.
   s = s.replace(/(<[a-z]+ class="pleg" data-gate="\d+"[^>]*?)fill="(?:#000000|#e06666)"/g,
-    (_m, head: string) => `${head}fill="${CLIENT_GOLD}"`);
+    (_m, head: string) => `${head}fill="${CLIENT_TINT}"`);
   s = s.replace(/(<path class="gdisc" data-gate="\d+"[^>]*?)fill="#000000"/g,
-    (_m, head: string) => `${head}fill="${CLIENT_GOLD}"`);
+    (_m, head: string) => `${head}fill="${CLIENT_TINT}"`);
 
   // 2. the sky's own gates. A transit is a single activation, so it takes the
   //    full-width personality leg. Gates the client already carries stay gold:
@@ -1976,6 +1979,11 @@ body.view-transit svg.canvas.plain:not(.transit) { display:none !important; }
 body.view-transit svg.canvas.transit { display:block; }
 body.view-transit { background:#ffffff; color:#1c1a2e; }
 body.view-transit .bridge, body.view-transit .halo { display:none; }
+/* The client tint is a light purple and the awareness centres are a mid purple,
+   so a gate disc sitting on the spleen or the solar plexus disappears into it.
+   A thin dark rim gives every disc an edge on any centre colour. */
+svg.canvas.transit .gdisc { stroke:#4a3357; stroke-width:1.1; }
+svg.canvas.transit .tdisc { stroke:#15151a; stroke-width:1.1; }
 body.view-plain { background:#ffffff; color:#1c1a2e; }
 body.view-transit .panel, body.view-plain .panel { background:rgba(132,80,149,.06); border-color:rgba(132,80,149,.22); }
 body.view-transit .card, body.view-plain .card { background:rgba(255,255,255,.98); border-color:rgba(132,80,149,.28);
