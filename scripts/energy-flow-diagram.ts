@@ -3373,14 +3373,20 @@ if (DATA.client) {
       sec.classList.add('loading');
       fetch('/api/sky?date=' + utcD + '&time=' + utcT).then(function (r) { return r.json(); }).then(function (j) {
         if (!j || !j.ok) throw new Error(j && j.error ? j.error : 'no sky');
+        // A server that has not learned about the time parameter answers for
+        // its own anchor hour and says nothing about it, which would put the
+        // wrong sky on the chart under the right clock. Make it say which
+        // moment it actually cast, and refuse anything else.
+        if (j.time !== utcT || j.date !== utcD) throw new Error('server sent a different moment');
         cache[key] = j.positions;
         if (curD === d && curT === t) { repaint(d, t, j.positions); litGate(null); }
       }).catch(function () {
         // loud rather than a chart that quietly shows the wrong moment
         document.getElementById('todaylab').textContent = shortDate(d);
         var read = document.getElementById('todayread');
-        if (read) read.innerHTML = '<div class="noread">Could not reach the sky for ' +
-          esc(shortDate(d)) + ' at ' + esc(clock12(t)) + '. Nothing on the chart has changed.</div>';
+        if (read) read.innerHTML = '<div class="noread">Could not get the sky for ' +
+          esc(shortDate(d)) + ' at ' + esc(clock12(t)) + '. The chart still shows the ' +
+          'moment it was built for, so nothing on it is wrong.</div>';
         document.getElementById('todaylist').innerHTML = '';
       }).then(function () {
         busyFlag = false;
