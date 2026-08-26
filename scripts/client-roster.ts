@@ -16,7 +16,7 @@ export const CLIENTS: Record<string, ClientBrief> = {
   meelad:   { slug: "meelad",   name: "Meelad Kharazian",  birthDate: "1986-02-09", birthTime: "01:02", birthPlace: "Lodi, California, United States" },
   tennyson: { slug: "tennyson", name: "Tennyson",          birthDate: "1993-01-06", birthTime: "07:51", birthPlace: "Orem, Utah, United States" },
   kaycee:   { slug: "kaycee",   name: "Kaycee Vandenberg", birthDate: "1983-06-17", birthTime: "06:29", birthPlace: "Ogden, Utah, United States" },
-  paul:     { slug: "paul",     name: "Paul",              birthDate: "1978-11-07", birthTime: "15:10", birthPlace: "Bountiful, Utah, United States" },
+  paul:     { slug: "paul",     name: "Paul Hollingshead", birthDate: "1978-11-07", birthTime: "15:10", birthPlace: "Bountiful, Utah, United States" },
   tiff:     { slug: "tiff",     name: "Tiff",              birthDate: "1981-12-01", birthTime: "15:05", birthPlace: "Saratoga Springs, New York, United States" },
   michael:  { slug: "michael",  name: "Michael",           birthDate: "1958-08-29", birthTime: "07:33", birthPlace: "Gary, Indiana, United States" },
   matt:     { slug: "matt",     name: "Matt Hollingshead", birthDate: "1984-04-08", birthTime: "07:15", birthPlace: "Bountiful, Utah, United States" },
