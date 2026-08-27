@@ -1076,6 +1076,13 @@ export function renderDataPassMarkdown(dp: DataPass): string {
   lines.push("");
 
   lines.push("## Chart Summary");
+  // The model has no idea what day it is and will otherwise reason from where
+  // its training data ends: a June 2027 date came out "approximately four years
+  // away" in a report written in August 2026. Giving it the real date removes
+  // the guess. It still must not state distances, because the report is read
+  // for decades and any distance is stale the day after it is written.
+  lines.push(`**Today's date**: ${new Date().toISOString().slice(0, 10)} ` +
+    `(for your reference only; NEVER state how far away a date is)`);
   lines.push(`${dp.profile} | ${dp.type} | ${dp.authority} Authority | ${dp.definition}`);
   lines.push(`**Birth**: ${dp.birth.localDate} (${dp.birth.timezone})${dp.birth.place ? `, ${dp.birth.place}` : ""}`);
   lines.push(`**Design**: ${dp.birth.designUtcDate} UTC`);

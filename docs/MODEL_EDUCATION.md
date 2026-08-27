@@ -169,3 +169,31 @@ Related: recurring leak classes are also tracked in the agent memory note
 terminology (e.g. "pure Generator" contrast on an MG chart, "role model" line vs
 profile) are validator-calibration issues, not model-understanding errors, and
 are tracked separately.
+
+## Never state how far away a date is (2026-08-27)
+
+**What happened.** Kaycee's Foundation said "June 5, 2027 is approximately four
+years away from now," in a report written in August 2026. It is nine months away.
+
+**Why.** The model was never told the current date. Asked to work out a distance
+it answers from where its training data ends, around 2023, and 2027 minus 2023 is
+four. It will be wrong by that same margin on every report.
+
+**Why it recurred.** Kaycee had already corrected this in an earlier chat. The
+correction was never written into the prompt, the validator, or this file, so it
+died with that conversation. This is the case for committing corrections rather
+than making them: a fix that lives only in a chat is not a fix.
+
+**Three guards now, because prompt-only enforcement leaks:**
+
+1. The Data Pass states today's real date, so the model is not guessing.
+2. The Foundation prompt forbids stating any distance from the present.
+3. The validator hard-fails `distance-from-now`: any "N years/months/decades
+   away | from now | hence | time" phrasing, and "next year" / "last summer".
+   Tested against "eighty-four-year life cycle", "four years of formal study" and
+   "eighty-four years of age", which must not trip it.
+
+**The underlying reason, worth keeping in mind for anything similar:** these
+reports are evergreen. A client re-reads them for decades. Any sentence measured
+from the moment of writing is wrong the day after it is written, even when the
+arithmetic is right.

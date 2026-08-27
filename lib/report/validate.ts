@@ -980,6 +980,21 @@ export function validateReport(text: string, dp: DataPass, tier: ReportTier = "f
       label: "fixing-planet-named",
       msg: "Phrase '[Planet] in detriment' names a fixing planet. Hard rule: say 'in detriment' alone, never with the planet name.",
     },
+      {
+        // Distance-from-now on a life-cycle date. The model is never told the
+        // current date, so any such figure is computed against where its
+        // training data ends: a 2027 date came out "approximately four years
+        // away" in a report written in August 2026. The report is evergreen, so
+        // the arithmetic would be wrong the day after it was written anyway.
+        re: /(?:\d+|an?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|a few|several|many)[\s-]+(?:years?|months?|decades?|weeks?|days?)(?:'|\u2019)?\s+(?:away|from now|from today|out|hence|time)\b/gi,
+        label: "distance-from-now",
+        msg: "States how far away a date is. The model is not told today's date, so this is computed against its training cutoff and is wrong. The report is evergreen: give the date and the window, never the distance from now.",
+      },
+      {
+        re: /\b(?:next|last)\s+(?:year|month|spring|summer|autumn|winter)\b/gi,
+        label: "distance-from-now",
+        msg: "Relative time reference ('next year', 'last summer') in an evergreen report. Anchor to the actual date instead.",
+      },
     {
       re: new RegExp(`\\b(?:the\\s+)?(?:exaltation|detriment)\\s*,\\s*${TONE_PLANETS}\\s*,`, "g"),
       label: "fixing-planet-named",
