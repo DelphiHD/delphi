@@ -506,11 +506,13 @@ const PAGE = /* html */ `<!doctype html>
         'so this fills in as reports are generated.</span></div>';
 
     document.getElementById('recent').innerHTML = d.recent.length
-      ? '<table class="rep"><thead><tr><th>when</th><th>client</th><th>report</th>' +
+      ? '<table class="rep"><thead><tr><th>date</th><th>time</th><th>client</th><th>report</th>' +
         '<th>cost</th><th>min</th><th>words</th><th>validator</th></tr></thead><tbody>' +
         d.recent.map(function (r) {
           var bad = /REJECT/.test(r.validation || '');
-          return '<tr><td>' + esc(new Date(r.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) +
+            var when = new Date(r.at);
+            return '<tr><td>' + esc(when.toLocaleDateString([], { month: 'short', day: 'numeric' })) +
+              '</td><td>' + esc(when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) +
             '</td><td>' + esc(r.client) + '</td><td>' + esc(r.kind) + '</td><td>' + money(r.cost) +
             '</td><td>' + r.minutes + '</td><td>' + (r.words || '').toLocaleString() +
               '</td><td class="' + (bad ? 'bad' : '') + '"' + (bad ? ' title="' + esc(
@@ -683,7 +685,7 @@ createServer((req, res) => {
     res.end(JSON.stringify({
       jobs: jobs.slice(-6).reverse(),
       byClient,
-      recent: stats.slice(-14).reverse().map((r: any) => ({
+      recent: stats.slice(-30).reverse().map((r: any) => ({
         at: r.timestamp, client: r.client, kind: r.report_type, cost: r.cost_usd,
         words: r.words, minutes: Math.round((r.elapsed_sec ?? 0) / 60),
         validation: r.validation,
