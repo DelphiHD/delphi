@@ -306,3 +306,73 @@ Client links live at **`charts.delphihd.com/c/<token>`** instead — Kaycee's ca
 **Lesson.** Check what a domain is already serving before attaching or pointing it. A registrar record looks like config; on an apex it is the whole business's front door.
 
 **Open.** No cost note: no Claude calls on this path; storage is a fraction of a cent per chart.
+
+---
+
+## Astrology view on the client chart (2026-08-27)
+
+**The endpoint was there all along.** Natal astrology lives at
+`GET /v240815/astro-data`, a different API version from the Human Design
+`/v221006/hd-data`. Probing for it under the HD version returns
+`{"error":"API endpoint not found"}`, which is how two separate sessions
+concluded the subscription did not include it. It does. So does the
+relationship chart, at `/v221006/hd-data` with `date[]`, `timezone[]` and
+`relationship=1`. **Read the vendor's docs at https://bodygraph.com/docs before
+concluding an API cannot do something.**
+
+It returns 14 planets with sign, degree, element, modality and house, all twelve
+cusps, ~50 aspects with orbs, the angles, and a rendered wheel.
+
+**We draw our own wheel.** The provider's wheel draws every glyph and number as
+a vector path rather than text, so its typography cannot be restyled and it
+reads heavier than the brand. `scripts/astro-wheel.ts` draws from the same
+numbers in Montserrat and `#845095`. Nothing on it is derived or estimated.
+
+**Coordinates come from OpenStreetMap, not from the chart provider.** The
+provider's `locations` endpoint returns a timezone and nothing else: no
+latitude, no longitude, and `hd-data` carries none either. Human Design only
+needs the instant, so this never mattered before. Astrology needs the place.
+
+**And a missing coordinate is silent.** `astro-data` accepts a missing latitude
+without complaint and returns a chart computed from a default point in the
+ocean. For a 6:29am Utah birth that put the Ascendant in Sagittarius instead of
+Cancer and moved every planet into the wrong house. `lib/astro.ts` now throws
+rather than letting that through, and geocodes are cached in
+`.cache/geocode.json`.
+
+**The node names are misleading.** `Mean_Node` and `True_Node` come back exactly
+180 degrees apart on every chart, which is the node axis, not the one degree
+that separates a mean from a true north node. Checked against the Human Design
+North Node, which we compute ourselves, on four charts: `True_Node` matched to
+two decimals every time and `Mean_Node` was opposite. **`True_Node` is North,
+`Mean_Node` is South.** Verify against HD before trusting a name in this API.
+
+**The sign copy is Kaycee's.** The provider's zodiac text is written in the
+second person for someone with that Sun sign, so used as a hover it tells every
+client they are all twelve signs. Hers is in `SIGN_NOTE` in `lib/astro.ts`,
+written about the sign rather than about the reader. Nine charts went out with
+the provider's text before she caught it.
+
+**Open.** No cost note: no Claude calls on this path, and charts are unlimited
+on her subscription.
+
+---
+
+## Runs must outlive the dashboard (2026-08-27)
+
+The form spawned `add-client` as a child of the server, so reloading the server
+killed the queue. On 2026-08-27 a reload to pick up a dashboard change did
+exactly that, thirty seconds after a three-client batch started: the report
+already in flight finished, because those are detached, but nothing advanced the
+queue and the dashboard showed "waiting" for ever. The run was gone and nothing
+said so.
+
+Runs are now their own process writing to `.cache/runs/<id>.log`. The server
+follows that log for progress instead of a pipe, picks live runs back up on
+startup, and closes out any that ended while it was down. **A run is current
+only while its process is alive**; that is the only test, because a job from
+before this change has no log to follow and would otherwise read "running" for
+ever.
+
+Verified by restarting the server repeatedly during live batches, including
+Kaycee's own test run.
