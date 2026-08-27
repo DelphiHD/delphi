@@ -12,8 +12,9 @@ import { config as loadEnv } from "dotenv";
 loadEnv({ path: ".env.local", override: true });
 
 import { execSync, spawn } from "node:child_process";
-import { createServer } from "node:http";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createServer, type ServerResponse } from "node:http";
+import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync,
+  readSync, statSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -124,7 +125,24 @@ interface Job {
   startedAt: string;
   finishedAt?: string;
   people: Person[];
+  /** The run is its own process, not a child of this server, so that restarting
+   *  the dashboard does not kill reports that are half generated. On 2026-08-27
+   *  a reload to pick up a dashboard change took a three-client batch with it,
+   *  silently: the report already in flight finished, because those are detached
+   *  too, but nothing advanced the queue and the dashboard showed "waiting"
+   *  forever. Progress is read from the log rather than from a pipe, so it
+   *  survives a restart on both ends. */
+  pid?: number;
+  log?: string;
+  /** Set when the run's process is gone but its queue never reached the end. */
+  died?: boolean;
 }
+
+const RUNS_DIR = ".cache/runs";
+const alive = (pid?: number) => {
+  if (!pid) return false;
+  try { process.kill(pid, 0); return true; } catch { return false; }
+};
 
 function loadJobs(): Job[] {
   try { return existsSync(JOBS_PATH) ? JSON.parse(readFileSync(JOBS_PATH, "utf8")) : []; }
@@ -144,6 +162,73 @@ const blankSteps = (): Record<StepName, StepState> =>
 /** Turn one line of add-client output into a change on the job. The lines are
  *  stable and deliberately parseable; this is the same shape the terminal
  *  shows, kept rather than thrown away when the page closes. */
+/** Start a run that does not die with this server, and follow its progress by
+ *  reading the log it writes. `res` is optional: without it we are picking a
+ *  run back up after a restart, with nobody watching. */
+function startRun(job: Job, jobs: Job[], args: string[], res?: ServerResponse) {
+  mkdirSync(RUNS_DIR, { recursive: true });
+  const logPath = join(RUNS_DIR, `${job.id}.log`);
+  const fd = openSync(logPath, "a");
+  const child = spawn("./node_modules/.bin/tsx", args,
+    { cwd: process.cwd(), detached: true, stdio: ["ignore", fd, fd] });
+  child.unref();
+  closeSync(fd);
+  job.pid = child.pid;
+  job.log = logPath;
+  saveJobs(jobs);
+  followRun(job, jobs, res);
+}
+
+function followRun(job: Job, jobs: Job[], res?: ServerResponse) {
+  let offset = 0;
+  let pending = "";
+  const drain = () => {
+    let size = 0;
+    try { size = statSync(job.log!).size; } catch { return; }
+    if (size <= offset) return;
+    const fd = openSync(job.log!, "r");
+    const buf = Buffer.alloc(size - offset);
+    readSync(fd, buf, 0, buf.length, offset);
+    closeSync(fd);
+    offset = size;
+    const text = buf.toString();
+    if (res && !res.writableEnded) res.write(text);
+    pending += text;
+    const lines = pending.split("\n");
+    pending = lines.pop() ?? "";
+    for (const l of lines) {
+      const named = job.people.find((pp) => l.trim() === pp.name);
+      if (named) { job.people = [...job.people.filter((x) => x !== named), named]; continue; }
+      applyLine(job, l);
+    }
+    // The step in flight is a half-written line: add-client prints "  planetary "
+    // and only completes it twenty minutes later with the outcome. Reading whole
+    // lines alone means the one step actually happening is the one shown as
+    // waiting, which is the opposite of useful. Apply the partial line too, but
+    // only when it is unmistakably a step, so a fragment cannot invent a person.
+    if (/^ {2}(roster|folder|foundation|planetary|chart|link|notion|cache|FAILED)\b/.test(pending)) {
+      applyLine(job, pending);
+    }
+    saveJobs(jobs);
+  };
+  const tick = () => {
+    const running = alive(job.pid);
+    drain();
+    if (running) { setTimeout(tick, 1000); return; }
+    // the process is gone. Anything still mid-step never got there.
+    const unfinished = job.people.some((pp) =>
+      Object.values(pp.steps).some((v) => v === "waiting" || v === "running"));
+    job.died = unfinished;
+    job.finishedAt = job.finishedAt ?? new Date().toISOString();
+    saveJobs(jobs);
+    if (res && !res.writableEnded) {
+      res.write(unfinished ? "\n\nThe run stopped before it finished.\n" : "\n\nAll done.\n");
+      res.end();
+    }
+  };
+  tick();
+}
+
 function applyLine(job: Job, raw: string) {
   const line = raw.replace(/\r/g, "");
   const heading = /^([A-Z][^=]{1,60})$/.exec(line.trim());
@@ -281,6 +366,7 @@ const PAGE = /* html */ `<!doctype html>
   .tile span { font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; opacity:.55; }
   .job { background:#fff; border:1px solid var(--line); border-radius:12px; padding:13px 15px; margin-bottom:10px; }
   .job > .when { font-size:11px; opacity:.5; margin-bottom:9px; }
+  .job > .when .stopped { color:#c0392b; font-weight:600; opacity:1; }
   .who { display:flex; align-items:center; gap:9px; flex-wrap:wrap; padding:6px 0;
     border-top:1px solid rgba(132,80,149,.1); }
   .who:first-of-type { border-top:none; }
@@ -541,7 +627,8 @@ const PAGE = /* html */ `<!doctype html>
     document.getElementById('jobs').innerHTML = d.jobs.length ? d.jobs.map(function (j) {
       var when = new Date(j.startedAt).toLocaleString();
       return '<div class="job"><div class="when">' + esc(when) +
-        (j.finishedAt ? ' &middot; finished' : ' &middot; running') + '</div>' +
+        (j.died ? ' &middot; <span class="stopped">stopped before it finished</span>'
+          : j.finishedAt ? ' &middot; finished' : ' &middot; running') + '</div>' +
         j.people.map(function (p) {
           return '<div class="who"><span class="nm">' + esc(p.name) +
             (p.id ? ' <span class="cid">' + esc(p.id) + '</span>' : '') + '</span>' +
@@ -880,29 +967,7 @@ createServer((req, res) => {
       jobs.push(job);
       saveJobs(jobs);
 
-      const child = spawn("./node_modules/.bin/tsx",
-        ["scripts/add-client.ts", ...slugs, "--redo", "--yes"], { cwd: process.cwd() });
-      let pending = "";
-      const consume = (d: Buffer) => {
-        res.write(d);
-        pending += d.toString();
-        const lines = pending.split("\n");
-        pending = lines.pop() ?? "";
-        for (const l of lines) {
-          const named = job.people.find((pp) => l.trim() === pp.name);
-          if (named) { job.people = [...job.people.filter((x) => x !== named), named]; continue; }
-          applyLine(job, l);
-        }
-        saveJobs(jobs);
-      };
-      child.stdout.on("data", consume);
-      child.stderr.on("data", consume);
-      child.on("close", (code) => {
-        job.finishedAt = new Date().toISOString();
-        saveJobs(jobs);
-        res.write(code === 0 ? "\n\nAll done.\n" : `\n\nFinished with problems (exit ${code}).\n`);
-        res.end();
-      });
+      startRun(job, jobs, ["scripts/add-client.ts", ...slugs, "--redo", "--yes"], res);
     });
     return;
   }
@@ -937,29 +1002,7 @@ createServer((req, res) => {
 
       const args = ["scripts/add-client.ts", "--file", csv, "--yes"];
       if (!reports) args.push("--no-reports");
-      const child = spawn("./node_modules/.bin/tsx", args, { cwd: process.cwd() });
-      let pending = "";
-      const consume = (d: Buffer) => {
-        res.write(d);
-        pending += d.toString();
-        const lines = pending.split("\n");
-        pending = lines.pop() ?? "";
-        // the job was seeded from the form, so match names rather than create
-        for (const l of lines) {
-          const named = job.people.find((p) => l.trim() === p.name);
-          if (named) { job.people = [...job.people.filter((x) => x !== named), named]; continue; }
-          applyLine(job, l);
-        }
-        saveJobs(jobs);
-      };
-      child.stdout.on("data", consume);
-      child.stderr.on("data", consume);
-      child.on("close", (code) => {
-        job.finishedAt = new Date().toISOString();
-        saveJobs(jobs);
-        res.write(code === 0 ? "\n\nAll done.\n" : `\n\nFinished with problems (exit ${code}).\n`);
-        res.end();
-      });
+      startRun(job, jobs, args, res);
     });
     return;
   }
@@ -1139,4 +1182,25 @@ createServer((req, res) => {
   res.writeHead(404); res.end("not found");
 }).listen(PORT, () => {
   console.log(`\n  Delphi client form: http://localhost:${PORT}\n`);
+
+  // Runs outlive this process, so on startup take back the ones still going and
+  // close the books on any that ended while we were down. Without this a restart
+  // leaves a live run showing "waiting" forever, which is worse than no dashboard.
+  const jobs = loadJobs();
+  let resumed = 0, closed = 0;
+  for (const job of jobs) {
+    if (job.finishedAt || !job.log) continue;
+    if (alive(job.pid)) { followRun(job, jobs); resumed++; }
+    else {
+      const unfinished = job.people.some((pp) =>
+        Object.values(pp.steps).some((v) => v === "waiting" || v === "running"));
+      job.died = unfinished;
+      job.finishedAt = new Date().toISOString();
+      closed++;
+    }
+  }
+  if (resumed || closed) {
+    saveJobs(jobs);
+    console.log(`  picked up ${resumed} run(s) still going, closed ${closed} that ended\n`);
+  }
 });
