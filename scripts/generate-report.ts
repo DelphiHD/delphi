@@ -239,12 +239,12 @@ async function main() {
     ?? resolve(homedir(), "Desktop", "Benchmark Reports", "Phase 4 Output");
   // For ad-hoc real-client runs, primary destination is clientDir.
   // For slug-mode benchmark runs, primary destination is benchmarkDir.
-  // Slug mode was written for benchmark runs, so it files everything under
-  // Benchmark Reports with "Phase 4" in the name. add-client also runs by slug,
-  // because that is how the roster is read (and how lookupPlace is honoured),
-  // and its output is a paying client's deliverable rather than a benchmark.
-  // --client-dir says which it is; nothing that does not pass it changes.
-  const toClientDir = isAdHoc || !!flags["client-dir"];
+  // A report about a real person belongs in that person's folder. Slug mode used
+  // to mean "benchmark run" purely because that is what slug mode was first
+  // written for, which quietly filed paying clients' deliverables under
+  // Benchmark Reports as "Phase 4 v2". Benchmarking is now the thing you ask
+  // for, with --benchmark, rather than the thing you get by default.
+  const toClientDir = !flags.benchmark;
   const primaryDir = toClientDir ? clientDir : benchmarkDir;
   mkdirSync(primaryDir, { recursive: true });
 

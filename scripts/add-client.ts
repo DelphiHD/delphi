@@ -21,6 +21,7 @@
 //   --no-notion    skip writing the Notion row
 //   --dry-run      say what would happen, change nothing
 //   --yes          do not stop to confirm (for unattended runs)
+//   --redo         regenerate reports even when one is already written
 //   --status X     Notion Status for new rows (default "Ready for Reports")
 //
 // Safe to re-run. Somebody already on the roster is picked up where they are
@@ -234,29 +235,48 @@ function run(script: string, args: string[]): string {
   });
 }
 
-/** A report generation that has gone quiet is not a report generation that is
- *  thinking hard. One of these wedged at nought per cent CPU with no network
- *  connection for forty six minutes and only stopped because somebody looked.
- *  A step that says nothing for QUIET_MINUTES is killed and tried again. */
-const QUIET_MINUTES = 8;
-const HARD_CAP_MINUTES = 35;
+/** There is no progress to watch for. generate-report prints "Calling Claude"
+ *  and then says nothing at all until every section is written: one await, all
+ *  sections inside it. Lance's Foundation was fifteen minutes of silence and
+ *  perfectly healthy.
+ *
+ *  A quiet-output watchdog was added here on the strength of a job that looked
+ *  wedged, and it was wrong twice over. The diagnosis was wrong (the check ran
+ *  against the tsx wrapper, which never holds the connection, rather than the
+ *  node process underneath that does), and the cure then killed healthy reports
+ *  at twelve minutes and started them again from nothing, repeatedly, which is
+ *  what turned an hour of work into an evening of it.
+ *
+ *  So: no silence timeout. Only a ceiling far beyond any real report, to catch
+ *  something genuinely wedged forever. */
+const QUIET_MINUTES = 0;                  // disabled: silence is normal here
+const HARD_CAP_MINUTES = 50;
 
 function runWatched(script: string, args: string[], label: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn("./node_modules/.bin/tsx", [script, ...args]);
+    // detached, so the child leads its own process group. tsx is a wrapper that
+    // spawns the real node underneath it: killing the wrapper alone leaves that
+    // one running, which is how two copies of the same report ended up racing
+    // each other, the retry alongside the job it was meant to replace.
+    const child = spawn("./node_modules/.bin/tsx", [script, ...args], { detached: true });
     let out = "", settled = false;
-    const finish = (fn: () => void) => { if (!settled) { settled = true; clearTimeout(quiet); clearTimeout(cap); fn(); } };
+    const finish = (fn: () => void) => { if (!settled) { settled = true; if (quiet) clearTimeout(quiet); clearTimeout(cap); fn(); } };
+    const killTree = () => {
+      try { if (child.pid) process.kill(-child.pid, "SIGKILL"); }
+      catch { try { child.kill("SIGKILL"); } catch { /* already gone */ } }
+    };
 
-    let quiet: NodeJS.Timeout;
+    let quiet: NodeJS.Timeout | undefined;
     const resetQuiet = () => {
+      if (!QUIET_MINUTES) return;
       clearTimeout(quiet);
       quiet = setTimeout(() => {
-        child.kill("SIGKILL");
+        killTree();
         finish(() => reject(new Error(`${label} went quiet for ${QUIET_MINUTES} minutes and was stopped`)));
       }, QUIET_MINUTES * 60_000);
     };
     const cap = setTimeout(() => {
-      child.kill("SIGKILL");
+      killTree();
       finish(() => reject(new Error(`${label} ran past ${HARD_CAP_MINUTES} minutes and was stopped`)));
     }, HARD_CAP_MINUTES * 60_000);
     resetQuiet();
@@ -343,6 +363,7 @@ async function main() {
   const f = flags(process.argv.slice(2));
   const dry = !!f["dry-run"];
   const doReports = !f["no-reports"];
+  const redo = !!f.redo;
   const doNotion = !f["no-notion"];
   const status = typeof f.status === "string" ? f.status : STATUS_DEFAULT;
 
@@ -394,7 +415,9 @@ async function main() {
       (CLIENTS[b.slug] ? "   (already on the roster, picking up where it is)" : ""));
   }
   console.log(doReports
-    ? "\nReports: Foundation and Planetary Overview will be generated (Sonnet 4.6; roughly a dollar or two each)."
+    ? `\nReports: Foundation and Planetary Overview` +
+      (redo ? " will be regenerated from scratch" : ", keeping any already written") +
+      " (Sonnet 4.6; roughly a dollar or two each)."
     : "\nReports: skipped (--no-reports).");
   if (dry) { console.log("\n--dry-run: nothing changed.\n"); return; }
 
@@ -422,10 +445,12 @@ async function main() {
 
       if (doReports) {
         for (const kind of ["foundation", "planetary"] as const) {
-          if (hasReport(dir, kind)) { console.log(`  ${kind.padEnd(10)}already written, kept`); continue; }
+          if (!redo && hasReport(dir, kind)) {
+            console.log(`  ${kind.padEnd(10)}already written, kept`);
+            continue;
+          }
           process.stdout.write(`  ${kind.padEnd(10)}generating… `);
-          // --client-dir: this is a deliverable, not a benchmark run
-          await runWithRetry("scripts/generate-report.ts", [b.slug, kind, "--client-dir"], kind);
+          await runWithRetry("scripts/generate-report.ts", [b.slug, kind], kind);
           console.log("ok");
         }
       }
