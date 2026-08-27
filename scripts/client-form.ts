@@ -11,7 +11,7 @@
 import { config as loadEnv } from "dotenv";
 loadEnv({ path: ".env.local", override: true });
 
-import { spawn } from "node:child_process";
+import { execSync, spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
@@ -171,6 +171,43 @@ function applyLine(job: Job, raw: string) {
   else if (/generating|building|retrying/.test(rest)) p.steps[step] = "running";
 }
 
+/** Anything generating RIGHT NOW, read from the process list rather than from a
+ *  job record, so a run started from the terminal shows up exactly like one
+ *  started from the form. Kaycee watched today's run show "No runs yet" for two
+ *  hours because the dashboard only knew about its own submissions. */
+function liveReports(): { client: string; kind: string; minutes: number; slow: boolean }[] {
+  let out = "";
+  try { out = execSync("ps -eo etime=,command=", { encoding: "utf8", timeout: 4000 }); }
+  catch { return []; }
+  const seen = new Set<string>();
+  const live: { client: string; kind: string; minutes: number; slow: boolean }[] = [];
+  for (const line of out.split("\n")) {
+    if (!line.includes("generate-report.ts")) continue;
+    if (line.includes("--require")) continue;           // the tsx shim, same job
+    const m = /generate-report\.ts\s+(\S+)\s+(\S+)/.exec(line);
+    if (!m) continue;
+    const key = m[1] + "|" + m[2];
+    if (seen.has(key)) continue;
+    seen.add(key);
+    // etime is [[dd-]hh:]mm:ss
+    const et = (line.trim().split(/\s+/)[0] ?? "").split("-").pop() ?? "";
+    const parts = et.split(":").map(Number).filter((x) => !Number.isNaN(x));
+    const mins = parts.length === 3 ? parts[0] * 60 + parts[1] + parts[2] / 60
+      : parts.length === 2 ? parts[0] + parts[1] / 60 : 0;
+    const slug = m[1];
+    const src = existsSync(ROSTER_PATH) ? readFileSync(ROSTER_PATH, "utf8") : "";
+    const nm = new RegExp(`slug: "${slug}",\\s*name: "([^"]+)"`).exec(src);
+    live.push({
+      client: nm ? nm[1] : slug,
+      kind: m[2] === "planetary" ? "Planetary Overview" : m[2] === "foundation" ? "Foundation" : m[2],
+      minutes: Math.round(mins),
+      // past the 90th percentile of every report ever written
+      slow: mins > 27,
+    });
+  }
+  return live;
+}
+
 /** Cost, words and elapsed time per report, straight from the report log. */
 function reportStats() {
   if (!existsSync(REPORT_LOG)) return [] as any[];
@@ -294,6 +331,8 @@ const PAGE = /* html */ `<!doctype html>
   <p class="sub">What every submitted client is doing, and what it has cost.</p>
   <h2>Today</h2>
   <div class="tiles" id="tiles"></div>
+  <h2>Running now</h2>
+  <div id="live"></div>
   <h2>Runs</h2>
   <div id="jobs"></div>
   <h2>Recent reports</h2>
@@ -423,6 +462,20 @@ const PAGE = /* html */ `<!doctype html>
         'Every report ever written, total cost divided by the number of reports. Includes regenerations.') +
       tile(Math.round(d.avgMinutes) + ' min', 'average per report',
         'Every report ever written, total minutes divided by the number of reports.');
+
+    // anything generating this second, however it was started
+    document.getElementById('live').innerHTML = d.live.length
+      ? d.live.map(function (x) {
+          return '<div class="job"><div class="who">' +
+            '<span class="nm">' + esc(x.client) + '</span>' +
+            '<span class="pip running">' + esc(x.kind) + '</span>' +
+            '<span class="pip ' + (x.slow ? 'rejected' : 'kept') + '">' + x.minutes + ' min</span>' +
+            '<span style="font-size:11.5px;opacity:.65">' +
+              (x.slow ? 'longer than 9 in 10 reports take. Still running; the model retries a stalled call on its own.'
+                      : 'normal, a report takes about 17 minutes') +
+            '</span></div></div>';
+        }).join('')
+      : '<div class="tile"><span>Nothing generating right now.</span></div>';
 
     document.getElementById('jobs').innerHTML = d.jobs.length ? d.jobs.map(function (j) {
       var when = new Date(j.startedAt).toLocaleString();
@@ -683,6 +736,7 @@ createServer((req, res) => {
     const todays = stats.filter((r: any) => String(r.timestamp ?? "").startsWith(today));
     res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
     res.end(JSON.stringify({
+      live: liveReports(),
       jobs: jobs.slice(-6).reverse(),
       byClient,
       recent: stats.slice(-30).reverse().map((r: any) => ({
