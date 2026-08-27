@@ -103,9 +103,15 @@ export function renderWheel(chart: AstroChart, name: string): string {
       `fill="${INK}" opacity=".55">${i + 1}</text>`);
   });
 
-  // aspects, drawn as chords inside
+  // Aspects, drawn as chords inside. Two things get left out. Conjunctions,
+  // because a chord between two points in the same place is a dot. And anything
+  // involving a house cusp: the API returns those alongside the planet-to-planet
+  // aspects, and drawing "Node opposition First House" as a chord across the
+  // wheel says something that isn't true.
+  const planetNames = new Set(chart.planets.map((p) => p.name));
   for (const a of chart.aspects) {
     if (a.aspect === "conjunction") continue;
+    if (!planetNames.has(a.p1_name) || !planetNames.has(a.p2_name)) continue;
     const colour = HARD.has(a.aspect) ? "#c0603c" : SOFT.has(a.aspect) ? PURPLE : "#b9b6bd";
     const [x1, y1] = pt(a.p1_abs_pos, asc, R_ASPECT);
     const [x2, y2] = pt(a.p2_abs_pos, asc, R_ASPECT);
