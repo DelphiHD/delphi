@@ -1227,6 +1227,29 @@ export function validateReport(text: string, dp: DataPass, tier: ReportTier = "f
     }
   }
 
+  // A universal mechanic written as though it belonged to this reader. Every
+  // cross is built from the same four Sun-Earth gates, so "yours is built from
+  // the four gates of your Sun-Earth axes" says the others are built from
+  // something else. Kaycee, 2026-08-27: "it implies that crosses are formed by
+  // different things for different people. I hate that."
+  const universalAsPersonal = [
+    /\byours?\s+(?:cross\s+)?is\s+(?:built|formed|made|composed)\s+from\b/i,
+    /\byour\s+(?:incarnation\s+)?cross\s+is\s+(?:built|formed|made|composed)\s+(?:from|of)\b/i,
+    /\bevery\s+chart\s+has\s+an\s+incarnation\s+cross\b/i,
+  ];
+  for (const re of universalAsPersonal) {
+    const m = text.match(re);
+    if (m) {
+      pushSoft({
+        section: "Your Incarnation Cross",
+        rule: "universal-as-personal",
+        message: "States a mechanic true of every chart as though it were specific to this one. " +
+          "Say it as a universal or leave it out.",
+        detected: text.slice(Math.max(0, (m.index ?? 0) - 40), Math.min(text.length, (m.index ?? 0) + 160)),
+      });
+    }
+  }
+
   // 7. Em dashes (should be 0 after post-process; flag if any survive).
   const emDashCount = (text.match(/—/g) ?? []).length;
   if (emDashCount > 0) {

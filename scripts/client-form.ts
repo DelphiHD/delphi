@@ -51,6 +51,7 @@ function reportsOnDisk(clientName: string): { foundation: boolean; planetary: bo
 // retrieval is wrong, a leak means the prompt is showing the reader machinery,
 // a drift means the model contradicted the chart.
 const RULE_CATEGORY: Record<string, string> = {
+  "universal-as-personal": "Contradicts the chart",
   // The engine's own vocabulary reaching the page
   "inline-source-citation": "Source leak",
   "ra-by-name-in-body": "Source leak",
@@ -171,6 +172,19 @@ const blankSteps = (): Record<StepName, StepState> =>
 /** Start a run that does not die with this server, and follow its progress by
  *  reading the log it writes. `res` is optional: without it we are picking a
  *  run back up after a restart, with nobody watching. */
+/** Write one run back without trampling the others.
+ *
+ *  Every follower held its own copy of the whole job list from when it started,
+ *  so a run begun later was wiped out by an older run's next save: it kept
+ *  generating, invisibly, while the dashboard showed no sign of it. Read, patch
+ *  the one entry, write. */
+function persistJob(job: Job) {
+  const all = loadJobs();
+  const i = all.findIndex((j) => j.id === job.id);
+  if (i >= 0) all[i] = job; else all.push(job);
+  saveJobs(all);
+}
+
 function startRun(job: Job, jobs: Job[], args: string[], res?: ServerResponse) {
   mkdirSync(RUNS_DIR, { recursive: true });
   const logPath = join(RUNS_DIR, `${job.id}.log`);
@@ -181,7 +195,7 @@ function startRun(job: Job, jobs: Job[], args: string[], res?: ServerResponse) {
   closeSync(fd);
   job.pid = child.pid;
   job.log = logPath;
-  saveJobs(jobs);
+  persistJob(job);
   followRun(job, jobs, res);
 }
 
@@ -219,7 +233,7 @@ function followRun(job: Job, jobs: Job[], res?: ServerResponse) {
     if (/^ {2}(roster|folder|foundation|planetary|chart|link|notion|cache|FAILED)/.test(pending)) {
       applyLine(job, pending);
     }
-    saveJobs(jobs);
+    persistJob(job);
   };
   const tick = () => {
     const running = alive(job.pid);
@@ -230,7 +244,7 @@ function followRun(job: Job, jobs: Job[], res?: ServerResponse) {
       Object.values(pp.steps).some((v) => v === "waiting" || v === "running"));
     job.died = unfinished;
     job.finishedAt = job.finishedAt ?? new Date().toISOString();
-    saveJobs(jobs);
+    persistJob(job);
     if (res && !res.writableEnded) {
       res.write(unfinished ? "\n\nThe run stopped before it finished.\n" : "\n\nAll done.\n");
       res.end();
