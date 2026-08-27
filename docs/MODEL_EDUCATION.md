@@ -208,3 +208,29 @@ failure opened the next. Worth expecting whenever a fact is added to a prompt.
 reports are evergreen. A client re-reads them for decades. Any sentence measured
 from the moment of writing is wrong the day after it is written, even when the
 arithmetic is right.
+
+---
+
+## Nine centers, always (Kaycee, 2026-08-27)
+
+**Every report goes into detail on all nine centers, regardless of definition
+status. No exceptions.** Defined, undefined and open are three different things
+to say about a center, not a reason to say nothing about one.
+
+This came from Lisa Bradshaw's Foundation, which rendered four of her five
+defined centers. The failure is worth understanding, because the model did not
+misunderstand the chart. Its own orientation paragraph read "This chart has five
+defined centers... the Head, Ajna, Heart, Sacral, and Spleen", and its closing
+synthesis referred to "the defined Heart, Sacral, and Spleen". It knew. It simply
+never wrote the Spleen's section. Four H3s where the same page said there should
+be five, and the report contradicted itself between its prose and its headings.
+
+Nothing was truncated: the call ended cleanly, well inside its token budget. This
+is a rendering omission, not a comprehension failure, which means instructions
+alone will not reliably prevent it. The validator's `center-missing` rule is what
+caught it, checking the rendered H3s against the nine centers in the Data Pass,
+and that check is the reason the report never reached her as a deliverable.
+
+**Do not weaken that rule.** A missing center is a hard failure whatever its
+state, and an open center with no activations still gets its own section: the
+open-center mechanic, conditioning, wisdom and challenges.
