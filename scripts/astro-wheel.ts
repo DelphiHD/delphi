@@ -1,0 +1,155 @@
+/**
+ * A Delphi natal wheel, drawn from the astrology endpoint's numbers.
+ *
+ * The provider returns its own wheel, but every glyph and number in it is a
+ * vector path rather than text, so its typography cannot be changed and it
+ * reads heavier than the rest of the brand. Drawing from the raw longitudes
+ * costs nothing extra (same API call) and gives Montserrat and the real purple.
+ *
+ *   npx tsx scripts/astro-wheel.ts <slug>
+ */
+import { config } from "dotenv";
+config({ path: ".env.local", quiet: true } as any);
+import { mkdirSync, writeFileSync } from "node:fs";
+import { getAstro, type AstroChart } from "../lib/astro";
+import { CLIENTS, clientFromSlug, placeForLookup } from "./client-roster";
+
+const PURPLE = "#845095";
+const INK = "#2f2a33";
+const CREAM = "#fdfcfd";
+
+// Two purples and two greys, the way the four elements read on the design page.
+const ELEMENT: Record<string, string> = {
+  Fire: PURPLE, Water: "#c9a7d4", Earth: "#9b9aa0", Air: "#5f5a66",
+};
+const HARD = new Set(["opposition", "square"]);
+const SOFT = new Set(["trine", "sextile"]);
+
+const GLYPH: Record<string, string> = {
+  Sun: "☉", Moon: "☽", Mercury: "☿", Venus: "♀", Mars: "♂",
+  Jupiter: "♃", Saturn: "♄", Uranus: "♅", Neptune: "♆", Pluto: "♇",
+  Mean_Node: "☊", True_Node: "☊", Mean_Lilith: "⚸", Chiron: "⚷",
+};
+
+const CX = 360, CY = 360;
+const R_OUT = 330, R_SIGN = 288, R_TICK = 278, R_PLANET = 250, R_HOUSE = 214, R_ASPECT = 196;
+
+/** Screen angle for a zodiac longitude: Ascendant on the left, signs counterclockwise. */
+function pt(lon: number, asc: number, r: number): [number, number] {
+  const a = ((180 + (lon - asc)) * Math.PI) / 180;
+  return [CX + r * Math.cos(a), CY - r * Math.sin(a)];
+}
+const f = (n: number) => Math.round(n * 100) / 100;
+
+function arc(from: number, to: number, asc: number, rOuter: number, rInner: number): string {
+  const [x1, y1] = pt(from, asc, rOuter), [x2, y2] = pt(to, asc, rOuter);
+  const [x3, y3] = pt(to, asc, rInner), [x4, y4] = pt(from, asc, rInner);
+  const big = ((to - from + 360) % 360) > 180 ? 1 : 0;
+  return `M${f(x1)} ${f(y1)}A${rOuter} ${rOuter} 0 ${big} 0 ${f(x2)} ${f(y2)}` +
+    `L${f(x3)} ${f(y3)}A${rInner} ${rInner} 0 ${big} 1 ${f(x4)} ${f(y4)}Z`;
+}
+
+const degLabel = (pos: number) => {
+  const d = Math.floor(pos);
+  const m = Math.round((pos - d) * 60);
+  return m === 60 ? `${d + 1}°` : `${d}°${String(m).padStart(2, "0")}'`;
+};
+
+export function renderWheel(chart: AstroChart, name: string): string {
+  const asc = chart.ascendant;
+  const s: string[] = [];
+  s.push(`<svg viewBox="0 0 720 720" xmlns="http://www.w3.org/2000/svg" ` +
+    `font-family="Montserrat, 'Helvetica Neue', sans-serif">`);
+  s.push(`<rect width="720" height="720" fill="${CREAM}"/>`);
+
+  // the twelve signs, coloured by element
+  const SIGNS = ["Ari", "Tau", "Gem", "Can", "Leo", "Vir", "Lib", "Sco", "Sag", "Cap", "Aqu", "Pis"];
+  const ELEM_OF = ["Fire", "Earth", "Air", "Water"];
+  const GL = ["♈", "♉", "♊", "♋", "♌", "♍",
+    "♎", "♏", "♐", "♑", "♒", "♓"];
+  for (let i = 0; i < 12; i++) {
+    const start = i * 30, end = start + 30;
+    s.push(`<path d="${arc(start, end, asc, R_OUT, R_SIGN)}" fill="${ELEMENT[ELEM_OF[i % 4]]}" opacity=".92"/>`);
+    const [gx, gy] = pt(start + 15, asc, (R_OUT + R_SIGN) / 2);
+    s.push(`<text x="${f(gx)}" y="${f(gy + 7)}" text-anchor="middle" font-size="20" fill="#fff">${GL[i]}</text>`);
+  }
+  // a tick every degree, longer every five
+  for (let d = 0; d < 360; d++) {
+    const [x1, y1] = pt(d, asc, R_SIGN);
+    const [x2, y2] = pt(d, asc, d % 5 === 0 ? R_TICK - 6 : R_TICK);
+    s.push(`<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" stroke="${INK}" ` +
+      `stroke-width="${d % 30 === 0 ? 1.4 : 0.4}" opacity="${d % 5 === 0 ? 0.5 : 0.25}"/>`);
+  }
+  s.push(`<circle cx="${CX}" cy="${CY}" r="${R_SIGN}" fill="none" stroke="${INK}" stroke-width="1" opacity=".5"/>`);
+  s.push(`<circle cx="${CX}" cy="${CY}" r="${R_HOUSE}" fill="none" stroke="${INK}" stroke-width="1" opacity=".35"/>`);
+  s.push(`<circle cx="${CX}" cy="${CY}" r="${R_ASPECT}" fill="none" stroke="${INK}" stroke-width="1" opacity=".2"/>`);
+
+  // house cusps, numbered in the space between the house ring and the aspect circle
+  chart.houses.forEach((h, i) => {
+    const angular = i % 3 === 0;
+    const [x1, y1] = pt(h.abs_pos, asc, R_SIGN);
+    const [x2, y2] = pt(h.abs_pos, asc, R_ASPECT);
+    s.push(`<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" stroke="${INK}" ` +
+      `stroke-width="${angular ? 1.6 : 0.7}" opacity="${angular ? 0.6 : 0.3}"/>`);
+    const next = chart.houses[(i + 1) % 12].abs_pos;
+    const mid = h.abs_pos + (((next - h.abs_pos) % 360) + 360) % 360 / 2;
+    const [nx, ny] = pt(mid, asc, (R_HOUSE + R_ASPECT) / 2);
+    s.push(`<text x="${f(nx)}" y="${f(ny + 4)}" text-anchor="middle" font-size="11" ` +
+      `fill="${INK}" opacity=".55">${i + 1}</text>`);
+  });
+
+  // aspects, drawn as chords inside
+  for (const a of chart.aspects) {
+    if (a.aspect === "conjunction") continue;
+    const colour = HARD.has(a.aspect) ? "#c0603c" : SOFT.has(a.aspect) ? PURPLE : "#b9b6bd";
+    const [x1, y1] = pt(a.p1_abs_pos, asc, R_ASPECT);
+    const [x2, y2] = pt(a.p2_abs_pos, asc, R_ASPECT);
+    s.push(`<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" stroke="${colour}" ` +
+      `stroke-width="${HARD.has(a.aspect) ? 0.9 : 0.8}" opacity=".5"/>`);
+  }
+
+  // planets, nudged apart when they crowd
+  const placed: number[] = [];
+  for (const p of [...chart.planets].sort((a, b) => a.abs_pos - b.abs_pos)) {
+    let lon = p.abs_pos;
+    while (placed.some((q) => Math.abs(((lon - q + 540) % 360) - 180) < 6)) lon += 3;
+    placed.push(lon);
+    const [x, y] = pt(lon, asc, R_PLANET);
+    const [tx, ty] = pt(lon, asc, R_PLANET - 26);
+    s.push(`<text x="${f(x)}" y="${f(y + 8)}" text-anchor="middle" font-size="21" fill="${INK}">` +
+      `${GLYPH[p.name] ?? p.name.slice(0, 2)}</text>`);
+    s.push(`<text x="${f(tx)}" y="${f(ty + 4)}" text-anchor="middle" font-size="9.5" ` +
+      `fill="${INK}" opacity=".6" letter-spacing=".02em">${degLabel(p.position)}</text>`);
+  }
+
+  // the angles
+  const angles: [string, number][] = [["As", asc], ["Ds", asc + 180], ["Mc", chart.mc], ["Ic", chart.mc + 180]];
+  for (const [label, lon] of angles) {
+    const [x, y] = pt(lon, asc, R_OUT + 16);
+    s.push(`<text x="${f(x)}" y="${f(y + 4)}" text-anchor="middle" font-size="12" ` +
+      `font-weight="600" fill="${PURPLE}" letter-spacing=".06em">${label}</text>`);
+  }
+  // the aspect chords run through the middle, so the name needs its own ground
+  s.push(`<circle cx="${CX}" cy="${CY}" r="74" fill="${CREAM}"/>`);
+  s.push(`<text x="${CX}" y="${CY - 4}" text-anchor="middle" font-size="15" fill="${INK}" ` +
+    `letter-spacing=".08em">${name}</text>`);
+  s.push(`<text x="${CX}" y="${CY + 16}" text-anchor="middle" font-size="9" fill="${INK}" ` +
+    `opacity=".45" letter-spacing=".18em">DELPHI HUMAN DESIGN</text>`);
+  s.push("</svg>");
+  return s.join("\n");
+}
+
+async function main() {
+  const slug = process.argv[2] ?? "kaycee";
+  const c = clientFromSlug(slug);
+  const chart = await getAstro({
+    birthDate: c.birthDate, birthTime: c.birthTime, place: placeForLookup(c),
+  });
+  const svg = renderWheel(chart, c.name);
+  mkdirSync(".cache/astro", { recursive: true });
+  writeFileSync(`.cache/astro/${c.slug}-wheel.svg`, svg);
+  console.log(`  ${c.name}: ${chart.planets.length} planets, ${chart.houses.length} houses, ` +
+    `${chart.aspects.length} aspects, Asc ${degLabel(chart.ascendant % 30)} ${chart.houses[0].sign}`);
+  console.log(`  .cache/astro/${c.slug}-wheel.svg`);
+}
+if (process.argv[1]?.includes("astro-wheel")) main();
