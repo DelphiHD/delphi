@@ -744,7 +744,13 @@ function reportPath(slug: string, name: string, outDir: string, kind: "foundatio
 /** Paragraphs under a report section, stopping at the next heading or rule. */
 function sectionParas(lines: string[], start: number): string[] {
   const paras: string[] = [];
-  const stop = (l: string) => /^#/.test(l) || /^---/.test(l.trim()) || /^[-*]\s+\*\*Gate/.test(l.trim());
+  // Stop at a heading or a rule, and nothing else. This used to stop at a
+  // bolded gate bullet too, which cut every gate out of the click-through text.
+  // It only ever hit reports that bolded them: "- **Gate 61: ...**" was dropped
+  // while "- Gate 64: ..." survived, so whichever format the model happened to
+  // choose decided whether a client's gates reached their chart. The gates are
+  // the specific part; they are the reason to open the panel at all.
+  const stop = (l: string) => /^#/.test(l) || /^---/.test(l.trim());
   let j = start;
   while (j < lines.length && !stop(lines[j])) {
     while (j < lines.length && lines[j].trim() === "") j++;
