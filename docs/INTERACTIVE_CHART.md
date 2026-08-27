@@ -284,3 +284,37 @@ channel list) draws a 3px `#f1c232` / `#ffcc00` stroke around the gate disc and 
 else: no fill, no pill, no drop-shadow. A filled pill was tried for the client column and
 rejected on sight, correctly, because it made that one highlight behave unlike every other
 highlight on the chart. Solid colour, never a glow.
+
+## Next up: the report dashboard (asked for 2026-08-26)
+
+Kaycee asked for a dashboard showing the status of submitted reports, loading on
+new client form submission, tracking cost and time. Not built yet. Everything it
+needs already exists:
+
+**The form** is `scripts/client-form.ts`, served at http://localhost:4321 by the
+LaunchAgent `com.delphihd.client-form` (RunAtLoad, KeepAlive, so it is always up).
+"Delphi - Add a Client" on the Desktop just opens that URL. It already spawns
+`add-client` and streams its stdout to the page; the dashboard is the same data,
+kept rather than thrown away when the page closes.
+
+**Per-step state** comes from the lines `add-client` prints, which are stable and
+parseable: `roster`, `folder`, `foundation`, `planetary`, `chart`, `link`,
+`notion`, `cache`, plus `FAILED` and `added N/M`. A rejected report prints
+"written, but the validator REJECTED it".
+
+**Cost and time** come from `.cache/reports/log.jsonl`, one JSON object per
+completed report: `timestamp`, `client`, `client_slug`, `report_type`, `version`,
+`model`, `cost_usd`, `words`, `elapsed_sec`, `validation`, `hard_failures`,
+`primary_path`. Real numbers from 2026-08-26: a Foundation runs 15-22 minutes and
+$1.20-1.71, a Planetary 17-20 minutes and $0.76-1.62. Budget about $1.30 a report,
+$2.60 a client, roughly $80 for the whole roster of 31.
+
+**What it must show that tonight lacked**: which step each person is on, and the
+validator's verdict per report. Both were invisible, and an evening went into
+guessing at the first and never seeing the second.
+
+Note the reports themselves are a single long await with no progress output at
+all: "Calling Claude" then silence until every section is written, fifteen minutes
+later. The dashboard should show that as expected rather than stalled, and MUST
+NOT infer a hang from silence. A watchdog built on that inference spent an hour
+killing healthy reports.
