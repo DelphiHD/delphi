@@ -76,8 +76,15 @@ export function loadDayRead(clientName: string, date: string): DayRead | null {
   const mine = heads.find((h) => h[1].trim() === clientName) ?? headingByRename(heads, clientName);
   if (!mine) return null;
   const start = mine.index! + mine[0].length;
-  const next = heads.find((h) => h.index! > mine.index!);
-  const body = md.slice(start, next ? next.index! : undefined);
+  // Stop at the next heading of ANY level, not merely the next person. The last
+  // person in the ranking has nobody after them, so bounding on people alone ran
+  // their section to the end of the file and hung the report's collective
+  // tables — active sky, transit formations, the day's gate changes — on
+  // whoever happened to rank last that day.
+  const after = /^#{1,6} /gm;
+  after.lastIndex = start;
+  const next = after.exec(md);
+  const body = md.slice(start, next ? next.index : undefined);
 
   const lines = body.split("\n");
   const paragraph = lines.filter((l) => l.trim() && !l.trim().startsWith("-")).join(" ").trim();
