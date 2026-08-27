@@ -977,7 +977,13 @@ export function validateReport(text: string, dp: DataPass, tier: ReportTier = "f
   // patterns. The Foundation Report is generally tighter on voice, but if
   // the model ever leaks them there too, the rules catch it.
   const TONE_PLANETS = "(?:Sun|Earth|Moon|Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Neptune|Pluto|Chiron)";
-  const planetaryToneHardPatterns: { re: RegExp; label: string; msg: string }[] = [
+  // `near`, when present, means the match only counts if that pattern also
+  // appears within NEAR_WINDOW characters. Used so "come back to this a decade
+  // from now" in the preamble passes, while the same phrasing measured against
+  // an actual date does not. Talking about time is fine; miscalculating it is
+  // the thing being caught.
+  const NEAR_WINDOW = 220;
+  const planetaryToneHardPatterns: { re: RegExp; label: string; msg: string; near?: RegExp }[] = [
     // Fixing-planet leakage: planet named as the exalter/detrimenter.
     // The master prompt says: "say 'exalted' or 'in detriment' alone, never
     // with the planet name."
@@ -1013,16 +1019,11 @@ export function validateReport(text: string, dp: DataPass, tier: ReportTier = "f
         // training data ends: a 2027 date came out "approximately four years
         // away" in a report written in August 2026. The report is evergreen, so
         // the arithmetic would be wrong the day after it was written anyway.
-        re: /(?:\d+|an?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|a few|several|many)[\s-]+(?:years?|months?|decades?|weeks?|days?)(?:'|\u2019)?\s+(?:away|from now|from today|out|hence|time)\b/gi,
+        re: /(?:\d+|an?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty)[\s-]+(?:years?|months?|decades?|weeks?|days?)(?:'|\u2019)?\s+(?:away|from now|from today|out|hence|time)\b/gi,
         label: "distance-from-now",
-        msg: "States how far away a date is. The model is not told today's date, so this is computed against its training cutoff and is wrong. The report is evergreen: give the date and the window, never the distance from now.",
-      },
-      {
-        re: /\b(?:next|last)\s+(?:year|month|spring|summer|autumn|winter)\b/gi,
-        label: "distance-from-now",
-        msg: "Relative time reference ('next year', 'last summer') in an evergreen report. Anchor to the actual date instead.",
-      },
-    {
+        near: /\b(?:19|20)\d{2}\b/,
+        msg: "States how far away a specific date is. The model is not told today's date, so this arithmetic is done against its training cutoff and comes out wrong: a June 2027 date became 'four years away' in a report written in 2026, and a 2035 Saturn Return became 'seventeen years away' when it was nine. Talking about time is fine; measuring from an unknown present is not. Give the date and let the reader subtract.",
+      },    {
       re: new RegExp(`\\b(?:the\\s+)?(?:exaltation|detriment)\\s*,\\s*${TONE_PLANETS}\\s*,`, "g"),
       label: "fixing-planet-named",
       msg: "Apposition 'the exaltation/detriment, [Planet],' names a fixing planet. Hard rule forbids.",
@@ -1106,6 +1107,10 @@ export function validateReport(text: string, dp: DataPass, tier: ReportTier = "f
   for (const p of planetaryToneHardPatterns) {
     for (const m of text.matchAll(p.re)) {
       const idx = m.index ?? 0;
+      if (p.near) {
+        const around = text.slice(Math.max(0, idx - NEAR_WINDOW), idx + m[0].length + NEAR_WINDOW);
+        if (!p.near.test(around)) continue;
+      }
       pushHard({
         section: "(any)",
         rule: p.label,

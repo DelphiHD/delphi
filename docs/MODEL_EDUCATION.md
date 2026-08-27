@@ -188,10 +188,13 @@ than making them: a fix that lives only in a chat is not a fix.
 
 1. The Data Pass states today's real date, so the model is not guessing.
 2. The Foundation prompt forbids stating any distance from the present.
-3. The validator hard-fails `distance-from-now`: any "N years/months/decades
-   away | from now | hence | time" phrasing, and "next year" / "last summer".
-   Tested against "eighty-four-year life cycle", "four years of formal study" and
-   "eighty-four years of age", which must not trip it.
+3. The validator hard-fails `distance-from-now`, but ONLY when the distance sits
+   within ~220 characters of a specific year. The model is allowed to talk about
+   time; what is being caught is arithmetic against an unknown present. "Come
+   back to this a decade from now" in the preamble passes. "June 5, 2027 is
+   approximately four years away" does not, nor does a distance in the sentence
+   after a date. A blanket "next year / last summer" rule was tried and removed:
+   too strict, and not a calculation error.
 
 **And the generation date must never appear in the prose at all** (Kaycee,
 2026-08-27, immediately after the above): not as a distance, not as a quote, not
