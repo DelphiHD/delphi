@@ -226,6 +226,11 @@ const PAGE = /* html */ `<!doctype html>
   .tile b { display:block; font-size:21px; font-weight:600; font-variant-numeric:tabular-nums; }
   .track { height:7px; border-radius:4px; background:rgba(132,80,149,.14); overflow:hidden; }
   .fill { height:100%; background:var(--purple); border-radius:4px; }
+  table.rep th { cursor:pointer; user-select:none; white-space:nowrap; }
+  table.rep th:hover { color:var(--purple); opacity:.9; }
+  table.rep th.sorted { color:var(--purple); opacity:1; }
+  table.rep th.sorted::after { content:" ↑"; }
+  table.rep th.sorted[data-dir="down"]::after { content:" ↓"; }
   .tile span { font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; opacity:.55; }
   .job { background:#fff; border:1px solid var(--line); border-radius:12px; padding:13px 15px; margin-bottom:10px; }
   .job > .when { font-size:11px; opacity:.5; margin-bottom:9px; }
@@ -337,6 +342,60 @@ const PAGE = /* html */ `<!doctype html>
   var go = document.getElementById('go'), out = document.getElementById('out');
   var log = document.getElementById('log'), links = document.getElementById('links');
   var err = document.getElementById('err');
+
+  // ── sortable tables ──────────────────────────────────────────────────────
+  // Click a header to sort, click again to reverse. The dashboard re-renders
+  // every few seconds, so the chosen sort is remembered per table and reapplied
+  // after each render rather than being lost.
+  var sortState = {};
+
+  function cellValue(cell) {
+    var t = (cell.textContent || '').trim();
+    // strip currency and thousands separators without a regex: this file is a
+    // template literal and escapes in it do not survive
+    var cleaned = '';
+    for (var i = 0; i < t.length; i++) {
+      var ch = t.charAt(i);
+      if (ch === '$' || ch === ',' || ch === '%') continue;
+      cleaned += ch;
+    }
+    var head = cleaned.split(' ')[0];
+    var n = parseFloat(head);
+    // a value is numeric only if the leading token parses cleanly
+    if (!isNaN(n) && head !== '' && String(n).length >= head.length - 1) return n;
+    return t.toLowerCase();
+  }
+
+  function applySort(table, col, dir) {
+    var body = table.tBodies[0];
+    if (!body) return;
+    var rows = [].slice.call(body.rows);
+    rows.sort(function (a, b) {
+      var x = cellValue(a.cells[col]), y = cellValue(b.cells[col]);
+      if (typeof x === 'number' && typeof y === 'number') return (x - y) * dir;
+      return String(x).localeCompare(String(y)) * dir;
+    });
+    rows.forEach(function (r) { body.appendChild(r); });
+    [].forEach.call(table.tHead.rows[0].cells, function (th, i) {
+      th.classList.toggle('sorted', i === col);
+      th.setAttribute('data-dir', i === col ? (dir > 0 ? 'up' : 'down') : '');
+    });
+  }
+
+  function sortable(containerId) {
+    var table = document.querySelector('#' + containerId + ' table.rep');
+    if (!table || !table.tHead) return;
+    [].forEach.call(table.tHead.rows[0].cells, function (th, i) {
+      th.onclick = function () {
+        var cur = sortState[containerId];
+        var dir = (cur && cur.col === i && cur.dir === 1) ? -1 : 1;
+        sortState[containerId] = { col: i, dir: dir };
+        applySort(table, i, dir);
+      };
+    });
+    var saved = sortState[containerId];
+    if (saved) applySort(table, saved.col, saved.dir);
+  }
 
   // ── the dashboard ────────────────────────────────────────────────────────
   var STEPS = ['roster', 'foundation', 'planetary', 'chart', 'notion'];
@@ -463,6 +522,11 @@ const PAGE = /* html */ `<!doctype html>
               '>' + (bad ? 'REJECT' : 'approve') + '</td></tr>';
         }).join('') + '</tbody></table>'
       : '<div class="tile"><span>No reports yet.</span></div>';
+
+    // the tables re-render every few seconds, so rewire and reapply the sort
+    sortable('recent');
+    sortable('mRules');
+    sortable('mRoster');
   }
   refresh();
   setInterval(refresh, 5000);
