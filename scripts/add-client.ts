@@ -286,7 +286,12 @@ function run(script: string, args: string[]): string {
  *  So: no silence timeout. Only a ceiling far beyond any real report, to catch
  *  something genuinely wedged forever. */
 const QUIET_MINUTES = 0;                  // disabled: silence is normal here
-const HARD_CAP_MINUTES = 50;
+/** Above anything real. Measured over 58 reports: median 17 minutes, but the
+ *  slowest five ran 29, 33, 38, 51 and 54, so a 50 minute cap was cutting into
+ *  healthy work. The LLM layer also retries a stalled call up to four times at
+ *  20 minutes each, which is legitimately 80 minutes of trying. This exists
+ *  only to stop something wedged forever, so it sits above both. */
+const HARD_CAP_MINUTES = 95;
 
 function runWatched(script: string, args: string[], label: string): Promise<string> {
   return new Promise((resolve, reject) => {
