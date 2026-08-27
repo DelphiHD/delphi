@@ -1227,15 +1227,16 @@ export function validateReport(text: string, dp: DataPass, tier: ReportTier = "f
     }
   }
 
-  // A universal mechanic written as though it belonged to this reader. Every
-  // cross is built from the same four Sun-Earth gates, so "yours is built from
-  // the four gates of your Sun-Earth axes" says the others are built from
-  // something else. Kaycee, 2026-08-27: "it implies that crosses are formed by
-  // different things for different people. I hate that."
+  // The explanation of what a cross is belongs in the report: most readers do
+  // not know. What is wrong is writing it in the second person. Every cross is
+  // built from the same four Sun-Earth gates, so "yours is built from the four
+  // gates of your Sun-Earth axes" says the others are built from something else.
+  // Kaycee, 2026-08-27: "it implies that crosses are formed by different things
+  // for different people. I hate that." Stating it as a universal is correct and
+  // is NOT flagged.
   const universalAsPersonal = [
     /\byours?\s+(?:cross\s+)?is\s+(?:built|formed|made|composed)\s+from\b/i,
     /\byour\s+(?:incarnation\s+)?cross\s+is\s+(?:built|formed|made|composed)\s+(?:from|of)\b/i,
-    /\bevery\s+chart\s+has\s+an\s+incarnation\s+cross\b/i,
   ];
   for (const re of universalAsPersonal) {
     const m = text.match(re);
