@@ -22,6 +22,7 @@ const JOBS_PATH = ".cache/client-jobs.json";
 const REPORT_LOG = ".cache/reports/log.jsonl";
 const ROSTER_PATH = "scripts/client-roster.ts";
 const DELIVERY_LOG = ".cache/reports/deliveries.jsonl";
+const FAILURE_LOG = ".cache/reports/failures.jsonl";
 const CLIENT_DIR = join(homedir(), "Desktop", "HD Reports", "Paid HD Reports");
 
 /** What a client actually HAS, read off their folder rather than the report log.
@@ -252,6 +253,13 @@ const PAGE = /* html */ `<!doctype html>
   .ghost { background:transparent; color:var(--purple); }
   .drop { background:transparent; border:none; color:var(--purple); font-size:12px;
     padding:4px 8px; cursor:pointer; opacity:.7; }
+  .hint { position:fixed; z-index:50; max-width:430px; padding:10px 13px; border-radius:10px;
+    background:#241b29; color:#f6f1f8; font-size:12px; line-height:1.55; pointer-events:none;
+    box-shadow:0 10px 30px rgba(30,18,40,.28); white-space:pre-wrap; }
+  .hint[hidden] { display:none; }
+  .hint b { display:block; font-size:11px; letter-spacing:.1em; text-transform:uppercase;
+    opacity:.6; margin-bottom:5px; font-weight:600; }
+  [data-help] { cursor:help; }
   .tabs { display:flex; gap:8px; margin-bottom:22px; }
   .tab { font-family:inherit; font-size:13px; font-weight:600; padding:8px 18px; border-radius:999px;
     border:1px solid var(--line); background:transparent; color:var(--purple); cursor:pointer; }
@@ -309,10 +317,12 @@ const PAGE = /* html */ `<!doctype html>
   .err { color:#b3261e; font-size:13px; margin-top:10px; }
   @media (max-width:620px) { .grid { grid-template-columns:1fr; } }
 </style></head><body><div class="wrap">
+<div class="hint" id="hint" hidden></div>
 <div class="tabs">
   <button type="button" class="tab on" id="tabAdd">Add a client</button>
   <button type="button" class="tab" id="tabStatus">Status</button>
   <button type="button" class="tab" id="tabMetrics">Metrics</button>
+  <button type="button" class="tab" id="tabFailures">Failures</button>
 </div>
 <div id="viewAdd">
 <h1>Add a Client</h1>
@@ -363,6 +373,13 @@ const PAGE = /* html */ `<!doctype html>
   <div id="recent"></div>
 </div>
 
+<div class="dash" id="failures" hidden>
+  <h1 style="margin-bottom:2px">Failures</h1>
+  <p class="sub">Every issue the validator has found, one line each. Hover an excerpt to read the whole thing.</p>
+  <div class="row" style="margin-top:0" id="failFilters"></div>
+  <div id="failTable"></div>
+</div>
+
 <div class="dash" id="metrics" hidden>
   <h1 style="margin-bottom:2px">Metrics</h1>
   <p class="sub">Where the roster stands, what it has cost, and what is going wrong.</p>
@@ -405,6 +422,25 @@ const PAGE = /* html */ `<!doctype html>
   var go = document.getElementById('go'), out = document.getElementById('out');
   var log = document.getElementById('log'), links = document.getElementById('links');
   var err = document.getElementById('err');
+
+  // ── hover explanations ───────────────────────────────────────────────────
+  // The browser's own title tooltip is slow to appear, cannot be styled and in
+  // practice showed Kaycee nothing but a question-mark cursor. This is a real
+  // one: appears immediately, readable, and can carry an excerpt.
+  var hint = document.getElementById('hint');
+  document.addEventListener('mousemove', function (e) {
+    var el = e.target.closest ? e.target.closest('[data-help]') : null;
+    if (!el) { hint.hidden = true; return; }
+    var label = el.getAttribute('data-help-label') || '';
+    hint.innerHTML = (label ? '<b>' + esc(label) + '</b>' : '') + esc(el.getAttribute('data-help'));
+    hint.hidden = false;
+    var w = hint.offsetWidth, h = hint.offsetHeight;
+    var x = Math.min(e.clientX + 16, window.innerWidth - w - 10);
+    var y = e.clientY + 18 + h > window.innerHeight ? e.clientY - h - 12 : e.clientY + 18;
+    hint.style.left = Math.max(8, x) + 'px';
+    hint.style.top = Math.max(8, y) + 'px';
+  });
+  document.addEventListener('mouseleave', function () { hint.hidden = true; });
 
   // ── sortable tables ──────────────────────────────────────────────────────
   // Click a header to sort, click again to reverse. The dashboard re-renders
@@ -467,7 +503,7 @@ const PAGE = /* html */ `<!doctype html>
   function money(n) { return '$' + (n || 0).toFixed(2); }
   // every tile explains itself: what it is, and how it is worked out
   function tile(value, label, help) {
-    return '<div class="tile" title="' + esc(help) + '"><b>' + value + '</b><span>' + esc(label) + '</span></div>';
+    return '<div class="tile" data-help="' + esc(help) + '"><b>' + value + '</b><span>' + esc(label) + '</span></div>';
   }
 
   async function refresh() {
@@ -552,6 +588,44 @@ const PAGE = /* html */ `<!doctype html>
       tile(Math.round(dl.perClientMinutes) + ' min', 'per finished client (actual)',
         'MEASURED: total minutes spent on the ' + dl.finishedSample + ' clients who have both reports, averaged. Includes regenerations.');
 
+    // ── the itemised failure log ─────────────────────────────────────────
+    var cats = {};
+    d.failures.forEach(function (f) { cats[f.category] = (cats[f.category] || 0) + 1; });
+    var catNames = Object.keys(cats).sort(function (a, b) { return cats[b] - cats[a]; });
+    if (!window.failFilter) window.failFilter = 'all';
+    document.getElementById('failFilters').innerHTML =
+      ['all'].concat(catNames).map(function (c) {
+        var count = c === 'all' ? d.failures.length : cats[c];
+        return '<button type="button" class="tab' + (window.failFilter === c ? ' on' : '') +
+          '" data-cat="' + esc(c) + '" style="font-size:11.5px;padding:6px 13px">' +
+          esc(c === 'all' ? 'Everything' : c) + ' ' + count + '</button>';
+      }).join('');
+    document.getElementById('failFilters').onclick = function (e) {
+      var b = e.target.closest ? e.target.closest('[data-cat]') : null;
+      if (!b) return;
+      window.failFilter = b.dataset.cat;
+      refresh();
+    };
+
+    var shown = d.failures.filter(function (f) {
+      return window.failFilter === 'all' || f.category === window.failFilter;
+    });
+    document.getElementById('failTable').innerHTML = shown.length
+      ? '<table class="rep"><thead><tr><th>date</th><th>id</th><th>client</th><th>report</th>' +
+        '<th>severity</th><th>category</th><th>rule</th><th>excerpt</th></tr></thead><tbody>' +
+        shown.map(function (f) {
+          var ex = (f.detected || '').slice(0, 64);
+          return '<tr><td>' + esc(new Date(f.at).toLocaleDateString([], { month: 'short', day: 'numeric' })) +
+            '</td><td><b>' + esc(f.id) + '</b></td><td>' + esc(f.client) +
+            '</td><td>' + esc(f.report === 'Planetary Overview' ? 'Planetary' : f.report) +
+            '</td><td class="' + (f.severity === 'hard' ? 'bad' : '') + '">' + esc(f.severity) +
+            '</td><td>' + esc(f.category) + '</td><td>' + esc(f.rule) +
+            '</td><td data-help-label="' + esc(f.rule) + '" data-help="' + esc(f.message + (f.detected ? "\u2014\u2014\u2014 " + f.detected : '')) + '">' +
+            esc(ex) + (f.detected && f.detected.length > 64 ? '\u2026' : '') + '</td></tr>';
+        }).join('') + '</tbody></table>'
+      : '<div class="tile"><span>Nothing in this category.</span></div>';
+    sortable('failTable');
+
     paintPicker(d.roster);
     document.getElementById('mRoster').innerHTML =
       '<table class="rep"><thead><tr><th>id</th><th>client</th><th>foundation</th>' +
@@ -560,7 +634,7 @@ const PAGE = /* html */ `<!doctype html>
         var tick = function (on) { return on ? '<span class="pip done">yes</span>' : '<span class="pip">no</span>'; };
         return '<tr><td><b>' + esc(r.id) + '</b></td><td>' + esc(r.name) + '</td><td>' +
           tick(r.foundation) + '</td><td>' + tick(r.planetary) + '</td><td' +
-          (r.costKnown ? '' : ' style="opacity:.4" title="Written before costs were logged, so nothing is recorded. Not the same as free."') +
+          (r.costKnown ? '' : ' style="opacity:.4" data-help="Written before costs were logged, so nothing is recorded. Not the same as free."') +
           '>' + (r.costKnown ? money(r.spent) : 'not logged') + '</td></tr>';
       }).join('') + '</tbody></table>';
 
@@ -593,12 +667,12 @@ const PAGE = /* html */ `<!doctype html>
           var st = new Date(x.started);
           var bad = (x.hang_minutes || 0) > 20 || x.outcome !== 'delivered';
           return '<tr><td>' + esc(st.toLocaleDateString([], { month: 'short', day: 'numeric' })) +
-            '</td><td>' + esc(x.client) + (x.reconstructed ? ' <span class="cid" title="Reconstructed from the run log: this client was delivered before delivery times were recorded.">est</span>' : '') +
+            '</td><td>' + esc(x.client) + (x.reconstructed ? ' <span class="cid" data-help="Reconstructed from the run log: this client was delivered before delivery times were recorded.">est</span>' : '') +
             '</td><td>' + esc(st.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) +
             '</td><td>' + t(x.delivered_minutes) +
             '</td><td>' + t(x.generating_minutes) +
             '</td><td class="' + (bad ? 'bad' : '') + '"' +
-              (bad ? ' title="Time not spent writing: stalled calls, retries, the chart build, waiting."' : '') +
+              (bad ? ' data-help="Time not spent writing: stalled calls, retries, the chart build, waiting."' : '') +
               '>' + t(x.hang_minutes) +
             '</td><td>' + (x.reports_attempted == null ? '-' : x.reports_attempted) +
             '</td><td class="' + (x.outcome === 'delivered' ? '' : 'bad') + '">' + esc(x.outcome) +
@@ -617,13 +691,13 @@ const PAGE = /* html */ `<!doctype html>
             '</td><td>' + esc(r.client) + '</td><td>' + esc(r.kind) + '</td><td>' + money(r.cost) +
               '</td><td>' + r.minutes + '</td><td' +
               (r.retries === null || r.retries === undefined
-                ? ' style="opacity:.35" title="Written before retries were recorded."'
+                ? ' style="opacity:.35" data-help="Written before retries were recorded."'
                 : r.retries > 0
-                  ? ' title="' + r.retries + ' of ' + r.sections + ' sections were written again because the validator rejected the first attempt."'
+                  ? ' data-help="' + r.retries + ' of ' + r.sections + ' sections were written again because the validator rejected the first attempt."'
                   : '') +
               '>' + (r.retries === null || r.retries === undefined ? '-' : r.retries + (r.sections ? ' / ' + r.sections : '')) +
               '</td><td>' + (r.words || '').toLocaleString() +
-              '</td><td class="' + (bad ? 'bad' : '') + '"' + (bad ? ' title="' + esc(
+              '</td><td class="' + (bad ? 'bad' : '') + '"' + (bad ? ' data-help-label="why it was rejected" data-help="' + esc(
                 (r.issues && r.issues.length)
                   ? r.issues.map(function (i) {
                       return i.rule + (i.detected ? ': ' + i.detected.slice(0, 110) : '');
@@ -700,8 +774,8 @@ const PAGE = /* html */ `<!doctype html>
   refresh();
   setInterval(refresh, 5000);
 
-  var VIEWS = { add: 'viewAdd', status: 'dash', metrics: 'metrics' };
-  var TABS = { add: 'tabAdd', status: 'tabStatus', metrics: 'tabMetrics' };
+  var VIEWS = { add: 'viewAdd', status: 'dash', metrics: 'metrics', failures: 'failures' };
+  var TABS = { add: 'tabAdd', status: 'tabStatus', metrics: 'tabMetrics', failures: 'tabFailures' };
   function show(which) {
     Object.keys(VIEWS).forEach(function (k) {
       document.getElementById(VIEWS[k]).hidden = (k !== which);
@@ -715,6 +789,7 @@ const PAGE = /* html */ `<!doctype html>
   // deep links, so either view can be bookmarked on its own
   if (location.hash === '#status') show('status');
   if (location.hash === '#metrics') show('metrics');
+  if (location.hash === '#failures') show('failures');
 
   go.onclick = async function () {
     err.textContent = '';
@@ -904,6 +979,14 @@ createServer((req, res) => {
     const todays = stats.filter((r: any) => String(r.timestamp ?? "").startsWith(today));
     res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
     res.end(JSON.stringify({
+      failures: (() => {
+        if (!existsSync(FAILURE_LOG)) return [];
+        return readFileSync(FAILURE_LOG, "utf8").split("\n").filter(Boolean)
+          .map((l) => { try { return JSON.parse(l); } catch { return null; } })
+          .filter(Boolean)
+          .map((f: any) => ({ ...f, category: categoryOf(f.rule) }))
+          .sort((a: any, b: any) => String(b.at).localeCompare(String(a.at)));
+      })(),
       deliveries: (() => {
         if (!existsSync(DELIVERY_LOG)) return [];
         return readFileSync(DELIVERY_LOG, "utf8").split("\n").filter(Boolean)
@@ -959,10 +1042,26 @@ createServer((req, res) => {
       })(),
       // Which rules leak most, so the prompt can be aimed at the real problem
       failingRules: (() => {
+        const fromFile = existsSync(FAILURE_LOG)
+          ? readFileSync(FAILURE_LOG, "utf8").split("\n").filter(Boolean)
+              .map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean)
+          : [];
         const tally: Record<string, number> = {};
         const cats: Record<string, { count: number; hard: number; soft: number; rules: Record<string, number>; clients: Set<string> }> = {};
         let withDetail = 0;
-        for (const r of stats) {
+        const seenReports = new Set<string>();
+        for (const f of fromFile as any[]) {
+          seenReports.add(f.slug + "|" + f.report);
+          tally[f.rule] = (tally[f.rule] ?? 0) + 1;
+          const c = categoryOf(f.rule);
+          cats[c] = cats[c] ?? { count: 0, hard: 0, soft: 0, rules: {}, clients: new Set() };
+          cats[c].count++;
+          (cats[c] as any)[f.severity === "soft" ? "soft" : "hard"]++;
+          cats[c].rules[f.rule] = (cats[c].rules[f.rule] ?? 0) + 1;
+          cats[c].clients.add(String(f.client));
+        }
+        withDetail = seenReports.size;
+        for (const r of [] as any[]) {
           const hard = Array.isArray(r.hard_issues) ? r.hard_issues : [];
           const soft = Array.isArray(r.soft_issues) ? r.soft_issues : [];
           if (!hard.length && !soft.length) continue;

@@ -296,6 +296,11 @@ async function lookupTimezone(query: string): Promise<string> {
   url.searchParams.set("query", query);
   const res = await fetch(url);
   const data = await res.json() as Array<{ value: string; timezone: string }>;
+  if (!Array.isArray(data) || !data.length) {
+    // Saying which place failed beats "Cannot read properties of undefined"
+    throw new Error(`no location match for "${query}" — if it is a small town, ` +
+      `give the client a lookupPlace in the roster (see client-roster.ts)`);
+  }
   return data[0].timezone;
 }
 
@@ -406,7 +411,7 @@ async function main() {
   // Standalone planetary placement tables (Personality + Design) for slides.
   // Subtitle: Personality shows the local birth date/time + place; Design shows
   // the design moment (~88 days prior) in the same local timezone.
-  const tz = await lookupTimezone(client.birthPlace);
+  const tz = await lookupTimezone(placeForLookup(client));
   const P = raw.Properties;
   const dfmt = (iso: string) => new Intl.DateTimeFormat("en-US", { timeZone: tz, month: "long", day: "numeric", year: "numeric" }).format(new Date(iso));
   const tfmt = (iso: string) => new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(iso));
@@ -430,7 +435,7 @@ async function main() {
 
   // Overview table from getChart (values in the reports' vocabulary). Profile
   // includes the line names, e.g. "2 / 4 Hermit Opportunist".
-  const hdChart = await getChart({ birthDate: client.birthDate, birthTime: client.birthTime, timezone: tz, locationQuery: client.birthPlace, includeChartImage: false });
+  const hdChart = await getChart({ birthDate: client.birthDate, birthTime: client.birthTime, timezone: tz, locationQuery: placeForLookup(client), includeChartImage: false });
   const profLines = (hdChart.profile.value.match(/\d/g) ?? []).map(Number).map((n) => PROFILE_LINES[n]).filter(Boolean);
   const overviewRows = [
     { k: "Type", v: hdChart.type.value },

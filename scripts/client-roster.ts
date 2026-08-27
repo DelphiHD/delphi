@@ -64,6 +64,8 @@ export const CLIENTS: Record<string, ClientBrief> = {
   daniela:  { id: "HD-030", slug: "daniela", name: "Daniela Montoya", birthDate: "1990-01-30", birthTime: "06:30", birthPlace: "Bogota, Colombia" },
   david:    { id: "HD-031", slug: "david", name: "David Whiting", birthDate: "1983-06-15", birthTime: "15:45", birthPlace: "Salmon, Idaho, United States", lookupPlace: "Idaho Falls, Idaho, United States" },
   patrick:  { id: "HD-032", slug: "patrick", name: "Patrick Johns", birthDate: "1984-03-17", birthTime: "11:00", birthPlace: "Ann Arbor, Michigan, United States" },
+  joseph:   { id: "HD-034", slug: "joseph", name: "Joseph Jaxin Vandenberg", birthDate: "2002-07-04", birthTime: "10:44", birthPlace: "Ogden, Utah, United States" },
+  tori:     { id: "HD-033", slug: "tori", name: "Tori Tarver", birthDate: "1987-12-06", birthTime: "17:30", birthPlace: "Landstuhl (Rheinland-Pfalz), Germany" },
 };
 
 /** Resolve a slug to a ClientBrief or exit with usage. */
