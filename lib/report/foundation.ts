@@ -336,6 +336,8 @@ For each UNDEFINED Center, write:
 2. A bulleted list of the hanging gates with the same per-gate bullet format.
 3. (Optional) A short synthesis.
 
+**ALL NINE CENTERS APPEAR IN EVERY REPORT. NO EXCEPTIONS.** Defined, undefined and open are three different things to say about a center, never a reason to say nothing about one. Across the two Centers calls there must be exactly nine H3 center headings. Count them before you finish. A report that names a center in its orientation paragraph and then never renders that center's section contradicts itself on the same page, and it is a hard validation failure.
+
 For each OPEN Center (zero placements):
 1. The open-center mechanic, conditioning factors, wisdom and potential challenges. No bulleted gate list because there are no placements.
 
