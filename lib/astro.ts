@@ -82,6 +82,11 @@ export interface AstroChart {
  */
 const GEO_CACHE = ".cache/geocode.json";
 
+/** A line on each sign's own energy, in the third person, because a sign on the
+ *  wheel is not a claim about the reader. Empty until Kaycee writes them: her
+ *  voice, not mine, and nothing invented in the meantime. */
+const SIGN_NOTE: Record<string, string> = {};
+
 function readGeoCache(): Record<string, { lat: number; lon: number }> {
   try { return JSON.parse(readFileSync(GEO_CACHE, "utf8")); } catch { return {}; }
 }
@@ -168,12 +173,17 @@ export async function getAstro(args: {
     "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"];
   const ELEMENTS = ["Fire", "Earth", "Air", "Water"];
   const QUALITIES = ["Cardinal", "Fixed", "Mutable"];
+  // The provider's sign text is written for a person with that Sun sign: "your
+  // courage and enthusiasm are your greatest strengths". On a wheel, hovering a
+  // sign is not a claim that the reader is one, so that text says something
+  // untrue about eleven signs out of twelve. Element and modality are facts and
+  // stay; the sentence waits for Kaycee's own words.
   const signs: Record<string, SignNote> = {};
   ZODIAC.forEach((name, i) => {
     signs[name] = {
       element: ELEMENTS[i % 4],
       quality: QUALITIES[i % 3],
-      blurb: firstSentence((j.Zodiacs ?? {})[name]?.description),
+      blurb: SIGN_NOTE[name] ?? "",
     };
   });
 
