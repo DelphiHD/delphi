@@ -16,7 +16,7 @@
 import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { CLIENTS, clientOutputDir } from "./client-roster.ts";
+import { CLIENTS, clientOutputDir } from "./client-roster";
 
 const [slug, newName, ...rest] = process.argv.slice(2);
 const dryRun = rest.includes("--dry-run");
@@ -112,7 +112,7 @@ if (dryRun) { console.log("\ndry run — nothing changed"); process.exit(0); }
 
 // 4. check it actually landed, in a fresh process that re-reads the roster
 const check = execSync(
-  `npx tsx -e 'import {CLIENTS,clientOutputDir} from "./scripts/client-roster.ts";` +
+  `npx tsx -e 'import {CLIENTS,clientOutputDir} from "./scripts/client-roster";` +
   `import fs from "node:fs";const c=CLIENTS["${slug}"];` +
   `console.log(JSON.stringify({name:c.name,id:c.id,dir:fs.existsSync(clientOutputDir(c)),` +
   `files:fs.existsSync(clientOutputDir(c))?fs.readdirSync(clientOutputDir(c)).length:0}));'`,

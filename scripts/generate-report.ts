@@ -319,6 +319,7 @@ async function main() {
   const metadataBlock = `<!--
 report:        ${kindLabel2}
 client:        ${brief.name}
+client_id:     ${brief.id}
 version:       v${nextV}
 generated_at:  ${generatedAt}
 elapsed_sec:   ${elapsed}

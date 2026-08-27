@@ -92,7 +92,11 @@ export function loadDayRead(clientName: string, date: string, clientId?: string)
   const next = after.exec(md);
   const body = md.slice(start, next ? next.index : undefined);
 
-  const lines = body.split("\n");
+  // The id stamp sits inside the section so the section can still be found after
+  // a rename. It must not survive into the prose: this paragraph is what a client
+  // reads on their own chart page, and an HTML comment there is either visible
+  // machinery or invisible machinery, and both are wrong.
+  const lines = body.split("\n").filter((l) => !/^\s*<!--.*-->\s*$/.test(l));
   const paragraph = lines.filter((l) => l.trim() && !l.trim().startsWith("-")).join(" ").trim();
 
   // "- Sun in 59 (Dispersion) completes 6-59 Mating with natal 6 (Conflict); bridges their split; sacral center [days]"
