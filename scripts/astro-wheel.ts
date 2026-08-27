@@ -24,6 +24,9 @@ const ELEMENT: Record<string, string> = {
 };
 const HARD = new Set(["opposition", "square"]);
 const SOFT = new Set(["trine", "sextile"]);
+const MAJOR = new Set(["opposition", "square", "trine", "sextile"]);
+/** Real points, but not what a classic wheel draws aspect lines to. */
+const MINOR_POINT = new Set(["Chiron", "Mean_Lilith", "Mean_Node", "True_Node"]);
 
 const GLYPH: Record<string, string> = {
   Sun: "☉", Moon: "☽", Mercury: "☿", Venus: "♀", Mars: "♂",
@@ -58,7 +61,7 @@ const degLabel = (pos: number) => {
 export function renderWheel(chart: AstroChart, name: string): string {
   const asc = chart.ascendant;
   const s: string[] = [];
-  s.push(`<svg viewBox="0 0 720 730" xmlns="http://www.w3.org/2000/svg" ` +
+  s.push(`<svg viewBox="0 0 720 730" width="720" height="730" xmlns="http://www.w3.org/2000/svg" ` +
     `font-family="Montserrat, 'Helvetica Neue', sans-serif">`);
   s.push(`<rect width="720" height="720" fill="${CREAM}"/>`);
 
@@ -113,9 +116,16 @@ export function renderWheel(chart: AstroChart, name: string): string {
     if (a.aspect === "conjunction") continue;
     if (!planetNames.has(a.p1_name) || !planetNames.has(a.p2_name)) continue;
     const colour = HARD.has(a.aspect) ? "#c0603c" : SOFT.has(a.aspect) ? PURPLE : "#b9b6bd";
+    // The classic set is the one most charts draw: a major aspect between two
+    // traditional planets, held to a six degree orb. Everything else is real and
+    // returned by the API, it is just a denser read than most people want on
+    // opening, so it is a class the page can switch on rather than a deletion.
+    const core = MAJOR.has(a.aspect) && !MINOR_POINT.has(a.p1_name) &&
+      !MINOR_POINT.has(a.p2_name) && Math.abs(a.orbit) <= 6;
     const [x1, y1] = pt(a.p1_abs_pos, asc, R_ASPECT);
     const [x2, y2] = pt(a.p2_abs_pos, asc, R_ASPECT);
-    s.push(`<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" stroke="${colour}" ` +
+    s.push(`<line class="asp ${core ? "core" : "extra"}" x1="${f(x1)}" y1="${f(y1)}" ` +
+      `x2="${f(x2)}" y2="${f(y2)}" stroke="${colour}" ` +
       `stroke-width="${HARD.has(a.aspect) ? 0.9 : 0.8}" opacity=".5"/>`);
   }
 

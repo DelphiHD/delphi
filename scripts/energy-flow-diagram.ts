@@ -42,6 +42,8 @@ import type { CenterName } from "@/lib/chart/types";
 import { gateName } from "@/lib/hd/gate-names";
 import { loadLibraryNames } from "@/lib/hd/library-names";
 import { renderFullMandala } from "@/lib/render/mandala";
+import { getAstro, type AstroChart } from "@/lib/astro";
+import { renderWheel } from "./astro-wheel";
 import type { ChartSide, Planet } from "@/lib/render/mandala.types";
 import { getChart, getTimezoneForLocation } from "@/lib/mybodygraph";
 import { CLIENTS, clientFromSlug, clientOutputDir, type ClientBrief, placeForLookup } from "./client-roster";
@@ -1498,6 +1500,8 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 interface SceneData {
+  /** natal astrology, present only on a client chart */
+  astro?: AstroChart;
   client?: ClientCtx;                       // set when rendering a real chart
   inner: Record<string, string>;            // skin id -> neutralized bodygraph markup
   plain?: string;                           // the chart as the design draws it
@@ -2035,7 +2039,8 @@ function mandalaView(d: SceneData): string {
 }
 
 // ── interactive page ────────────────────────────────────────────────────────
-function buildHtml(d: SceneData, canvases: string, mandala: string, fonts: Map<number, Buffer>): string {
+function buildHtml(d: SceneData, canvases: string, mandala: string, astro: string,
+  fonts: Map<number, Buffer>): string {
   const logoSrc = brandMark("Delphi Logo.svg");
   const knowSrc = brandMark("Know Thyself.svg");
   const iconSrc = favicon();
@@ -2048,6 +2053,7 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, fonts: Map<n
       <button id="vBody">Circuits</button>
       <button id="vMandala">Mandala</button>
       <button id="vTransit">Transit</button>
+      <button id="vAstro">Astrology</button>
     </div>
     <div class="row" id="siderow" hidden>
       <button id="sideP" class="on">Personality</button>
@@ -2067,6 +2073,7 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, fonts: Map<n
   ).join("");
 
   const payload = {
+    astro: d.astro ?? null,
     read: d.read ?? null,
     cycles: d.client?.report.cycles ?? [],
     client: d.client
@@ -2244,6 +2251,7 @@ svg.canvas.transit .tdisc.lit { stroke:#f1c232 !important; stroke-width:3 !impor
    column rings the gate rather than covering it */
 svg.canvas.transit .gdisc.lit { stroke:#f1c232 !important; stroke-width:3 !important; }
 body.view-plain { background:#ffffff; color:#1c1a2e; }
+body.view-astro .panel,
 body.view-transit .panel, body.view-plain .panel { background:rgba(132,80,149,.06); border-color:rgba(132,80,149,.22); }
 body.view-transit .card, body.view-plain .card { background:rgba(255,255,255,.98); border-color:rgba(132,80,149,.28);
   color:#1c1a2e; box-shadow:0 14px 34px rgba(60,40,80,.18); }
@@ -2528,6 +2536,24 @@ body.show-bridges .bridge { opacity:1; }
 .trow { cursor:pointer; }
 .mandala { display:none; }
 body.view-mandala .mandala { display:block; }
+.astro { display:none; }
+body.view-astro .astro { display:block; }
+body.view-astro svg.canvas, body.view-astro .mandala { display:none !important; }
+body.view-astro { background:#ffffff; color:#1c1a2e; }
+body.view-astro .astro { display:flex; align-items:center; justify-content:center; width:100%; }
+body.view-astro .astro svg { height:calc(100vh - 36px); width:auto; max-width:100%; display:block; }
+/* the classic set on opening; the rest is a click away rather than a deletion */
+body:not(.astro-all) .astro .asp.extra { display:none; }
+body:not(.astro-all) #astroaspects .line.extra { display:none; }
+/* this view's home tab is astrology, not Human Design */
+#astrohome { display:none; }
+body.view-astro #astrohome { display:block; }
+body.view-astro #pmeta, body.view-astro #circdrop, body.view-astro #placements,
+body.view-astro #datesec, body.view-astro #todaysec, body.view-astro #chandrop,
+body.view-astro #defdrop { display:none !important; }
+#astroplanets .line, #astrohouses .line, #astroaspects .line { display:grid;
+  grid-template-columns:74px 1fr auto; gap:6px; font-size:11.5px; line-height:1.85; }
+#astroplanets .line i, #astrohouses .line i, #astroaspects .line i { font-style:normal; opacity:.55; }
 body.view-mandala svg.canvas { display:none !important; }
 .mandala { border-radius:18px; overflow:hidden; }
 body.view-mandala .mandala svg { max-height:calc(100vh - 28px); width:auto; height:auto; margin:0 auto; display:block; }
@@ -2535,7 +2561,7 @@ body.view-mandala .mandala svg { max-height:calc(100vh - 28px); width:auto; heig
 <body class="skin-paper${d.client ? " chart" : ""}">
 <div class="wrap">
   ${logoSrc ? `<img class="brandmark logo" src="${logoSrc}" alt="Delphi">` : ""}
-  <div class="stage">${canvases}${mandala}<div class="tip" id="tip" hidden></div><div class="card" id="card" hidden></div>${knowSrc ? `<img class="brandmark know" src="${knowSrc}" alt="Know thyself">` : ""}${d.client ? `<div class="viewdock docked">${viewControls}</div>` : ""}</div>
+  <div class="stage">${canvases}${mandala}${astro}<div class="tip" id="tip" hidden></div><div class="card" id="card" hidden></div>${knowSrc ? `<img class="brandmark know" src="${knowSrc}" alt="Know thyself">` : ""}${d.client ? `<div class="viewdock docked">${viewControls}</div>` : ""}</div>
   <aside class="panel">
 ${d.client ? "" : `<h1 id="ptitle">Centers, function, and flow</h1>
     <p class="sub" id="psub">Nine centers, each labeled with what it does. The moving light follows every channel toward the Throat, the only center that turns energy into expression.</p>`}
@@ -2559,6 +2585,14 @@ ${d.client ? "" : viewControls}
       <div id="circuits"></div>
       <div class="row"><button id="all">All</button><button id="none">None</button></div>
     </details>
+
+    <div id="astrohome">
+      <div id="astrometa"></div>
+      <div class="row" id="asprow"><button id="aspAll">Show every aspect</button></div>
+      <details class="drop" open><summary>Placements</summary><div id="astroplanets"></div></details>
+      <details class="drop"><summary>Houses</summary><div id="astrohouses"></div></details>
+      <details class="drop"><summary>Aspects</summary><div id="astroaspects"></div></details>
+    </div>
 
     <details class="drop" id="placements" hidden>
       <summary>Placements</summary>
@@ -3627,6 +3661,7 @@ if (DATA.client) {
     });
   };
   var view = function (id) {
+    body.classList.toggle('view-astro', id === 'astro');
     body.classList.toggle('view-mandala', id === 'mandala');
     body.classList.toggle('view-plain', id === 'plain');
     body.classList.toggle('view-transit', id === 'transit');
@@ -3635,6 +3670,8 @@ if (DATA.client) {
     document.getElementById('vMandala').classList.toggle('on', id === 'mandala');
     var vt = document.getElementById('vTransit');
     if (vt) vt.classList.toggle('on', id === 'transit');
+    var va = document.getElementById('vAstro');
+    if (va) va.classList.toggle('on', id === 'astro');
   };
   document.getElementById('vBody').onclick = function () { view('body'); };
   view('plain');
@@ -3642,6 +3679,72 @@ if (DATA.client) {
   document.getElementById('vMandala').onclick = function () { view('mandala'); };
   var vt0 = document.getElementById('vTransit');
   if (vt0) vt0.onclick = function () { view('transit'); };
+  var va0 = document.getElementById('vAstro');
+  if (va0) va0.onclick = function () { view('astro'); };
+
+  // The Astrology view answers with astrology. The Human Design sections of the
+  // home tab are hidden by CSS in this view and these stand in their place, so
+  // the panel is talking about the same chart as the wheel beside it.
+  if (DATA.astro) {
+    var A = DATA.astro;
+    var HOUSE_N = { First_House: 1, Second_House: 2, Third_House: 3, Fourth_House: 4,
+      Fifth_House: 5, Sixth_House: 6, Seventh_House: 7, Eighth_House: 8,
+      Ninth_House: 9, Tenth_House: 10, Eleventh_House: 11, Twelfth_House: 12 };
+    var ZSIGN = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
+      'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
+    var MINOR_PT = { Chiron: 1, Mean_Lilith: 1, Mean_Node: 1, True_Node: 1 };
+    var CLASSIC = { conjunction: 1, opposition: 1, square: 1, trine: 1, sextile: 1 };
+    var dg = function (v) {
+      var d = Math.floor(v), m = Math.round((v - d) * 60);
+      if (m === 60) { d += 1; m = 0; }
+      return d + '\u00b0' + (m < 10 ? '0' : '') + m + "'";
+    };
+    var pretty = function (n) { return n.replace(/_/g, ' '); };
+    var byName = function (n) {
+      for (var i = 0; i < A.planets.length; i++) if (A.planets[i].name === n) return A.planets[i];
+      return null;
+    };
+    var sun = byName('Sun'), moon = byName('Moon');
+    document.getElementById('astrometa').innerHTML =
+      (sun ? '<div class="line"><span>Sun</span> ' + sun.sign + ' ' + dg(sun.position) + '</div>' : '') +
+      (moon ? '<div class="line"><span>Moon</span> ' + moon.sign + ' ' + dg(moon.position) + '</div>' : '') +
+      '<div class="line"><span>Ascendant</span> ' + ZSIGN[Math.floor(A.ascendant / 30) % 12] +
+      ' ' + dg(A.ascendant % 30) + '</div>' +
+      '<div class="line"><span>Midheaven</span> ' + ZSIGN[Math.floor(A.mc / 30) % 12] +
+      ' ' + dg(A.mc % 30) + '</div>';
+
+    document.getElementById('astroplanets').innerHTML = A.planets.map(function (p) {
+      return '<div class="line"><i>' + esc(pretty(p.name)) + '</i><span>' + esc(p.sign) +
+        ' ' + dg(p.position) + '</span><i>' + (HOUSE_N[p.house] || '') + '</i></div>';
+    }).join('');
+
+    document.getElementById('astrohouses').innerHTML = A.houses.map(function (h, i) {
+      return '<div class="line"><i>House ' + (i + 1) + '</i><span>' + esc(h.sign) +
+        ' ' + dg(h.position) + '</span><i></i></div>';
+    }).join('');
+
+    var isPlanet = {};
+    A.planets.forEach(function (p) { isPlanet[p.name] = 1; });
+    document.getElementById('astroaspects').innerHTML = A.aspects.filter(function (x) {
+      return isPlanet[x.p1_name] && isPlanet[x.p2_name];
+    }).map(function (x) {
+      var core = CLASSIC[x.aspect] && !MINOR_PT[x.p1_name] && !MINOR_PT[x.p2_name] &&
+        Math.abs(x.orbit) <= 6;
+      return '<div class="line ' + (core ? 'core' : 'extra') + '"><i>' + esc(pretty(x.p1_name)) +
+        '</i><span>' + esc(x.aspect) + ' ' + esc(pretty(x.p2_name)) + '</span><i>' +
+        (Math.round(Math.abs(x.orbit) * 10) / 10) + '\u00b0</i></div>';
+    }).join('');
+
+    var ab = document.getElementById('aspAll');
+    ab.onclick = function () {
+      var on = body.classList.toggle('astro-all');
+      ab.classList.toggle('on', on);
+      ab.textContent = on ? 'Show the classic set' : 'Show every aspect';
+    };
+  } else {
+    var vaGone = document.getElementById('vAstro');
+    if (vaGone) vaGone.remove();
+  }
 }
 
 
@@ -4344,8 +4447,28 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
     .join("\n") +
     (client ? "\n" + buildCanvas(PAPER, scene, { animate: false, legend: false, plain: true }) : "") +
     (client ? "\n" + buildCanvas(PAPER, scene, { animate: false, legend: false, plain: true, transit: true }) : "");
+  // The natal wheel, for the Astrology view. Only a client chart has a birth
+  // moment to draw, and a failure here must not cost her the whole chart: the
+  // view simply does not appear.
+  let astroChart: AstroChart | null = null;
+  if (client) {
+    try {
+      const brief = clientFromSlug(slug);
+      astroChart = await getAstro({
+        birthDate: brief.birthDate, birthTime: brief.birthTime,
+        place: placeForLookup(brief),
+      });
+    } catch (err) {
+      console.log(`  astrology unavailable: ${(err as Error).message}`);
+    }
+  }
+  const astroHtml = astroChart
+    ? `<div class="astro">${renderWheel(astroChart, client!.name)}</div>`
+    : "";
+  if (astroChart) scene.astro = astroChart;
+
   const htmlPath = join(outDir, `${stem}.html`);
-  const html = buildHtml(scene, canvases, mandalaView(scene), fonts);
+  const html = buildHtml(scene, canvases, mandalaView(scene), astroHtml, fonts);
   writeFileSync(htmlPath, html);
   console.log(`\n✓ ${htmlPath}`);
 
