@@ -3498,6 +3498,17 @@ if (DATA.client) {
     tfield.value = curT;
     nowBtn.classList.add('show');
     fetchRead(curD);
+
+    // A baked file opens on the moment it was BUILT, which is the moment it
+    // stopped being now. Kaycee opened her chart the next morning and got the
+    // previous evening's sky and the previous day's read, both correct for the
+    // date the page thought it was on and both wrong for her. So if the build
+    // moment is not still roughly now, move to now before anyone reads it.
+    var STALE_MS = 45 * 60 * 1000;
+    var nowStamp = new Date();
+    if (Math.abs(nowStamp.getTime() - baked.getTime()) > STALE_MS) {
+      go(localDate(nowStamp), localTime(nowStamp));
+    }
     [].forEach.call(document.querySelectorAll('.ttime'), function (e) {
       e.textContent = clock12(curT) + (TZ ? ' ' + TZ : '');
     });
