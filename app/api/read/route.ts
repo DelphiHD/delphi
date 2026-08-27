@@ -61,5 +61,9 @@ export async function GET(request: Request) {
       paragraph: data.paragraph,
       completions: data.completions ?? [],
     },
-  }, { headers: { "Cache-Control": "private, max-age=300" } });
+    // Not cached. A read is small, fetched once per page load, and CAN change:
+    // a parser fix on 2026-08-27 corrected 25 of them, and a five minute cache
+    // meant Kaycee refreshed a corrected page and saw the old text anyway.
+    // Freshness matters more than saving one small request.
+  }, { headers: { "Cache-Control": "private, no-store" } });
 }
