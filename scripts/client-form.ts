@@ -13,14 +13,34 @@ loadEnv({ path: ".env.local", override: true });
 
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
 const PORT = Number(process.env.CLIENT_FORM_PORT ?? 4321);
 const JOBS_PATH = ".cache/client-jobs.json";
 const REPORT_LOG = ".cache/reports/log.jsonl";
 const ROSTER_PATH = "scripts/client-roster.ts";
+const CLIENT_DIR = join(homedir(), "Desktop", "HD Reports", "Paid HD Reports");
+
+/** What a client actually HAS, read off their folder rather than the report log.
+ *  The log only knows about reports generated since it started being written, so
+ *  it said Max Jones had nothing while both his reports sat in his folder, and
+ *  it missed every Goodin Foundation. The folder is the deliverable; the log is
+ *  only good for what a report cost and how long it took. */
+function reportsOnDisk(clientName: string): { foundation: boolean; planetary: boolean } {
+  const dir = join(CLIENT_DIR, clientName);
+  if (!existsSync(dir)) return { foundation: false, planetary: false };
+  let foundation = false, planetary = false;
+  try {
+    for (const f of readdirSync(dir)) {
+      if (!f.endsWith(".md") && !f.endsWith(".docx")) continue;
+      if (/foundation/i.test(f)) foundation = true;
+      else if (/planetary/i.test(f)) planetary = true;
+    }
+  } catch { /* an unreadable folder is simply nothing delivered */ }
+  return { foundation, planetary };
+}
 
 // Every validator rule sorted into the kind of problem it represents, so the
 // failures can be worked through as classes rather than one sentence at a time.
@@ -366,7 +386,7 @@ const PAGE = /* html */ `<!doctype html>
       tile(dl.roster, 'clients on the roster',
         'Everyone in the client roster file. This is what the daily transit report runs over, so a person is only real once they are here.') +
       tile(dl.both, 'both reports written',
-        'Clients with a Foundation AND a Planetary Overview on record. The full deliverable.') +
+        'Clients with a Foundation AND a Planetary Overview in their folder on the Desktop. Read from the folders themselves, so reports written before the cost log existed still count.') +
       tile(dl.some, 'one report only',
         'Clients with exactly one of the two reports. Half-finished work.') +
       tile(dl.none, 'no reports yet',
@@ -381,7 +401,7 @@ const PAGE = /* html */ `<!doctype html>
       tile(money(d.avgCost), 'per report',
         'Total spent divided by the number of reports. Regenerated reports count separately, because they were separately paid for.') +
       tile(money(dl.perClientCost), 'per finished client (actual, n=' + dl.finishedSample + ')',
-        'MEASURED, not estimated. Takes only the ' + dl.finishedSample + ' clients who have both reports, adds up everything ever spent on each of them including regenerations, and averages. Higher than twice the per-report figure because some reports were written more than once.') +
+        'MEASURED over the ' + dl.finishedSample + ' clients who have both reports on disk, adding everything ever spent on each including regenerations. Reports written before the cost log existed contribute nothing, so for older clients this reads low.') +
       tile(money(dl.remainingCost), 'to finish the roster (estimate)',
         'An ESTIMATE: the reports still missing across the roster, priced at the average cost per report. Assumes each is written once and comes out clean, so treat it as a floor rather than a forecast.');
 
@@ -401,7 +421,9 @@ const PAGE = /* html */ `<!doctype html>
       d.roster.map(function (r) {
         var tick = function (on) { return on ? '<span class="pip done">yes</span>' : '<span class="pip">no</span>'; };
         return '<tr><td><b>' + esc(r.id) + '</b></td><td>' + esc(r.name) + '</td><td>' +
-          tick(r.foundation) + '</td><td>' + tick(r.planetary) + '</td><td>' + money(r.spent) + '</td></tr>';
+          tick(r.foundation) + '</td><td>' + tick(r.planetary) + '</td><td' +
+          (r.costKnown ? '' : ' style="opacity:.4" title="Written before costs were logged, so nothing is recorded. Not the same as free."') +
+          '>' + (r.costKnown ? money(r.spent) : 'not logged') + '</td></tr>';
       }).join('') + '</tbody></table>';
 
     var fr = d.failingRules;
@@ -608,13 +630,12 @@ createServer((req, res) => {
       delivery: (() => {
         const roster = existsSync(ROSTER_PATH) ? readFileSync(ROSTER_PATH, "utf8") : "";
         const slugs = [...roster.matchAll(/slug: "([^"]+)"/g)].map((m) => m[1]);
-        const kinds: Record<string, Set<string>> = {};
-        for (const r of stats) {
-          const k = r.client_slug as string;
-          (kinds[k] = kinds[k] ?? new Set()).add(String(r.report_type));
-        }
-        const both = slugs.filter((sl) => (kinds[sl]?.size ?? 0) >= 2).length;
-        const some = slugs.filter((sl) => (kinds[sl]?.size ?? 0) === 1).length;
+        // read off the folders, not the log: see reportsOnDisk
+        const names = Object.fromEntries(
+          [...roster.matchAll(/slug: "([^"]+)",\s*name: "([^"]+)"/g)].map((m) => [m[1], m[2]]));
+        const held = Object.fromEntries(slugs.map((sl) => [sl, reportsOnDisk(names[sl] ?? "")]));
+        const both = slugs.filter((sl) => held[sl].foundation && held[sl].planetary).length;
+        const some = slugs.filter((sl) => (held[sl].foundation ? 1 : 0) + (held[sl].planetary ? 1 : 0) === 1).length;
         const none = slugs.length - both - some;
         const avg = stats.length
           ? stats.reduce((a: number, r: any) => a + (r.cost_usd ?? 0), 0) / stats.length : 0;
@@ -628,7 +649,7 @@ createServer((req, res) => {
           spentPer[k].cost += r.cost_usd ?? 0;
           spentPer[k].minutes += (r.elapsed_sec ?? 0) / 60;
         }
-        const finished = slugs.filter((sl) => (kinds[sl]?.size ?? 0) >= 2);
+        const finished = slugs.filter((sl) => held[sl].foundation && held[sl].planetary);
         const perClientCost = finished.length
           ? finished.reduce((a, sl) => a + (spentPer[sl]?.cost ?? 0), 0) / finished.length : 0;
         const perClientMinutes = finished.length
@@ -678,19 +699,23 @@ createServer((req, res) => {
         const src = existsSync(ROSTER_PATH) ? readFileSync(ROSTER_PATH, "utf8") : "";
         const rows = [...src.matchAll(/id: "(HD-\d+)", slug: "([^"]+)",\s*name: "([^"]+)"/g)]
           .map((m) => ({ id: m[1], slug: m[2], name: m[3] }));
-        const kinds: Record<string, Set<string>> = {};
         const spent: Record<string, number> = {};
         for (const r of stats) {
           const k = r.client_slug as string;
-          (kinds[k] = kinds[k] ?? new Set()).add(String(r.report_type));
           spent[k] = (spent[k] ?? 0) + (r.cost_usd ?? 0);
         }
-        return rows.map((r) => ({
-          ...r,
-          foundation: kinds[r.slug]?.has("Foundation") ?? false,
-          planetary: kinds[r.slug]?.has("Planetary Overview") ?? false,
-          spent: spent[r.slug] ?? 0,
-        })).sort((a, b) => a.id.localeCompare(b.id));
+        return rows.map((r) => {
+          const on = reportsOnDisk(r.name);
+          return {
+            ...r,
+            foundation: on.foundation,
+            planetary: on.planetary,
+            spent: spent[r.slug] ?? 0,
+            // a report that predates the log has no recorded cost, which is not
+            // the same as having cost nothing
+            costKnown: (spent[r.slug] ?? 0) > 0,
+          };
+        }).sort((a, b) => a.id.localeCompare(b.id));
       })(),
       people: (() => {
         const roster = existsSync(ROSTER_PATH) ? readFileSync(ROSTER_PATH, "utf8") : "";
