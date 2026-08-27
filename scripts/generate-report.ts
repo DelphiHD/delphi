@@ -143,6 +143,10 @@ async function main() {
   // 3. Build the canonical Data Pass.
   console.log(`\nBuilding Data Pass…`);
   const dataPass = await buildDataPass({ supabase, client: { name: brief.name }, chart });
+  // The chart is CAST from lookupPlace, which for a small town is a larger one
+  // nearby. The report must still say where the person was actually born, so the
+  // display place is put back over the query we had to use to geocode.
+  if (dataPass.birth) dataPass.birth.place = brief.birthPlace;
   console.log(`  ${dataPass.personalityActivations.length} P + ${dataPass.designActivations.length} D activations`);
   console.log(`  Definition: ${dataPass.split.definitionLabel} (${dataPass.split.islandCount} island${dataPass.split.islandCount === 1 ? "" : "s"})`);
   if (dataPass.warnings.length) {
@@ -284,6 +288,20 @@ async function main() {
   const softCount = ("validation" in result)
     ? (result as { validation: { softCount: number } }).validation.softCount
     : 0;
+    // The reasons, not just the count. Without these a REJECT is a number and
+    // somebody must re-run the validator by hand to learn what leaked, which is
+    // exactly what happened on 2026-08-27.
+    type HardIssue = { severity: string; section: string; rule: string; message: string; detected?: string };
+    const hardIssues = ("validation" in result)
+      ? (result as { validation: { issues: HardIssue[] } }).validation.issues
+          .filter((i) => i.severity === "hard")
+          .map((i) => ({
+            rule: i.rule,
+            section: i.section,
+            message: i.message,
+            detected: String(i.detected ?? "").replace(/\s+/g, " ").slice(0, 240),
+          }))
+      : [];
   const generatedAt = new Date().toISOString();
   const metadataBlock = `<!--
 report:        ${kindLabel2}
@@ -330,6 +348,10 @@ soft_warnings: ${softCount}
     validation:    validationLine,
     hard_failures: hardCount,
     soft_warnings: softCount,
+    // The reasons, not just the count. Without these a REJECT is a number and
+    // somebody has to re-run the validator by hand to find out what leaked,
+    // which is exactly what happened on 2026-08-27.
+    hard_issues:   hardIssues,
     primary_path: primaryMdPath,
     cache_path:   resolve(outPath),
   };
