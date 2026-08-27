@@ -119,6 +119,12 @@ interface Person {
   link?: string;
   note?: string;
   error?: string;
+  /** The step currently being written. add-client never prints "foundation done":
+   *  it prints "  foundation generating…" and the outcome arrives later on an
+   *  indented Validation line, and the step is only implicitly finished when the
+   *  next one starts. Without holding on to which step is open, every finished
+   *  report stayed on screen as still running. */
+  active?: StepName;
 }
 interface Job {
   id: string;
@@ -244,6 +250,14 @@ function applyLine(job: Job, raw: string) {
   }
   const idLine = /^\s{2}roster\s+.*\b(HD-\d+)\b/.exec(line);
   if (idLine && cur()) cur().id = idLine[1];
+  // "            Validation: 34/34 fields matched. APPROVE." closes the open step
+  const verdict = /^\s{4,}Validation:.*?\b(APPROVE|REJECT)\b/.exec(line);
+  if (verdict && cur() && cur().active) {
+    const p0 = cur();
+    p0.steps[p0.active!] = verdict[1] === "APPROVE" ? "done" : "rejected";
+    p0.active = undefined;
+    return;
+  }
   const m = /^\s{2}(roster|folder|foundation|planetary|chart|link|notion|cache|FAILED)\s*(.*)$/.exec(line);
   if (!m || !cur()) return;
   const [, key, rest] = m;
@@ -252,10 +266,15 @@ function applyLine(job: Job, raw: string) {
   if (key === "FAILED") { p.error = rest.trim(); return; }
   if (key === "folder" || key === "cache") return;
   const step = key as StepName;
+  // a new step starting means the one before it got where it was going
+  if (p.active && p.active !== step && p.steps[p.active] === "running") {
+    p.steps[p.active] = "done";
+    p.active = undefined;
+  }
   if (/already written, kept/.test(rest)) p.steps[step] = "kept";
   else if (/REJECTED/.test(rest)) p.steps[step] = "rejected";
   else if (/\bok\b/.test(rest) || /row (created|updated)/.test(rest)) p.steps[step] = "done";
-  else if (/generating|building|retrying/.test(rest)) p.steps[step] = "running";
+  else if (/generating|building|retrying/.test(rest)) { p.steps[step] = "running"; p.active = step; }
 }
 
 /** Anything generating RIGHT NOW, read from the process list rather than from a
