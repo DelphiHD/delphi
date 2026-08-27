@@ -3716,6 +3716,10 @@ if (DATA.client) {
       return d + '\u00b0' + (m < 10 ? '0' : '') + m + "'";
     };
     var pretty = function (n) { return n.replace(/_/g, ' '); };
+    var labelOf = function (n) {
+      var p = byName(n);
+      return p && p.label ? p.label : pretty(n);
+    };
     var byName = function (n) {
       for (var i = 0; i < A.planets.length; i++) if (A.planets[i].name === n) return A.planets[i];
       return null;
@@ -3730,7 +3734,7 @@ if (DATA.client) {
       ' ' + dg(A.mc % 30) + '</div>';
 
     document.getElementById('astroplanets').innerHTML = A.planets.map(function (p) {
-      return '<div class="line"><i>' + esc(pretty(p.name)) + '</i><span>' + esc(p.sign) +
+      return '<div class="line"><i>' + esc(p.label || pretty(p.name)) + '</i><span>' + esc(p.sign) +
         ' ' + dg(p.position) + '</span><i>' + (HOUSE_N[p.house] || '') + '</i></div>';
     }).join('');
 
@@ -3746,8 +3750,8 @@ if (DATA.client) {
     }).map(function (x) {
       var core = CLASSIC[x.aspect] && !MINOR_PT[x.p1_name] && !MINOR_PT[x.p2_name] &&
         Math.abs(x.orbit) <= 6;
-      return '<div class="line ' + (core ? 'core' : 'extra') + '"><i>' + esc(pretty(x.p1_name)) +
-        '</i><span>' + esc(x.aspect) + ' ' + esc(pretty(x.p2_name)) + '</span><i>' +
+      return '<div class="line ' + (core ? 'core' : 'extra') + '"><i>' + esc(labelOf(x.p1_name)) +
+        '</i><span>' + esc(x.aspect) + ' ' + esc(labelOf(x.p2_name)) + '</span><i>' +
         (Math.round(Math.abs(x.orbit) * 10) / 10) + '\u00b0</i></div>';
     }).join('');
 
@@ -3778,7 +3782,7 @@ if (DATA.client) {
         } else {
           var pl = byName(t.getAttribute('data-aplanet'));
           if (!pl) { tip.hidden = true; return; }
-          html = '<b>' + esc(pretty(pl.name)) + ' in ' + esc(pl.sign) + ' ' + dg(pl.position) + '</b>' +
+          html = '<b>' + esc(pl.label || pretty(pl.name)) + ' in ' + esc(pl.sign) + ' ' + dg(pl.position) + '</b>' +
             pill(pl.quality) + pill(pl.element) +
             (HOUSE_N[pl.house] ? '<span class="pill house">House ' + HOUSE_N[pl.house] + '</span>' : '') +
             (pl.blurb ? '<br><span style="opacity:.72">' + esc(pl.blurb) + '</span>' : '');

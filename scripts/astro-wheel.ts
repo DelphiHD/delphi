@@ -31,7 +31,7 @@ const MINOR_POINT = new Set(["Chiron", "Mean_Lilith", "Mean_Node", "True_Node"])
 const GLYPH: Record<string, string> = {
   Sun: "☉", Moon: "☽", Mercury: "☿", Venus: "♀", Mars: "♂",
   Jupiter: "♃", Saturn: "♄", Uranus: "♅", Neptune: "♆", Pluto: "♇",
-  Mean_Node: "☊", True_Node: "☊", Mean_Lilith: "⚸", Chiron: "⚷",
+  True_Node: "☊", Mean_Node: "☋", Mean_Lilith: "⚸", Chiron: "⚷",
 };
 
 const CX = 360, CY = 360;
@@ -61,9 +61,9 @@ const degLabel = (pos: number) => {
 export function renderWheel(chart: AstroChart, name: string): string {
   const asc = chart.ascendant;
   const s: string[] = [];
-  s.push(`<svg viewBox="0 0 720 730" width="720" height="730" xmlns="http://www.w3.org/2000/svg" ` +
+  s.push(`<svg viewBox="0 -66 720 780" width="720" height="780" xmlns="http://www.w3.org/2000/svg" ` +
     `font-family="Montserrat, 'Helvetica Neue', sans-serif">`);
-  s.push(`<rect width="720" height="720" fill="${CREAM}"/>`);
+  s.push(`<rect x="0" y="-66" width="720" height="780" fill="${CREAM}"/>`);
 
   // the twelve signs, coloured by element
   const SIGNS = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
@@ -157,10 +157,8 @@ export function renderWheel(chart: AstroChart, name: string): string {
   }
   // Nothing in the middle. The chords are the point of the middle, and a label
   // sitting on top of them makes them impossible to follow.
-  s.push(`<text x="${CX}" y="700" text-anchor="middle" font-size="13" fill="${INK}" ` +
-    `letter-spacing=".06em">${name}</text>`);
-  s.push(`<text x="${CX}" y="716" text-anchor="middle" font-size="8" fill="${INK}" ` +
-    `opacity=".45" letter-spacing=".18em">DELPHI HUMAN DESIGN</text>`);
+  s.push(`<text x="${CX}" y="-26" text-anchor="middle" font-size="27" font-weight="600" ` +
+    `letter-spacing=".02em" fill="${INK}">${name}</text>`);
   s.push("</svg>");
   return s.join("\n");
 }

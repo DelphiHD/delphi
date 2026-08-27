@@ -40,6 +40,13 @@ export interface AstroPoint {
    *  ours: nothing here is authored. */
   blurb?: string;
   signBlurb?: string;
+  /** What to call it on screen. The API's node names are misleading: Mean_Node
+   *  and True_Node come back exactly 180 degrees apart on every chart, which is
+   *  the node axis, not the one-degree difference between a mean and a true
+   *  north node. Checked against the Human Design North Node on four charts,
+   *  True_Node matched it to two decimals every time and Mean_Node was opposite,
+   *  so True_Node is north and Mean_Node is south. */
+  label: string;
 }
 
 export interface AstroAspect {
@@ -182,7 +189,14 @@ export async function getAstro(args: {
     return (m ? m[0] : s).trim();
   };
 
+  const LABEL: Record<string, string> = {
+    True_Node: "North Node",
+    Mean_Node: "South Node",
+    Mean_Lilith: "Lilith",
+  };
+
   const clean = (p: any): AstroPoint => ({
+    label: LABEL[p.name] ?? String(p.name ?? "").replace(/_/g, " "),
     name: p.name, sign: p.sign, sign_num: p.sign_num, position: p.position,
     abs_pos: p.abs_pos, element: p.element, quality: p.quality,
     emoji: p.emoji, house: p.house, point_type: p.point_type,
