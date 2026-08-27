@@ -36,10 +36,38 @@ These docs are the project's ground truth. Read whichever exist:
 - `docs/VOICE.md` — how Kaycee writes. Inject alongside IDENTITY.
 - `docs/ARCHITECTURE.md` — system map.
 - `docs/DECISIONS.md` — append-only log of why-we-chose-X.
+- `docs/NEW_CLIENT_CHECKLIST.md` — how to add a person, and the traps in doing it.
+- `docs/CRITICAL_ERRORS.md` — what counts as a stop-the-line failure, per product.
 - `docs/STACK_PORTED.md` — inventory of Tennyson's prior-work repos being ported in.
 - `docs/PHASE_1_HANDOFF.md` — the Phase 1 scaffolding spec.
 - `docs/PHASE_4_HANDOFF.md` — current state of the Planetary Overview build (v3). READ THIS when continuing PO work.
 - `HD-Reports-Master-Plan.md` — the full phase-by-phase build plan.
+
+## Continuity between sessions
+
+Kaycee works across many chats. A decision reached in one is worthless if the next
+one cannot see it, and making her explain the same thing twice is the failure mode
+this section exists to prevent.
+
+**Before starting work on anything that sounds like it has history, look for that
+history.** In order:
+
+1. The docs above. `docs/NEW_CLIENT_CHECKLIST.md` in particular is easy to miss and
+   contains the traps; on 2026-08-26 an agent rebuilt the client-adding process for
+   an evening without ever opening it, and repeated a gotcha written down in it.
+2. Prior sessions. They are readable: list them, search their transcripts, and read
+   the relevant one. If Kaycee says "we worked this out in another chat," that is not
+   background colour, it is an instruction to go and read it before touching anything.
+3. `git log` on the files involved. Today's work is usually today's commits.
+
+**Before a context window fills, write the decisions down.** A session that ends
+without committing what it decided has cost her the work. Non-obvious conclusions go
+in the doc they belong to (`DECISIONS.md` for why-we-chose-X, the product's own doc
+for how-it-works), in the same commit as the change.
+
+**Never rebuild something that already exists.** If a process, script or checklist
+covers the task, use it. Adding a wrapper on top of working machinery is where the
+failures come from, and the wrapper is what gets blamed on the machinery.
 
 ## Cost discipline (the whole point)
 

@@ -32,7 +32,7 @@ loadEnv({ path: ".env.local", override: true });
 
 import { createInterface } from "node:readline/promises";
 import { execFileSync, spawn } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { CLIENTS, clientOutputDir, type ClientBrief } from "./client-roster";
 
 const ROSTER = "scripts/client-roster.ts";
@@ -216,15 +216,42 @@ function slugFor(name: string, wanted: string | undefined, taken: Set<string>): 
 
 // ── the roster file ─────────────────────────────────────────────────────────
 
+/** docs/NEW_CLIENT_CHECKLIST.md, gotcha 1: the natal chart is cached and the
+ *  cache wins, so correcting a birth field silently keeps casting the old chart
+ *  until the cache file is deleted. Described there as the most common
+ *  "my change didn't take" cause. Doing it here rather than trusting whoever is
+ *  at the keyboard to remember. */
+function clearChartCache(slug: string) {
+  const p = `.cache/charts/${slug}.json`;
+  if (existsSync(p)) { rmSync(p); console.log(`  cache     cleared ${p} so the chart is re-cast`); }
+}
+
 function addToRoster(b: ClientBrief) {
   const src = readFileSync(ROSTER, "utf8");
-  if (new RegExp(`^\\s*${b.slug}:\\s`, "m").test(src)) return;
+  const line = new RegExp(`^\\s*${b.slug}:\\s.*$`, "m").exec(src);
+  if (line) {
+    // already there: if any birth field differs, the entry is corrected and the
+    // stale cast has to go with it
+    const differs = !line[0].includes(`birthDate: "${b.birthDate}"`)
+      || !line[0].includes(`birthTime: "${b.birthTime}"`)
+      || !line[0].includes(`birthPlace: "${b.birthPlace}"`);
+    if (differs) {
+      const replacement = `  ${(b.slug + ":").padEnd(10)}{ slug: "${b.slug}", ` +
+        `name: "${b.name}", birthDate: "${b.birthDate}", ` +
+        `birthTime: "${b.birthTime}", birthPlace: "${b.birthPlace}"` +
+        `${b.lookupPlace ? `, lookupPlace: "${b.lookupPlace}"` : ""} },`;
+      writeFileSync(ROSTER, src.replace(line[0], replacement));
+      console.log("  roster    birth details changed, entry updated");
+      clearChartCache(b.slug);
+    }
+    return;
+  }
   const close = src.indexOf("\n};", src.indexOf("export const CLIENTS"));
   if (close < 0) throw new Error("could not find the end of the CLIENTS object");
-  const line = `  ${(b.slug + ":").padEnd(10)}{ slug: "${b.slug}", ` +
+  const entry = `  ${(b.slug + ":").padEnd(10)}{ slug: "${b.slug}", ` +
     `name: "${b.name}", birthDate: "${b.birthDate}", ` +
     `birthTime: "${b.birthTime}", birthPlace: "${b.birthPlace}" },`;
-  writeFileSync(ROSTER, src.slice(0, close + 1) + line + "\n" + src.slice(close + 1));
+  writeFileSync(ROSTER, src.slice(0, close + 1) + entry + "\n" + src.slice(close + 1));
 }
 
 // ── running the existing steps ──────────────────────────────────────────────
