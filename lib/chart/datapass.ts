@@ -1082,7 +1082,8 @@ export function renderDataPassMarkdown(dp: DataPass): string {
   // the guess. It still must not state distances, because the report is read
   // for decades and any distance is stale the day after it is written.
   lines.push(`**Today's date**: ${new Date().toISOString().slice(0, 10)} ` +
-    `(for your reference only; NEVER state how far away a date is)`);
+    `(INTERNAL. Never write this date in the report, never quote it, never ` +
+    `measure anything from it. It exists only so you do not guess at the year.)`);
   lines.push(`${dp.profile} | ${dp.type} | ${dp.authority} Authority | ${dp.definition}`);
   lines.push(`**Birth**: ${dp.birth.localDate} (${dp.birth.timezone})${dp.birth.place ? `, ${dp.birth.place}` : ""}`);
   lines.push(`**Design**: ${dp.birth.designUtcDate} UTC`);

@@ -186,6 +186,33 @@ export function validateReport(text: string, dp: DataPass, tier: ReportTier = "f
   const pushHard = (i: Omit<ValidationIssue, "severity">) => issues.push({ severity: "hard", ...i });
   const pushSoft = (i: Omit<ValidationIssue, "severity">) => issues.push({ severity: "soft", ...i });
 
+  // The generation date must never appear in the prose. The model is given
+  // today's date so it stops guessing at distances, and the obvious next failure
+  // is that it starts quoting it: "as of August 27, 2026...". These reports are
+  // read for decades and a date stamped into the text ages them the moment it is
+  // written. The metadata comment block at the top is not prose, so it is
+  // stripped before this check; it is allowed to carry generated_at.
+  const prose = text.replace(/<!--[\s\S]*?-->/g, "");
+  const now = new Date();
+  const MONTHS = ["January", "February", "March", "April", "May", "June", "July",
+    "August", "September", "October", "November", "December"];
+  const y = now.getFullYear(), mi = now.getMonth(), d = now.getDate();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const todayForms = [
+    `${MONTHS[mi]} ${d}, ${y}`, `${MONTHS[mi]} ${d} ${y}`, `${d} ${MONTHS[mi]} ${y}`,
+    `${y}-${pad(mi + 1)}-${pad(d)}`, `${pad(mi + 1)}/${pad(d)}/${y}`, `${mi + 1}/${d}/${y}`,
+  ];
+  for (const form of todayForms) {
+    if (!prose.includes(form)) continue;
+    const at = prose.indexOf(form);
+    pushHard({
+      section: "(any)",
+      rule: "generation-date-in-prose",
+      message: `Today's date ("${form}") appears in the report. The generation date must never be written into the prose: the report is evergreen and a client re-reads it for years. State the chart's own dates, never the day it was produced.`,
+      detected: prose.slice(Math.max(0, at - 70), at + form.length + 70).replace(/\s+/g, " "),
+    });
+  }
+
   // 1. Required H1 sections must exist (tier-specific).
   const requiredH1 = REQUIRED_H1_BY_TIER[tier];
   for (const h of requiredH1) {

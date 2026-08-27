@@ -193,6 +193,14 @@ than making them: a fix that lives only in a chat is not a fix.
    Tested against "eighty-four-year life cycle", "four years of formal study" and
    "eighty-four years of age", which must not trip it.
 
+**And the generation date must never appear in the prose at all** (Kaycee,
+2026-08-27, immediately after the above): not as a distance, not as a quote, not
+as "as of". A fourth guard hard-fails `generation-date-in-prose` if today's date
+shows up in any format. The metadata comment block is exempt, since it is not
+prose and `generated_at` belongs there. Note the shape of this: giving the model
+the date to stop it guessing invites it to start quoting it, so the fix for one
+failure opened the next. Worth expecting whenever a fact is added to a prompt.
+
 **The underlying reason, worth keeping in mind for anything similar:** these
 reports are evergreen. A client re-reads them for decades. Any sentence measured
 from the moment of writing is wrong the day after it is written, even when the
