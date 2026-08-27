@@ -241,7 +241,12 @@ function applyLine(job: Job, raw: string) {
   const cur = () => job.people[job.people.length - 1];
 
   // a person's block opens with their name on its own line between rules
-  if (heading && !/^(added|Reports:|Nothing|Go ahead)/.test(line.trim())
+  // A person's name is printed at column zero between two rules. The summary
+  // lines at the end of a run are indented and can look just like one:
+  // "  Tennyson Taggart planetary" was being read as a fourth person who never
+  // started, which is a worrying thing to leave on a dashboard.
+  if (heading && !/^\s/.test(line)
+      && !/^(added|Reports:|Nothing|Go ahead)/.test(line.trim())
       && job.people.every((p) => p.name !== line.trim())
       && /^[A-Z]/.test(line.trim()) && line.trim().split(" ").length <= 5
       && !line.includes(":")) {
