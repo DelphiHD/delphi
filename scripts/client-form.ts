@@ -283,6 +283,13 @@ const PAGE = /* html */ `<!doctype html>
   .pip.kept { background:#eef0f4; border-color:#b9bfcc; opacity:1; }
   .pip.rejected { background:#fdeaea; border-color:#e0a0a0; opacity:1; font-weight:600; }
   .pip.failed { background:#fdeaea; border-color:#c46a6a; opacity:1; font-weight:600; }
+  #rosterPick { display:grid; grid-template-columns:repeat(auto-fill,minmax(232px,1fr)); gap:2px 14px;
+    background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:4px;
+    max-height:320px; overflow:auto; }
+  #rosterPick label { display:flex; align-items:center; gap:8px; font-size:12.5px; padding:3px 0; cursor:pointer; }
+  #rosterPick input { width:auto; }
+  #rosterPick .rid { font-size:10px; opacity:.45; font-weight:600; letter-spacing:.05em; }
+  #rosterPick .miss { color:#b3261e; font-size:10.5px; }
   .cid { font-size:10px; font-weight:600; letter-spacing:.06em; opacity:.5; margin-left:6px; }
   .who a { font-size:11.5px; color:var(--purple); word-break:break-all; }
   table.rep { width:100%; border-collapse:collapse; font-size:12px; }
@@ -325,6 +332,18 @@ const PAGE = /* html */ `<!doctype html>
 <div class="err" id="err"></div>
 
 <div id="out"><pre id="log"></pre><div class="links" id="links" style="display:none"></div></div>
+
+<h2 style="margin-top:34px">Rerun someone already on the roster</h2>
+<p class="sub">Their birth details are already on file, so nothing is retyped. Both reports are written again from scratch.</p>
+<div class="row" style="margin-top:0">
+  <button type="button" class="ghost" id="pickNone">Clear</button>
+  <button type="button" class="ghost" id="pickMissing">Select everyone missing a report</button>
+</div>
+<div id="rosterPick"></div>
+<div class="row">
+  <button type="button" class="go" id="rerunGo" disabled>Rerun selected</button>
+  <span class="sub" id="rerunNote" style="margin:0"></span>
+</div>
 </div>
 
 <div class="dash" id="dash" hidden>
@@ -529,6 +548,7 @@ const PAGE = /* html */ `<!doctype html>
       tile(Math.round(dl.perClientMinutes) + ' min', 'per finished client (actual)',
         'MEASURED: total minutes spent on the ' + dl.finishedSample + ' clients who have both reports, averaged. Includes regenerations.');
 
+    paintPicker(d.roster);
     document.getElementById('mRoster').innerHTML =
       '<table class="rep"><thead><tr><th>id</th><th>client</th><th>foundation</th>' +
       '<th>planetary</th><th>spent</th></tr></thead><tbody>' +
@@ -592,6 +612,64 @@ const PAGE = /* html */ `<!doctype html>
     sortable('mRules');
     sortable('mRoster');
   }
+  // the roster picker, filled from the same data the dashboard uses
+  function paintPicker(roster) {
+    var box = document.getElementById('rosterPick');
+    if (!box || box.dataset.filled === String(roster.length)) return;
+    box.dataset.filled = String(roster.length);
+    box.innerHTML = roster.map(function (r) {
+      var missing = [];
+      if (!r.foundation) missing.push('no foundation');
+      if (!r.planetary) missing.push('no planetary');
+      return '<label><input type="checkbox" value="' + esc(r.slug) + '">' +
+        '<span class="rid">' + esc(r.id) + '</span>' + esc(r.name) +
+        (missing.length ? ' <span class="miss">' + missing.join(', ') + '</span>' : '') + '</label>';
+    }).join('');
+    box.addEventListener('change', updateRerun);
+  }
+  function selected() {
+    return [].slice.call(document.querySelectorAll('#rosterPick input:checked')).map(function (i) { return i.value; });
+  }
+  function updateRerun() {
+    var n = selected().length;
+    document.getElementById('rerunGo').disabled = n === 0;
+    document.getElementById('rerunNote').textContent = n
+      ? n + ' selected \u00b7 about ' + Math.round(n * 34) + ' minutes and $' + (n * 2.7).toFixed(2)
+      : '';
+  }
+  document.getElementById('pickNone').onclick = function () {
+    [].slice.call(document.querySelectorAll('#rosterPick input')).forEach(function (i) { i.checked = false; });
+    updateRerun();
+  };
+  document.getElementById('pickMissing').onclick = function () {
+    [].slice.call(document.querySelectorAll('#rosterPick label')).forEach(function (l) {
+      l.querySelector('input').checked = !!l.querySelector('.miss');
+    });
+    updateRerun();
+  };
+  document.getElementById('rerunGo').onclick = async function () {
+    var slugs = selected();
+    if (!slugs.length) return;
+    var btn = document.getElementById('rerunGo');
+    btn.disabled = true; btn.textContent = 'Working\u2026';
+    show('status');
+    out.className = 'on'; log.textContent = ''; links.style.display = 'none'; links.innerHTML = '';
+    var res = await fetch('/rerun', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slugs: slugs }),
+    });
+    var reader = res.body.getReader(), dec = new TextDecoder(), buf = '';
+    while (true) {
+      var r = await reader.read();
+      if (r.done) break;
+      buf += dec.decode(r.value, { stream: true });
+      log.textContent = buf;
+      log.scrollTop = log.scrollHeight;
+    }
+    btn.disabled = false; btn.textContent = 'Rerun selected';
+    refresh();
+  };
+
   refresh();
   setInterval(refresh, 5000);
 
@@ -673,6 +751,60 @@ createServer((req, res) => {
     res.end(PAGE);
     return;
   }
+  // Rerunning somebody already on the roster: named by slug, so their recorded
+  // birth details are reused rather than retyped. Both birth-time errors this
+  // week came from retyping details that were already on file.
+  if (req.method === "POST" && path === "/rerun") {
+    let body = "";
+    req.on("data", (c) => { body += c; });
+    req.on("end", () => {
+      let slugs: string[] = [];
+      try {
+        const parsed = JSON.parse(body);
+        slugs = Array.isArray(parsed.slugs) ? parsed.slugs.filter((x: unknown) => typeof x === "string") : [];
+      } catch { res.writeHead(400); res.end("bad request"); return; }
+      if (!slugs.length) { res.writeHead(400); res.end("nobody selected"); return; }
+
+      res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" });
+      const src = existsSync(ROSTER_PATH) ? readFileSync(ROSTER_PATH, "utf8") : "";
+      const nameOf = Object.fromEntries(
+        [...src.matchAll(/slug: "([^"]+)",\s*name: "([^"]+)"/g)].map((m) => [m[1], m[2]]));
+      const jobs = loadJobs();
+      const job: Job = {
+        id: String(Date.now()),
+        startedAt: new Date().toISOString(),
+        people: slugs.map((sl) => ({ name: nameOf[sl] ?? sl, steps: blankSteps() })),
+      };
+      jobs.push(job);
+      saveJobs(jobs);
+
+      const child = spawn("./node_modules/.bin/tsx",
+        ["scripts/add-client.ts", ...slugs, "--redo", "--yes"], { cwd: process.cwd() });
+      let pending = "";
+      const consume = (d: Buffer) => {
+        res.write(d);
+        pending += d.toString();
+        const lines = pending.split("\n");
+        pending = lines.pop() ?? "";
+        for (const l of lines) {
+          const named = job.people.find((pp) => l.trim() === pp.name);
+          if (named) { job.people = [...job.people.filter((x) => x !== named), named]; continue; }
+          applyLine(job, l);
+        }
+        saveJobs(jobs);
+      };
+      child.stdout.on("data", consume);
+      child.stderr.on("data", consume);
+      child.on("close", (code) => {
+        job.finishedAt = new Date().toISOString();
+        saveJobs(jobs);
+        res.write(code === 0 ? "\n\nAll done.\n" : `\n\nFinished with problems (exit ${code}).\n`);
+        res.end();
+      });
+    });
+    return;
+  }
+
   if (req.method === "POST" && path === "/run") {
     let body = "";
     req.on("data", (c) => { body += c; });
