@@ -58,7 +58,7 @@ const degLabel = (pos: number) => {
 export function renderWheel(chart: AstroChart, name: string): string {
   const asc = chart.ascendant;
   const s: string[] = [];
-  s.push(`<svg viewBox="0 0 720 720" xmlns="http://www.w3.org/2000/svg" ` +
+  s.push(`<svg viewBox="0 0 720 730" xmlns="http://www.w3.org/2000/svg" ` +
     `font-family="Montserrat, 'Helvetica Neue', sans-serif">`);
   s.push(`<rect width="720" height="720" fill="${CREAM}"/>`);
 
@@ -140,11 +140,11 @@ export function renderWheel(chart: AstroChart, name: string): string {
     s.push(`<text x="${f(x)}" y="${f(y + 4)}" text-anchor="middle" font-size="12" ` +
       `font-weight="600" fill="${PURPLE}" letter-spacing=".06em">${label}</text>`);
   }
-  // the aspect chords run through the middle, so the name needs its own ground
-  s.push(`<circle cx="${CX}" cy="${CY}" r="74" fill="${CREAM}"/>`);
-  s.push(`<text x="${CX}" y="${CY - 4}" text-anchor="middle" font-size="15" fill="${INK}" ` +
-    `letter-spacing=".08em">${name}</text>`);
-  s.push(`<text x="${CX}" y="${CY + 16}" text-anchor="middle" font-size="9" fill="${INK}" ` +
+  // Nothing in the middle. The chords are the point of the middle, and a label
+  // sitting on top of them makes them impossible to follow.
+  s.push(`<text x="${CX}" y="700" text-anchor="middle" font-size="13" fill="${INK}" ` +
+    `letter-spacing=".06em">${name}</text>`);
+  s.push(`<text x="${CX}" y="716" text-anchor="middle" font-size="8" fill="${INK}" ` +
     `opacity=".45" letter-spacing=".18em">DELPHI HUMAN DESIGN</text>`);
   s.push("</svg>");
   return s.join("\n");
