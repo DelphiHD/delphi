@@ -43,6 +43,32 @@ These docs are the project's ground truth. Read whichever exist:
 - `docs/PHASE_4_HANDOFF.md` — current state of the Planetary Overview build (v3). READ THIS when continuing PO work.
 - `HD-Reports-Master-Plan.md` — the full phase-by-phase build plan.
 
+## When Kaycee reports a problem
+
+She is looking at the real thing. You are looking at a proxy. When those disagree,
+she is right and the proxy is wrong.
+
+**Verify at her surface, not at yours.** If she says a page is wrong, load the
+page. Not the API the page calls, not the file the page was built from, not the
+database behind it. On 2026-08-27 a client's read was corrected in the database
+and served correctly by the endpoint, which was checked three times and reported
+as fixed. The page never asked for it: the stale copy baked into the file was
+winning. Three "it's fixed" messages, none of them true, all of them backed by a
+real check of the wrong layer.
+
+**Never say fixed until you have reproduced the fix where she would see it.**
+"The endpoint returns the right value" is not "the page shows the right value."
+
+**Her report is evidence the thing is broken.** The question is why, never
+whether. Do not ask her to reload, clear a cache, or send a screenshot to prove
+it before investigating. On 2026-08-26 she was right three times running about
+gate highlighting while being asked to prove it, and diagnosed it herself in the
+end.
+
+**She has the whole picture; you have a slice.** She has been doing this work for
+years and knows what her charts should look like. When her account and your test
+disagree, the test is measuring the wrong thing.
+
 ## Continuity between sessions
 
 Kaycee works across many chats. A decision reached in one is worthless if the next
