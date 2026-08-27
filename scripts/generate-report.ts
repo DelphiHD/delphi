@@ -364,6 +364,14 @@ soft_warnings: ${softCount}
     // The reasons, not just the count. Without these a REJECT is a number and
     // somebody has to re-run the validator by hand to find out what leaked,
     // which is exactly what happened on 2026-08-27.
+    // how many sections had to be written twice because the validator rejected
+    // the first attempt: a report that needed three retries is a report whose
+    // prompt is fighting the material, and worth seeing next to its cost
+    retried_sections: ("sections" in result)
+      ? (result as { sections: { retried?: boolean }[] }).sections.filter((x) => x.retried).length
+      : 0,
+    total_sections: ("sections" in result)
+      ? (result as { sections: unknown[] }).sections.length : 0,
     hard_issues:   hardIssues,
     soft_issues:   softIssues,
     primary_path: primaryMdPath,

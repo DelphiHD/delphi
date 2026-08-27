@@ -180,7 +180,7 @@ function liveReports(): { client: string; kind: string; minutes: number; slow: b
   try { out = execSync("ps -eo etime=,command=", { encoding: "utf8", timeout: 4000 }); }
   catch { return []; }
   const seen = new Set<string>();
-  const live: { client: string; kind: string; minutes: number; slow: boolean }[] = [];
+  const live: { client: string; kind: string; minutes: number; slow: boolean; startedAt: string }[] = [];
   for (const line of out.split("\n")) {
     if (!line.includes("generate-report.ts")) continue;
     if (line.includes("--require")) continue;           // the tsx shim, same job
@@ -198,6 +198,7 @@ function liveReports(): { client: string; kind: string; minutes: number; slow: b
     const src = existsSync(ROSTER_PATH) ? readFileSync(ROSTER_PATH, "utf8") : "";
     const nm = new RegExp(`slug: "${slug}",\\s*name: "([^"]+)"`).exec(src);
     live.push({
+      startedAt: new Date(Date.now() - mins * 60_000).toISOString(),
       client: nm ? nm[1] : slug,
       kind: m[2] === "planetary" ? "Planetary Overview" : m[2] === "foundation" ? "Foundation" : m[2],
       minutes: Math.round(mins),
@@ -469,6 +470,7 @@ const PAGE = /* html */ `<!doctype html>
           return '<div class="job"><div class="who">' +
             '<span class="nm">' + esc(x.client) + '</span>' +
             '<span class="pip running">' + esc(x.kind) + '</span>' +
+            '<span class="pip">started ' + esc(new Date(x.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) + '</span>' +
             '<span class="pip ' + (x.slow ? 'rejected' : 'kept') + '">' + x.minutes + ' min</span>' +
             '<span style="font-size:11.5px;opacity:.65">' +
               (x.slow ? 'longer than 9 in 10 reports take. Still running; the model retries a stalled call on its own.'
@@ -560,14 +562,21 @@ const PAGE = /* html */ `<!doctype html>
 
     document.getElementById('recent').innerHTML = d.recent.length
       ? '<table class="rep"><thead><tr><th>date</th><th>time</th><th>client</th><th>report</th>' +
-        '<th>cost</th><th>min</th><th>words</th><th>validator</th></tr></thead><tbody>' +
+        '<th>cost</th><th>min</th><th>retries</th><th>words</th><th>validator</th></tr></thead><tbody>' +
         d.recent.map(function (r) {
           var bad = /REJECT/.test(r.validation || '');
             var when = new Date(r.at);
             return '<tr><td>' + esc(when.toLocaleDateString([], { month: 'short', day: 'numeric' })) +
               '</td><td>' + esc(when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) +
             '</td><td>' + esc(r.client) + '</td><td>' + esc(r.kind) + '</td><td>' + money(r.cost) +
-            '</td><td>' + r.minutes + '</td><td>' + (r.words || '').toLocaleString() +
+              '</td><td>' + r.minutes + '</td><td' +
+              (r.retries === null || r.retries === undefined
+                ? ' style="opacity:.35" title="Written before retries were recorded."'
+                : r.retries > 0
+                  ? ' title="' + r.retries + ' of ' + r.sections + ' sections were written again because the validator rejected the first attempt."'
+                  : '') +
+              '>' + (r.retries === null || r.retries === undefined ? '-' : r.retries + (r.sections ? ' / ' + r.sections : '')) +
+              '</td><td>' + (r.words || '').toLocaleString() +
               '</td><td class="' + (bad ? 'bad' : '') + '"' + (bad ? ' title="' + esc(
                 (r.issues && r.issues.length)
                   ? r.issues.map(function (i) {
@@ -743,6 +752,8 @@ createServer((req, res) => {
         at: r.timestamp, client: r.client, kind: r.report_type, cost: r.cost_usd,
         words: r.words, minutes: Math.round((r.elapsed_sec ?? 0) / 60),
         validation: r.validation,
+        retries: r.retried_sections ?? null,
+        sections: r.total_sections ?? null,
         // the reasons, so a REJECT can be read rather than re-derived
         issues: (r.hard_issues ?? []).map((i: any) => ({ rule: i.rule, detected: i.detected })),
       })),

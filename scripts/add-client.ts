@@ -19,6 +19,14 @@
 // Flags:
 //   --no-reports   skip the Foundation and Planetary Overview generation
 //   --no-notion    skip writing the Notion row
+//   Somebody already on the roster is named by their slug or id, since their
+//   birth details are already recorded and retyping them is a chance to get
+//   them wrong:
+//
+//     ./client rob --redo            one person, reports rewritten
+//     ./client rob kaycee bryan      several
+//     ./client --all --redo          the whole roster
+//
 //   --dry-run      say what would happen, change nothing
 //   --yes          do not stop to confirm (for unattended runs)
 //   --redo         regenerate reports even when one is already written
@@ -422,8 +430,27 @@ async function main() {
   const doNotion = !f["no-notion"];
   const status = typeof f.status === "string" ? f.status : STATUS_DEFAULT;
 
+  // bare arguments are roster slugs or ids: their birth details are already
+  // known, so nothing needs retyping
+  const bare = process.argv.slice(2).filter((a, i, all) =>
+    !a.startsWith("--") && (i === 0 || !all[i - 1].startsWith("--") ||
+      ["--dry-run", "--yes", "--redo", "--no-reports", "--no-notion", "--from-notion", "--all"].includes(all[i - 1])));
+  const fromRoster = f.all
+    ? Object.values(CLIENTS)
+    : bare.map((key) => {
+        const hit = Object.values(CLIENTS).find(
+          (c) => c.slug === key.toLowerCase() || c.id.toLowerCase() === key.toLowerCase());
+        if (!hit) throw new Error(`"${key}" is not a roster slug or id. Try: ${Object.keys(CLIENTS).slice(0, 6).join(", ")}...`);
+        return hit;
+      });
+
   let incoming: Incoming[];
-  if (f["from-notion"]) {
+  if (fromRoster.length) {
+    incoming = fromRoster.map((c) => ({
+      name: c.name, birthDate: c.birthDate, birthTime: c.birthTime,
+      birthPlace: c.birthPlace, slug: c.slug,
+    }));
+  } else if (f["from-notion"]) {
     incoming = await fromNotion();
     if (!incoming.length) { console.log("\nNobody in Notion is waiting for a chart.\n"); return; }
   } else if (typeof f.file === "string") {

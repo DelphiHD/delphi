@@ -1,0 +1,10 @@
+#!/bin/zsh
+# Short way in. Everything add-client does, without the npx incantation.
+#   ./client                      ask me, one at a time
+#   ./client rob --redo           rerun somebody already on the roster
+#   ./client rob kaycee bryan     several of them
+#   ./client --all --redo         the whole roster
+#   ./client --from-notion        anyone in Notion with birth data and no chart
+cd "$(dirname "$0")" || exit 1
+export PATH=/usr/local/bin:/opt/homebrew/bin:$PATH
+exec ./node_modules/.bin/tsx scripts/add-client.ts "$@"
