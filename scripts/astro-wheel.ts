@@ -66,7 +66,8 @@ export function renderWheel(chart: AstroChart, name: string): string {
   s.push(`<rect width="720" height="720" fill="${CREAM}"/>`);
 
   // the twelve signs, coloured by element
-  const SIGNS = ["Ari", "Tau", "Gem", "Can", "Leo", "Vir", "Lib", "Sco", "Sag", "Cap", "Aqu", "Pis"];
+  const SIGNS = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+    "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"];
   const ELEM_OF = ["Fire", "Earth", "Air", "Water"];
   // U+FE0E, the text variation selector. The zodiac signs default to colour
   // emoji presentation, so without it every sign draws as a filled badge with
@@ -77,9 +78,11 @@ export function renderWheel(chart: AstroChart, name: string): string {
     "♎", "♏", "♐", "♑", "♒", "♓"].map((g) => g + TEXT);
   for (let i = 0; i < 12; i++) {
     const start = i * 30, end = start + 30;
-    s.push(`<path d="${arc(start, end, asc, R_OUT, R_SIGN)}" fill="${ELEMENT[ELEM_OF[i % 4]]}" opacity=".92"/>`);
+    s.push(`<path class="signband" data-asign="${SIGNS[i]}" d="${arc(start, end, asc, R_OUT, R_SIGN)}" ` +
+      `fill="${ELEMENT[ELEM_OF[i % 4]]}" opacity=".92"/>`);
     const [gx, gy] = pt(start + 15, asc, (R_OUT + R_SIGN) / 2);
-    s.push(`<text x="${f(gx)}" y="${f(gy + 7)}" text-anchor="middle" font-size="20" fill="#fff">${GL[i]}</text>`);
+    s.push(`<text class="signband" data-asign="${SIGNS[i]}" x="${f(gx)}" y="${f(gy + 7)}" ` +
+      `text-anchor="middle" font-size="20" fill="#fff">${GL[i]}</text>`);
   }
   // a tick every degree, longer every five
   for (let d = 0; d < 360; d++) {
@@ -137,9 +140,11 @@ export function renderWheel(chart: AstroChart, name: string): string {
     placed.push(lon);
     const [x, y] = pt(lon, asc, R_PLANET);
     const [tx, ty] = pt(lon, asc, R_PLANET - 26);
-    s.push(`<text x="${f(x)}" y="${f(y + 8)}" text-anchor="middle" font-size="21" fill="${INK}">` +
+    s.push(`<text class="pglyph" data-aplanet="${p.name}" x="${f(x)}" y="${f(y + 8)}" ` +
+      `text-anchor="middle" font-size="21" fill="${INK}">` +
       `${GLYPH[p.name] ?? p.name.slice(0, 2)}</text>`);
-    s.push(`<text x="${f(tx)}" y="${f(ty + 4)}" text-anchor="middle" font-size="9.5" ` +
+    s.push(`<text class="pglyph" data-aplanet="${p.name}" x="${f(tx)}" y="${f(ty + 4)}" ` +
+      `text-anchor="middle" font-size="9.5" ` +
       `fill="${INK}" opacity=".6" letter-spacing=".02em">${degLabel(p.position)}</text>`);
   }
 

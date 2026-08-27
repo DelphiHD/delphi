@@ -36,6 +36,10 @@ export interface AstroPoint {
   emoji: string;
   house: string;
   point_type: string;
+  /** first sentence of the provider's own text, for a hover. Their words, not
+   *  ours: nothing here is authored. */
+  blurb?: string;
+  signBlurb?: string;
 }
 
 export interface AstroAspect {
@@ -47,8 +51,16 @@ export interface AstroAspect {
   orbit: number;
 }
 
+export interface SignNote {
+  element: string;
+  quality: string;
+  blurb: string;
+}
+
 export interface AstroChart {
   planets: AstroPoint[];
+  /** the twelve signs with their element, modality and a one-line read */
+  signs: Record<string, SignNote>;
   houses: AstroPoint[];
   aspects: AstroAspect[];
   ascendant: number;
@@ -133,14 +145,41 @@ export async function getAstro(args: {
   if (!res.ok) throw new Error(`astro-data failed: ${res.status} ${res.statusText}`);
   const j: any = await res.json();
 
+  /** One sentence. The provider writes paragraphs; a hover is not the place. */
+  const firstSentence = (t: unknown): string => {
+    const s = String(t ?? "").trim();
+    if (!s) return "";
+    const m = /^.*?[.!?](\s|$)/.exec(s);
+    return (m ? m[0] : s).trim();
+  };
+
   const clean = (p: any): AstroPoint => ({
     name: p.name, sign: p.sign, sign_num: p.sign_num, position: p.position,
     abs_pos: p.abs_pos, element: p.element, quality: p.quality,
     emoji: p.emoji, house: p.house, point_type: p.point_type,
+    blurb: firstSentence(p.description?.planet),
+    signBlurb: firstSentence(p.description?.zodiac),
+  });
+
+  // Element and modality are fixed properties of the signs themselves, so they
+  // are counted off the wheel rather than asked for: every fourth sign shares an
+  // element, every third a modality.
+  const ZODIAC = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+    "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"];
+  const ELEMENTS = ["Fire", "Earth", "Air", "Water"];
+  const QUALITIES = ["Cardinal", "Fixed", "Mutable"];
+  const signs: Record<string, SignNote> = {};
+  ZODIAC.forEach((name, i) => {
+    signs[name] = {
+      element: ELEMENTS[i % 4],
+      quality: QUALITIES[i % 3],
+      blurb: firstSentence((j.Zodiacs ?? {})[name]?.description),
+    };
   });
 
   return {
     planets: Object.values(j.Planets ?? {}).map(clean),
+    signs,
     houses: (j.Houses ?? []).map(clean),
     aspects: Object.values(j.Aspects ?? {}) as AstroAspect[],
     ascendant: j.ASCMC?.[0] ?? 0,

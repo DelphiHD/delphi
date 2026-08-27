@@ -2544,6 +2544,8 @@ body.view-astro .astro { display:flex; align-items:center; justify-content:cente
 body.view-astro .astro svg { height:calc(100vh - 36px); width:auto; max-width:100%; display:block; }
 /* the classic set on opening; the rest is a click away rather than a deletion */
 body:not(.astro-all) .astro .asp.extra { display:none; }
+.astro [data-asign], .astro [data-aplanet] { cursor:pointer; }
+.astro text[data-aplanet]:hover { font-weight:600; }
 body:not(.astro-all) #astroaspects .line.extra { display:none; }
 /* this view's home tab is astrology, not Human Design */
 #astrohome { display:none; }
@@ -3734,6 +3736,37 @@ if (DATA.client) {
         '</i><span>' + esc(x.aspect) + ' ' + esc(pretty(x.p2_name)) + '</span><i>' +
         (Math.round(Math.abs(x.orbit) * 10) / 10) + '\u00b0</i></div>';
     }).join('');
+
+    // Hovering the wheel. Element and modality belong to the sign itself, so
+    // they are counted rather than asked for; the sentence is the provider's
+    // own, cut to one line. Nothing here is written by us.
+    var astroEl = document.querySelector('.astro');
+    if (astroEl) {
+      astroEl.addEventListener('mousemove', function (e) {
+        var t = e.target.closest ? e.target.closest('[data-asign],[data-aplanet]') : null;
+        if (!t) { tip.hidden = true; return; }
+        // the mandala's own planet handler sits further up and would answer for
+        // this one otherwise, with a transit read instead of an astrology one
+        e.stopPropagation();
+        var html;
+        if (t.getAttribute('data-asign')) {
+          var nm = t.getAttribute('data-asign');
+          var note = (A.signs || {})[nm] || {};
+          html = '<b>' + esc(nm) + '</b>' +
+            esc([note.quality, note.element].filter(Boolean).join(' ')) +
+            (note.blurb ? '<br><span style="opacity:.72">' + esc(note.blurb) + '</span>' : '');
+        } else {
+          var pl = byName(t.getAttribute('data-aplanet'));
+          if (!pl) { tip.hidden = true; return; }
+          html = '<b>' + esc(pretty(pl.name)) + ' in ' + esc(pl.sign) + ' ' + dg(pl.position) + '</b>' +
+            esc([pl.quality, pl.element].filter(Boolean).join(' ')) +
+            (HOUSE_N[pl.house] ? ' &middot; house ' + HOUSE_N[pl.house] : '') +
+            (pl.blurb ? '<br><span style="opacity:.72">' + esc(pl.blurb) + '</span>' : '');
+        }
+        showTip(e, html);
+      });
+      astroEl.addEventListener('mouseleave', function () { tip.hidden = true; });
+    }
 
     var ab = document.getElementById('aspAll');
     ab.onclick = function () {
