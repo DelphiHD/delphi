@@ -316,6 +316,33 @@ async function main() {
           }))
       : [];
   const generatedAt = new Date().toISOString();
+
+  // Every issue goes to the failure log as it happens. Until now only the
+  // backfill script wrote that file, so the dashboard's Failures tab was a
+  // snapshot of whenever it was last run by hand and no new report ever showed
+  // up in it. Watching for a rule to stop recurring does not work if the log
+  // stops at last week.
+  try {
+    mkdirSync(".cache/reports", { recursive: true });
+    const logged = [
+      ...hardIssues.map((x) => ({ ...x, severity: "hard" })),
+      ...softIssues.map((x) => ({ ...x, severity: "soft" })),
+    ];
+    for (const i of logged) {
+      appendFileSync(".cache/reports/failures.jsonl", JSON.stringify({
+        at: generatedAt,
+        id: brief.id, slug: brief.slug, client: brief.name,
+        report: kindLabel2,
+        severity: i.severity,
+        rule: i.rule,
+        section: i.section,
+        message: i.message,
+        detected: i.detected,
+        file: `${brief.name} - ${outSuffix} - v${nextV}.md`,
+      }) + "\n");
+    }
+  } catch { /* the log is for watching; never worth failing a report over */ }
+
   const metadataBlock = `<!--
 report:        ${kindLabel2}
 client:        ${brief.name}
