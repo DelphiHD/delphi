@@ -65,8 +65,13 @@ export function renderWheel(chart: AstroChart, name: string): string {
   // the twelve signs, coloured by element
   const SIGNS = ["Ari", "Tau", "Gem", "Can", "Leo", "Vir", "Lib", "Sco", "Sag", "Cap", "Aqu", "Pis"];
   const ELEM_OF = ["Fire", "Earth", "Air", "Water"];
+  // U+FE0E, the text variation selector. The zodiac signs default to colour
+  // emoji presentation, so without it every sign draws as a filled badge with
+  // its own background. The planet symbols are not in the emoji set, which is
+  // why they were already coming out as plain text.
+  const TEXT = "\uFE0E";
   const GL = ["♈", "♉", "♊", "♋", "♌", "♍",
-    "♎", "♏", "♐", "♑", "♒", "♓"];
+    "♎", "♏", "♐", "♑", "♒", "♓"].map((g) => g + TEXT);
   for (let i = 0; i < 12; i++) {
     const start = i * 30, end = start + 30;
     s.push(`<path d="${arc(start, end, asc, R_OUT, R_SIGN)}" fill="${ELEMENT[ELEM_OF[i % 4]]}" opacity=".92"/>`);
