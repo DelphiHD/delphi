@@ -30,8 +30,8 @@ import { config as loadEnv } from "dotenv";
 loadEnv({ path: ".env.local", override: true });
 
 import { createInterface } from "node:readline/promises";
-import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { execFileSync, spawn } from "node:child_process";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { CLIENTS, clientOutputDir, type ClientBrief } from "./client-roster";
 
 const ROSTER = "scripts/client-roster.ts";
@@ -234,6 +234,69 @@ function run(script: string, args: string[]): string {
   });
 }
 
+/** A report generation that has gone quiet is not a report generation that is
+ *  thinking hard. One of these wedged at nought per cent CPU with no network
+ *  connection for forty six minutes and only stopped because somebody looked.
+ *  A step that says nothing for QUIET_MINUTES is killed and tried again. */
+const QUIET_MINUTES = 8;
+const HARD_CAP_MINUTES = 35;
+
+function runWatched(script: string, args: string[], label: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("./node_modules/.bin/tsx", [script, ...args]);
+    let out = "", settled = false;
+    const finish = (fn: () => void) => { if (!settled) { settled = true; clearTimeout(quiet); clearTimeout(cap); fn(); } };
+
+    let quiet: NodeJS.Timeout;
+    const resetQuiet = () => {
+      clearTimeout(quiet);
+      quiet = setTimeout(() => {
+        child.kill("SIGKILL");
+        finish(() => reject(new Error(`${label} went quiet for ${QUIET_MINUTES} minutes and was stopped`)));
+      }, QUIET_MINUTES * 60_000);
+    };
+    const cap = setTimeout(() => {
+      child.kill("SIGKILL");
+      finish(() => reject(new Error(`${label} ran past ${HARD_CAP_MINUTES} minutes and was stopped`)));
+    }, HARD_CAP_MINUTES * 60_000);
+    resetQuiet();
+
+    child.stdout.on("data", (d) => { out += d; resetQuiet(); });
+    child.stderr.on("data", (d) => { process.stderr.write(d); resetQuiet(); });
+    child.on("error", (e) => finish(() => reject(e)));
+    child.on("close", (code) => finish(() =>
+      code === 0 ? resolve(out) : reject(new Error(`${label} exited with ${code}`))));
+  });
+}
+
+/** Twice, because the failure that prompted this was transient. */
+async function runWithRetry(script: string, args: string[], label: string): Promise<string> {
+  try {
+    return await runWatched(script, args, label);
+  } catch (e) {
+    console.log(`\n            ${e instanceof Error ? e.message : e} — trying once more`);
+    process.stdout.write(`  ${label.padEnd(10)}retrying… `);
+    return runWatched(script, args, label);
+  }
+}
+
+/** A report already written is not written again. This is what makes a run that
+ *  died halfway worth simply repeating. */
+function hasReport(dir: string, kind: "foundation" | "planetary"): boolean {
+  if (!existsSync(dir)) return false;
+  const want = kind === "foundation" ? /foundation/i : /planetary/i;
+  return readdirSync(dir).some((f) => f.endsWith(".md") && want.test(f));
+}
+
+/** Say so out loud when it is over, since the point is not to sit and watch. */
+function announce(title: string, body: string) {
+  try {
+    const esc = (t: string) => t.replace(/["\\]/g, "");
+    execFileSync("/usr/bin/osascript", ["-e",
+      `display notification "${esc(body)}" with title "${esc(title)}" sound name "Glass"`]);
+  } catch { /* a missing notification must never fail a run */ }
+}
+
 async function notionUpsert(b: ClientBrief, link: string, status: string, statusGiven: boolean) {
   const token = process.env.NOTION_TOKEN;
   if (!token) throw new Error("NOTION_TOKEN is not set");
@@ -359,14 +422,16 @@ async function main() {
 
       if (doReports) {
         for (const kind of ["foundation", "planetary"] as const) {
+          if (hasReport(dir, kind)) { console.log(`  ${kind.padEnd(10)}already written, kept`); continue; }
           process.stdout.write(`  ${kind.padEnd(10)}generating… `);
-          run("scripts/generate-report.ts", [b.slug, kind]);
+          // --client-dir: this is a deliverable, not a benchmark run
+          await runWithRetry("scripts/generate-report.ts", [b.slug, kind, "--client-dir"], kind);
           console.log("ok");
         }
       }
 
       process.stdout.write("  chart     building and publishing… ");
-      const out = run("scripts/energy-flow-diagram.ts", [b.slug, "--publish"]);
+      const out = await runWithRetry("scripts/energy-flow-diagram.ts", [b.slug, "--publish"], "chart");
       const link = /https:\/\/charts\.delphihd\.com\/c\/[a-f0-9]{32}/.exec(out)?.[0];
       if (!link) throw new Error("published but no link came back");
       console.log("ok");
@@ -395,6 +460,11 @@ async function main() {
     console.log("\nRe-running is safe: whoever succeeded is picked up where they are.");
     process.exitCode = 1;
   }
+  announce(
+    failed.length ? "Delphi: finished with problems" : "Delphi: charts are ready",
+    failed.length
+      ? `${done.length} of ${briefs.length} done. ${failed.length} need a look.`
+      : `${done.length} chart${done.length === 1 ? "" : "s"} published.`);
   console.log("\nTheir reads start with tomorrow's transit report, which reads the roster.\n");
 }
 

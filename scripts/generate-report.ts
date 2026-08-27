@@ -239,7 +239,13 @@ async function main() {
     ?? resolve(homedir(), "Desktop", "Benchmark Reports", "Phase 4 Output");
   // For ad-hoc real-client runs, primary destination is clientDir.
   // For slug-mode benchmark runs, primary destination is benchmarkDir.
-  const primaryDir = isAdHoc ? clientDir : benchmarkDir;
+  // Slug mode was written for benchmark runs, so it files everything under
+  // Benchmark Reports with "Phase 4" in the name. add-client also runs by slug,
+  // because that is how the roster is read (and how lookupPlace is honoured),
+  // and its output is a paying client's deliverable rather than a benchmark.
+  // --client-dir says which it is; nothing that does not pass it changes.
+  const toClientDir = isAdHoc || !!flags["client-dir"];
+  const primaryDir = toClientDir ? clientDir : benchmarkDir;
   mkdirSync(primaryDir, { recursive: true });
 
   const kindLabel2 = kind === "foundation" ? "Foundation"
@@ -249,7 +255,7 @@ async function main() {
   //   - Benchmark: "<Name> - <Tier> - Phase 4 v<N>.md/.docx"
   //   - Client:    "<Name> - <Tier> - v<N>.md/.docx"  (no "Phase 4" prefix —
   //                this is the client's actual deliverable, not a benchmark)
-  const versionPrefix = isAdHoc
+  const versionPrefix = toClientDir
     ? `${brief.name} - ${kindLabel2} - v`
     : `${brief.name} - ${kindLabel2} - Phase 4 v`;
   let nextV = 1;
