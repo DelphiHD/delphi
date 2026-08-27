@@ -212,7 +212,11 @@ function followRun(job: Job, jobs: Job[], res?: ServerResponse) {
     // lines alone means the one step actually happening is the one shown as
     // waiting, which is the opposite of useful. Apply the partial line too, but
     // only when it is unmistakably a step, so a fragment cannot invent a person.
-    if (/^ {2}(roster|folder|foundation|planetary|chart|link|notion|cache|FAILED)\b/.test(pending)) {
+    // No word boundary after the name: add-client pads the label to a fixed
+    // width and "foundation" fills it exactly, so the line reads
+    // "  foundationgenerating…" with nothing between them. Requiring a boundary
+    // there failed on the one step this exists to catch.
+    if (/^ {2}(roster|folder|foundation|planetary|chart|link|notion|cache|FAILED)/.test(pending)) {
       applyLine(job, pending);
     }
     saveJobs(jobs);
@@ -475,6 +479,7 @@ const PAGE = /* html */ `<!doctype html>
   <h2>Running now</h2>
   <div id="live"></div>
   <h2>Runs</h2>
+  <div class="row" id="jobrow"><button id="clearRuns">Clear finished runs</button></div>
   <div id="jobs"></div>
   <h2>Deliveries</h2>
   <p class="sub" style="margin-top:-4px">Pickup to published chart. Writing is what the model spent; hang is everything else, which is where problems hide.</p>
@@ -849,6 +854,20 @@ const PAGE = /* html */ `<!doctype html>
       ? n + ' selected \u00b7 about ' + Math.round(n * 34) + ' minutes and $' + (n * 2.7).toFixed(2)
       : '';
   }
+  document.getElementById('clearRuns').onclick = function () {
+    var b = document.getElementById('clearRuns');
+    b.disabled = true;
+    fetch('/jobs/clear', { method: 'POST' })
+      .then(function (r) { return r.json(); })
+      .then(function (o) {
+        b.disabled = false;
+        b.textContent = o.dropped ? 'Cleared ' + o.dropped : 'Nothing finished to clear';
+        setTimeout(function () { b.textContent = 'Clear finished runs'; }, 2500);
+        refresh();
+      })
+      .catch(function () { b.disabled = false; });
+  };
+
   document.getElementById('pickNone').onclick = function () {
     [].slice.call(document.querySelectorAll('#rosterPick input')).forEach(function (i) { i.checked = false; });
     updateRerun();
@@ -1030,6 +1049,18 @@ createServer((req, res) => {
     });
     return;
   }
+  if (req.method === "POST" && path === "/jobs/clear") {
+    // Finished only. A run whose process is still alive stays on the board
+    // however old it looks, because that is the one she needs to see.
+    const jobs = loadJobs();
+    const keep = jobs.filter((j) => alive(j.pid));
+    const dropped = jobs.length - keep.length;
+    saveJobs(keep);
+    res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+    res.end(JSON.stringify({ dropped, left: keep.length }));
+    return;
+  }
+
   if (req.method === "GET" && path === "/jobs") {
     const jobs = loadJobs();
     const stats = reportStats();
@@ -1213,8 +1244,11 @@ createServer((req, res) => {
   const jobs = loadJobs();
   let resumed = 0, closed = 0;
   for (const job of jobs) {
-    if (job.finishedAt || !job.log) continue;
-    if (alive(job.pid)) { followRun(job, jobs); resumed++; }
+    if (job.finishedAt) continue;
+    // Alive is the only test that means anything. A job from before runs kept
+    // their own log has no log to follow and no pid to check, so it would sit
+    // on the board saying "running" for ever.
+    if (job.log && alive(job.pid)) { followRun(job, jobs); resumed++; }
     else {
       const unfinished = job.people.some((pp) =>
         Object.values(pp.steps).some((v) => v === "waiting" || v === "running"));
