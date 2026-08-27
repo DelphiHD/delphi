@@ -2513,6 +2513,10 @@ body.show-bridges .bridge { opacity:1; }
 .bar { cursor:default; padding:1px 6px; margin-left:-6px; margin-right:-6px; border-radius:6px; }
 .bar:hover { background:rgba(132,80,149,.12); }
 .bar i { font-style:normal; opacity:.75; }
+.bar.grp { margin-top:6px; }
+.bar.grp i { opacity:1; font-weight:600; letter-spacing:.05em; text-transform:uppercase; font-size:10px; }
+.bar.sub i { padding-left:9px; }
+.k-sign .bar { grid-template-columns:94px 1fr 26px; }
 .bar .track { height:7px; border-radius:4px; background:rgba(132,80,149,.14); overflow:hidden; }
 .bar .fill { height:100%; background:var(--purple); border-radius:4px; }
 .bar b { text-align:right; font-weight:600; font-size:11px; }
@@ -2928,9 +2932,10 @@ if (DATA.client) {
     // them on the chart and in the columns
     var table = function (title, rows, kind) {
       var max = Math.max.apply(null, rows.map(function (r) { return r[1]; }).concat([1]));
-      return '<details class="drop"><summary>' + title + '</summary>' + rows.map(function (r) {
+      return '<details class="drop k-' + kind + '"><summary>' + title + '</summary>' + rows.map(function (r) {
         var pl = (r[2] || []).map(function (p) { return p.side + ':' + p.pid; }).join(',');
-        return '<div class="bar" data-kind="' + kind + '" data-key="' + esc(r[0]) + '" data-pl="' + pl + '">' +
+        return '<div class="bar' + (r[3] ? ' ' + r[3] : '') + '" data-kind="' + kind +
+          '" data-key="' + esc(r[0]) + '" data-pl="' + pl + '">' +
           '<i>' + esc(r[0]) + '</i><div class="track"><div class="fill" style="width:' +
           Math.round((r[1] / max) * 100) + '%"></div></div><b>' + r[1] + '</b></div>';
       }).join('') + '</details>';
@@ -2975,10 +2980,26 @@ if (DATA.client) {
     // placement already names a longitude and therefore a sign. Ordered round
     // the zodiac rather than by count, because that is the order she reads it in.
     // Sign is where the planet actually is. Whole numbers, no splitting.
-    var signRows = (DATA.zodiac || []).map(function (z) {
-      var list = pick(function (p) { return p.sign === z.name; });
-      return [z.glyph + '  ' + z.name, list.length, list];
-    }).filter(function (r) { return r[1] > 0; });
+    var ELEMENTS = [
+      ['Fire', ['Aries', 'Leo', 'Sagittarius']],
+      ['Earth', ['Taurus', 'Virgo', 'Capricorn']],
+      ['Air', ['Gemini', 'Libra', 'Aquarius']],
+      ['Water', ['Cancer', 'Scorpio', 'Pisces']]
+    ];
+    var glyphOf = {};
+    (DATA.zodiac || []).forEach(function (z) { glyphOf[z.name] = z.glyph; });
+    // Grouped by element, because the balance between the four is what gets read
+    // first and counting it by hand off twelve rows is a chore. An element with
+    // nothing in it is kept: a missing element says as much as a full one.
+    var signRows = [];
+    ELEMENTS.forEach(function (e) {
+      var inEl = pick(function (p) { return e[1].indexOf(p.sign) > -1; });
+      signRows.push([e[0], inEl.length, inEl, 'grp']);
+      e[1].forEach(function (name) {
+        var list = pick(function (p) { return p.sign === name; });
+        if (list.length) signRows.push([(glyphOf[name] || '') + '  ' + name, list.length, list, 'sub']);
+      });
+    });
 
     // Twelve of the 384 gate-lines cross a sign boundary. Anything sitting on
     // one is named, with the side its exact degree puts it on, because that is
@@ -3051,6 +3072,13 @@ if (DATA.client) {
         var c = DATA.centers.filter(function (x) { return x.name === el.dataset.key; })[0];
         if (c) sub = c.fns.join(' + ') + (c.stateLabel ? ' &middot; ' + c.stateLabel : '') +
           (c.biology ? '. ' + c.biology : '');
+      } else if (el.dataset.kind === 'sign' && el.className.indexOf('grp') > -1) {
+        // an element is a total, so the useful breakdown is which of its three
+        // signs carries the weight, not twelve planets and their degrees
+        var grp = ELEMENTS.filter(function (x) { return x[0] === el.dataset.key; })[0];
+        sub = grp ? grp[1].map(function (n) {
+          return n + ' ' + list.filter(function (p) { return p.sign === n; }).length;
+        }).join(' &middot; ') : '';
       } else if (el.dataset.kind === 'sign') {
         // where in the sign each one falls, which is the thing worth seeing
         sub = list.map(function (p) {
