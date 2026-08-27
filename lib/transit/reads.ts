@@ -27,14 +27,14 @@ export interface DayRead {
 
 /** Every archived read for this client, keyed by date. Each morning's run adds
  *  one. */
-export function loadAllReads(clientName: string): Record<string, DayRead> {
+export function loadAllReads(clientName: string, clientId?: string): Record<string, DayRead> {
   const dir = TRANSITS_DIR;
   if (!existsSync(dir)) return {};
   const out: Record<string, DayRead> = {};
   for (const f of readdirSync(dir)) {
     const m = /^(\d{4}-\d{2}-\d{2}) - Daily Transit Report\.md$/.exec(f);
     if (!m) continue;
-    const r = loadDayRead(clientName, m[1]);
+    const r = loadDayRead(clientName, m[1], clientId);
     if (r) out[m[1]] = r;
   }
   return out;
@@ -65,7 +65,7 @@ export function headingByRename(
   return heads.find((h) => h[1].trim() === first);
 }
 
-export function loadDayRead(clientName: string, date: string): DayRead | null {
+export function loadDayRead(clientName: string, date: string, clientId?: string): DayRead | null {
   const path = join(TRANSITS_DIR, `${date} - Daily Transit Report.md`);
   if (!existsSync(path)) return null;
   const md = readFileSync(path, "utf8");
@@ -73,7 +73,13 @@ export function loadDayRead(clientName: string, date: string): DayRead | null {
 
   // "### 3. Bryan Rodabough · Split Definition (simple) (impact 74.25)"
   const heads = [...md.matchAll(/^### \d+\.\s+(.+?)\s+·\s+.*$/gm)];
-  const mine = heads.find((h) => h[1].trim() === clientName) ?? headingByRename(heads, clientName);
+  // The permanent id first, since it survives a rename. Falling back to the
+  // name for reports written before ids existed, and to the first-name rule for
+  // reports written before a rename.
+  const byId = clientId
+    ? heads.find((h) => md.slice(h.index!, h.index! + 400).includes(`<!-- client: ${clientId} -->`))
+    : undefined;
+  const mine = byId ?? heads.find((h) => h[1].trim() === clientName) ?? headingByRename(heads, clientName);
   if (!mine) return null;
   const start = mine.index! + mine[0].length;
   // Stop at the next heading of ANY level, not merely the next person. The last

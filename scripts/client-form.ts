@@ -22,6 +22,65 @@ const JOBS_PATH = ".cache/client-jobs.json";
 const REPORT_LOG = ".cache/reports/log.jsonl";
 const ROSTER_PATH = "scripts/client-roster.ts";
 
+// Every validator rule sorted into the kind of problem it represents, so the
+// failures can be worked through as classes rather than one sentence at a time.
+// The category is what decides the fix: a wrong fact means the engine or the
+// retrieval is wrong, a leak means the prompt is showing the reader machinery,
+// a drift means the model contradicted the chart.
+const RULE_CATEGORY: Record<string, string> = {
+  // The engine's own vocabulary reaching the page
+  "inline-source-citation": "Source leak",
+  "ra-by-name-in-body": "Source leak",
+  "operational-instruction-leak": "Source leak",
+  "operator-name-in-report": "Source leak",
+  "meta-process-sentence": "Source leak",
+  "quick-orientation-meta": "Source leak",
+  "what-each-variable-tracks": "Source leak",
+  "section-as-reading": "Source leak",
+  "closing-lineage-statement-present": "Source leak",
+  // Saying something the chart does not say
+  "type-drift": "Contradicts the chart",
+  "type-drift-saturation": "Contradicts the chart",
+  "profile-drift": "Contradicts the chart",
+  "definition-drift": "Contradicts the chart",
+  "cross-profile-drift": "Contradicts the chart",
+  "center-status-mismatch": "Contradicts the chart",
+  "center-status-prose-drift": "Contradicts the chart",
+  "line-archetype-mismatch": "Contradicts the chart",
+  "return-date-mismatch": "Contradicts the chart",
+  "sacral-throat-fabricated": "Contradicts the chart",
+  "mind-role-improper": "Contradicts the chart",
+  // Naming the fixing planet, which is a house rule
+  "fixing-planet-named": "Fixing planet named",
+  "neutral-placement-exaltation-hedge": "Fixing planet named",
+  // Time and dates
+  "distance-from-now": "Time and dates",
+  "generation-date-in-prose": "Time and dates",
+  // Something the report should contain and does not
+  "section-missing": "Missing content",
+  "center-missing": "Missing content",
+  "channel-missing": "Missing content",
+  "return-missing": "Missing content",
+  "cross-h1-missing": "Missing content",
+  "variable-header-missing": "Missing content",
+  "definition-not-cited": "Missing content",
+  "center-extraneous": "Missing content",
+  "variable-header-altered": "Missing content",
+  // Voice and house style
+  "pov-name-in-body": "Voice and style",
+  "banned-phrase": "Voice and style",
+  "banned-phrase-hard": "Voice and style",
+  "before-we-dive-in": "Voice and style",
+  "em-dash": "Voice and style",
+  "common-misspelling": "Voice and style",
+  "rooftop": "Voice and style",
+  "6-line-adjacent": "Voice and style",
+  "end-of-section-marker": "Voice and style",
+  "end-of-named-section-marker": "Voice and style",
+  "end-of-report-marker": "Voice and style",
+};
+const categoryOf = (rule: string) => RULE_CATEGORY[rule] ?? "Uncategorised";
+
 // ── the job store ───────────────────────────────────────────────────────────
 // What each submitted person is doing right now, and what it cost. Kept on disk
 // so a restart does not lose the record, and so the dashboard shows the last
@@ -32,6 +91,7 @@ type StepState = "waiting" | "running" | "done" | "kept" | "rejected" | "failed"
 
 interface Person {
   name: string;
+  id?: string;
   steps: Record<StepName, StepState>;
   link?: string;
   note?: string;
@@ -75,6 +135,8 @@ function applyLine(job: Job, raw: string) {
     job.people.push({ name: line.trim(), steps: blankSteps() });
     return;
   }
+  const idLine = /^\s{2}roster\s+.*\b(HD-\d+)\b/.exec(line);
+  if (idLine && cur()) cur().id = idLine[1];
   const m = /^\s{2}(roster|folder|foundation|planetary|chart|link|notion|cache|FAILED)\s*(.*)$/.exec(line);
   if (!m || !cur()) return;
   const [, key, rest] = m;
@@ -140,8 +202,10 @@ const PAGE = /* html */ `<!doctype html>
   .dash h2 { font-size:11px; letter-spacing:.16em; text-transform:uppercase; opacity:.55;
     margin:22px 0 10px; font-weight:600; }
   .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(128px,1fr)); gap:10px; }
-  .tile { background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px 14px; }
+  .tile { background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px 14px; cursor:help; }
   .tile b { display:block; font-size:21px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .track { height:7px; border-radius:4px; background:rgba(132,80,149,.14); overflow:hidden; }
+  .fill { height:100%; background:var(--purple); border-radius:4px; }
   .tile span { font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; opacity:.55; }
   .job { background:#fff; border:1px solid var(--line); border-radius:12px; padding:13px 15px; margin-bottom:10px; }
   .job > .when { font-size:11px; opacity:.5; margin-bottom:9px; }
@@ -156,6 +220,7 @@ const PAGE = /* html */ `<!doctype html>
   .pip.kept { background:#eef0f4; border-color:#b9bfcc; opacity:1; }
   .pip.rejected { background:#fdeaea; border-color:#e0a0a0; opacity:1; font-weight:600; }
   .pip.failed { background:#fdeaea; border-color:#c46a6a; opacity:1; font-weight:600; }
+  .cid { font-size:10px; font-weight:600; letter-spacing:.06em; opacity:.5; margin-left:6px; }
   .who a { font-size:11.5px; color:var(--purple); word-break:break-all; }
   table.rep { width:100%; border-collapse:collapse; font-size:12px; }
   table.rep th { text-align:left; font-size:10px; letter-spacing:.1em; text-transform:uppercase;
@@ -221,6 +286,8 @@ const PAGE = /* html */ `<!doctype html>
   <div class="tiles" id="mQuality"></div>
   <h2>What is failing validation</h2>
   <div id="mRules"></div>
+  <h2>The roster</h2>
+  <div id="mRoster"></div>
 </div>
 </div>
 <script>
@@ -256,6 +323,10 @@ const PAGE = /* html */ `<!doctype html>
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) {
     return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
   function money(n) { return '$' + (n || 0).toFixed(2); }
+  // every tile explains itself: what it is, and how it is worked out
+  function tile(value, label, help) {
+    return '<div class="tile" title="' + esc(help) + '"><b>' + value + '</b><span>' + esc(label) + '</span></div>';
+  }
 
   async function refresh() {
     var d;
@@ -263,18 +334,24 @@ const PAGE = /* html */ `<!doctype html>
     catch (e) { return; }
 
     document.getElementById('tiles').innerHTML =
-      '<div class="tile"><b>' + d.today.reports + '</b><span>reports today</span></div>' +
-      '<div class="tile"><b>' + money(d.today.cost) + '</b><span>spent today</span></div>' +
-      '<div class="tile"><b>' + d.today.minutes + ' min</b><span>model time today</span></div>' +
-      '<div class="tile"><b>' + money(d.avgCost) + '</b><span>average per report</span></div>' +
-      '<div class="tile"><b>' + Math.round(d.avgMinutes) + ' min</b><span>average per report</span></div>';
+      tile(d.today.reports, 'reports today',
+        'Foundation and Planetary reports finished since midnight. Counted from the report log, one entry per completed report.') +
+      tile(money(d.today.cost), 'spent today',
+        'What today\u2019s reports cost in Claude API charges, added up from each report\u2019s own recorded cost. Charts, publishing and Notion cost nothing.') +
+      tile(d.today.minutes + ' min', 'model time today',
+        'Total time the model spent writing today\u2019s reports. Wall-clock per report added together, so two reports run one after another sum to both.') +
+      tile(money(d.avgCost), 'average per report',
+        'Every report ever written, total cost divided by the number of reports. Includes regenerations.') +
+      tile(Math.round(d.avgMinutes) + ' min', 'average per report',
+        'Every report ever written, total minutes divided by the number of reports.');
 
     document.getElementById('jobs').innerHTML = d.jobs.length ? d.jobs.map(function (j) {
       var when = new Date(j.startedAt).toLocaleString();
       return '<div class="job"><div class="when">' + esc(when) +
         (j.finishedAt ? ' &middot; finished' : ' &middot; running') + '</div>' +
         j.people.map(function (p) {
-          return '<div class="who"><span class="nm">' + esc(p.name) + '</span>' +
+          return '<div class="who"><span class="nm">' + esc(p.name) +
+            (p.id ? ' <span class="cid">' + esc(p.id) + '</span>' : '') + '</span>' +
             STEPS.map(function (s) {
               return '<span class="pip ' + (p.steps[s] || 'waiting') + '">' + s + '</span>';
             }).join('') +
@@ -286,33 +363,64 @@ const PAGE = /* html */ `<!doctype html>
 
     var dl = d.delivery;
     document.getElementById('mDelivery').innerHTML =
-      '<div class="tile"><b>' + dl.roster + '</b><span>clients on the roster</span></div>' +
-      '<div class="tile"><b>' + dl.both + '</b><span>both reports written</span></div>' +
-      '<div class="tile"><b>' + dl.some + '</b><span>one report only</span></div>' +
-      '<div class="tile"><b>' + dl.none + '</b><span>no reports yet</span></div>' +
-      '<div class="tile"><b>' + Math.round((dl.both / (dl.roster || 1)) * 100) + '%</b><span>roster delivered</span></div>';
+      tile(dl.roster, 'clients on the roster',
+        'Everyone in the client roster file. This is what the daily transit report runs over, so a person is only real once they are here.') +
+      tile(dl.both, 'both reports written',
+        'Clients with a Foundation AND a Planetary Overview on record. The full deliverable.') +
+      tile(dl.some, 'one report only',
+        'Clients with exactly one of the two reports. Half-finished work.') +
+      tile(dl.none, 'no reports yet',
+        'On the roster with neither report written. These are the ones still to do.') +
+      tile(Math.round((dl.both / (dl.roster || 1)) * 100) + '%', 'roster delivered',
+        'Clients with both reports, divided by everyone on the roster.');
 
     document.getElementById('mCost').innerHTML =
-      '<div class="tile"><b>' + money(d.people.lifetimeCost) + '</b><span>spent all time</span></div>' +
-      '<div class="tile"><b>' + money(d.today.cost) + '</b><span>spent today</span></div>' +
-      '<div class="tile"><b>' + money(d.avgCost) + '</b><span>per report</span></div>' +
-      '<div class="tile"><b>' + money(d.avgCost * 2) + '</b><span>per client</span></div>' +
-      '<div class="tile"><b>' + money(dl.remainingCost) + '</b><span>to finish the roster</span></div>';
+      tile(money(d.people.lifetimeCost), 'spent all time',
+        'Every report ever written, added up. Claude API charges only. Charts, the transit report\u2019s own summaries, publishing and Notion are not in this.') +
+      tile(money(d.today.cost), 'spent today', 'Reports finished since midnight.') +
+      tile(money(d.avgCost), 'per report',
+        'Total spent divided by the number of reports. Regenerated reports count separately, because they were separately paid for.') +
+      tile(money(dl.perClientCost), 'per finished client (actual, n=' + dl.finishedSample + ')',
+        'MEASURED, not estimated. Takes only the ' + dl.finishedSample + ' clients who have both reports, adds up everything ever spent on each of them including regenerations, and averages. Higher than twice the per-report figure because some reports were written more than once.') +
+      tile(money(dl.remainingCost), 'to finish the roster (estimate)',
+        'An ESTIMATE: the reports still missing across the roster, priced at the average cost per report. Assumes each is written once and comes out clean, so treat it as a floor rather than a forecast.');
 
     document.getElementById('mQuality').innerHTML =
-      '<div class="tile"><b>' + d.people.lifetimeReports + '</b><span>reports written</span></div>' +
-      '<div class="tile"><b>' + Math.round(d.people.rejectRate * 100) + '%</b><span>rejected by the validator</span></div>' +
-      '<div class="tile"><b>' + Math.round(d.avgMinutes) + ' min</b><span>average to write</span></div>' +
-      '<div class="tile"><b>' + Math.round(d.avgMinutes * 2) + ' min</b><span>per client</span></div>';
+      tile(d.people.lifetimeReports, 'reports written',
+        'Every completed report in the log, including regenerations and reports that were later replaced.') +
+      tile(Math.round(d.people.rejectRate * 100) + '%', 'rejected by the validator',
+        'Share of reports where the validator found at least one HARD failure. A rejected report is still written and readable; it means at least one sentence needs a hand-touch before sending.') +
+      tile(Math.round(d.avgMinutes) + ' min', 'average to write',
+        'Wall-clock minutes per report, from the first API call to the finished text.') +
+      tile(Math.round(dl.perClientMinutes) + ' min', 'per finished client (actual)',
+        'MEASURED: total minutes spent on the ' + dl.finishedSample + ' clients who have both reports, averaged. Includes regenerations.');
 
-    var fr = d.failingRules, rules = Object.keys(fr.tally).sort(function (a, b) { return fr.tally[b] - fr.tally[a]; });
-    document.getElementById('mRules').innerHTML = rules.length
-      ? '<table class="rep"><thead><tr><th>rule</th><th>times</th></tr></thead><tbody>' +
-        rules.map(function (k) {
-          return '<tr><td>' + esc(k) + '</td><td>' + fr.tally[k] + '</td></tr>';
+    document.getElementById('mRoster').innerHTML =
+      '<table class="rep"><thead><tr><th>id</th><th>client</th><th>foundation</th>' +
+      '<th>planetary</th><th>spent</th></tr></thead><tbody>' +
+      d.roster.map(function (r) {
+        var tick = function (on) { return on ? '<span class="pip done">yes</span>' : '<span class="pip">no</span>'; };
+        return '<tr><td><b>' + esc(r.id) + '</b></td><td>' + esc(r.name) + '</td><td>' +
+          tick(r.foundation) + '</td><td>' + tick(r.planetary) + '</td><td>' + money(r.spent) + '</td></tr>';
+      }).join('') + '</tbody></table>';
+
+    var fr = d.failingRules;
+    var worst = fr.categories.length ? fr.categories[0].count : 0;
+    document.getElementById('mRules').innerHTML = fr.categories.length
+      ? '<table class="rep"><thead><tr><th>category</th><th>failures</th><th>reports</th>' +
+        '<th>share</th><th>rules involved</th></tr></thead><tbody>' +
+        fr.categories.map(function (c) {
+          return '<tr><td><b>' + esc(c.name) + '</b></td>' +
+            '<td>' + c.count + '</td>' +
+            '<td>' + c.reports + '</td>' +
+            '<td><div class="track" style="min-width:70px"><div class="fill" style="width:' +
+              Math.round((c.count / (worst || 1)) * 100) + '%"></div></div></td>' +
+            '<td style="opacity:.75">' + c.rules.map(function (r) {
+              return esc(r.rule) + ' \u00d7' + r.n;
+            }).join(', ') + '</td></tr>';
         }).join('') + '</tbody></table>' +
         '<p class="sub" style="margin-top:10px">From ' + fr.reportsWithDetail + ' of ' +
-        fr.totalReports + ' reports. Reasons are only recorded for reports written after 27 Aug 2026.</p>'
+        fr.totalReports + ' reports. Reasons are only recorded for reports written from 27 Aug 2026 on.</p>'
       : '<div class="tile"><span>No failure reasons recorded yet. Reports written from now on log them, ' +
         'so this fills in as reports are generated.</span></div>';
 
@@ -510,18 +618,79 @@ createServer((req, res) => {
         const none = slugs.length - both - some;
         const avg = stats.length
           ? stats.reduce((a: number, r: any) => a + (r.cost_usd ?? 0), 0) / stats.length : 0;
-        return { roster: slugs.length, both, some, none, remainingCost: (both === slugs.length ? 0 : (none * 2 + some) * avg) };
+        // Measured, not assumed: what a finished client has ACTUALLY cost,
+        // averaged over the clients who have both reports. That includes any
+        // regenerations, which an average-per-report doubled would miss.
+        const spentPer: Record<string, { cost: number; minutes: number }> = {};
+        for (const r of stats) {
+          const k = r.client_slug as string;
+          spentPer[k] = spentPer[k] ?? { cost: 0, minutes: 0 };
+          spentPer[k].cost += r.cost_usd ?? 0;
+          spentPer[k].minutes += (r.elapsed_sec ?? 0) / 60;
+        }
+        const finished = slugs.filter((sl) => (kinds[sl]?.size ?? 0) >= 2);
+        const perClientCost = finished.length
+          ? finished.reduce((a, sl) => a + (spentPer[sl]?.cost ?? 0), 0) / finished.length : 0;
+        const perClientMinutes = finished.length
+          ? finished.reduce((a, sl) => a + (spentPer[sl]?.minutes ?? 0), 0) / finished.length : 0;
+        return {
+          roster: slugs.length, both, some, none,
+          perClientCost, perClientMinutes, finishedSample: finished.length,
+          // an estimate, and labelled as one on the page
+          remainingCost: both === slugs.length ? 0 : (none * 2 + some) * avg,
+        };
       })(),
       // Which rules leak most, so the prompt can be aimed at the real problem
       failingRules: (() => {
         const tally: Record<string, number> = {};
+        const cats: Record<string, { count: number; hard: number; soft: number; rules: Record<string, number>; clients: Set<string> }> = {};
         let withDetail = 0;
         for (const r of stats) {
-          if (!Array.isArray(r.hard_issues) || !r.hard_issues.length) continue;
+          const hard = Array.isArray(r.hard_issues) ? r.hard_issues : [];
+          const soft = Array.isArray(r.soft_issues) ? r.soft_issues : [];
+          if (!hard.length && !soft.length) continue;
           withDetail++;
-          for (const i of r.hard_issues) tally[i.rule] = (tally[i.rule] ?? 0) + 1;
+          for (const [sev, list] of [["hard", hard], ["soft", soft]] as const) {
+            for (const i of list as any[]) {
+              tally[i.rule] = (tally[i.rule] ?? 0) + 1;
+              const c = categoryOf(i.rule);
+              cats[c] = cats[c] ?? { count: 0, hard: 0, soft: 0, rules: {}, clients: new Set() };
+              cats[c].count++;
+              (cats[c] as any)[sev]++;
+              cats[c].rules[i.rule] = (cats[c].rules[i.rule] ?? 0) + 1;
+              cats[c].clients.add(String(r.client));
+            }
+          }
         }
-        return { tally, reportsWithDetail: withDetail, totalReports: stats.length };
+        return {
+          tally,
+          reportsWithDetail: withDetail,
+          totalReports: stats.length,
+          categories: Object.entries(cats)
+            .map(([name, v]) => ({
+              name, count: v.count, hard: v.hard, soft: v.soft, reports: v.clients.size,
+              rules: Object.entries(v.rules).sort((a, b) => b[1] - a[1]).map(([r, n]) => ({ rule: r, n })),
+            }))
+            .sort((a, b) => b.count - a.count),
+        };
+      })(),
+      roster: (() => {
+        const src = existsSync(ROSTER_PATH) ? readFileSync(ROSTER_PATH, "utf8") : "";
+        const rows = [...src.matchAll(/id: "(HD-\d+)", slug: "([^"]+)",\s*name: "([^"]+)"/g)]
+          .map((m) => ({ id: m[1], slug: m[2], name: m[3] }));
+        const kinds: Record<string, Set<string>> = {};
+        const spent: Record<string, number> = {};
+        for (const r of stats) {
+          const k = r.client_slug as string;
+          (kinds[k] = kinds[k] ?? new Set()).add(String(r.report_type));
+          spent[k] = (spent[k] ?? 0) + (r.cost_usd ?? 0);
+        }
+        return rows.map((r) => ({
+          ...r,
+          foundation: kinds[r.slug]?.has("Foundation") ?? false,
+          planetary: kinds[r.slug]?.has("Planetary Overview") ?? false,
+          spent: spent[r.slug] ?? 0,
+        })).sort((a, b) => a.id.localeCompare(b.id));
       })(),
       people: (() => {
         const roster = existsSync(ROSTER_PATH) ? readFileSync(ROSTER_PATH, "utf8") : "";

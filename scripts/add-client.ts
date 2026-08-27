@@ -201,6 +201,14 @@ function normalise(row: Incoming): Incoming {
   return { name, birthDate: date, birthTime: time, birthPlace: place, slug: row.slug?.trim() };
 }
 
+/** The next permanent id. Sequential, never reused, and read from the roster
+ *  file rather than counted, so a removed client does not free their number. */
+function nextId(): string {
+  const src = readFileSync(ROSTER, "utf8");
+  const used = [...src.matchAll(/id: "HD-(\d+)"/g)].map((m) => parseInt(m[1], 10));
+  return `HD-${String((used.length ? Math.max(...used) : 0) + 1).padStart(3, "0")}`;
+}
+
 function slugFor(name: string, wanted: string | undefined, taken: Set<string>): string {
   const base = (wanted || name.split(" ")[0]).toLowerCase().replace(/[^a-z0-9]/g, "");
   if (!base) throw new Error(`cannot make a slug from "${name}"`);
@@ -236,7 +244,7 @@ function addToRoster(b: ClientBrief) {
       || !line[0].includes(`birthTime: "${b.birthTime}"`)
       || !line[0].includes(`birthPlace: "${b.birthPlace}"`);
     if (differs) {
-      const replacement = `  ${(b.slug + ":").padEnd(10)}{ slug: "${b.slug}", ` +
+      const replacement = `  ${(b.slug + ":").padEnd(10)}{ id: "${b.id}", slug: "${b.slug}", ` +
         `name: "${b.name}", birthDate: "${b.birthDate}", ` +
         `birthTime: "${b.birthTime}", birthPlace: "${b.birthPlace}"` +
         `${b.lookupPlace ? `, lookupPlace: "${b.lookupPlace}"` : ""} },`;
@@ -248,7 +256,8 @@ function addToRoster(b: ClientBrief) {
   }
   const close = src.indexOf("\n};", src.indexOf("export const CLIENTS"));
   if (close < 0) throw new Error("could not find the end of the CLIENTS object");
-  const entry = `  ${(b.slug + ":").padEnd(10)}{ slug: "${b.slug}", ` +
+  if (!b.id) b.id = nextId();
+  const entry = `  ${(b.slug + ":").padEnd(10)}{ id: "${b.id}", slug: "${b.slug}", ` +
     `name: "${b.name}", birthDate: "${b.birthDate}", ` +
     `birthTime: "${b.birthTime}", birthPlace: "${b.birthPlace}" },`;
   writeFileSync(ROSTER, src.slice(0, close + 1) + entry + "\n" + src.slice(close + 1));
@@ -308,7 +317,18 @@ function runWatched(script: string, args: string[], label: string): Promise<stri
     }, HARD_CAP_MINUTES * 60_000);
     resetQuiet();
 
-    child.stdout.on("data", (d) => { out += d; resetQuiet(); });
+    child.stdout.on("data", (d) => {
+      out += d;
+      resetQuiet();
+      // A rejected report exits zero, so without this the validator's verdict is
+      // captured and thrown away: "ok" is printed and a report Kaycee would have
+      // rewritten by hand goes out looking clean. Surface the verdict as it lands.
+      for (const line of String(d).split("\n")) {
+        if (/Validation:|HARD failure|REJECT|em dash|⚠/.test(line)) {
+          process.stdout.write(`\n            ${line.trim()}`);
+        }
+      }
+    });
     child.stderr.on("data", (d) => { process.stderr.write(d); resetQuiet(); });
     child.on("error", (e) => finish(() => reject(e)));
     child.on("close", (code) => finish(() =>
@@ -368,6 +388,9 @@ async function notionUpsert(b: ClientBrief, link: string, status: string, status
     "Birth Place": { rich_text: [{ text: { content: b.birthPlace } }] },
     "Bodygraph Link": { url: link },
     "Analysis Type": { select: { name: "Individual" } },
+    // the permanent id, so Notion and the roster agree on who this is even if
+    // the name on the row changes later
+    "Client ID": { rich_text: [{ text: { content: b.id } }] },
   };
   if (!existing) properties.Name = { title: [{ text: { content: title } }] };
   // Status is where Kaycee is with someone, not something this knows. A new row
@@ -401,8 +424,13 @@ async function main() {
   } else if (typeof f.file === "string") {
     incoming = fromFile(f.file);
   } else if (typeof f.name === "string") {
-    const born = typeof f.born === "string" ? f.born : "";
-    const [d, t] = born.split(/\s+/);
+    // "1983-06-15 3:45 PM" is three words, and taking the first two threw the
+    // meridiem away: David Whiting was built on 3:45 AM. Keep everything after
+    // the date, so the same normalise() that handles a CSV handles this too.
+    const born = typeof f.born === "string" ? f.born.trim() : "";
+    const firstSpace = born.indexOf(" ");
+    const d = firstSpace < 0 ? born : born.slice(0, firstSpace);
+    const t = firstSpace < 0 ? "" : born.slice(firstSpace + 1).trim();
     incoming = [{
       name: f.name,
       birthDate: typeof f.date === "string" ? f.date : d ?? "",
@@ -426,7 +454,10 @@ async function main() {
       const already = Object.values(CLIENTS).find((c) => c.name.toLowerCase() === n.name.toLowerCase());
       const slug = already ? already.slug : slugFor(n.name, n.slug, taken);
       taken.add(slug);
-      briefs.push({ slug, name: n.name, birthDate: n.birthDate, birthTime: n.birthTime, birthPlace: n.birthPlace });
+      briefs.push({
+        id: already ? already.id : "",   // filled at write time, so a failed row burns no id
+        slug, name: n.name, birthDate: n.birthDate, birthTime: n.birthTime, birthPlace: n.birthPlace,
+      });
     } catch (e) {
       problems.push(e instanceof Error ? e.message : String(e));
     }
@@ -460,7 +491,7 @@ async function main() {
     }
   }
 
-  const done: string[] = [], failed: string[] = [];
+  const done: string[] = [], failed: string[] = [], rejected: string[] = [];
   for (const b of briefs) {
     console.log(`\n${"=".repeat(60)}\n${b.name}\n${"=".repeat(60)}`);
     try {
@@ -477,8 +508,13 @@ async function main() {
             continue;
           }
           process.stdout.write(`  ${kind.padEnd(10)}generating… `);
-          await runWithRetry("scripts/generate-report.ts", [b.slug, kind], kind);
-          console.log("ok");
+          const rep = await runWithRetry("scripts/generate-report.ts", [b.slug, kind], kind);
+          if (/REJECT/.test(rep)) {
+            rejected.push(`${b.name} ${kind}`);
+            console.log("\n  " + " ".repeat(10) + "written, but the validator REJECTED it — needs a hand-touch");
+          } else {
+            console.log("ok");
+          }
         }
       }
 
@@ -505,6 +541,10 @@ async function main() {
 
   console.log(`\n${"=".repeat(60)}`);
   console.log(`added ${done.length}/${briefs.length}`);
+  if (rejected.length) {
+    console.log(`\n${rejected.length} report(s) failed validation and need a hand-touch before sending:`);
+    rejected.forEach((r) => console.log("  " + r));
+  }
   done.forEach((d) => console.log("  " + d));
   if (failed.length) {
     console.log(`\nfailed ${failed.length}:`);
@@ -513,7 +553,7 @@ async function main() {
     process.exitCode = 1;
   }
   announce(
-    failed.length ? "Delphi: finished with problems" : "Delphi: charts are ready",
+    failed.length || rejected.length ? "Delphi: finished with problems" : "Delphi: charts are ready",
     failed.length
       ? `${done.length} of ${briefs.length} done. ${failed.length} need a look.`
       : `${done.length} chart${done.length === 1 ? "" : "s"} published.`);

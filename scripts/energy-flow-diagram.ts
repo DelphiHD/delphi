@@ -44,7 +44,7 @@ import { loadLibraryNames } from "@/lib/hd/library-names";
 import { renderFullMandala } from "@/lib/render/mandala";
 import type { ChartSide, Planet } from "@/lib/render/mandala.types";
 import { getChart, getTimezoneForLocation } from "@/lib/mybodygraph";
-import { clientFromSlug, clientOutputDir, type ClientBrief, placeForLookup } from "./client-roster";
+import { CLIENTS, clientFromSlug, clientOutputDir, type ClientBrief, placeForLookup } from "./client-roster";
 import { loadDayRead, type DayRead } from "@/lib/transit/reads";
 import { castSkyAt } from "@/lib/transit/sky";
 
@@ -4270,7 +4270,7 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
         planet: p.planet, gate: p.gate, line: p.line, fixingState: p.fixingState,
       })),
     };
-    dayRead = loadDayRead(client.name, date) ?? undefined;
+    dayRead = loadDayRead(client.name, date, CLIENTS[client.slug]?.id) ?? undefined;
     console.log(dayRead
       ? `Today's read: ${dayRead.paragraph.split(" ").length} words, ${dayRead.completions.length} completion(s) from ${date}`
       : `Today's read: none found for ${date} (no transit report yet)`);

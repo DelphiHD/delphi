@@ -32,8 +32,8 @@ function rowsFor(date: string | null): Row[] {
   const rows: Row[] = [];
   for (const client of Object.values(CLIENTS)) {
     const reads = date
-      ? (() => { const r = loadDayRead(client.name, date); return r ? { [date]: r } : {}; })()
-      : loadAllReads(client.name);
+      ? (() => { const r = loadDayRead(client.name, date, client.id); return r ? { [date]: r } : {}; })()
+      : loadAllReads(client.name, client.id);
     for (const [d, r] of Object.entries(reads)) {
       rows.push({
         client_slug: client.slug,

@@ -179,7 +179,15 @@ function renderWhoSection(impacts: ClientImpact[], reads: Record<string, string>
   let rank = 0;
   for (const i of impacts) {
     rank++;
-    out.push(`### ${rank}. ${i.name} · ${i.definitionLabel} (impact ${i.score.toFixed(2)})`, "");
+    out.push(`### ${rank}. ${i.name} · ${i.definitionLabel} (impact ${i.score.toFixed(2)})`);
+    // Machine-readable and invisible to a reader: the heading carries the name,
+    // which changes, so anything reading this file back needs the permanent id.
+    // A rename used to orphan every read a person had. Kaycee reads this report
+    // herself each morning, so it goes in a comment rather than the heading:
+    // operational data does not belong in prose, which is her own rule.
+    const brief = Object.values(CLIENTS).find((c) => c.name === i.name);
+    if (brief) out.push(`<!-- client: ${brief.id} -->`);
+    out.push("");
     if (!i.completions.length && !i.reinforcements) {
       out.push("Quiet day, no transit channels or reinforcements.", "");
       continue;

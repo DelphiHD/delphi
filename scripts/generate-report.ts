@@ -82,6 +82,8 @@ async function main() {
   if (isAdHoc) {
     const slug = flags.slug || slugify(flags.name);
     brief = {
+      // ad-hoc runs are not roster members, so they carry no permanent id
+      id: CLIENTS[slug]?.id ?? "",
       slug,
       name: flags.name,
       birthDate: flags.date,
@@ -292,6 +294,17 @@ async function main() {
     // somebody must re-run the validator by hand to learn what leaked, which is
     // exactly what happened on 2026-08-27.
     type HardIssue = { severity: string; section: string; rule: string; message: string; detected?: string };
+    const pickIssues = (sev: string) => ("validation" in result)
+      ? (result as { validation: { issues: HardIssue[] } }).validation.issues
+          .filter((i) => i.severity === sev)
+          .map((i) => ({
+            rule: i.rule,
+            section: i.section,
+            message: i.message,
+            detected: String(i.detected ?? "").replace(/\s+/g, " ").slice(0, 240),
+          }))
+      : [];
+    const softIssues = pickIssues("soft");
     const hardIssues = ("validation" in result)
       ? (result as { validation: { issues: HardIssue[] } }).validation.issues
           .filter((i) => i.severity === "hard")
@@ -352,6 +365,7 @@ soft_warnings: ${softCount}
     // somebody has to re-run the validator by hand to find out what leaked,
     // which is exactly what happened on 2026-08-27.
     hard_issues:   hardIssues,
+    soft_issues:   softIssues,
     primary_path: primaryMdPath,
     cache_path:   resolve(outPath),
   };
