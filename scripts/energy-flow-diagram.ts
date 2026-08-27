@@ -37,6 +37,7 @@ import { join } from "node:path";
 
 import { CHANNELS } from "@/lib/hd/channels";
 import { centerOf, type Center } from "@/lib/hd/gate-center";
+import { longitudeOf, GATE_RANGES, GATE_ARC_DEGREES, LINE_ARC_DEGREES } from "@/lib/hd/gate-longitude";
 import type { CenterName } from "@/lib/chart/types";
 import { gateName } from "@/lib/hd/gate-names";
 import { loadLibraryNames } from "@/lib/hd/library-names";
@@ -615,7 +616,8 @@ interface ClientCtx {
   meta: { label: string; value: string }[];
   report: ReportText;
   variables: { key: string; label: string; arrow: "left" | "right"; theme: string; side: "design" | "personality" }[];
-  acts: { side: "personality" | "design"; planet: string; gate: number; line: number; fix: string }[];
+  acts: { side: "personality" | "design"; planet: string; gate: number; line: number; fix: string;
+    color: number; tone: number; base: number }[];
   subtitle: { personality: string[]; design: string[] };
   outDir: string;
 }
@@ -664,6 +666,9 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
       line: a.line,
       fix: /exalt/i.test(a.fixingState ?? "") ? "\u25B2"
         : /detriment/i.test(a.fixingState ?? "") ? "\u25BD" : "",
+      // colour, tone and base pin the longitude to about 0.0007 degrees, which
+      // is what settles the twelve gate-lines that straddle a sign boundary
+      color: a.color ?? 1, tone: a.tone ?? 1, base: a.base ?? 1,
     })),
   );
 
@@ -1007,6 +1012,49 @@ function centerStates(chunks: Chunk[]): Record<Center, CenterStates> {
     };
   }
   return out;
+}
+
+/** The tropical sign a placement falls in. The Rave wheel is fixed against the
+ *  ecliptic, so a gate and line already name a longitude, and the sign is that
+ *  longitude in thirty degree slices from 0 Aries. Checked against the Black
+ *  Book anchor: gate 41 line 1 sits at 2 Aquarius. */
+const ZODIAC = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+  "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"] as const;
+const ZODIAC_GLYPH: Record<string, string> = {
+  Aries: "\u2648", Taurus: "\u2649", Gemini: "\u264A", Cancer: "\u264B",
+  Leo: "\u264C", Virgo: "\u264D", Libra: "\u264E", Scorpio: "\u264F",
+  Sagittarius: "\u2650", Capricorn: "\u2651", Aquarius: "\u2652", Pisces: "\u2653",
+};
+function signOf(gate: number, line: number, color = 1, tone = 1, base = 1) {
+  const lon = longitudeOf(gate, line, color, tone, base);
+  const norm = ((lon % 360) + 360) % 360;
+  return { sign: ZODIAC[Math.floor(norm / 30)], degree: norm % 30, longitude: norm };
+}
+
+/** Sign is decided by where the planet actually is, not by which gate it is in.
+ *  A gate spans 5.625 degrees so twelve gates cross a sign boundary, but at line
+ *  level only twelve of the 384 gate-lines do, and the full fixing settles even
+ *  those. Splitting a whole transitional gate in half was tried and was wrong in
+ *  every case: the boundary falls at 0.98, 0.31 or 0.64 of the way through, never
+ *  the middle, so Saturn at 50.2 came out half Scorpio when it is plainly Libra.
+ *
+ *  ON_BOUNDARY_LINES is kept only to note which placements sit on a boundary at
+ *  all, since Kaycee reads that off the mandala. */
+const SIGN_AT = (lon: number) => ZODIAC[Math.floor(((((lon % 360) + 360) % 360)) / 30)];
+const SIGNS_BY_GATE: Record<number, string[]> = Object.fromEntries(
+  GATE_RANGES.map((r) => {
+    const first = SIGN_AT(r.start);
+    const last = SIGN_AT(r.start + GATE_ARC_DEGREES - 1e-6);
+    return [r.gate, first === last ? [first] : [first, last]];
+  }),
+);
+/** The gate.line pairs whose 0.9375 degrees cross a boundary: twelve of 384. */
+function lineOnBoundary(gate: number, line: number): string[] | null {
+  const r = GATE_RANGES.find((x) => x.gate === gate);
+  if (!r) return null;
+  const a = r.start + (line - 1) * LINE_ARC_DEGREES;
+  const b = a + LINE_ARC_DEGREES - 1e-9;
+  return SIGN_AT(a) === SIGN_AT(b) ? null : [SIGN_AT(a), SIGN_AT(b)];
 }
 
 /** One or two sentences for the pills in a card: circuits and channel types from
@@ -2090,6 +2138,9 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, fonts: Map<n
           circuit: d.gateInfo[a.gate]?.circuit ?? "",
           quarter: d.gateInfo[a.gate]?.quarter ?? "",
           center: CENTER_DISPLAY[centerOf(a.gate)], cid: centerOf(a.gate),
+          sign: signOf(a.gate, a.line, a.color, a.tone, a.base).sign,
+          signDeg: r2(signOf(a.gate, a.line, a.color, a.tone, a.base).degree),
+          onBoundary: lineOnBoundary(a.gate, a.line),
           report: d.client!.report.gates[`${a.side}|${a.planet}`] ?? "",
         }))
       : [],
@@ -2118,6 +2169,8 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, fonts: Map<n
       planet: p.planet, gate: p.gate, line: p.line, fixingState: p.fixingState,
     })) } : null,
     natalGates: d.client ? [...new Set(d.client.acts.map((a) => a.gate))].sort((a, b) => a - b) : [],
+    zodiac: ZODIAC.map((z) => ({ name: z, glyph: ZODIAC_GLYPH[z] })),
+    signsByGate: SIGNS_BY_GATE,
     planets: PLANET_ROWS.map((p) => ({ id: planetId(p), name: p })),
     functions: FUNCTION_ORDER.map((f) => ({ name: f, color: FUNCTIONS[f] })),
   };
@@ -2918,11 +2971,63 @@ if (DATA.client) {
         }).join('')
       : '<div class="line"><span>No gate is activated more than once.</span></div>') + '</details>';
 
+    // Activations by sign: the wheel is fixed against the ecliptic, so every
+    // placement already names a longitude and therefore a sign. Ordered round
+    // the zodiac rather than by count, because that is the order she reads it in.
+    // Sign is where the planet actually is. Whole numbers, no splitting.
+    var signRows = (DATA.zodiac || []).map(function (z) {
+      var list = pick(function (p) { return p.sign === z.name; });
+      return [z.glyph + '  ' + z.name, list.length, list];
+    }).filter(function (r) { return r[1] > 0; });
+
+    // Twelve of the 384 gate-lines cross a sign boundary. Anything sitting on
+    // one is named, with the side its exact degree puts it on, because that is
+    // visible on the mandala and worth being able to check.
+    var onEdge = pick(function (p) { return !!p.onBoundary; });
+    var transHtml = '';
+    if (onEdge.length) {
+      transHtml = '<div class="cyc" data-kind="trans" data-key="On a sign boundary" data-pl="' +
+        onEdge.map(function (p) { return p.side + ':' + p.pid; }).join(',') + '">' +
+        '<b>On a sign boundary &middot; ' + onEdge.length + '</b><span>' +
+        onEdge.map(function (p) {
+          return (p.side === 'design' ? 'D ' : 'P ') + p.planet + ' ' + p.gate + '.' + p.line +
+            ' (' + p.onBoundary.join('/') + ') falls in ' + p.sign + ' at ' +
+            Math.floor(p.signDeg) + '\u00b0';
+        }).join(' &middot; ') + '</span></div>';
+    }
+
+    // Conjunctions: two or more planets sharing a gate on the SAME side. The
+    // Replicated Gates section above counts a gate held on both sides; this is
+    // the tighter thing, planets sitting together within one side.
+    var conj = [];
+    ['personality', 'design'].forEach(function (side) {
+      var bySideGate = {};
+      P.filter(function (p) { return p.side === side; }).forEach(function (p) {
+        (bySideGate[p.gate] = bySideGate[p.gate] || []).push(p);
+      });
+      Object.keys(bySideGate).forEach(function (g) {
+        if (bySideGate[g].length > 1) conj.push({ side: side, gate: +g, list: bySideGate[g] });
+      });
+    });
+    conj.sort(function (a, b) { return b.list.length - a.list.length || a.gate - b.gate; });
+    var conjHtml = '<details class="drop"><summary>Conjunctions</summary>' + (conj.length
+      ? conj.map(function (c) {
+          var who = c.list.map(function (p) { return p.planet + ' ' + p.gate + '.' + p.line; }).join(', ');
+          var pl = c.list.map(function (p) { return p.side + ':' + p.pid; }).join(',');
+          return '<div class="cyc" data-gate="' + c.gate + '" data-pl="' + pl + '" data-kind="conj" ' +
+            'data-key="' + (c.side === 'design' ? 'Design' : 'Personality') + ' Gate ' + c.gate + '">' +
+            '<b>' + (c.side === 'design' ? 'Design' : 'Personality') + ' &middot; Gate ' + c.gate +
+            ' &times; ' + c.list.length + '</b><span>' + esc(who) + '</span></div>';
+        }).join('')
+      : '<div class="line"><span>No two planets share a gate on the same side.</span></div>') + '</details>';
+
     document.getElementById('tab-stats').innerHTML =
       table('Activations by Line', lineRows, 'line') +
       table('Activations by Circuit', groupRows, 'group') +
       table('Activations by Center', centerRows, 'center') +
-      repHtml;
+      table('Activations by Astrological Sign', signRows, 'sign').replace('</details>', transHtml + '</details>') +
+      repHtml +
+      conjHtml;
     document.getElementById('tab-stats').addEventListener('click', function (e) {
       var el = e.target.closest ? e.target.closest('[data-gate]') : null;
       if (el) openCard(el, gateLibHtml(+el.dataset.gate), null, +el.dataset.gate);
@@ -2946,13 +3051,23 @@ if (DATA.client) {
         var c = DATA.centers.filter(function (x) { return x.name === el.dataset.key; })[0];
         if (c) sub = c.fns.join(' + ') + (c.stateLabel ? ' &middot; ' + c.stateLabel : '') +
           (c.biology ? '. ' + c.biology : '');
+      } else if (el.dataset.kind === 'sign') {
+        // where in the sign each one falls, which is the thing worth seeing
+        sub = list.map(function (p) {
+          return (p.side === 'design' ? 'D ' : 'P ') + p.planet + ' ' +
+            Math.floor(p.signDeg) + '\u00b0';
+        }).join(' &middot; ');
+      } else if (el.dataset.kind === 'conj') {
+        var g0 = list.length ? list[0].gate : null;
+        var GL = g0 ? (DATA.gateLib || {})[g0] : null;
+        if (GL) sub = esc(GL.name) + (GL.center ? ' &middot; ' + esc(GL.center) : '');
       }
       var gl = list.map(function (p) { return p.gate + '.' + p.line; }).join(', ');
       showTip(e, '<b>' + esc(head) + '</b>' + (sub ? sub + '<br>' : '') +
         (gl ? '<span style="opacity:.7">' + esc(gl) + '</span>' : 'None in this chart.'));
     };
     document.getElementById('tab-stats').addEventListener('mousemove', function (e) {
-      var el = e.target.closest ? e.target.closest('.bar') : null;
+      var el = e.target.closest ? e.target.closest('.bar, .cyc[data-pl]') : null;
       if (el) { statTip(el, e); return; }
       var g = e.target.closest ? e.target.closest('[data-gate]') : null;
       if (g) return;
