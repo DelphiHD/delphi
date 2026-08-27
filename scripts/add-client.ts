@@ -40,10 +40,11 @@ loadEnv({ path: ".env.local", override: true });
 
 import { createInterface } from "node:readline/promises";
 import { execFileSync, spawn } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { CLIENTS, clientOutputDir, type ClientBrief } from "./client-roster";
 
 const ROSTER = "scripts/client-roster.ts";
+const DELIVERY_LOG = ".cache/reports/deliveries.jsonl";
 // The Reference Files DATABASE id, which is what the REST API wants. Notion
 // also exposes a data source ("collection://") id for the same table and the
 // two are different; using the data source id here returns a 404 that reads
@@ -524,8 +525,35 @@ async function main() {
   }
 
   const done: string[] = [], failed: string[] = [], rejected: string[] = [];
+
+  /** How long a client took from being picked up to having a published chart.
+   *  The report log times a single successful generation attempt, which for
+   *  Tori Tarver read 38 minutes when the real wait was 3 hours 23: a stalled
+   *  attempt, a retry and the chart build all fell outside it. This is the
+   *  number that matters for planning, so it is recorded separately. */
+  /** Minutes the model actually spent writing for this client since a moment,
+   *  read back out of the report log. Anything in the wall clock that is not
+   *  this is hang: a stalled call, a retry, the chart build, waiting. */
+  const reportMinutesSince = (slug: string, since: number): number => {
+    try {
+      return readFileSync(".cache/reports/log.jsonl", "utf8").split("\n")
+        .filter(Boolean)
+        .map((l) => { try { return JSON.parse(l); } catch { return null; } })
+        .filter((r) => r && r.client_slug === slug && Date.parse(r.timestamp) >= since)
+        .reduce((a, r) => a + (r.elapsed_sec ?? 0) / 60, 0);
+    } catch { return 0; }
+  };
+
+  const recordDelivery = (rec: Record<string, unknown>) => {
+    try {
+      mkdirSync(".cache/reports", { recursive: true });
+      appendFileSync(DELIVERY_LOG, JSON.stringify(rec) + "\n");
+    } catch { /* never fail a run over a metric */ }
+  };
   for (const b of briefs) {
     console.log(`\n${"=".repeat(60)}\n${b.name}\n${"=".repeat(60)}`);
+    const startedAt = Date.now();
+    let attempts = 0;
     try {
       addToRoster(b);
       console.log("  roster    ok");
@@ -540,6 +568,7 @@ async function main() {
             continue;
           }
           process.stdout.write(`  ${kind.padEnd(10)}generating… `);
+          attempts++;
           const rep = await runWithRetry("scripts/generate-report.ts", [b.slug, kind], kind);
           if (/REJECT/.test(rep)) {
             rejected.push(`${b.name} ${kind}`);
@@ -563,9 +592,35 @@ async function main() {
           (what === "created" || typeof f.status === "string"
             ? `, status "${status}"` : ", status left as you had it"));
       }
+      const mins = (Date.now() - startedAt) / 60000;
+      // Split the wait into work and hang. Generation is what the model was
+      // actually writing for; everything else is stalls, retries and waiting,
+      // and that is the part worth tracking. Tori Tarver's real wait was 3h 23
+      // against 38 minutes of writing: nearly three hours of hang that nothing
+      // recorded.
+      const generated = reportMinutesSince(b.slug, startedAt);
+      const hang = Math.max(0, mins - generated);
+      recordDelivery({
+        at: new Date().toISOString(), id: b.id, slug: b.slug, client: b.name,
+        started: new Date(startedAt).toISOString(),
+        delivered_minutes: Math.round(mins * 10) / 10,
+        generating_minutes: Math.round(generated * 10) / 10,
+        hang_minutes: Math.round(hang * 10) / 10,
+        reports_attempted: attempts, link, outcome: "delivered",
+      });
+      const fmt = (x: number) => (x < 90 ? Math.round(x) + " min" : (x / 60).toFixed(1) + " h");
+      console.log(`  delivered  ${fmt(mins)} from pickup to published chart` +
+        ` (${fmt(generated)} writing, ${fmt(hang)} hanging)`);
       done.push(`${b.name} → ${link}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
+      recordDelivery({
+        at: new Date().toISOString(), id: b.id, slug: b.slug, client: b.name,
+        started: new Date(startedAt).toISOString(),
+        delivered_minutes: Math.round(((Date.now() - startedAt) / 60000) * 10) / 10,
+        generating_minutes: Math.round(reportMinutesSince(b.slug, startedAt) * 10) / 10,
+        reports_attempted: attempts, outcome: "failed", error: msg,
+      });
       console.error(`  FAILED    ${msg}`);
       failed.push(`${b.name}: ${msg}`);
     }

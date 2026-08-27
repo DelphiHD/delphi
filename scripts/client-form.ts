@@ -21,6 +21,7 @@ const PORT = Number(process.env.CLIENT_FORM_PORT ?? 4321);
 const JOBS_PATH = ".cache/client-jobs.json";
 const REPORT_LOG = ".cache/reports/log.jsonl";
 const ROSTER_PATH = "scripts/client-roster.ts";
+const DELIVERY_LOG = ".cache/reports/deliveries.jsonl";
 const CLIENT_DIR = join(homedir(), "Desktop", "HD Reports", "Paid HD Reports");
 
 /** What a client actually HAS, read off their folder rather than the report log.
@@ -355,6 +356,9 @@ const PAGE = /* html */ `<!doctype html>
   <div id="live"></div>
   <h2>Runs</h2>
   <div id="jobs"></div>
+  <h2>Deliveries</h2>
+  <p class="sub" style="margin-top:-4px">Pickup to published chart. Writing is what the model spent; hang is everything else, which is where problems hide.</p>
+  <div id="deliveries"></div>
   <h2>Recent reports</h2>
   <div id="recent"></div>
 </div>
@@ -580,6 +584,28 @@ const PAGE = /* html */ `<!doctype html>
       : '<div class="tile"><span>No failure reasons recorded yet. Reports written from now on log them, ' +
         'so this fills in as reports are generated.</span></div>';
 
+    document.getElementById('deliveries').innerHTML = d.deliveries.length
+      ? '<table class="rep"><thead><tr><th>date</th><th>client</th><th>started</th>' +
+        '<th>delivered in</th><th>writing</th><th>hang</th><th>attempts</th><th>outcome</th>' +
+        '</tr></thead><tbody>' +
+        d.deliveries.map(function (x) {
+          var t = function (m) { return m == null ? '-' : (m < 90 ? Math.round(m) + ' min' : (m / 60).toFixed(1) + ' h'); };
+          var st = new Date(x.started);
+          var bad = (x.hang_minutes || 0) > 20 || x.outcome !== 'delivered';
+          return '<tr><td>' + esc(st.toLocaleDateString([], { month: 'short', day: 'numeric' })) +
+            '</td><td>' + esc(x.client) + (x.reconstructed ? ' <span class="cid" title="Reconstructed from the run log: this client was delivered before delivery times were recorded.">est</span>' : '') +
+            '</td><td>' + esc(st.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) +
+            '</td><td>' + t(x.delivered_minutes) +
+            '</td><td>' + t(x.generating_minutes) +
+            '</td><td class="' + (bad ? 'bad' : '') + '"' +
+              (bad ? ' title="Time not spent writing: stalled calls, retries, the chart build, waiting."' : '') +
+              '>' + t(x.hang_minutes) +
+            '</td><td>' + (x.reports_attempted == null ? '-' : x.reports_attempted) +
+            '</td><td class="' + (x.outcome === 'delivered' ? '' : 'bad') + '">' + esc(x.outcome) +
+            '</td></tr>';
+        }).join('') + '</tbody></table>'
+      : '<div class="tile"><span>No deliveries recorded yet.</span></div>';
+
     document.getElementById('recent').innerHTML = d.recent.length
       ? '<table class="rep"><thead><tr><th>date</th><th>time</th><th>client</th><th>report</th>' +
         '<th>cost</th><th>min</th><th>retries</th><th>words</th><th>validator</th></tr></thead><tbody>' +
@@ -608,6 +634,7 @@ const PAGE = /* html */ `<!doctype html>
       : '<div class="tile"><span>No reports yet.</span></div>';
 
     // the tables re-render every few seconds, so rewire and reapply the sort
+    sortable('deliveries');
     sortable('recent');
     sortable('mRules');
     sortable('mRoster');
@@ -877,6 +904,12 @@ createServer((req, res) => {
     const todays = stats.filter((r: any) => String(r.timestamp ?? "").startsWith(today));
     res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
     res.end(JSON.stringify({
+      deliveries: (() => {
+        if (!existsSync(DELIVERY_LOG)) return [];
+        return readFileSync(DELIVERY_LOG, "utf8").split("\n").filter(Boolean)
+          .map((l) => { try { return JSON.parse(l); } catch { return null; } })
+          .filter(Boolean).slice(-30).reverse();
+      })(),
       live: liveReports(),
       jobs: jobs.slice(-6).reverse(),
       byClient,
