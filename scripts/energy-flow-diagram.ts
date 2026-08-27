@@ -2545,6 +2545,20 @@ body.view-astro .astro svg { height:calc(100vh - 36px); width:auto; max-width:10
 /* the classic set on opening; the rest is a click away rather than a deletion */
 body:not(.astro-all) .astro .asp.extra { display:none; }
 .astro [data-asign], .astro [data-aplanet] { cursor:pointer; }
+.tip .pill { display:inline-block; padding:2.5px 8px; border-radius:999px; font-size:9px;
+  font-weight:600; letter-spacing:.08em; text-transform:uppercase; margin:5px 5px 1px 0;
+  line-height:1.5; }
+/* element: the wheel's own four colours, so the pill matches the band under the cursor */
+.tip .pill.fire { background:#845095; color:#fff; }
+.tip .pill.water { background:#c9a7d4; color:#3a2b40; }
+.tip .pill.earth { background:#9b9aa0; color:#fff; }
+.tip .pill.air { background:#5f5a66; color:#fff; }
+/* modality: one gold family, so the category reads before the value does */
+.tip .pill.cardinal { background:#c9971f; color:#fff; }
+.tip .pill.fixed { background:#8a6a14; color:#fff; }
+.tip .pill.mutable { background:#e3c05c; color:#3a2f10; }
+.tip .pill.house { background:transparent; color:inherit; opacity:.6;
+  border:1px solid currentColor; }
 .astro text[data-aplanet]:hover { font-weight:600; }
 body:not(.astro-all) #astroaspects .line.extra { display:none; }
 /* this view's home tab is astrology, not Human Design */
@@ -3748,19 +3762,22 @@ if (DATA.client) {
         // the mandala's own planet handler sits further up and would answer for
         // this one otherwise, with a transit read instead of an astrology one
         e.stopPropagation();
+        var pill = function (word) {
+          if (!word) return '';
+          return '<span class="pill ' + esc(String(word).toLowerCase()) + '">' + esc(word) + '</span>';
+        };
         var html;
         if (t.getAttribute('data-asign')) {
           var nm = t.getAttribute('data-asign');
           var note = (A.signs || {})[nm] || {};
-          html = '<b>' + esc(nm) + '</b>' +
-            esc([note.quality, note.element].filter(Boolean).join(' ')) +
+          html = '<b>' + esc(nm) + '</b>' + pill(note.quality) + pill(note.element) +
             (note.blurb ? '<br><span style="opacity:.72">' + esc(note.blurb) + '</span>' : '');
         } else {
           var pl = byName(t.getAttribute('data-aplanet'));
           if (!pl) { tip.hidden = true; return; }
           html = '<b>' + esc(pretty(pl.name)) + ' in ' + esc(pl.sign) + ' ' + dg(pl.position) + '</b>' +
-            esc([pl.quality, pl.element].filter(Boolean).join(' ')) +
-            (HOUSE_N[pl.house] ? ' &middot; house ' + HOUSE_N[pl.house] : '') +
+            pill(pl.quality) + pill(pl.element) +
+            (HOUSE_N[pl.house] ? '<span class="pill house">House ' + HOUSE_N[pl.house] + '</span>' : '') +
             (pl.blurb ? '<br><span style="opacity:.72">' + esc(pl.blurb) + '</span>' : '');
         }
         showTip(e, html);
