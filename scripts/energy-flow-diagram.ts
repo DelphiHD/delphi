@@ -3125,7 +3125,11 @@ if (DATA.client) {
   // so this morning's words reach every chart the moment Kaycee's report runs
   // rather than waiting for all 28 to be rebuilt and republished.
   var readCache = {}, readWanted = null;
-  if (DATA.read && DATA.read.date) readCache[DATA.read.date] = DATA.read;
+  // The baked read is a FALLBACK for when the fetch fails, not a cache entry.
+  // Seeding the cache with it meant the page already "had" today's read and
+  // never asked the server, so a read corrected after the chart was published
+  // stayed wrong on the page forever. Joe Goodin's 702-word read kept its
+  // swallowed data tables for exactly this reason after the parser was fixed.
   function chartToken() {
     var parts = location.pathname.split('/c/');
     var t = parts.length > 1 ? parts[1].split('/')[0] : '';
@@ -3143,9 +3147,12 @@ if (DATA.client) {
       readCache[d] = j.read || null;
       if (readWanted === d) renderRead(j.read || null, d);
     }).catch(function () {
+      if (readWanted !== d) return;
+      // The copy baked in at publish time, used only when the server cannot be
+      // reached, and only for the day it was baked for.
+      if (DATA.read && DATA.read.date === d) { renderRead(DATA.read, d); return; }
       // a read that cannot be fetched is not a read that does not exist, and
       // saying so wrongly would have a client think Kaycee skipped their day
-      if (readWanted !== d) return;
       var el = document.getElementById('todayread');
       if (el) el.innerHTML = '<div class="noread">Could not load the reading for ' +
         esc(shortDate(d)) + '. The chart above is still that day&rsquo;s sky.</div>';
