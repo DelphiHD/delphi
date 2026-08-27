@@ -54,7 +54,11 @@ export interface AstroAspect {
 export interface SignNote {
   element: string;
   quality: string;
+  /** "The Ram", "The Scales" */
+  symbol: string;
   blurb: string;
+  /** what the element stands for: "Action and Passion" */
+  theme: string;
 }
 
 export interface AstroChart {
@@ -82,10 +86,30 @@ export interface AstroChart {
  */
 const GEO_CACHE = ".cache/geocode.json";
 
-/** A line on each sign's own energy, in the third person, because a sign on the
- *  wheel is not a claim about the reader. Empty until Kaycee writes them: her
- *  voice, not mine, and nothing invented in the meantime. */
-const SIGN_NOTE: Record<string, string> = {};
+/** Kaycee's own words. A sign on the wheel is a sign, not a claim about whoever
+ *  is reading, so these are written about the sign itself. Her copy, verbatim. */
+const SIGN_NOTE: Record<string, { symbol: string; blurb: string }> = {
+  Aries: { symbol: "The Ram", blurb: "Represents courage, initiation, and direct energy." },
+  Taurus: { symbol: "The Bull", blurb: "Represents grounding, comfort, reliability, and patience." },
+  Gemini: { symbol: "The Twins", blurb: "Represents curiosity, adaptability, and dual perspectives." },
+  Cancer: { symbol: "The Crab", blurb: "Represents deep sensitivity, intuition, and nurturing care." },
+  Leo: { symbol: "The Lion", blurb: "Represents vitality, confidence, leadership, and creativity." },
+  Virgo: { symbol: "The Virgin", blurb: "Represents organization, service, and a helpful nature." },
+  Libra: { symbol: "The Scales", blurb: "Represents balance, harmony, relationships, and beauty." },
+  Scorpio: { symbol: "The Scorpion", blurb: "Represents intensity, transformation, and emotional depth." },
+  Sagittarius: { symbol: "The Archer", blurb: "Represents adventure, expansion, and optimism." },
+  Capricorn: { symbol: "The Goat", blurb: "Represents ambition, structure, and hard work." },
+  Aquarius: { symbol: "The Water Bearer", blurb: "Represents innovation, independence, and humanitarian ideas." },
+  Pisces: { symbol: "The Fish", blurb: "Represents imagination, empathy, and spiritual connection." },
+};
+
+/** What each element stands for, also hers. */
+const ELEMENT_THEME: Record<string, string> = {
+  Fire: "Action and Passion",
+  Earth: "Stability and Practicality",
+  Air: "Intellect and Communication",
+  Water: "Emotion and Intuition",
+};
 
 function readGeoCache(): Record<string, { lat: number; lon: number }> {
   try { return JSON.parse(readFileSync(GEO_CACHE, "utf8")); } catch { return {}; }
@@ -180,10 +204,13 @@ export async function getAstro(args: {
   // stay; the sentence waits for Kaycee's own words.
   const signs: Record<string, SignNote> = {};
   ZODIAC.forEach((name, i) => {
+    const el = ELEMENTS[i % 4];
     signs[name] = {
-      element: ELEMENTS[i % 4],
+      element: el,
       quality: QUALITIES[i % 3],
-      blurb: SIGN_NOTE[name] ?? "",
+      symbol: SIGN_NOTE[name]?.symbol ?? "",
+      blurb: SIGN_NOTE[name]?.blurb ?? "",
+      theme: ELEMENT_THEME[el] ?? "",
     };
   });
 

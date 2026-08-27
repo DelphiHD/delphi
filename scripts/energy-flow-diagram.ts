@@ -3770,8 +3770,11 @@ if (DATA.client) {
         if (t.getAttribute('data-asign')) {
           var nm = t.getAttribute('data-asign');
           var note = (A.signs || {})[nm] || {};
-          html = '<b>' + esc(nm) + '</b>' + pill(note.quality) + pill(note.element) +
-            (note.blurb ? '<br><span style="opacity:.72">' + esc(note.blurb) + '</span>' : '');
+          html = '<b>' + esc(nm) + (note.symbol ? ' &middot; ' + esc(note.symbol) : '') + '</b>' +
+            pill(note.quality) + pill(note.element) +
+            (note.blurb ? '<br><span style="opacity:.78">' + esc(note.blurb) + '</span>' : '') +
+            (note.theme ? '<br><span style="opacity:.5">' + esc(note.element) +
+              ' signs: ' + esc(note.theme.toLowerCase()) + '</span>' : '');
         } else {
           var pl = byName(t.getAttribute('data-aplanet'));
           if (!pl) { tip.hidden = true; return; }
