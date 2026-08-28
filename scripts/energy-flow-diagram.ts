@@ -2530,6 +2530,9 @@ body.show-bridges .bridge { opacity:1; }
 .bar.grp { margin-top:6px; }
 .bar.grp i { opacity:1; font-weight:600; letter-spacing:.05em; text-transform:uppercase; font-size:10px; }
 .bar.sub i { padding-left:9px; }
+.drop.bdry { margin-top:8px; }
+.bdrylist { list-style:disc; margin:4px 0 2px; padding-left:17px; }
+.bdrylist li { font-size:11px; line-height:1.65; opacity:.8; }
 .k-sign .bar { grid-template-columns:94px 1fr 26px; }
 .bar .track { height:7px; border-radius:4px; background:rgba(132,80,149,.14); overflow:hidden; }
 .bar .fill { height:100%; background:var(--purple); border-radius:4px; }
@@ -2988,7 +2991,17 @@ if (DATA.client) {
     // them on the chart and in the columns
     var table = function (title, rows, kind) {
       var max = Math.max.apply(null, rows.map(function (r) { return r[1]; }).concat([1]));
-      return '<details class="drop k-' + kind + '"><summary>' + title + '</summary>' + rows.map(function (r) {
+      // what each category counts, in plain terms, on the heading itself
+      var NOTE = {
+        line: 'Every activation sorted by its line number, 1 to 6. The line is the second number in a placement: in 12.4 the line is 4. Lines carry the same theme in any gate, so the shape of this list says something about how the whole design behaves.',
+        group: 'Every activation sorted by the circuit its gate belongs to. Individual keeps mutation, Tribal keeps support and bargain, Collective keeps sharing. Integration is the small group that serves survival of the self.',
+        center: 'Every activation sorted by the centre its gate sits in. All nine are listed. A centre showing zero has no activations at all, which is as much a fact about the design as a full one.',
+        sign: 'Every activation placed in the zodiac, grouped by element and heaviest first. The mandala and the zodiac are the same wheel, so each gate and line falls at an exact degree of a sign.'
+      };
+      var note = NOTE[kind] || '';
+      return '<details class="drop k-' + kind + '"><summary' +
+        (note ? ' data-help="' + esc(note) + '" data-help-label="' + esc(title) + '"' : '') +
+        '>' + title + '</summary>' + rows.map(function (r) {
         var pl = (r[2] || []).map(function (p) { return p.side + ':' + p.pid; }).join(',');
         return '<div class="bar' + (r[3] ? ' ' + r[3] : '') + '" data-kind="' + kind +
           '" data-key="' + esc(r[0]) + '" data-pl="' + pl + '">' +
@@ -3013,9 +3026,16 @@ if (DATA.client) {
     });
 
     var byCenter = tally(function (p) { return (L[p.gate] || {}).center; });
-    var centerRows = Object.keys(byCenter).sort(function (a, b) { return byCenter[b] - byCenter[a]; })
+    // All nine, including any centre carrying nothing. A centre with no
+    // activations is a fact about the chart, not an absence of data.
+    // the chart's own centre names, so "G / Identity" and "Ego / Heart" are not
+    // duplicated by a hardcoded "G" and "Heart" sitting at zero beside them
+    var ALL_CENTERS = (DATA.centers || []).map(function (c) { return c.name; });
+    var centerKeys = ALL_CENTERS.slice();
+    Object.keys(byCenter).forEach(function (k) { if (centerKeys.indexOf(k) < 0) centerKeys.push(k); });
+    var centerRows = centerKeys.sort(function (a, b) { return (byCenter[b] || 0) - (byCenter[a] || 0); })
       .map(function (k) {
-        return [k, byCenter[k], pick(function (p) { return (L[p.gate] || {}).center === k; })];
+        return [k, byCenter[k] || 0, pick(function (p) { return (L[p.gate] || {}).center === k; })];
       });
 
     var byGate = {};
@@ -3037,13 +3057,15 @@ if (DATA.client) {
     // the zodiac rather than by count, because that is the order she reads it in.
     // Sign is where the planet actually is. Whole numbers, no splitting.
     var ELEMENTS = [
-      ['Fire', ['Aries', 'Leo', 'Sagittarius']],
-      ['Earth', ['Taurus', 'Virgo', 'Capricorn']],
       ['Air', ['Gemini', 'Libra', 'Aquarius']],
+      ['Earth', ['Taurus', 'Virgo', 'Capricorn']],
+      ['Fire', ['Aries', 'Leo', 'Sagittarius']],
       ['Water', ['Cancer', 'Scorpio', 'Pisces']]
     ];
+    // U+FE0E, the text variation selector. Without it the zodiac characters
+    // render as colour emoji badges, the same thing that happened on the wheel.
     var glyphOf = {};
-    (DATA.zodiac || []).forEach(function (z) { glyphOf[z.name] = z.glyph; });
+    (DATA.zodiac || []).forEach(function (z) { glyphOf[z.name] = z.glyph + '\uFE0E'; });
     // Grouped by element, because the balance between the four is what gets read
     // first and counting it by hand off twelve rows is a chore. An element with
     // nothing in it is kept: a missing element says as much as a full one.
@@ -3051,10 +3073,14 @@ if (DATA.client) {
     ELEMENTS.forEach(function (e) {
       var inEl = pick(function (p) { return e[1].indexOf(p.sign) > -1; });
       signRows.push([e[0], inEl.length, inEl, 'grp']);
-      e[1].forEach(function (name) {
-        var list = pick(function (p) { return p.sign === name; });
-        if (list.length) signRows.push([(glyphOf[name] || '') + '  ' + name, list.length, list, 'sub']);
-      });
+      // every sign, heaviest first inside its element; a sign with nothing in it
+      // is as much a fact about the chart as one that is full
+      e[1].map(function (name) {
+        return [name, pick(function (p) { return p.sign === name; })];
+      }).sort(function (a, b) { return b[1].length - a[1].length; })
+        .forEach(function (r) {
+          signRows.push([(glyphOf[r[0]] || '') + '  ' + r[0], r[1].length, r[1], 'sub']);
+        });
     });
 
     // Twelve of the 384 gate-lines cross a sign boundary. Anything sitting on
@@ -3063,14 +3089,18 @@ if (DATA.client) {
     var onEdge = pick(function (p) { return !!p.onBoundary; });
     var transHtml = '';
     if (onEdge.length) {
-      transHtml = '<div class="cyc" data-kind="trans" data-key="On a sign boundary" data-pl="' +
+      // its own collapsed section, one placement per line, closed on opening:
+      // it is a footnote about twelve of the 384 gate-lines, not headline material
+      transHtml = '<details class="drop bdry"><summary>On a sign boundary &middot; ' +
+        onEdge.length + '</summary><div class="cyc" data-kind="trans" ' +
+        'data-key="On a sign boundary" data-pl="' +
         onEdge.map(function (p) { return p.side + ':' + p.pid; }).join(',') + '">' +
-        '<b>On a sign boundary &middot; ' + onEdge.length + '</b><span>' +
+        '<ul class="bdrylist">' +
         onEdge.map(function (p) {
-          return (p.side === 'design' ? 'D ' : 'P ') + p.planet + ' ' + p.gate + '.' + p.line +
-            ' (' + p.onBoundary.join('/') + ') falls in ' + p.sign + ' at ' +
-            Math.floor(p.signDeg) + '\u00b0';
-        }).join(' &middot; ') + '</span></div>';
+          return '<li>' + (p.side === 'design' ? 'D ' : 'P ') + esc(p.planet) + ' &middot; ' +
+            p.gate + '.' + p.line + ' &middot; ' + esc(p.onBoundary.join('/')) +
+            ' &middot; falls in ' + esc(p.sign) + ' at ' + Math.floor(p.signDeg) + '\u00b0</li>';
+        }).join('') + '</ul></div></details>';
     }
 
     // Conjunctions: two or more planets sharing a gate on the SAME side. The
@@ -3111,6 +3141,7 @@ if (DATA.client) {
     });
 
     var statTip = function (el, e) {
+      var pairedAlready = false;
       var keys = (el.dataset.pl || '').split(',').filter(Boolean);
       var list = keys.map(function (k) { return placeBy[k.split(':')[0] + '|' + k.split(':')[1]]; })
         .filter(Boolean);
@@ -3136,21 +3167,33 @@ if (DATA.client) {
           return n + ' ' + list.filter(function (p) { return p.sign === n; }).length;
         }).join(' &middot; ') : '';
       } else if (el.dataset.kind === 'sign') {
-        // where in the sign each one falls, which is the thing worth seeing
+        // gate and degree on the same line as the planet. These used to be two
+        // separate lists, planets-with-degrees above a bare list of gates, which
+        // left the reader matching them up by position.
         sub = list.map(function (p) {
-          return (p.side === 'design' ? 'D ' : 'P ') + p.planet + ' ' +
-            Math.floor(p.signDeg) + '\u00b0';
-        }).join(' &middot; ');
+          return (p.side === 'design' ? 'D ' : 'P ') + p.planet + ' &middot; ' +
+            p.gate + '.' + p.line + ' &middot; ' + Math.floor(p.signDeg) + '\u00b0';
+        }).join('<br>');
+        pairedAlready = true;
       } else if (el.dataset.kind === 'conj') {
         var g0 = list.length ? list[0].gate : null;
         var GL = g0 ? (DATA.gateLib || {})[g0] : null;
         if (GL) sub = esc(GL.name) + (GL.center ? ' &middot; ' + esc(GL.center) : '');
       }
-      var gl = list.map(function (p) { return p.gate + '.' + p.line; }).join(', ');
+      var gl = pairedAlready ? '' : list.map(function (p) { return p.gate + '.' + p.line; }).join(', ');
       showTip(e, '<b>' + esc(head) + '</b>' + (sub ? sub + '<br>' : '') +
-        (gl ? '<span style="opacity:.7">' + esc(gl) + '</span>' : 'None in this chart.'));
+        (gl ? '<span style="opacity:.7">' + esc(gl) + '</span>'
+            : (list.length ? '' : 'None in this chart.')));
     };
     document.getElementById('tab-stats').addEventListener('mousemove', function (e) {
+      // the category heading explains what its table counts
+      var sm = e.target.closest ? e.target.closest('summary[data-help]') : null;
+      if (sm) {
+        if (!pinned) { litGate(null); markRowsFor(null); }
+        showTip(e, '<b>' + esc(sm.getAttribute('data-help-label')) + '</b>' +
+          '<span style="opacity:.78">' + esc(sm.getAttribute('data-help')) + '</span>');
+        return;
+      }
       var el = e.target.closest ? e.target.closest('.bar, .cyc[data-pl]') : null;
       if (el) { statTip(el, e); return; }
       var g = e.target.closest ? e.target.closest('[data-gate]') : null;
