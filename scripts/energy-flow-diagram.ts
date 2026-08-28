@@ -769,6 +769,8 @@ const cleanProse = (paras: string[]): string =>
     .join("\n\n");
 
 interface ReportText {
+  /** gate -> the Planetary Overview's prose for that conjunction */
+  conjunctions: Record<number, string>;
   centers: Record<string, string>;    // center id -> prose
   channels: Record<string, string>;   // "low-high" -> prose
   gates: Record<string, string>;      // "personality|Sun" -> prose
@@ -795,7 +797,7 @@ function centerFromHeading(label: string): Center | null {
 function loadReports(
   slug: string, name: string, outDir: string, freq: { signature: string; notSelf: string },
 ): ReportText {
-  const out: ReportText = { centers: {}, channels: {}, gates: {}, props: {}, cycles: [] };
+  const out: ReportText = { centers: {}, channels: {}, gates: {}, props: {}, cycles: [], conjunctions: {} };
 
   const foundation = reportPath(slug, name, outDir, "foundation");
   if (foundation) {
@@ -890,6 +892,18 @@ function loadReports(
       const side = m[1] === "P" ? "personality" : "design";
       out.gates[`${side}|${m[2].trim()}`] = cleanProse(sectionParas(lines, i + 1));
     }
+    // The Conjunctions chapter: one H2 per gate holding two or more planets on
+    // the same side, headed "## Gate 12: Standstill | P-Sun, P-North Node". The
+    // stats panel lists those gates; this is what it should say when one opens.
+    let inConj = false;
+    for (let i = 0; i < lines.length; i++) {
+      const h1 = lines[i].match(/^#\s+(.+?)\s*$/);
+      if (h1) { inConj = /^conjunctions?$/i.test(h1[1].trim()); continue; }
+      if (!inConj) continue;
+      const g = lines[i].match(/^##\s+Gate\s+(\d{1,2})\b/i);
+      if (g) out.conjunctions[Number(g[1])] = cleanProse(sectionParas(lines, i + 1));
+    }
+
     // the cross also has its own chapter here, with the profile-on-cross piece
     // the Foundation report does not always carry
     const crossParts: string[] = [];
@@ -2183,6 +2197,7 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
     })) } : null,
     natalGates: d.client ? [...new Set(d.client.acts.map((a) => a.gate))].sort((a, b) => a - b) : [],
     zodiac: ZODIAC.map((z) => ({ name: z, glyph: ZODIAC_GLYPH[z] })),
+    conjunctionText: d.client?.report.conjunctions ?? {},
     signsByGate: SIGNS_BY_GATE,
     planets: PLANET_ROWS.map((p) => ({ id: planetId(p), name: p })),
     functions: FUNCTION_ORDER.map((f) => ({ name: f, color: FUNCTIONS[f] })),
@@ -3137,7 +3152,23 @@ if (DATA.client) {
       conjHtml;
     document.getElementById('tab-stats').addEventListener('click', function (e) {
       var el = e.target.closest ? e.target.closest('[data-gate]') : null;
-      if (el) openCard(el, gateLibHtml(+el.dataset.gate), null, +el.dataset.gate);
+      if (!el) return;
+      var g = +el.dataset.gate;
+      // a conjunction opens what the Planetary Overview wrote about it. The gate
+      // library is the fallback for charts whose Planetary has no such chapter.
+      if (el.dataset.kind === 'conj') {
+        var ct = (DATA.conjunctionText || {})[g];
+        if (ct) {
+          openCard(el, '<h3>' + esc(el.dataset.key || ('Gate ' + g)) + '</h3>' +
+              ct.split(String.fromCharCode(10, 10)).map(function (para) {
+              return para.charAt(0) === '\u00a7'
+                ? '<h4>' + esc(para.slice(1)) + '</h4>'
+                : '<p>' + esc(para) + '</p>';
+            }).join(''), null, g);
+          return;
+        }
+      }
+      openCard(el, gateLibHtml(g), null, g);
     });
 
     var statTip = function (el, e) {
