@@ -1251,6 +1251,25 @@ export function validateReport(text: string, dp: DataPass, tier: ReportTier = "f
     }
   }
 
+  // A fixing state buried in a long sentence. Not a correctness problem: a
+  // reading one, and the one Kaycee says makes people stop reading. Measured
+  // across 41 Foundation reports, the 727 sentences carrying a fixing state ran
+  // 27.9 words against 20.4 for everything else, with 162% more technical
+  // vocabulary. Soft, because the sentence is not wrong, only heavy.
+  for (const sent of text.split(/(?<=[.!?])\s+/)) {
+    const t = sent.replace(/\s+/g, " ").trim();
+    if (!/\b(exalted|in detriment)\b/i.test(t)) continue;
+    if (/^[#\-`|]/.test(t) || t.includes("|")) continue;   // headers and placement lines are exempt
+    const words = t.split(/\s+/).length;
+    if (words <= 30) continue;
+    pushSoft({
+      section: "(any)",
+      rule: "fixation-sentence-long",
+      message: `A sentence carrying a fixing state runs ${words} words. Give the fixing state its own short sentence.`,
+      detected: t.slice(0, 240),
+    });
+  }
+
   // 7. Em dashes (should be 0 after post-process; flag if any survive).
   const emDashCount = (text.match(/—/g) ?? []).length;
   if (emDashCount > 0) {
