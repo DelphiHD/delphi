@@ -80,3 +80,18 @@ Stellium (12.4°): Sun, Mercury, Uranus, Neptune in Capricorn (1st House-12th Ho
 
 Note the Ascendant counts in the element and polarity tallies (Kaycee's example
 lists it under Earth), and the distributions therefore total 12, not 11.
+
+---
+
+## The examples are formats, not data
+
+**Kaycee, 2026-08-28: chart2txt.com miscalculates incarnation crosses. Our data
+is good.**
+
+These examples show the SHAPE of the output: section names, separators, column
+pairing, ordering. Every value comes from our own Data Pass, which is computed
+from the chart API and is the authority for this product.
+
+**Do not validate our output against chart2txt's numbers, and never "correct"
+ours to match theirs.** If a value differs, ours is the one to trust unless
+Kaycee says otherwise. The incarnation cross in particular is known to differ.

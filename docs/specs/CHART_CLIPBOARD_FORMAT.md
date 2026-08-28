@@ -72,3 +72,18 @@ Uranus: 38.6    Neptune: 54.2    Pluto: 43.3
 - **HANGING GATES** are gates that do not complete a channel, and repeat in the
   [GATES] block.
 - Centre naming follows this example: "Ego", "G Center", "Solar Plexus".
+
+---
+
+## The examples are formats, not data
+
+**Kaycee, 2026-08-28: chart2txt.com miscalculates incarnation crosses. Our data
+is good.**
+
+These examples show the SHAPE of the output: section names, separators, column
+pairing, ordering. Every value comes from our own Data Pass, which is computed
+from the chart API and is the authority for this product.
+
+**Do not validate our output against chart2txt's numbers, and never "correct"
+ours to match theirs.** If a value differs, ours is the one to trust unless
+Kaycee says otherwise. The incarnation cross in particular is known to differ.
