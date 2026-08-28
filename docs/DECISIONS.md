@@ -407,3 +407,18 @@ So the levers are on the output side, where they belong:
   would suppress real ones on a heavy chart (Lisa has 13).
 - `fixation-claimed-without-fixing` — hard, catches the 10%: a fixing state
   claimed on a placement that has none.
+
+---
+
+## Conjunctions on the chart: shown in full, written up in part (2026-08-27)
+
+The stats panel lists every gate holding two or more planets on the same side.
+The Planetary Overview only writes up the ones its source material covers, so on
+Kaycee's chart five conjunctions are listed and three have prose. The other two
+open the gate library instead of opening empty.
+
+**That fallback is deliberate. Do not hide the unwritten conjunctions.** They are
+real features of the chart and Kaycee wants them visible; what is missing is the
+astrology material to say what they mean, which is hers to gather. Kaycee,
+2026-08-27: "I'm sure they have impacts, but I'll have to dig through the
+astrology literature to identify them. Good enough for now."
