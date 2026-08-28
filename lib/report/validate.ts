@@ -1251,23 +1251,74 @@ export function validateReport(text: string, dp: DataPass, tier: ReportTier = "f
     }
   }
 
-  // A fixing state buried in a long sentence. Not a correctness problem: a
-  // reading one, and the one Kaycee says makes people stop reading. Measured
-  // across 41 Foundation reports, the 727 sentences carrying a fixing state ran
-  // 27.9 words against 20.4 for everything else, with 162% more technical
-  // vocabulary. Soft, because the sentence is not wrong, only heavy.
-  for (const sent of text.split(/(?<=[.!?])\s+/)) {
-    const t = sent.replace(/\s+/g, " ").trim();
-    if (!/\b(exalted|in detriment)\b/i.test(t)) continue;
-    if (/^[#\-`|]/.test(t) || t.includes("|")) continue;   // headers and placement lines are exempt
-    const words = t.split(/\s+/).length;
-    if (words <= 30) continue;
-    pushSoft({
-      section: "(any)",
-      rule: "fixation-sentence-long",
-      message: `A sentence carrying a fixing state runs ${words} words. Give the fixing state its own short sentence.`,
-      detected: t.slice(0, 240),
-    });
+  // Fixation claimed where the chart has none.
+  //
+  // Kaycee, 2026-08-27: "I don't ever want the model to talk about fixations if
+  // there is no fixation on that gate." Arithmetic, not judgement. Every
+  // activation carries its fixing state and most carry none: Brett Bradshaw has
+  // 52 activations, 5 exalted, 1 in detriment, 46 neutral. A sentence claiming a
+  // fixation while naming only neutral placements describes something that is
+  // not in this chart.
+  {
+    const fixedLine = new Set<string>();
+    const fixedGate = new Set<number>();
+    for (const row of [...(dp.personalityActivations ?? []), ...(dp.designActivations ?? [])]) {
+      if (row.fixingState === "Exalted" || row.fixingState === "Detriment") {
+        fixedLine.add(`${row.gate}.${row.line}`);
+        fixedGate.add(row.gate);
+      }
+    }
+    for (const sent of text.split(/(?<=[.!?])\s+/)) {
+      const t = sent.replace(/\s+/g, " ").trim();
+      if (!/\b(exalted|exaltation|in detriment)\b/i.test(t)) continue;
+      if (/^[#\-`|]/.test(t) || t.includes("|")) continue;
+      const lineRefs = [...t.matchAll(/\b(\d{1,2})\.(\d)\b/g)].map((m) => `${m[1]}.${m[2]}`);
+      const gateRefs = [...t.matchAll(/\bGate\s+(\d{1,2})\b/gi)].map((m) => Number(m[1]));
+      if (!lineRefs.length && !gateRefs.length) continue;
+      if (lineRefs.some((k) => fixedLine.has(k)) || gateRefs.some((g) => fixedGate.has(g))) continue;
+      const named = [...new Set([...lineRefs, ...gateRefs.map(String)])].join(", ");
+      pushHard({
+        section: "(any)",
+        rule: "fixation-claimed-without-fixing",
+        message: `Prose claims a fixing state, but no placement it names carries one (${named}). ` +
+          `Do not discuss exaltation or detriment for a gate that has neither.`,
+        detected: t.slice(0, 240),
+        expected: "no fixing state on the placements named in this sentence",
+      });
+    }
+  }
+
+  // Fixation mentioned more often than the chart has fixings.
+  //
+  // Kaycee, 2026-08-27: fixation prose is "the least important fucking thing"
+  // and the main reason readers stop. She had trained it down by hand, v1 to v2
+  // on the same chart went 11 mentions to 9, and a prompt change pushed it back
+  // to 14. A cap makes that structural rather than a habit that has to be
+  // retrained: each fixing may be mentioned once, and a chart with six fixings
+  // cannot carry nine mentions of them.
+  {
+    const fixings = [...(dp.personalityActivations ?? []), ...(dp.designActivations ?? [])]
+      .filter((r) => r.fixingState === "Exalted" || r.fixingState === "Detriment").length;
+    let mentions = 0;
+    let firstOver = "";
+    for (const sent of text.split(/(?<=[.!?])\s+/)) {
+      const t = sent.replace(/\s+/g, " ").trim();
+      if (/^[#\-`|]/.test(t) || t.includes("|")) continue;   // headers and placement lines carry the fact
+      const n = (t.match(/\b(exalted|exaltation|in detriment)\b/gi) ?? []).length;
+      if (!n) continue;
+      mentions += n;
+      if (!firstOver && mentions > fixings) firstOver = t.slice(0, 200);
+    }
+    if (mentions > fixings) {
+      pushHard({
+        section: "(any)",
+        rule: "fixation-over-mentioned",
+        message: `Fixation is mentioned ${mentions} times in prose; this chart has ${fixings} fixings. ` +
+          `Mention each fixing once at most, where it changes the reading. It is the least important thing on the page.`,
+        detected: firstOver || "(count exceeded)",
+        expected: `at most ${fixings} mentions`,
+      });
+    }
   }
 
   // 7. Em dashes (should be 0 after post-process; flag if any survive).
