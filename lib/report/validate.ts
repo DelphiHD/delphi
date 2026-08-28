@@ -1321,6 +1321,44 @@ export function validateReport(text: string, dp: DataPass, tier: ReportTier = "f
     }
   }
 
+  // A planet from the source's teaching apparatus, named inside a placement
+  // section that does not carry a fixing.
+  //
+  // Kaycee has asked for this for months and been told repeatedly that the rule
+  // was in place. It was, in planetary.ts, and it never held, because every
+  // example it forbade was the HEDGED form ("which the chart does not carry").
+  // The validator caught hedges too. So the model learned to drop the hedge and
+  // state it flat: "Jupiter in this line describes the faith that darkness
+  // eventually destroys itself." No hedge, no fixing word, rule technically
+  // unbroken, and the reader is left accounting for a planet that is nowhere in
+  // their chart. Instructions cannot win this; arithmetic can.
+  //
+  // The source describes a line by walking its exalted and detriment poles and
+  // naming the planet at each. That range is the reader's. The planets are not.
+  {
+    const PLANET = "(Sun|Earth|Moon|Mercury|Venus|Mars|Jupiter|Saturn|Uranus|Neptune|Pluto)";
+    const tied = new RegExp(
+      `\\b${PLANET}\\s+(?:in this line|in this position|at this line|in the line|here|exalted|in detriment)\\b`, "gi");
+    for (const sec of text.split(/\n(?=## )/)) {
+      const head = sec.split("\n", 1)[0];
+      const own = /^##\s+[PD]-(\w[\w ]*?)\s*\|/.exec(head);
+      if (!own) continue;                                   // not a placement section
+      if (/\|\s*(Exalted|Detriment)\s*\|/i.test(head)) continue;   // this placement has a fixing; it may name it
+      const body = sec.slice(head.length);
+      for (const m of body.matchAll(tied)) {
+        if (m[1].toLowerCase() === own[1].trim().toLowerCase()) continue;  // its own planet is fine
+        pushHard({
+          section: head.slice(0, 60),
+          rule: "foreign-planet-in-neutral-placement",
+          message: `"${m[0]}" names a planet this placement does not carry, in a section with no fixing state. ` +
+            `Describe the line's spectrum without naming the planets that mark its poles.`,
+          detected: body.slice(Math.max(0, (m.index ?? 0) - 60), (m.index ?? 0) + 150).replace(/\s+/g, " "),
+          expected: `only ${own[1].trim()} may be named in this section`,
+        });
+      }
+    }
+  }
+
   // 7. Em dashes (should be 0 after post-process; flag if any survive).
   const emDashCount = (text.match(/—/g) ?? []).length;
   if (emDashCount > 0) {

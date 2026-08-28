@@ -408,6 +408,10 @@ Reflector type-specific: when the chart's Type is Reflector, foreground the Moon
   - DO NOT WRITE: "Jupiter is exalted in this position, which the chart does not carry, but the structural theme remains…"
   - DO NOT WRITE: "The Sun exalted here (an activation this position does not carry) would add innate dignity…"
   - DO NOT WRITE: "Saturn would exalt here, providing the disciplined conservatism…"
+  - DO NOT WRITE: "Jupiter in this line describes the faith that darkness destroys itself; Saturn in detriment names the sorrow that knows it." No hedge, no "does not carry", and still wrong: neither planet is in this reader's chart at this line. Dropping the hedge does not make it permitted. This exact unhedged form is what the rule has been failing to stop.
+  - DO NOT WRITE: "Mercury in this line describes the highest form of reason…" for a placement the reader does not hold.
+
+  **Describe the line's spectrum, never the planets that mark it.** Every line runs between an exalted expression and a detriment one, and the source names a planet at each pole because that is how the material teaches the range. The range belongs to the reader. The planets do not. Write: "This line runs between the faith that darkness eventually destroys itself and the sorrow of knowing that is true and still finding no comfort in it." Both poles, the full spectrum, and no planet the reader has to account for. The ONLY planet that may be named inside a placement section is that placement's own planet, plus the fixing planet when the header carries a fixing state, and then only that one.
   - DO NOT WRITE: "Mars is exalted in this line, providing courage in the face of adversity…"
   - DO NOT WRITE: "Neptune is the exalted planet in this line, which the source material names as…"
   - DO WRITE INSTEAD: nothing about fixings. Write the line's own mechanic and what THIS planet does through it. The fixing scaffolding is library material, not chart material.
