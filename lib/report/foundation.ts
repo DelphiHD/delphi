@@ -370,6 +370,26 @@ interface SectionPlan {
   name: string;
   maxTokens: number;
   userInstruction: string;
+  /** What this call was told to render, checked against what it returned.
+   *
+   *  The validator only sees the whole report, so a call that quietly drops one
+   *  of the items it was handed cannot be blamed for it until every call is
+   *  done, by which point no call owns the failure and nothing retries. Lisa
+   *  Bradshaw's Foundation was handed her five defined centers, rendered four,
+   *  and said in its own orientation paragraph that there were five. Returns
+   *  the labels that are missing; empty means complete. */
+  expect?: (text: string) => string[];
+}
+
+/** Center names as H3 headings: "### Spleen | Intuitive Awareness | Defined". */
+function missingCenters(text: string, names: string[]): string[] {
+  const heads = [...text.matchAll(/^###\s+([^|\n]+?)\s*\|/gm)].map((m) => m[1].trim().toLowerCase());
+  return names.filter((n) => {
+    const want = n.trim().toLowerCase();
+    // "G" is written as "G", "G Center" or "G / Identity" depending on the call
+    const stem = want.replace(/\s*(center|centre)$/, "").split("/")[0].trim();
+    return !heads.some((h) => h === want || h.startsWith(stem));
+  });
 }
 
 function planForLength(length: ReportLength, clientName: string, dataPass: DataPass): SectionPlan[] {
@@ -498,6 +518,7 @@ ${wordTargetSuffix(3500, 4500)}`,
     {
       name: "defined-centers",
       maxTokens: 7000,
+      expect: (t: string) => missingCenters(t, definedCenters),
       userInstruction: `Continue the Foundation Report for ${clientName}. Open the Centers section and render the DEFINED centers only:
 
   # Your Centers
@@ -514,6 +535,7 @@ Do NOT include Undefined or Open centers in this call (they get their own call).
     {
       name: "undefined-open-centers",
       maxTokens: 6000,
+      expect: (t: string) => missingCenters(t, [...undefinedCenters, ...openCenters]),
       userInstruction: `Continue the Foundation Report for ${clientName}. Render the Undefined and Open centers (continuation of the Centers H1 from the previous call; do NOT repeat the # Your Centers H1).
 
   ## Undefined Centers
@@ -653,9 +675,19 @@ export async function buildFoundationReport(args: BuildArgs): Promise<BuildResul
         if (i.section === "(any)") return !priorIssueKeys.has(priorKey(i));
         return false;
       });
-      if (blames.length === 0) break;
+      // What this call was told to render but did not. Checked alongside the
+      // validator's own complaints, because an omission is cheap to detect here
+      // and impossible to attribute later: once every call has run, no single
+      // call owns a missing center and nothing retries it.
+      const absent = section.expect ? section.expect(text) : [];
+      if (blames.length === 0 && absent.length === 0) break;
 
-      const failsForRetry = blames.slice(0, 6).map((i) => `  - ${i.rule}: ${i.message}${i.expected ? ` (Expected: ${i.expected})` : ""}`).join("\n");
+      const failsForRetry = [
+        ...absent.map((label) =>
+          `  - omitted: "${label}" was in the list this call was given and never appeared in the output. ` +
+          `Render every item on that list, this one included.`),
+        ...blames.slice(0, 6).map((i) => `  - ${i.rule}: ${i.message}${i.expected ? ` (Expected: ${i.expected})` : ""}`),
+      ].join("\n");
       const attemptLabel = attempt === 0 ? "first retry" : `retry #${attempt + 1}`;
       const nudge = `\n\nIMPORTANT (${attemptLabel}): a validator just rejected a draft of this section with the following hard failures. Rewrite the section from scratch correcting EVERY failure. The Data Pass above is canonical. Pay attention to every banned-phrase / drift / sentence-shape rule, even ones that the prompt only describes by example — those examples are anchors, not the literal set of forbidden strings. Do not introduce new failures of the same kind.\n${failsForRetry}\n`;
       const retry = await generateSection(section, nudge);
