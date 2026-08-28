@@ -376,3 +376,34 @@ ever.
 
 Verified by restarting the server repeatedly during live batches, including
 Kaycee's own test run.
+
+---
+
+## The source library is never filtered (Kaycee, 2026-08-27)
+
+**Non-negotiable. Do not strip, trim, or filter the source material before it
+reaches the model, for any reason.** She has been down this road before and the
+answer is settled.
+
+Recorded because it is an attractive-looking idea that will occur again. 309 of
+the 384 line-level chunks carry exaltation and detriment prose naming the fixing
+planets, because that is how Ra's line material is written. When the model writes
+about a fixing on a placement that carries none, the library sitting in the
+prompt looks like the culprit, and "just don't send that passage for neutral
+placements" looks clean. It is not on the table.
+
+**And the measurement does not support the theory anyway.** Attributed at
+paragraph level across 33 reports: of 650 fixation mentions, 88% sit in a
+paragraph about a placement that genuinely has a fixing, 10% about one that does
+not, 1% floating. The model is not mostly riffing on phantom fixing planets. It
+is talking about real fixings two and a half times more often than it needs to:
+211 fixings across the roster, 518 mentions.
+
+So the levers are on the output side, where they belong:
+
+- `fixation-over-mentioned` — hard, caps mentions at one per fixing in the chart.
+  Removes 307 of 518 mentions roster-wide and loses no fixation. Proportional per
+  chart, because charts carry between 2 and 13 fixings and an absolute ceiling
+  would suppress real ones on a heavy chart (Lisa has 13).
+- `fixation-claimed-without-fixing` — hard, catches the 10%: a fixing state
+  claimed on a placement that has none.
