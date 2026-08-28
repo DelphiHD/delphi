@@ -1299,10 +1299,19 @@ export function validateReport(text: string, dp: DataPass, tier: ReportTier = "f
   {
     const fixings = [...(dp.personalityActivations ?? []), ...(dp.designActivations ?? [])]
       .filter((r) => r.fixingState === "Exalted" || r.fixingState === "Detriment").length;
+    // The Planetary carries standing chapters that teach the reader what these
+    // words mean ("Exaltations & Detriments", "How To Read This Report"). Those
+    // mentions are boilerplate, not the model dwelling on a placement, and
+    // counting them made every Planetary fail the cap on arrival.
+    const EXPLAINER = /^##\s+(Exaltations?|How To Read|Your Imprint|The Lines|Time & Space)/i;
     let mentions = 0;
     let firstOver = "";
+    let inExplainer = false;
     for (const sent of text.split(/(?<=[.!?])\s+/)) {
       const t = sent.replace(/\s+/g, " ").trim();
+      const head = /^##\s+/.test(t);
+      if (head) inExplainer = EXPLAINER.test(t);
+      if (inExplainer) continue;
       if (/^[#\-`|]/.test(t) || t.includes("|")) continue;   // headers and placement lines carry the fact
       const n = (t.match(/\b(exalted|exaltation|in detriment)\b/gi) ?? []).length;
       if (!n) continue;
