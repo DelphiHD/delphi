@@ -234,3 +234,31 @@ and that check is the reason the report never reached her as a deliverable.
 **Do not weaken that rule.** A missing center is a hard failure whatever its
 state, and an open center with no activations still gets its own section: the
 open-center mechanic, conditioning, wisdom and challenges.
+
+---
+
+## Reaching gates yes, phantom paragraphs no (Kaycee, 2026-08-27)
+
+The `neutral-placement-exaltation-hedge` rules exist because the model was
+writing **whole paragraphs about gates the chart does not have**. Not a passing
+mention: sustained prose about what a gate would do if the partner were there.
+
+**Naming the reaching gate is correct and stays.** A hanging gate hangs because
+its partner is absent, and the reader cannot understand the mechanic without
+knowing which gate it reaches toward. "Without Gate 63 completing the channel,
+this pressure has no internal circuit" is the explanation, not the problem.
+
+What was banned is dwelling: paragraphs of hypothetical, and the hedging
+constructions that introduce them ("which this chart does not carry", "but the
+structural theme remains"). Do not widen these rules into a ban on mentioning a
+partner gate, and do not delete them as redundant. Absence prose now measures
+1-2% of a report **because** the rule is holding, not because it was never a
+problem.
+
+**Related, and unsolved.** Kaycee, same day: fixation prose is "probably the
+number one thing that people complain about that makes them stop reading". Across
+41 Foundation reports, the 727 sentences containing exalted/detriment run 37%
+longer than the rest (27.9 words vs 20.4) and carry 162% more technical
+vocabulary. The problem is sentence shape rather than vocabulary: fixation
+content arrives as a subordinate clause bolted onto an already long sentence. A
+ban on the words would not fix it. Left as is by her decision, 2026-08-27.
