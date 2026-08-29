@@ -2087,6 +2087,7 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
     <div class="row" id="actrow" hidden>
       <button id="reset" class="gold" data-help="Clears every highlight and selection and returns the chart to how it opened." data-help-label="Reset">Reset</button>
       <button id="snap" data-help="Downloads the chart exactly as it appears now, including whatever you have highlighted." data-help-label="Save Image">Save Image</button>
+      <button id="copytxt" data-help="Copies the data currently on screen as plain text, ready to paste anywhere. Chart data only, never report writing." data-help-label="Copy chart data">Copy chart data</button>
     </div>`;
   const face = [...fonts.entries()].map(([w, buf]) =>
     `@font-face{font-family:Montserrat;font-style:normal;font-weight:${w};font-display:swap;` +
@@ -3786,6 +3787,166 @@ if (DATA.client) {
   document.getElementById('vMandala').onclick = function () { view('mandala'); };
   var vt0 = document.getElementById('vTransit');
   if (vt0) vt0.onclick = function () { view('transit'); };
+  // ---- copy what is on screen, as plain text -------------------------------
+  // Chart data only. Never report prose. The format follows chart2txt's shape
+  // because it pastes cleanly anywhere, but every value comes from our own Data
+  // Pass: chart2txt miscalculates incarnation crosses and is not a reference.
+  (function () {
+    var btn = document.getElementById('copytxt');
+    if (!btn) return;
+
+    var NL = String.fromCharCode(10);
+    var metaOf = function (key) {
+      var m = ((DATA.client || {}).meta || []).filter(function (x) { return x.key === key; })[0];
+      return m ? m.value : '';
+    };
+    var titleCase = function (t) {
+      return String(t).split(' ').map(function (w) {
+        return w ? w.charAt(0).toUpperCase() + w.slice(1) : w;
+      }).join(' ');
+    };
+    var centreName = function (id) {
+      var c = (DATA.centers || []).filter(function (x) { return x.id === id; })[0];
+      return c ? c.name : titleCase(id.replace('-', ' '));
+    };
+
+    var hdText = function () {
+      var C = DATA.client || {}, L = [];
+      var push = function (x) { L.push(x); };
+      push('[METADATA]'); push('chart_type: human_design'); push('');
+      push('[CHART: ' + C.name + ']');
+      push('[BIRTHDATA] ' + (C.dates || {}).place + ' | ' + (C.dates || {}).birth);
+      push('');
+      push('[TYPE]');
+      ['type', 'strategy', 'authority', 'definition', 'profile', 'cross'].forEach(function (k) {
+        var v = metaOf(k);
+        if (!v) return;
+        var label = k === 'cross' ? 'Incarnation Cross' : titleCase(k);
+        push(label + ': ' + v);
+      });
+      var isl = C.islands || [];
+      if (isl.length > 1) {
+        push('Definition Islands: ' + isl.map(function (grp) {
+          return '[' + grp.map(centreName).join('+') + ']';
+        }).join(' + '));
+      }
+      push('');
+      push('[CENTERS]');
+      ['defined', 'undefined', 'open'].forEach(function (st) {
+        var names = (DATA.centers || []).filter(function (c) { return c.state === st; })
+          .map(function (c) { return c.name; });
+        if (names.length) push(titleCase(st) + ': ' + names.join(', '));
+      });
+      // client.channelList is what this chart actually carries; DATA.channels is
+      // all 36 with the geometry. Cross-reference so we print only her own.
+      var mine = {};
+      ((C.channelList) || []).forEach(function (c) { mine[c.key] = true; });
+      var chans = (DATA.channels || []).filter(function (c) { return mine[c.key]; });
+      if (chans.length) {
+        push(''); push('[CHANNELS]');
+        chans.forEach(function (c) {
+          var nm = String(c.name || '');
+          var colon = nm.indexOf(': ');
+          if (colon > -1) nm = nm.slice(colon + 2);
+          if (nm.indexOf('The Channel of ') === 0) nm = nm.slice(15);
+          push(c.key + ' (' + nm + '): ' + c.from + ' <-> ' + c.to);
+        });
+      }
+      var byGate = {};
+      (DATA.placements || []).forEach(function (p) {
+        var g = byGate[p.gate] = byGate[p.gate] || { name: p.gateName, sides: {} };
+        g.sides[p.side] = true;
+      });
+      var gateNums = Object.keys(byGate).map(Number).sort(function (a, b) { return a - b; });
+      var hanging = (DATA.natalGates || []);
+      if (hanging.length) {
+        push(''); push('[HANGING GATES]');
+        push('(Gates not part of a complete channel)');
+        hanging.slice().sort(function (a, b) { return a - b; }).forEach(function (g) {
+          var lib = (DATA.gateLib || {})[g] || {};
+          push(g + ': ' + (byGate[g] ? byGate[g].name : (lib.name || '')) + ' | ' + (lib.center || ''));
+        });
+      }
+      push(''); push('[GATES]');
+      gateNums.forEach(function (g) {
+        var e = byGate[g], lib = (DATA.gateLib || {})[g] || {};
+        var side = e.sides.personality && e.sides.design ? 'Both'
+          : e.sides.personality ? 'Personality' : 'Design';
+        push(g + ': ' + e.name + ' | ' + (lib.center || '') + ' (' + side + ')');
+      });
+      ['personality', 'design'].forEach(function (side) {
+        var rows = (DATA.placements || []).filter(function (p) { return p.side === side; });
+        if (!rows.length) return;
+        push(''); push('[' + side.toUpperCase() + ' ACTIVATIONS]');
+        var at = {};
+        rows.forEach(function (p) { at[p.planet] = p.gate + '.' + p.line; });
+        var pair = function (a, b) {
+          if (!at[a] && !(b && at[b])) return null;
+          var left = a + ': ' + (at[a] || '-');
+          return (b && at[b]) ? left + '    ' + b + ': ' + at[b] : left;
+        };
+        [pair('Sun', 'Earth'), pair('Moon', ''), pair('North Node', 'South Node'),
+         pair('Mercury', 'Venus'), pair('Mars', 'Jupiter'), pair('Saturn', 'Uranus'),
+         pair('Neptune', 'Pluto')].forEach(function (r) { if (r) push(r); });
+      });
+      return L.join(NL);
+    };
+
+    var astroText = function () {
+      var A = DATA.astro || {}, C = DATA.client || {}, L = [];
+      var deg = function (v) {
+        var d = Math.floor(v), m = Math.round((v - d) * 60);
+        if (m === 60) { d += 1; m = 0; }
+        return d + '\u00b0' + (m < 10 ? '0' : '') + m + "'";
+      };
+      var SIGN = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
+        'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
+      var signAt = function (abs) { return SIGN[Math.floor(abs / 30) % 12] + ' ' + deg(abs % 30); };
+      L.push('[METADATA]'); L.push('chart_type: natal'); L.push('');
+      L.push('[CHART: ' + C.name + ']');
+      L.push('[BIRTHDATA] ' + (C.dates || {}).place + ' | ' + (C.dates || {}).birth);
+      L.push('');
+      L.push('[ANGLES]');
+      L.push('Ascendant: ' + signAt(A.ascendant || 0));
+      L.push('Midheaven: ' + signAt(A.mc || 0));
+      if ((A.houses || []).length) {
+        L.push(''); L.push('[HOUSE CUSPS]');
+        A.houses.forEach(function (h, i) { L.push((i + 1) + ': ' + h.sign + ' ' + deg(h.position)); });
+      }
+      L.push(''); L.push('[PLANETS]');
+      (A.planets || []).forEach(function (p) {
+        L.push((p.label || p.name) + ': ' + deg(p.position) + ' ' + p.sign +
+          (p.house ? ', ' + p.house.replace(/_/g, ' ') : ''));
+      });
+      var asp = (A.aspects || []).filter(function (x) { return x.aspect !== 'conjunction' || true; });
+      if (asp.length) {
+        L.push(''); L.push('[ASPECTS]');
+        asp.slice().sort(function (a, b) { return Math.abs(a.orbit) - Math.abs(b.orbit); })
+          .forEach(function (x) {
+            L.push(x.p1_name.replace(/_/g, ' ') + ' ' + x.aspect + ' ' +
+              x.p2_name.replace(/_/g, ' ') + ': ' + Math.abs(x.orbit).toFixed(1) + '\u00b0');
+          });
+      }
+      return L.join(NL);
+    };
+
+    btn.onclick = function () {
+      var txt = body.classList.contains('view-astro') ? astroText() : hdText();
+      var done = function (ok) {
+        btn.textContent = ok ? 'Copied' : 'Press Cmd C';
+        setTimeout(function () { btn.textContent = 'Copy chart data'; }, 2000);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(function () { done(true); }, function () { done(false); });
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = txt; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); done(true); } catch (err) { done(false); }
+        document.body.removeChild(ta);
+      }
+    };
+  })();
+
   var va0 = document.getElementById('vAstro');
   if (va0) va0.onclick = function () { view('astro'); };
 
