@@ -105,8 +105,8 @@ export function renderWheel(chart: AstroChart, name: string): string {
     const next = chart.houses[(i + 1) % 12].abs_pos;
     const mid = h.abs_pos + (((next - h.abs_pos) % 360) + 360) % 360 / 2;
     const [nx, ny] = pt(mid, asc, (R_HOUSE + R_ASPECT) / 2);
-    s.push(`<text x="${f(nx)}" y="${f(ny + 4)}" text-anchor="middle" font-size="11" ` +
-      `fill="${INK}" opacity=".55">${i + 1}</text>`);
+    s.push(`<text class="hnum" data-house="${i + 1}" x="${f(nx)}" y="${f(ny + 4)}" ` +
+      `text-anchor="middle" font-size="11" fill="${INK}" opacity=".55">${i + 1}</text>`);
   });
 
   // Aspects, drawn as chords inside. Two things get left out. Conjunctions,
@@ -152,8 +152,9 @@ export function renderWheel(chart: AstroChart, name: string): string {
   const angles: [string, number][] = [["As", asc], ["Ds", asc + 180], ["Mc", chart.mc], ["Ic", chart.mc + 180]];
   for (const [label, lon] of angles) {
     const [x, y] = pt(lon, asc, R_OUT + 16);
-    s.push(`<text x="${f(x)}" y="${f(y + 4)}" text-anchor="middle" font-size="12" ` +
-      `font-weight="600" fill="${PURPLE}" letter-spacing=".06em">${label}</text>`);
+    s.push(`<text class="angle" data-angle="${label}" x="${f(x)}" y="${f(y + 4)}" ` +
+      `text-anchor="middle" font-size="12" font-weight="600" fill="${PURPLE}" ` +
+      `letter-spacing=".06em">${label}</text>`);
   }
   // Nothing in the middle. The chords are the point of the middle, and a label
   // sitting on top of them makes them impossible to follow.

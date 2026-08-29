@@ -43,6 +43,7 @@ import { gateName } from "@/lib/hd/gate-names";
 import { loadLibraryNames } from "@/lib/hd/library-names";
 import { renderFullMandala } from "@/lib/render/mandala";
 import { getAstro, type AstroChart } from "@/lib/astro";
+import { HOUSES, HOUSES_INTRO } from "@/lib/hd/houses";
 import { renderWheel } from "./astro-wheel";
 import type { ChartSide, Planet } from "@/lib/render/mandala.types";
 import { getChart, getTimezoneForLocation } from "@/lib/mybodygraph";
@@ -2069,23 +2070,23 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
   // diagram has room, so there they stay in the panel.
   const viewControls = `<div class="sec" id="viewsec" hidden>VIEW</div>
     <div class="row" id="viewrow" hidden>
-      <button id="vPlain" class="on">Bodygraph</button>
-      <button id="vBody">Circuits</button>
-      <button id="vMandala">Mandala</button>
-      <button id="vTransit">Transit</button>
-      <button id="vAstro">Astrology</button>
+      <button id="vPlain" class="on" data-help="The chart as it is normally drawn. Nine centres, the channels between them, and every gate you carry. Defined centres are filled; the rest are white." data-help-label="Bodygraph">Bodygraph</button>
+      <button id="vBody" data-help="The same body, coloured by circuit. Shows which of the three circuits each defined channel belongs to: Individual for mutation, Tribal for support, Collective for sharing." data-help-label="Circuits">Circuits</button>
+      <button id="vMandala" data-help="The wheel the chart is calculated from. All 64 gates in their zodiac order, with your planets placed where they actually fall." data-help-label="Mandala">Mandala</button>
+      <button id="vTransit" data-help="Today's sky over your chart. Shows which gates the planets are currently activating and what they complete in you." data-help-label="Transit">Transit</button>
+      <button id="vAstro" data-help="Your natal chart in the astrological wheel: signs, houses, planets and the aspects between them." data-help-label="Astrology">Astrology</button>
     </div>
     <div class="row" id="siderow" hidden>
-      <button id="sideP" class="on">Personality</button>
-      <button id="sideD" class="on">Design</button>
+      <button id="sideP" class="on" data-help="The conscious side, calculated from the moment of birth. What you know about yourself and can talk about. Shown in black." data-help-label="Personality">Personality</button>
+      <button id="sideD" class="on" data-help="The unconscious side, calculated about 88 days before birth. The body you were given rather than the self you know. Shown in red." data-help-label="Design">Design</button>
     </div>
     <div class="row" id="hangrow" hidden>
-      <button id="defined" class="on">Defined Channels</button>
-      <button id="hang" class="on">Hanging Gates</button>
+      <button id="defined" class="on" data-help="The channels you carry completely, both gates. These are fixed and always on." data-help-label="Defined Channels">Defined Channels</button>
+      <button id="hang" class="on" data-help="Gates where you hold one end of a channel but not the other. They look for the missing gate in the people around you." data-help-label="Hanging Gates">Hanging Gates</button>
     </div>
     <div class="row" id="actrow" hidden>
-      <button id="reset" class="gold">Reset</button>
-      <button id="snap">Save Image</button>
+      <button id="reset" class="gold" data-help="Clears every highlight and selection and returns the chart to how it opened." data-help-label="Reset">Reset</button>
+      <button id="snap" data-help="Downloads the chart exactly as it appears now, including whatever you have highlighted." data-help-label="Save Image">Save Image</button>
     </div>`;
   const face = [...fonts.entries()].map(([w, buf]) =>
     `@font-face{font-family:Montserrat;font-style:normal;font-weight:${w};font-display:swap;` +
@@ -2198,6 +2199,15 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
     natalGates: d.client ? [...new Set(d.client.acts.map((a) => a.gate))].sort((a, b) => a - b) : [],
     zodiac: ZODIAC.map((z) => ({ name: z, glyph: ZODIAC_GLYPH[z] })),
     conjunctionText: d.client?.report.conjunctions ?? {},
+    houses: HOUSES,
+    housesIntro: HOUSES_INTRO,
+    // the four angles, and what each one marks
+    angles: {
+      As: ["Ascendant", "The sign rising on the eastern horizon at the moment of birth. Self-image, physical appearance, and the first impression you make."],
+      Ds: ["Descendant", "Opposite the Ascendant. One-on-one partnerships, marriage, business contracts, and open enemies."],
+      Mc: ["Midheaven", "The highest point of the chart. Career, public reputation, social status, and professional ambitions."],
+      Ic: ["Imum Coeli", "The lowest point, opposite the Midheaven. Home, family roots, parents or primary caregivers, and private foundation."],
+    },
     signsByGate: SIGNS_BY_GATE,
     planets: PLANET_ROWS.map((p) => ({ id: planetId(p), name: p })),
     functions: FUNCTION_ORDER.map((f) => ({ name: f, color: FUNCTIONS[f] })),
@@ -2568,7 +2578,8 @@ body.view-astro .astro { display:flex; align-items:center; justify-content:cente
 body.view-astro .astro svg { height:calc(100vh - 36px); width:auto; max-width:100%; display:block; }
 /* the classic set on opening; the rest is a click away rather than a deletion */
 body:not(.astro-all) .astro .asp.extra { display:none; }
-.astro [data-asign], .astro [data-aplanet] { cursor:pointer; }
+.astro [data-asign], .astro [data-aplanet], .astro [data-house], .astro [data-angle] { cursor:pointer; }
+.astro text[data-house]:hover, .astro text[data-angle]:hover { opacity:1; font-weight:600; }
 .tip .pill { display:inline-block; padding:2.5px 8px; border-radius:999px; font-size:9px;
   font-weight:600; letter-spacing:.08em; text-transform:uppercase; margin:5px 5px 1px 0;
   line-height:1.5; }
@@ -3841,8 +3852,28 @@ if (DATA.client) {
     var astroEl = document.querySelector('.astro');
     if (astroEl) {
       astroEl.addEventListener('mousemove', function (e) {
-        var t = e.target.closest ? e.target.closest('[data-asign],[data-aplanet]') : null;
+        var t = e.target.closest
+          ? e.target.closest('[data-asign],[data-aplanet],[data-house],[data-angle]') : null;
         if (!t) { tip.hidden = true; return; }
+        // a house number, and one of the four angles
+        var hn = t.getAttribute('data-house');
+        if (hn) {
+          e.stopPropagation();
+          var hh = (DATA.houses || []).filter(function (x) { return String(x.number) === hn; })[0];
+          if (!hh) { tip.hidden = true; return; }
+          showTip(e, '<b>' + esc(hh.name) + '</b>' +
+            '<span class="pill house">' + esc(hh.group) + '</span>' +
+            '<br><span style="opacity:.78">' + esc(hh.blurb) + '</span>');
+          return;
+        }
+        var an = t.getAttribute('data-angle');
+        if (an) {
+          e.stopPropagation();
+          var aa = (DATA.angles || {})[an];
+          if (!aa) { tip.hidden = true; return; }
+          showTip(e, '<b>' + esc(aa[0]) + '</b><span style="opacity:.78">' + esc(aa[1]) + '</span>');
+          return;
+        }
         // the mandala's own planet handler sits further up and would answer for
         // this one otherwise, with a transit read instead of an astrology one
         e.stopPropagation();
@@ -4260,6 +4291,15 @@ stage.addEventListener('mouseleave', function (e) {
 });
 
 document.addEventListener('mousemove', function (e) {
+  // every VIEW panel button explains itself. Checked before the panel bail-out
+  // below, because on a client chart these buttons dock into the stage rather
+  // than the panel, and they need to work in both places.
+  var hb = e.target.closest ? e.target.closest('[data-help]') : null;
+  if (hb) {
+    showTip(e, '<b>' + esc(hb.getAttribute('data-help-label')) + '</b>' +
+      '<span style="opacity:.78">' + esc(hb.getAttribute('data-help')) + '</span>');
+    return;
+  }
   // the panel has its own hover behaviour (stat rows, channel list, properties);
   // this handler must not clear what those just set
   if (e.target.closest && e.target.closest('.panel')) return;
