@@ -146,7 +146,8 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
     const angular = i % 3 === 0;
     const [x1, y1] = pt(h.abs_pos, asc, R_SIGN);
     const [x2, y2] = pt(h.abs_pos, asc, R_ASPECT);
-    s.push(`<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" stroke="${INK}" ` +
+    s.push(`<line class="cusp" data-cusp="${i + 1}" x1="${f(x1)}" y1="${f(y1)}" ` +
+      `x2="${f(x2)}" y2="${f(y2)}" stroke="${INK}" ` +
       `stroke-width="${angular ? 1.6 : 0.7}" opacity="${angular ? 0.6 : 0.3}"/>`);
     const next = chart.houses[(i + 1) % 12].abs_pos;
     const mid = h.abs_pos + (((next - h.abs_pos) % 360) + 360) % 360 / 2;

@@ -2614,9 +2614,10 @@ body:not(.astro-all) .astro .asp.extra { display:none; }
 .astro .lit-glyph { fill:#f1c232 !important; font-weight:700; }
 .astro .hov-glyph { fill:#f1c232 !important; font-weight:700; }
 .astro path.hov-band { stroke:#f1c232 !important; stroke-width:2 !important; stroke-opacity:1 !important; }
+.astro line.hov-cusp { stroke:#f1c232 !important; stroke-width:2.4 !important; opacity:1 !important; }
 .astro text.hov-band { fill:#845095 !important; opacity:1 !important; }
-#astroplanets .pl-row { cursor:default; border-radius:5px; margin:0 -5px; padding:0 5px; }
-#astroplanets .pl-row:hover { background:rgba(241,194,50,.16); }
+#astrohome .pl-row { cursor:default; border-radius:5px; margin:0 -5px; padding:0 5px; }
+#astrohome .pl-row:hover { background:rgba(241,194,50,.16); }
 body:not(.astro-all) #astroaspects .line.extra { display:none; }
 /* this view's home tab is astrology, not Human Design */
 #astrohome { display:none; }
@@ -4062,6 +4063,7 @@ if (DATA.client) {
       };
       var clearHover = function () {
         [].forEach.call(wheelEl.querySelectorAll('.hov-band'), function (n) { n.classList.remove('hov-band'); });
+        [].forEach.call(wheelEl.querySelectorAll('.hov-cusp'), function (n) { n.classList.remove('hov-cusp'); });
         [].forEach.call(wheelEl.querySelectorAll('.hov-glyph'), function (n) { n.classList.remove('hov-glyph'); });
         [].forEach.call(wheelEl.querySelectorAll('.spoke'), function (l) {
           if (l.getAttribute('data-hov')) { l.setAttribute('opacity', '0'); l.removeAttribute('data-hov'); }
@@ -4114,8 +4116,14 @@ if (DATA.client) {
           var r = e.target.closest ? e.target.closest('[data-hrow]') : null;
           clearHover();
           if (!r) return;
-          var h = wheelEl.querySelector('text.hnum[data-house="' + r.getAttribute('data-hrow') + '"]');
+          var hn = +r.getAttribute('data-hrow');
+          var h = wheelEl.querySelector('text.hnum[data-house="' + hn + '"]');
           if (h) h.classList.add('hov-glyph');
+          // and the two cusps that bound it, so the slice reads as a slice
+          [hn, hn === 12 ? 1 : hn + 1].forEach(function (c) {
+            var cl = wheelEl.querySelector('line.cusp[data-cusp="' + c + '"]');
+            if (cl) cl.classList.add('hov-cusp');
+          });
         });
         hRows.addEventListener('mouseleave', clearHover);
       }
