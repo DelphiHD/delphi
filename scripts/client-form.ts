@@ -25,6 +25,69 @@ const ROSTER_PATH = "scripts/client-roster.ts";
 const DELIVERY_LOG = ".cache/reports/deliveries.jsonl";
 const FAILURE_LOG = ".cache/reports/failures.jsonl";
 const CHANGE_LOG = ".cache/charts/changelog.jsonl";
+
+/**
+ * Identifies this running copy of the dashboard.
+ *
+ * A tab that was open before a restart keeps polling and keeps receiving the new
+ * data, but it is still running the old page, so anything added since simply has
+ * nowhere to render and the screen never changes. That happened to Kaycee twice
+ * on 2026-08-30 with the Changes tab, and both times the server was correct and
+ * her screen was not. The page compares this against its own copy and reloads
+ * itself when they differ, so a restart can never strand a tab again.
+ */
+const BUILD_ID = String(Date.now());
+
+
+/**
+ * What we changed in the system, from the commit history.
+ *
+ * Kaycee asked for the change log to cover "the programming changes we were
+ * making to the chart page programming too", not only chart publishes. The
+ * commit subjects in this repo are already written as plain sentences, so they
+ * are shown as-is; the files each commit touched are translated into the part
+ * of the system she recognises rather than paths.
+ */
+function systemChanges(limit = 80): { at: string; what: string; areas: string[] }[] {
+  let raw = "";
+  try {
+    raw = execSync(
+      `git log -${limit} --date=iso-strict --pretty=format:%x01%ad%x02%s --name-only`,
+      { cwd: process.cwd(), encoding: "utf8", maxBuffer: 4 * 1024 * 1024 },
+    );
+  } catch {
+    return [];                                   // not a checkout, or git unavailable
+  }
+
+  const AREA: [RegExp, string][] = [
+    [/^scripts\/energy-flow-diagram\.ts$/, "chart page"],
+    [/^scripts\/astro-wheel\.ts$|^lib\/astro\.ts$|^lib\/hd\/houses\.ts$/, "astrology view"],
+    [/^scripts\/mandala/, "mandala"],
+    [/^lib\/report\/|^scripts\/generate-report\.ts$/, "reports"],
+    [/^lib\/transit\/|^scripts\/transit-report\.ts$/, "transits"],
+    [/^scripts\/client-form\.ts$/, "dashboard"],
+    [/^scripts\/client-roster\.ts$|^scripts\/add-client\.ts$|^scripts\/rename-client\.ts$/, "roster"],
+    [/^scripts\/sync-notion\.ts$|^lib\/retrieval\//, "library sync"],
+    [/^supabase\/migrations\//, "database"],
+    [/^docs\//, "notes"],
+  ];
+
+  const out: { at: string; what: string; areas: string[] }[] = [];
+  for (const block of raw.split("\u0001").slice(1)) {
+    const [head, ...rest] = block.split("\n");
+    const [at, subject] = head.split("\u0002");
+    if (!at || !subject) continue;
+    const areas: string[] = [];
+    for (const f of rest.map((l) => l.trim()).filter(Boolean)) {
+      for (const [re, name] of AREA) {
+        if (re.test(f) && !areas.includes(name)) areas.push(name);
+      }
+    }
+    out.push({ at, what: subject, areas });
+  }
+  return out;
+}
+
 const CLIENT_DIR = join(homedir(), "Desktop", "HD Reports", "Paid HD Reports");
 
 /** What a client actually HAS, read off their folder rather than the report log.
@@ -513,7 +576,12 @@ const PAGE = /* html */ `<!doctype html>
 
 <div class="dash" id="changes" hidden>
   <h1 style="margin-bottom:2px">Changes</h1>
-  <p class="sub">Every chart publish, newest first. "Rollback" says whether the version this replaced was kept, and can be restored.</p>
+  <p class="sub">What changed in the system, and every chart published.</p>
+  <h2>What we changed</h2>
+  <p class="sub" style="margin-top:0">Each piece of work, newest first, and which part of the system it touched.</p>
+  <div id="systemTable"></div>
+  <h2>Charts published</h2>
+  <p class="sub" style="margin-top:0">"Rollback" says whether the version this replaced was kept, and can be restored.</p>
   <div id="changeTable"></div>
 </div>
 
@@ -648,6 +716,13 @@ const PAGE = /* html */ `<!doctype html>
     try { d = await fetch('/jobs', { cache: 'no-store' }).then(function (r) { return r.json(); }); }
     catch (e) { return; }
 
+    // The dashboard was restarted under this tab. The tab is still running the
+    // page it loaded before that, so anything added since has nowhere to render
+    // and the screen silently stops matching the server. Reload once, rather
+    // than leave somebody looking at a page that cannot show them the answer.
+    if (!window.__build) window.__build = d.build;
+    else if (d.build && d.build !== window.__build) { location.reload(); return; }
+
     document.getElementById('tiles').innerHTML =
       tile(d.today.reports, 'reports today',
         'Foundation and Planetary reports finished since midnight. Counted from the report log, one entry per completed report.') +
@@ -780,7 +855,7 @@ const PAGE = /* html */ `<!doctype html>
           if (paren >= 0) kind = kind.slice(0, paren);
           var help = CHANGE_HELP[kind] || '';
           var when = new Date(c.at);
-          return '<tr><td>' + esc(when.toLocaleDateString([], { month: 'short', day: 'numeric' })) + ' ' +
+          return '<tr><td style="white-space:nowrap">' + esc(when.toLocaleDateString([], { month: 'short', day: 'numeric' })) + ' ' +
             esc(when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) +
             '</td><td>' + esc(c.client) +
             '</td><td data-help-label="' + esc(kind) + '" data-help="' + esc(help) + '">' + esc(c.what) +
@@ -788,6 +863,33 @@ const PAGE = /* html */ `<!doctype html>
         }).join('') + '</tbody></table>'
       : '<div class="tile"><span>No chart has been published since the change log was switched on.</span></div>';
     sortable('changeTable');
+
+    var AREA_HELP = {
+      'chart page': 'The interactive chart your clients open: its views, panels and highlighting.',
+      'astrology view': 'The natal wheel, the houses, the signs and the planet placements on it.',
+      'mandala': 'The mandala renderer and the motion animation.',
+      'reports': 'How the Foundation and Planetary Overview get written and checked.',
+      'transits': 'The daily transit read and the sky data behind it.',
+      'dashboard': 'This dashboard.',
+      'roster': 'Who is on the roster and how people get added or renamed.',
+      'library sync': 'The pull from Notion into the searchable library.',
+      'database': 'The database structure itself.',
+      'notes': 'Written notes and decisions, no behaviour change on its own.'
+    };
+    document.getElementById('systemTable').innerHTML = (d.systemChanges && d.systemChanges.length)
+      ? '<table class="rep"><thead><tr><th>when</th><th>what changed</th><th>part of the system</th>' +
+        '</tr></thead><tbody>' +
+        d.systemChanges.map(function (c) {
+          var when = new Date(c.at);
+          var areas = (c.areas || []).map(function (a) {
+            return '<span data-help-label="' + esc(a) + '" data-help="' + esc(AREA_HELP[a] || '') + '">' + esc(a) + '</span>';
+          }).join(', ');
+          return '<tr><td style="white-space:nowrap">' + esc(when.toLocaleDateString([], { month: 'short', day: 'numeric' })) +
+            '</td><td>' + esc(c.what) +
+            '</td><td>' + (areas || '\u2014') + '</td></tr>';
+        }).join('') + '</tbody></table>'
+      : '<div class="tile"><span>No history available.</span></div>';
+    sortable('systemTable');
 
     paintPicker(d.roster);
     document.getElementById('mRoster').innerHTML =
@@ -1133,6 +1235,8 @@ createServer((req, res) => {
           .map((f: any) => ({ ...f, category: categoryOf(f.rule) }))
           .sort((a: any, b: any) => String(b.at).localeCompare(String(a.at)));
       })(),
+      build: BUILD_ID,
+      systemChanges: systemChanges(),
       changes: (() => {
         if (!existsSync(CHANGE_LOG)) return [];
         return readFileSync(CHANGE_LOG, "utf8").split("\n").filter(Boolean)
