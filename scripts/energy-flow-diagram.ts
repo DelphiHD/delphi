@@ -2607,6 +2607,9 @@ body:not(.astro-all) .astro .asp.extra { display:none; }
   border:1px solid currentColor; }
 .astro text[data-aplanet]:hover { font-weight:600; }
 .astro .spoke { pointer-events:none; transition:opacity .12s; }
+/* the house sectors exist to be filled, not to be hovered: left clickable
+   they swallow the pointer before it reaches a house number or a glyph */
+.astro .housesector { pointer-events:none; }
 .astro path.lit-band { fill:#fbf7b2 !important; fill-opacity:1 !important;
   stroke:#c9a728 !important; stroke-width:1.6 !important; stroke-opacity:1 !important; }
 .astro path.housesector.lit-band { fill-opacity:.6 !important; stroke:none !important; }
@@ -4179,6 +4182,12 @@ if (DATA.client) {
           clearHover();
           if (!r) return;
           var hn = +r.getAttribute('data-hrow');
+          var hh = (DATA.houses || []).filter(function (x) { return x.number === hn; })[0];
+          if (hh) {
+            showTip(e, '<b>' + esc(hh.name) + '</b>' +
+              '<span class="pill house">' + esc(hh.group) + '</span>' +
+              '<br><span style="opacity:.78">' + esc(hh.blurb) + '</span>');
+          }
           var h = wheelEl.querySelector('text.hnum[data-house="' + hn + '"]');
           if (h) h.classList.add('hov-glyph');
           // and the two cusps that bound it, so the slice reads as a slice
