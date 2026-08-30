@@ -11,7 +11,8 @@
 import { config } from "dotenv";
 config({ path: ".env.local", quiet: true } as any);
 import { mkdirSync, writeFileSync } from "node:fs";
-import { getAstro, type AstroChart } from "../lib/astro";
+import { getAstro, type AstroChart, type AstroPoint } from "../lib/astro";
+import { GATE_RANGES } from "../lib/hd/gate-longitude";
 import { CLIENTS, clientFromSlug, placeForLookup } from "./client-roster";
 
 const PURPLE = "#845095";
@@ -37,13 +38,31 @@ const GLYPH: Record<string, string> = {
 const DESIGN = "#e06666";   // the same red the bodygraph uses for the design side
 
 const CX = 360, CY = 360;
-const R_OUT = 330, R_SIGN = 288, R_TICK = 278, R_PLANET = 252, R_HOUSE = 232, R_ASPECT = 178;
+/** The 64 gates ride outside the zodiac, on the same wheel and the same
+ *  longitudes: the Rave mandala and the zodiac are one circle, anchored at
+ *  Gate 41 line 1 = 2 Aquarius = 302 degrees. */
+const R_GATE = 348, R_GATE_IN = 318;
+const R_OUT = 312, R_SIGN = 272, R_TICK = 262, R_PLANET = 238, R_HOUSE = 220, R_ASPECT = 170;
 /** Design planets sit just inside the personality ring, on the same zodiac. */
-const R_DESIGN = 208;
+const R_DESIGN = 196;
 
-/** Screen angle for a zodiac longitude: Ascendant on the left, signs counterclockwise. */
+/**
+ * Screen angle for a zodiac longitude.
+ *
+ * Two anchors. ASCENDANT puts the rising degree on the left, the convention for
+ * a single natal chart, where the houses want to sit in their familiar places.
+ * ARIES fixes 0 Aries at the top, so the zodiac never moves: the same degree is
+ * always the same place on screen. That is what makes two sets of planets on one
+ * wheel comparable, which is why it suits the personality-and-design overlay and
+ * will suit a two-person composite. It also matches the HD mandala, which is
+ * likewise fixed.
+ */
+export type WheelAnchor = "ascendant" | "aries";
+let ANCHOR: WheelAnchor = "aries";
+
 function pt(lon: number, asc: number, r: number): [number, number] {
-  const a = ((180 + (lon - asc)) * Math.PI) / 180;
+  const deg = ANCHOR === "aries" ? 90 + lon : 180 + (lon - asc);
+  const a = (deg * Math.PI) / 180;
   return [CX + r * Math.cos(a), CY - r * Math.sin(a)];
 }
 const f = (n: number) => Math.round(n * 100) / 100;
@@ -62,12 +81,29 @@ const degLabel = (pos: number) => {
   return m === 60 ? `${d + 1}°` : `${d}°${String(m).padStart(2, "0")}'`;
 };
 
-export function renderWheel(chart: AstroChart, name: string, design?: AstroChart | null): string {
+export function renderWheel(chart: AstroChart, name: string, design?: AstroChart | null,
+  anchor: WheelAnchor = "aries", carriedGates: readonly number[] = []): string {
+  ANCHOR = anchor;
   const asc = chart.ascendant;
   const s: string[] = [];
-  s.push(`<svg viewBox="0 -66 720 780" width="720" height="780" xmlns="http://www.w3.org/2000/svg" ` +
+  s.push(`<svg viewBox="-34 -96 788 840" width="788" height="840" xmlns="http://www.w3.org/2000/svg" ` +
     `font-family="Montserrat, 'Helvetica Neue', sans-serif">`);
-  s.push(`<rect x="0" y="-66" width="720" height="780" fill="${CREAM}"/>`);
+  s.push(`<rect x="-34" y="-96" width="788" height="840" fill="${CREAM}"/>`);
+
+  // The 64 gates, outside the zodiac on the same circle. A gate the chart
+  // carries is filled; the rest are outline only, the same convention the
+  // bodygraph uses for activated and unactivated gates.
+  const carried = new Set(carriedGates);
+  for (const g of GATE_RANGES) {
+    const on = carried.has(g.gate);
+    s.push(`<path class="gateband" data-gate="${g.gate}" d="${arc(g.start, g.end, asc, R_GATE, R_GATE_IN)}" ` +
+      `fill="${on ? PURPLE : "none"}" fill-opacity="${on ? 0.16 : 0}" ` +
+      `stroke="${INK}" stroke-width="0.5" stroke-opacity=".35"/>`);
+    const [gx, gy] = pt((g.start + g.end) / 2, asc, (R_GATE + R_GATE_IN) / 2);
+    s.push(`<text class="gateband" data-gate="${g.gate}" x="${f(gx)}" y="${f(gy + 4)}" ` +
+      `text-anchor="middle" font-size="11" font-weight="${on ? 600 : 400}" ` +
+      `fill="${INK}" opacity="${on ? 0.95 : 0.4}">${g.gate}</text>`);
+  }
 
   // the twelve signs, coloured by element
   const SIGNS = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
@@ -82,7 +118,8 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
     "♎", "♏", "♐", "♑", "♒", "♓"].map((g) => g + TEXT);
   for (let i = 0; i < 12; i++) {
     const start = i * 30, end = start + 30;
-    s.push(`<path class="signband" data-asign="${SIGNS[i]}" d="${arc(start, end, asc, R_OUT, R_SIGN)}" ` +
+    s.push(`<path class="signband" data-asign="${SIGNS[i]}" data-signi="${i}" ` +
+      `d="${arc(start, end, asc, R_OUT, R_SIGN)}" ` +
       `fill="${ELEMENT[ELEM_OF[i % 4]]}" opacity=".92"/>`);
     const [gx, gy] = pt(start + 15, asc, (R_OUT + R_SIGN) / 2);
     s.push(`<text class="signband" data-asign="${SIGNS[i]}" x="${f(gx)}" y="${f(gy + 7)}" ` +
@@ -172,6 +209,23 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
       void tx; void ty;
     }
   }
+
+  // One radial line per planet. A planet's gate, its sign and its house all sit
+  // at the same angle, so the line that joins them is a spoke: it leaves the
+  // gate ring, crosses the zodiac, passes the house band, and ends at the
+  // aspect circle. Drawn once and revealed on demand rather than built on click.
+  const spokeFor = (list: AstroPoint[], side: string) => {
+    for (const p of list) {
+      const [x1, y1] = pt(p.abs_pos, asc, R_GATE);
+      const [x2, y2] = pt(p.abs_pos, asc, R_ASPECT);
+      s.push(`<line class="spoke" data-spoke="${side}:${p.name}" ` +
+        `x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" ` +
+        `stroke="${side === "design" ? DESIGN : PURPLE}" stroke-width="2" ` +
+        `stroke-linecap="round" opacity="0"/>`);
+    }
+  };
+  spokeFor(chart.planets, "personality");
+  if (design) spokeFor(design.planets, "design");
 
   // the angles
   const angles: [string, number][] = [["As", asc], ["Ds", asc + 180], ["Mc", chart.mc], ["Ic", chart.mc + 180]];

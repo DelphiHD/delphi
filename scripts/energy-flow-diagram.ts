@@ -1527,6 +1527,8 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
 interface SceneData {
   /** natal astrology, present only on a client chart */
   astro?: AstroChart;
+  /** the design side, read at the design instant */
+  astroDesign?: AstroChart;
   client?: ClientCtx;                       // set when rendering a real chart
   inner: Record<string, string>;            // skin id -> neutralized bodygraph markup
   plain?: string;                           // the chart as the design draws it
@@ -2099,7 +2101,7 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
   ).join("");
 
   const payload = {
-    astro: d.astro ?? null,
+    astro: d.astro ? { ...d.astro, design: d.astroDesign ?? null } : null,
     read: d.read ?? null,
     cycles: d.client?.report.cycles ?? [],
     client: d.client
@@ -2604,6 +2606,10 @@ body:not(.astro-all) .astro .asp.extra { display:none; }
 .tip .pill.house { background:transparent; color:inherit; opacity:.6;
   border:1px solid currentColor; }
 .astro text[data-aplanet]:hover { font-weight:600; }
+.astro .spoke { pointer-events:none; transition:opacity .12s; }
+.astro .lit-band { stroke:#f1c232 !important; stroke-width:2.5 !important; stroke-opacity:1 !important; }
+.astro text.lit-band { fill:#8a6a14 !important; opacity:1 !important; font-weight:600; }
+.astro .lit-glyph { fill:#f1c232 !important; font-weight:700; }
 body:not(.astro-all) #astroaspects .line.extra { display:none; }
 /* this view's home tab is astrology, not Human Design */
 #astrohome { display:none; }
@@ -4070,6 +4076,46 @@ if (DATA.client) {
         showTip(e, html);
       });
       astroEl.addEventListener('mouseleave', function () { tip.hidden = true; });
+
+      // Click a planet: light the spoke from its gate through its sign to its
+      // house, and mark the three bands it crosses. Everything already knows
+      // where it is; this only reveals the connection.
+      var clearPicked = function () {
+        [].forEach.call(astroEl.querySelectorAll('.spoke'), function (l) { l.setAttribute('opacity', '0'); });
+        [].forEach.call(astroEl.querySelectorAll('.lit-band'), function (n) { n.classList.remove('lit-band'); });
+        [].forEach.call(astroEl.querySelectorAll('.lit-glyph'), function (n) { n.classList.remove('lit-glyph'); });
+      };
+      astroEl.addEventListener('click', function (e) {
+        var g = e.target.closest ? e.target.closest('[data-aplanet]') : null;
+        if (!g) { clearPicked(); return; }
+        var name = g.getAttribute('data-aplanet');
+        var side = g.getAttribute('data-side') || 'personality';
+        var already = g.classList.contains('lit-glyph');
+        clearPicked();
+        if (already) return;
+        var src = side === 'design' ? (A.design || {}) : A;
+        var pl = ((src.planets) || []).filter(function (x) { return x.name === name; })[0];
+        if (!pl) return;
+        var spoke = astroEl.querySelector('[data-spoke="' + side + ':' + name + '"]');
+        if (spoke) spoke.setAttribute('opacity', '.85');
+        [].forEach.call(astroEl.querySelectorAll('[data-aplanet="' + name + '"][data-side="' + side + '"]'),
+          function (n) { n.classList.add('lit-glyph'); });
+        var sb = astroEl.querySelector('[data-asign="' + pl.sign + '"]');
+        if (sb) sb.classList.add('lit-band');
+        var hn = HOUSE_N[pl.house];
+        if (hn) {
+          var hEl = astroEl.querySelector('text.hnum[data-house="' + hn + '"]');
+          if (hEl) hEl.classList.add('lit-band');
+        }
+        var gate = null;
+        (DATA.placements || []).forEach(function (q) {
+          if (q.side === side && q.planet.toLowerCase() === String(name).replace('_', ' ').toLowerCase()) gate = q.gate;
+        });
+        if (gate) {
+          [].forEach.call(astroEl.querySelectorAll('.gateband[data-gate="' + gate + '"]'),
+            function (n) { n.classList.add('lit-band'); });
+        }
+      });
     }
 
     var ab = document.getElementById('aspAll');
@@ -4820,9 +4866,11 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
     }
   }
   const astroHtml = astroChart
-    ? `<div class="astro">${renderWheel(astroChart, client!.name, astroDesign)}</div>`
+    ? `<div class="astro">${renderWheel(astroChart, client!.name, astroDesign, "aries",
+        [...new Set(client!.acts.map((a) => a.gate))])}</div>`
     : "";
   if (astroChart) scene.astro = astroChart;
+  if (astroDesign) scene.astroDesign = astroDesign;
 
   const htmlPath = join(outDir, `${stem}.html`);
   const html = buildHtml(scene, canvases, mandalaView(scene), astroHtml, fonts);
