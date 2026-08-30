@@ -20,6 +20,7 @@ import type { Chart } from "@/lib/chart/types";
 import type { ChunkRow, RetrievalResult } from "@/lib/retrieval/chartChunks";
 import { renderDataPassMarkdown, type DataPass } from "@/lib/chart/datapass";
 import { validateReport, type ValidationResult } from "@/lib/report/validate";
+import { runFinalPass } from "@/lib/report/finalpass";
 
 export type ReportLength = "standard" | "long";
 
@@ -718,10 +719,40 @@ export async function buildFoundationReport(args: BuildArgs): Promise<BuildResul
     previousMarkdown.push(text);
   }
 
-  const fullText = previousMarkdown.join("\n\n");
+  // The final pass. Everything above validates one chapter at a time and can
+  // only see what that chapter broke; report-wide rules survive it by
+  // construction. This looks at the finished report and sends the carrying
+  // chapters back with that whole-report context. Two passes, then it returns
+  // whatever it has and the report publishes flagged.
+  const fp = await runFinalPass({
+    sections: accumulated.map((s, i) => ({ name: s.name, text: previousMarkdown[i] })),
+    dataPass: args.dataPass,
+    tier: "foundation",
+    regenerate: async (index, nudge) => {
+      // Regenerating in place: the chapter's own instruction, plus the report-wide
+      // complaint. previousMarkdown still holds the full report, so the
+      // continuation note stays true.
+      return generateSection(sections[index], nudge);
+    },
+  });
 
-  // Final validation on the assembled report.
-  const validation = validateReport(fullText, args.dataPass);
+  for (const line of fp.log) console.log(`  ${line}`);
+
+  fp.sections.forEach((s, i) => {
+    if (s.text !== previousMarkdown[i]) {
+      accumulated[i].text = s.text;
+      accumulated[i].retried = true;
+      previousMarkdown[i] = s.text;
+    }
+  });
+  totalCents += fp.costCents;
+  totalUsage.input_tokens += fp.usage.input_tokens;
+  totalUsage.output_tokens += fp.usage.output_tokens;
+  totalUsage.cache_creation_input_tokens += fp.usage.cache_creation_input_tokens;
+  totalUsage.cache_read_input_tokens += fp.usage.cache_read_input_tokens;
+
+  const fullText = previousMarkdown.join("\n\n");
+  const validation = fp.validation;
 
   return {
     text: fullText,

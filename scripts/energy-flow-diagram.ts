@@ -32,7 +32,8 @@ import { config as loadEnv } from "dotenv";
 loadEnv({ path: ".env.local", override: true });
 
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { join } from "node:path";
 
 import { CHANNELS } from "@/lib/hd/channels";
@@ -4911,6 +4912,32 @@ async function publishChart(client: ClientCtx, html: string): Promise<string> {
   const token = existing?.token ?? randomBytes(16).toString("hex");
   const path = existing?.storage_path ?? `${slug}/${token}.html`;
 
+  // Keep the version we are about to overwrite. A publish writes to one fixed
+  // address, so before this there was no way back from a bad build except
+  // regenerating the report. Copies live beside the chart under versions/ and
+  // the newest five are kept; --rollback lists and restores them.
+  let rolledFrom = "";
+  let previousHtml = "";
+  if (existing) {
+    const prev = await db.storage.from("charts").download(path);
+    if (prev.data) {
+      previousHtml = await prev.data.text();
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      rolledFrom = `${slug}/versions/${token}-${stamp}.html`;
+      const kept = await db.storage.from("charts").upload(rolledFrom, Buffer.from(previousHtml, "utf8"), {
+        contentType: "text/html; charset=utf-8",
+        upsert: true,
+      });
+      if (kept.error) {
+        // A failed backup must not cost her the publish, but it must be visible.
+        console.warn(`  ! could not keep a rollback copy: ${kept.error.message}`);
+        rolledFrom = "";
+      } else {
+        await pruneVersions(db, slug, token);
+      }
+    }
+  }
+
   // Storage caches an object for an hour by default, so a republished chart
   // would keep serving yesterday's file to the client holding the link. The
   // link is the same address every time, so the file behind it has to be the
@@ -4931,7 +4958,156 @@ async function publishChart(client: ClientCtx, html: string): Promise<string> {
     : await db.from("client_charts").insert(row);
   if (saved.error) throw new Error(`link record failed: ${saved.error.message}`);
 
+  recordChange(client, { previousHtml, nextHtml: html, rolledFrom });
+
   return `${SITE}/c/${token}`;
+}
+
+/** Keep the newest five rollback copies per chart; older ones are removed. */
+async function pruneVersions(db: SupabaseClient, slug: string, token: string): Promise<void> {
+  const listed = await db.storage.from("charts").list(`${slug}/versions`, { limit: 100 });
+  if (listed.error || !listed.data) return;
+  const mine = listed.data
+    .filter((f: { name: string }) => f.name.startsWith(`${token}-`))
+    .map((f: { name: string }) => f.name)
+    .sort();                                  // ISO stamps sort chronologically
+  const stale = mine.slice(0, Math.max(0, mine.length - KEEP_VERSIONS));
+  if (stale.length) {
+    await db.storage.from("charts").remove(stale.map((n) => `${slug}/versions/${n}`));
+  }
+}
+
+const KEEP_VERSIONS = 5;
+
+/**
+ * The change log. Every publish writes one line: who, when, what moved, and the
+ * rollback copy it can be undone from. Kaycee asked for this alongside rollback
+ * on 2026-08-30, after a 36 chart sweep went out with no record of what changed.
+ *
+ * "What changed" is answered honestly rather than precisely: the report prose
+ * and the page around it are separated, because a chart republished for a new
+ * view is a different event from one republished because the report was rewritten.
+ */
+function recordChange(
+  client: ClientCtx,
+  args: { previousHtml: string; nextHtml: string; rolledFrom: string },
+): void {
+  const { previousHtml, nextHtml, rolledFrom } = args;
+  const at = new Date().toISOString();
+
+  let what: string;
+  if (!previousHtml) {
+    what = "first publish";
+  } else if (previousHtml === nextHtml) {
+    what = "no change";
+  } else {
+    const before = reportProseOf(previousHtml);
+    const after = reportProseOf(nextHtml);
+    const proseMoved = before !== after;
+    const pageMoved = previousHtml.length - before.length !== nextHtml.length - after.length
+      || stripProse(previousHtml, before) !== stripProse(nextHtml, after);
+    what = proseMoved && pageMoved ? "report text and page"
+      : proseMoved ? "report text"
+      : "page only";
+    if (proseMoved) {
+      const delta = after.length - before.length;
+      what += ` (${delta >= 0 ? "+" : ""}${delta} characters of prose)`;
+    }
+  }
+
+  const entry = { at, slug: client.slug, client: client.name, what, rollback: rolledFrom };
+
+  mkdirSync(".cache/charts", { recursive: true });
+  appendFileSync(".cache/charts/changelog.jsonl", `${JSON.stringify(entry)}\n`, "utf8");
+
+  const day = at.slice(0, 10);
+  const time = at.slice(11, 16);
+  const line = `| ${day} ${time} | ${client.name} | ${what} | ${rolledFrom ? "yes" : "none"} |`;
+  const header = [
+    "# Chart change log",
+    "",
+    "Every chart publish, newest at the bottom. Written automatically by the chart",
+    "builder; do not edit by hand. \"Rollback\" says whether the version this replaced",
+    "was kept and can be restored.",
+    "",
+    "| When (UTC) | Client | What changed | Rollback |",
+    "|---|---|---|---|",
+    "",
+  ].join("\n");
+  if (!existsSync(CHANGELOG_MD)) writeFileSync(CHANGELOG_MD, header, "utf8");
+  appendFileSync(CHANGELOG_MD, `${line}\n`, "utf8");
+}
+
+const CHANGELOG_MD = "docs/CHART_CHANGELOG.md";
+
+/** The report prose baked into a published chart, isolated from the page around it. */
+function reportProseOf(html: string): string {
+  const chunks = html.match(/<script id="reporttext"[^>]*>([\s\S]*?)<\/script>/g);
+  return chunks ? chunks.join("") : "";
+}
+
+function stripProse(html: string, prose: string): string {
+  return prose ? html.split(prose).join("") : html;
+}
+
+/**
+ * Restore a chart from one of its kept versions.
+ *
+ * With no version named, this lists what is available and stops, because
+ * restoring the wrong build silently is worse than making her pick. With one
+ * named, it publishes that copy back to the live address; the version being
+ * replaced is itself kept first, so a rollback can be rolled back.
+ */
+async function rollbackChart(brief: { slug: string; name: string }, version?: string): Promise<void> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error("NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set");
+  const { createClient: createSupabase } = await import("@supabase/supabase-js");
+  const db = createSupabase(url, key, { auth: { persistSession: false } });
+
+  const { data: rec } = await db
+    .from("client_charts")
+    .select("token, storage_path")
+    .eq("client_slug", brief.slug)
+    .maybeSingle();
+  if (!rec) throw new Error(`${brief.name} has no published chart`);
+
+  const listed = await db.storage.from("charts").list(`${brief.slug}/versions`, { limit: 100 });
+  const mine = (listed.data ?? [])
+    .filter((f) => f.name.startsWith(`${rec.token}-`))
+    .map((f) => f.name)
+    .sort()
+    .reverse();                                   // newest first
+
+  if (!mine.length) {
+    console.log(`no kept versions for ${brief.name}. Nothing to roll back to.`);
+    return;
+  }
+
+  if (!version) {
+    console.log(`kept versions for ${brief.name}, newest first:`);
+    for (const n of mine) {
+      const when = n.slice(rec.token.length + 1).replace(".html", "");
+      console.log(`  ${when}`);
+    }
+    console.log(`\nrestore one with:  --rollback ${mine[0].slice(rec.token.length + 1).replace(".html", "")}`);
+    return;
+  }
+
+  const name = version.endsWith(".html") ? version : `${rec.token}-${version}.html`;
+  const target = mine.find((n) => n === name || n.includes(version));
+  if (!target) throw new Error(`no kept version matching "${version}" for ${brief.name}`);
+
+  const got = await db.storage.from("charts").download(`${brief.slug}/versions/${target}`);
+  if (!got.data) throw new Error(`could not read ${target}`);
+  const html = await got.data.text();
+
+  await publishChart(
+    { slug: brief.slug, name: brief.name } as ClientCtx,
+    html,
+  );
+  console.log(`✓ ${brief.name} rolled back to ${target.slice(rec.token.length + 1).replace(".html", "")}`);
+  console.log(`  ${SITE}/c/${rec.token}`);
 }
 
 /** Pull a link. The chart stays in storage; the route stops serving it. */
@@ -4993,6 +5169,14 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
   const wantPublish = args.includes("--publish");
   const wantUnpublish = args.includes("--unpublish");
   const slug = args.find((a) => !a.startsWith("--")) ?? process.env.CLIENT;
+
+  if (args.includes("--rollback")) {
+    if (!slug) throw new Error("--rollback needs a client slug");
+    const brief = clientFromSlug(slug);
+    const which = args[args.indexOf("--rollback") + 1];
+    await rollbackChart(brief, which && !which.startsWith("--") ? which : undefined);
+    return;
+  }
 
   if (wantUnpublish) {
     if (!slug) throw new Error("--unpublish needs a client slug");

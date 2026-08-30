@@ -24,6 +24,7 @@ const REPORT_LOG = ".cache/reports/log.jsonl";
 const ROSTER_PATH = "scripts/client-roster.ts";
 const DELIVERY_LOG = ".cache/reports/deliveries.jsonl";
 const FAILURE_LOG = ".cache/reports/failures.jsonl";
+const CHANGE_LOG = ".cache/charts/changelog.jsonl";
 const CLIENT_DIR = join(homedir(), "Desktop", "HD Reports", "Paid HD Reports");
 
 /** What a client actually HAS, read off their folder rather than the report log.
@@ -451,6 +452,7 @@ const PAGE = /* html */ `<!doctype html>
   <button type="button" class="tab" id="tabStatus">Status</button>
   <button type="button" class="tab" id="tabMetrics">Metrics</button>
   <button type="button" class="tab" id="tabFailures">Failures</button>
+  <button type="button" class="tab" id="tabChanges">Changes</button>
 </div>
 <div id="viewAdd">
 <h1>Add a Client</h1>
@@ -507,6 +509,12 @@ const PAGE = /* html */ `<!doctype html>
   <p class="sub">Every issue the validator has found, one line each. Hover an excerpt to read the whole thing.</p>
   <div class="row" style="margin-top:0" id="failFilters"></div>
   <div id="failTable"></div>
+</div>
+
+<div class="dash" id="changes" hidden>
+  <h1 style="margin-bottom:2px">Changes</h1>
+  <p class="sub">Every chart publish, newest first. "Rollback" says whether the version this replaced was kept, and can be restored.</p>
+  <div id="changeTable"></div>
 </div>
 
 <div class="dash" id="metrics" hidden>
@@ -756,6 +764,31 @@ const PAGE = /* html */ `<!doctype html>
       : '<div class="tile"><span>Nothing in this category.</span></div>';
     sortable('failTable');
 
+    var CHANGE_HELP = {
+      'report text': 'The words in the report changed. Somebody reran it, or the final pass rewrote a chapter.',
+      'page only': 'The report is word for word the same. The chart page around it changed: a new view, a fix, a style change.',
+      'report text and page': 'Both moved: the report was rewritten and the page around it changed in the same publish.',
+      'first publish': 'This chart had never been published before, so there is nothing it replaced.',
+      'no change': 'Republished, but the file came out byte for byte identical to the one already live.'
+    };
+    document.getElementById('changeTable').innerHTML = (d.changes && d.changes.length)
+      ? '<table class="rep"><thead><tr><th>when</th><th>client</th><th>what changed</th>' +
+        '<th>rollback</th></tr></thead><tbody>' +
+        d.changes.map(function (c) {
+          var kind = String(c.what || '');
+          var paren = kind.indexOf(' (');
+          if (paren >= 0) kind = kind.slice(0, paren);
+          var help = CHANGE_HELP[kind] || '';
+          var when = new Date(c.at);
+          return '<tr><td>' + esc(when.toLocaleDateString([], { month: 'short', day: 'numeric' })) + ' ' +
+            esc(when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) +
+            '</td><td>' + esc(c.client) +
+            '</td><td data-help-label="' + esc(kind) + '" data-help="' + esc(help) + '">' + esc(c.what) +
+            '</td><td>' + (c.rollback ? 'kept' : '\u2014') + '</td></tr>';
+        }).join('') + '</tbody></table>'
+      : '<div class="tile"><span>No chart has been published since the change log was switched on.</span></div>';
+    sortable('changeTable');
+
     paintPicker(d.roster);
     document.getElementById('mRoster').innerHTML =
       '<table class="rep"><thead><tr><th>id</th><th>client</th><th>foundation</th>' +
@@ -918,8 +951,8 @@ const PAGE = /* html */ `<!doctype html>
   refresh();
   setInterval(refresh, 5000);
 
-  var VIEWS = { add: 'viewAdd', status: 'dash', metrics: 'metrics', failures: 'failures' };
-  var TABS = { add: 'tabAdd', status: 'tabStatus', metrics: 'tabMetrics', failures: 'tabFailures' };
+  var VIEWS = { add: 'viewAdd', status: 'dash', metrics: 'metrics', failures: 'failures', changes: 'changes' };
+  var TABS = { add: 'tabAdd', status: 'tabStatus', metrics: 'tabMetrics', failures: 'tabFailures', changes: 'tabChanges' };
   function show(which) {
     Object.keys(VIEWS).forEach(function (k) {
       document.getElementById(VIEWS[k]).hidden = (k !== which);
@@ -934,6 +967,7 @@ const PAGE = /* html */ `<!doctype html>
   if (location.hash === '#status') show('status');
   if (location.hash === '#metrics') show('metrics');
   if (location.hash === '#failures') show('failures');
+  if (location.hash === '#changes') show('changes');
 
   go.onclick = async function () {
     err.textContent = '';
@@ -1098,6 +1132,14 @@ createServer((req, res) => {
           .filter(Boolean)
           .map((f: any) => ({ ...f, category: categoryOf(f.rule) }))
           .sort((a: any, b: any) => String(b.at).localeCompare(String(a.at)));
+      })(),
+      changes: (() => {
+        if (!existsSync(CHANGE_LOG)) return [];
+        return readFileSync(CHANGE_LOG, "utf8").split("\n").filter(Boolean)
+          .map((l) => { try { return JSON.parse(l); } catch { return null; } })
+          .filter(Boolean)
+          .sort((a: any, b: any) => String(b.at).localeCompare(String(a.at)))
+          .slice(0, 500);
       })(),
       deliveries: (() => {
         if (!existsSync(DELIVERY_LOG)) return [];

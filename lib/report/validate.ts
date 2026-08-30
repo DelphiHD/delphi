@@ -257,7 +257,7 @@ export function validateReport(text: string, dp: DataPass, tier: ReportTier = "f
   const definitionSection = definitionH1 ? getH1Section(text, definitionH1) : null;
   if (definitionH1) {
     factsChecked++;
-    if (definitionSection && definitionSection.includes(expectedDefLabel)) {
+    if (definitionSection && citesDefinition(definitionSection, expectedDefLabel)) {
       factsMatched++;
     } else if (definitionSection) {
       pushHard({
@@ -1303,20 +1303,13 @@ export function validateReport(text: string, dp: DataPass, tier: ReportTier = "f
     // words mean ("Exaltations & Detriments", "How To Read This Report"). Those
     // mentions are boilerplate, not the model dwelling on a placement, and
     // counting them made every Planetary fail the cap on arrival.
-    const EXPLAINER = /^##\s+(Exaltations?|How To Read|Your Imprint|The Lines|Time & Space)/i;
-    let mentions = 0;
+    const scan = scanFixationMentions(text);
+    const mentions = scan.total;
     let firstOver = "";
-    let inExplainer = false;
-    for (const sent of text.split(/(?<=[.!?])\s+/)) {
-      const t = sent.replace(/\s+/g, " ").trim();
-      const head = /^##\s+/.test(t);
-      if (head) inExplainer = EXPLAINER.test(t);
-      if (inExplainer) continue;
-      if (/^[#\-`|]/.test(t) || t.includes("|")) continue;   // headers and placement lines carry the fact
-      const n = (t.match(/\b(exalted|exaltation|in detriment)\b/gi) ?? []).length;
-      if (!n) continue;
-      mentions += n;
-      if (!firstOver && mentions > fixings) firstOver = t.slice(0, 200);
+    let running = 0;
+    for (const hit of scan.hits) {
+      running += hit.n;
+      if (running > fixings) { firstOver = hit.sentence.slice(0, 200); break; }
     }
     if (mentions > fixings) {
       pushHard({
@@ -1454,4 +1447,68 @@ export function renderValidationMarkdown(v: ValidationResult): string {
     }
   }
   return lines.join("\n");
+}
+
+// One implementation of "what counts as a mention of fixation", shared by the
+// fixation-over-mentioned rule and by the final pass, which needs per-chapter
+// counts to know which chapter to send back. Keeping both on this function means
+// attribution can never drift from the rule that does the failing.
+export function scanFixationMentions(text: string): { total: number; hits: { sentence: string; n: number }[] } {
+  const EXPLAINER = /^##\s+(Exaltations?|How To Read|Your Imprint|The Lines|Time & Space)/i;
+  const hits: { sentence: string; n: number }[] = [];
+  let total = 0;
+  let inExplainer = false;
+  for (const sent of text.split(/(?<=[.!?])\s+/)) {
+    const t = sent.replace(/\s+/g, " ").trim();
+    if (/^##\s+/.test(t)) inExplainer = EXPLAINER.test(t);
+    if (inExplainer) continue;
+    if (/^[#\-`|]/.test(t) || t.includes("|")) continue;   // headers and placement lines carry the fact
+    const n = (t.match(/\b(exalted|exaltation|in detriment)\b/gi) ?? []).length;
+    if (!n) continue;
+    total += n;
+    hits.push({ sentence: t, n });
+  }
+  return { total, hits };
+}
+
+/**
+ * Does the Definition section name the reader's definition type?
+ *
+ * The canonical labels end in the word "Definition" ("Triple Split Definition"),
+ * and prose that reads well almost never repeats it: a correct section says
+ * "Triple Split means the defined centers form three separate groups". Requiring
+ * the literal label failed two correct reports on 2026-08-30, Sarah Marie's and
+ * Michael Jackson's, and the only way to satisfy it was to write the label as a
+ * label, which produced "The No Definition means there is no fixed internal
+ * frequency". Kaycee confirmed both sections were correct and asked for the rule
+ * to accept them.
+ *
+ * So the type still has to be named; the trailing "Definition" is optional. The
+ * Reflector case is handled separately because stripping the word from "No
+ * Definition" leaves "No", which would match almost any sentence.
+ */
+export function citesDefinition(section: string, expectedLabel: string): boolean {
+  if (section.includes(expectedLabel)) return true;
+
+  const hay = section.toLowerCase().replace(/\s+/g, " ");
+
+  if (/^no definition$/i.test(expectedLabel.trim())) {
+    // A Reflector has no definition, and correct prose says so in words rather
+    // than by quoting the label. These are the forms Kaycee has signed off on.
+    return [
+      "no definition",
+      "no defined centers",
+      "no centers are defined",
+      "none of the centers are defined",
+      "every center is open",
+      "all nine centers are open",
+      "all centers are open",
+    ].some((p) => hay.includes(p));
+  }
+
+  // "Triple Split Definition" -> "Triple Split". Naming the type is enough.
+  const withoutWord = expectedLabel.replace(/\s*Definition\s*$/i, "").trim();
+  if (withoutWord.length >= 5 && hay.includes(withoutWord.toLowerCase())) return true;
+
+  return false;
 }

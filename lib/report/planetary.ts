@@ -32,6 +32,7 @@ import type { Chart } from "@/lib/chart/types";
 import type { ChunkRow, RetrievalResult } from "@/lib/retrieval/chartChunks";
 import { renderDataPassMarkdown, type DataPass } from "@/lib/chart/datapass";
 import { validateReport, type ValidationResult } from "@/lib/report/validate";
+import { runFinalPass } from "@/lib/report/finalpass";
 
 export interface BuildArgs {
   client: { name: string };
@@ -1001,9 +1002,38 @@ export async function buildPlanetaryOverview(args: BuildArgs): Promise<BuildResu
     previousMarkdown.push(text);
   }
 
+  // The final pass. See lib/report/finalpass.ts: the per-section loop above can
+  // only see what each chapter broke, so report-wide rules survive it. Assembly
+  // goes through normalizePlanetaryStructure so the final pass judges exactly
+  // the text the validator will judge.
+  const assemble = (parts: { text: string }[]) =>
+    normalizePlanetaryStructure(parts.map((p) => p.text).join("\n\n"));
+
+  const fp = await runFinalPass({
+    sections: accumulated.map((s, i) => ({ name: s.name, text: previousMarkdown[i] })),
+    dataPass: args.dataPass,
+    tier: "planetary",
+    assemble,
+    regenerate: async (index, nudge) => generateSection(sections[index], nudge),
+  });
+
+  for (const line of fp.log) console.log(`  ${line}`);
+
+  fp.sections.forEach((s, i) => {
+    if (s.text !== previousMarkdown[i]) {
+      accumulated[i].text = s.text;
+      previousMarkdown[i] = s.text;
+    }
+  });
+  totalCents += fp.costCents;
+  totalUsage.input_tokens += fp.usage.input_tokens;
+  totalUsage.output_tokens += fp.usage.output_tokens;
+  totalUsage.cache_creation_input_tokens += fp.usage.cache_creation_input_tokens;
+  totalUsage.cache_read_input_tokens += fp.usage.cache_read_input_tokens;
+
   const rawText = previousMarkdown.join("\n\n");
   const fullText = normalizePlanetaryStructure(rawText);
-  const validation = validateReport(fullText, args.dataPass, "planetary");
+  const validation = fp.validation;
 
   return {
     text: fullText,

@@ -422,3 +422,63 @@ real features of the chart and Kaycee wants them visible; what is missing is the
 astrology material to say what they mean, which is hers to gather. Kaycee,
 2026-08-27: "I'm sure they have impacts, but I'll have to dig through the
 astrology literature to identify them. Good enough for now."
+
+---
+
+## The final pass: report-wide rules get a second look (2026-08-30)
+
+Each report builder already validated section by section and retried what that
+section broke. Two failures could survive it by construction:
+
+1. A report-wide budget rule is broken by no single chapter. `fixation-over-mentioned`
+   caps mentions at one per fixing; each chapter adds two or three, all defensible
+   alone, and only the total crosses the line.
+2. An issue is keyed by the sentence that tripped it. Once a count first goes over,
+   that sentence stops looking new, so the delta filter treats it as already handled
+   and stops retrying while the number keeps climbing. On Meelad's Foundation it fired
+   once and went quiet from ten mentions to twenty-three.
+
+So after the whole report is assembled it is validated again, each surviving hard
+failure is traced to the chapter carrying it, and those chapters are rewritten with
+the whole-report context the per-section loop never had. Two passes, then the report
+publishes flagged. Kaycee, 2026-08-30, on the retry ceiling: "two retries to publish
+and flag so it doesn't get caught in endless loops."
+
+A budget rule is spread across every chapter that spends against it, not dumped on
+the heaviest one. Trimming only the heaviest does not reach the cap: Meelad's Centers
+chapter held 16 of 23 mentions and cutting it to its proportional 6 still left 13
+against a cap of 9. Each contributor is given its own share instead.
+
+A pass is kept only if it lowers the hard-failure count, so the final pass can never
+hand back something worse than it was given.
+
+Measured on a Meelad Foundation: 5 hard failures to 1, three chapters rewritten,
+$1.97 against $1.30 without, 33 minutes against about 20. Only failing reports pay it.
+
+## Rollback copies and the chart change log (2026-08-30)
+
+Publishing writes to one fixed address per client, so before this there was no way
+back from a bad build except regenerating the report. Every publish now keeps the
+version it replaced, five deep, and `--rollback` lists them and restores one. Each
+publish also writes a line saying what moved: the report prose, the page around it,
+or both. It reads out on the dashboard's Changes tab, because Kaycee asked for it
+where she already looks rather than in a file: "That's easier for me to understand."
+
+## Naming the definition type is enough (2026-08-30)
+
+`definition-not-cited` required the canonical label verbatim inside the Definition
+section. The labels end in the word "Definition", and prose that reads well does not
+repeat it, so two correct reports failed on the same day: Sarah Marie's said "Triple
+Split means the defined centers form three separate groups", Michael Jackson's said
+"This chart has no defined centers. Every center is open." The only way to satisfy
+the rule was to write the label as a label, which produced "The No Definition means
+there is no fixed internal frequency."
+
+The rule now requires the type to be named and treats the trailing "Definition" as
+optional. The Reflector case is listed separately, because stripping the word from
+"No Definition" leaves "No", which would match almost any sentence. Kaycee confirmed
+both sections were correct: "Yes to the definition thing... They are correct."
+
+This rule was not new and was not caused by that day's work: it has fired seven times
+since the Phase 4 build, in May, June twice, July, and twice on 2026-08-30, when three
+reports were generated in one day.
