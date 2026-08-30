@@ -105,12 +105,20 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   for (const g of GATE_RANGES) {
     const on = carried.has(g.gate);
     const isP = pSide.has(g.gate), isD = dSide.has(g.gate);
-    const fill = !on ? "none" : (isP ? PURPLE : DESIGN);
-    const edge = on && isP && isD ? DESIGN : INK;
+    const both = isP && isD;
+    if (both) {
+      // Carried by both sides: the band splits, purple on the outer half for
+      // personality, red on the inner half for design. A coloured border said
+      // the same thing but read as a mistake rather than as information.
+      const mid = (R_GATE + R_GATE_IN) / 2;
+      s.push(`<path class="gateband" data-gate="${g.gate}" d="${arc(g.start, g.end, asc, R_GATE, mid)}" ` +
+        `fill="${PURPLE}" fill-opacity=".16" stroke="none"/>`);
+      s.push(`<path class="gateband" data-gate="${g.gate}" d="${arc(g.start, g.end, asc, mid, R_GATE_IN)}" ` +
+        `fill="${DESIGN}" fill-opacity=".16" stroke="none"/>`);
+    }
     s.push(`<path class="gateband" data-gate="${g.gate}" d="${arc(g.start, g.end, asc, R_GATE, R_GATE_IN)}" ` +
-      `fill="${fill}" fill-opacity="${on ? 0.16 : 0}" ` +
-      `stroke="${edge}" stroke-width="${on && isP && isD ? 1.1 : 0.5}" ` +
-      `stroke-opacity="${on && isP && isD ? 0.7 : 0.35}"/>`);
+      `fill="${!on || both ? "none" : (isP ? PURPLE : DESIGN)}" fill-opacity="${on && !both ? 0.16 : 0}" ` +
+      `stroke="${INK}" stroke-width="0.5" stroke-opacity=".35"/>`);
     // Gate 25 runs 358.25 to 3.875, the only gate that crosses 0 Aries.
     // Averaging its ends puts the midpoint on the far side of the wheel, which
     // left its number missing from the ring and drew its band inside out.

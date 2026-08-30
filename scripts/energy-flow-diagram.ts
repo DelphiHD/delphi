@@ -4047,6 +4047,38 @@ if (DATA.client) {
     // True_Node and Mean_Node; the chart calls them North Node and South Node,
     // so match on the label the data carries rather than the raw key. One
     // lookup, used by both the hover and the click, so they cannot drift apart.
+    // One tooltip for a planet, wherever it is hovered: the wheel, the summary
+    // lines, or the placements list. Built once so the three cannot drift.
+    var planetTip = function (nm, side) {
+      var pl = byName(nm, side);
+      if (!pl) return '';
+      var pill = function (w) {
+        if (!w) return '';
+        return '<span class="pill ' + esc(String(w).toLowerCase()) + '">' + esc(w) + '</span>';
+      };
+      var sideNm = side === 'design' ? 'Design ' : '';
+      var g = gateForPlanet(nm, side);
+      return '<b>' + esc(sideNm + (pl.label || pretty(pl.name))) + ' in ' + esc(pl.sign) +
+        ' ' + dg(pl.position) + '</b>' +
+        pill(pl.quality) + pill(pl.element) +
+        (HOUSE_N[pl.house] ? '<span class="pill house">House ' + HOUSE_N[pl.house] + '</span>' : '') +
+        (g ? '<span class="pill house">Gate ' + g + '</span>' : '') +
+        (pl.blurb ? '<br><span style="opacity:.78">' + esc(pl.blurb) + '</span>' : '');
+    };
+
+    // The geometry of an aspect, which is fact rather than interpretation.
+    // What each one MEANS is Kaycee's to write; this says only what it is.
+    var ASPECT_GEOMETRY = {
+      conjunction: 'Two planets at the same degree, 0 degrees apart.',
+      opposition: 'Two planets facing each other across the wheel, 180 degrees apart.',
+      square: 'Two planets 90 degrees apart, a quarter of the wheel.',
+      trine: 'Two planets 120 degrees apart, a third of the wheel.',
+      sextile: 'Two planets 60 degrees apart, a sixth of the wheel.',
+      quincunx: 'Two planets 150 degrees apart.',
+      quintile: 'Two planets 72 degrees apart, a fifth of the wheel.',
+      semisextile: 'Two planets 30 degrees apart.'
+    };
+
     var gateForPlanet = function (nm, side) {
       var src = side === 'design' ? (A.design || {}) : A;
       var pl = ((src.planets) || []).filter(function (x) { return x.name === nm; })[0];
@@ -4104,6 +4136,7 @@ if (DATA.client) {
           function (n) { n.classList.add('hov-band'); });
       };
       var clearHover = function () {
+        tip.hidden = true;
         [].forEach.call(wheelEl.querySelectorAll('.hov-band'), function (n) { n.classList.remove('hov-band'); });
         [].forEach.call(wheelEl.querySelectorAll('.hov-cusp'), function (n) { n.classList.remove('hov-cusp'); });
         [].forEach.call(wheelEl.querySelectorAll('.hov-glyph'), function (n) { n.classList.remove('hov-glyph'); });
@@ -4116,6 +4149,7 @@ if (DATA.client) {
         clearHover();
         if (!r) return;
         var nm = r.getAttribute('data-prow');
+        showTip(e, planetTip(nm, 'personality'));
         [].forEach.call(wheelEl.querySelectorAll('[data-aplanet="' + nm + '"][data-side="personality"]'),
           function (n) { n.classList.add('hov-glyph'); });
         var sp = wheelEl.querySelector('[data-spoke="personality:' + nm + '"]');
@@ -4156,6 +4190,7 @@ if (DATA.client) {
           if (!r) return;
           var nm = r.getAttribute('data-prow');
           if (nm) {
+            showTip(e, planetTip(nm, 'personality'));
             [].forEach.call(wheelEl.querySelectorAll('[data-aplanet="' + nm + '"][data-side="personality"]'),
               function (n) { n.classList.add('hov-glyph'); });
             var sp = wheelEl.querySelector('[data-spoke="personality:' + nm + '"]');
@@ -4165,6 +4200,8 @@ if (DATA.client) {
           }
           // an angle: light it and its opposite, since they are one axis
           var an = r.getAttribute('data-angrow');
+          var aa = (DATA.angles || {})[an];
+          if (aa) showTip(e, '<b>' + esc(aa[0]) + '</b><span style="opacity:.78">' + esc(aa[1]) + '</span>');
           var pairFor = { As: ['As', 'Ds'], Mc: ['Mc', 'Ic'] };
           (pairFor[an] || [an]).forEach(function (a) {
             var el = wheelEl.querySelector('text[data-angle="' + a + '"]');
@@ -4209,6 +4246,16 @@ if (DATA.client) {
           clearHover();
           if (!r) return;
           var pair = r.getAttribute('data-arow').split('|');
+          var asp = (A.aspects || []).filter(function (x) {
+            return x.p1_name === pair[0] && x.p2_name === pair[1];
+          })[0];
+          if (asp) {
+            var geo = ASPECT_GEOMETRY[asp.aspect] || '';
+            showTip(e, '<b>' + esc(labelOf(asp.p1_name)) + ' ' + esc(asp.aspect) + ' ' +
+              esc(labelOf(asp.p2_name)) + '</b>' +
+              '<span class="pill house">orb ' + (Math.round(Math.abs(asp.orbit) * 10) / 10) + '\u00b0</span>' +
+              (geo ? '<br><span style="opacity:.78">' + esc(geo) + '</span>' : ''));
+          }
           pair.forEach(function (nm) {
             [].forEach.call(wheelEl.querySelectorAll('[data-aplanet="' + nm + '"][data-side="personality"]'),
               function (n) { n.classList.add('hov-glyph'); });
