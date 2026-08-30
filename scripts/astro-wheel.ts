@@ -86,9 +86,9 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   ANCHOR = anchor;
   const asc = chart.ascendant;
   const s: string[] = [];
-  s.push(`<svg viewBox="-34 -96 788 840" width="788" height="840" xmlns="http://www.w3.org/2000/svg" ` +
+  s.push(`<svg viewBox="-54 -118 828 884" width="828" height="884" xmlns="http://www.w3.org/2000/svg" ` +
     `font-family="Montserrat, 'Helvetica Neue', sans-serif">`);
-  s.push(`<rect x="-34" y="-96" width="788" height="840" fill="${CREAM}"/>`);
+  s.push(`<rect x="-54" y="-118" width="828" height="884" fill="${CREAM}"/>`);
 
   // The 64 gates, outside the zodiac on the same circle. A gate the chart
   // carries is filled; the rest are outline only, the same convention the
@@ -99,7 +99,12 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
     s.push(`<path class="gateband" data-gate="${g.gate}" d="${arc(g.start, g.end, asc, R_GATE, R_GATE_IN)}" ` +
       `fill="${on ? PURPLE : "none"}" fill-opacity="${on ? 0.16 : 0}" ` +
       `stroke="${INK}" stroke-width="0.5" stroke-opacity=".35"/>`);
-    const [gx, gy] = pt((g.start + g.end) / 2, asc, (R_GATE + R_GATE_IN) / 2);
+    // Gate 25 runs 358.25 to 3.875, the only gate that crosses 0 Aries.
+    // Averaging its ends puts the midpoint on the far side of the wheel, which
+    // left its number missing from the ring and drew its band inside out.
+    const span = ((g.end - g.start) % 360 + 360) % 360;
+    const mid = (g.start + span / 2) % 360;
+    const [gx, gy] = pt(mid, asc, (R_GATE + R_GATE_IN) / 2);
     s.push(`<text class="gateband" data-gate="${g.gate}" x="${f(gx)}" y="${f(gy + 4)}" ` +
       `text-anchor="middle" font-size="11" font-weight="${on ? 600 : 400}" ` +
       `fill="${INK}" opacity="${on ? 0.95 : 0.4}">${g.gate}</text>`);
@@ -241,7 +246,8 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   // the angles
   const angles: [string, number][] = [["As", asc], ["Ds", asc + 180], ["Mc", chart.mc], ["Ic", chart.mc + 180]];
   for (const [label, lon] of angles) {
-    const [x, y] = pt(lon, asc, R_OUT + 16);
+    // outside the gate ring, not tucked underneath it
+    const [x, y] = pt(lon, asc, R_GATE + 20);
     s.push(`<text class="angle" data-angle="${label}" x="${f(x)}" y="${f(y + 4)}" ` +
       `text-anchor="middle" font-size="12" font-weight="600" fill="${PURPLE}" ` +
       `letter-spacing=".06em">${label}</text>`);

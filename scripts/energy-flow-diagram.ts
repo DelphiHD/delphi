@@ -2607,9 +2607,14 @@ body:not(.astro-all) .astro .asp.extra { display:none; }
   border:1px solid currentColor; }
 .astro text[data-aplanet]:hover { font-weight:600; }
 .astro .spoke { pointer-events:none; transition:opacity .12s; }
-.astro .lit-band { stroke:#f1c232 !important; stroke-width:2.5 !important; stroke-opacity:1 !important; }
-.astro text.lit-band { fill:#8a6a14 !important; opacity:1 !important; font-weight:600; }
+.astro path.lit-band { stroke:#f1c232 !important; stroke-width:2.5 !important; stroke-opacity:1 !important; }
+/* a gate number changes colour when it is picked out; it does not thicken.
+   Bold gold on a small numeral turns it into a smudge. */
+.astro text.lit-band { fill:#845095 !important; opacity:1 !important; }
 .astro .lit-glyph { fill:#f1c232 !important; font-weight:700; }
+.astro .hov-glyph { fill:#f1c232 !important; font-weight:700; }
+#astroplanets .pl-row { cursor:default; border-radius:5px; margin:0 -5px; padding:0 5px; }
+#astroplanets .pl-row:hover { background:rgba(241,194,50,.16); }
 body:not(.astro-all) #astroaspects .line.extra { display:none; }
 /* this view's home tab is astrology, not Human Design */
 #astrohome { display:none; }
@@ -3782,7 +3787,30 @@ if (DATA.client) {
       sv.setAttribute('viewBox', off ? sv.dataset.vbCore : sv.dataset.vbWide);
     });
   };
+  // The astrology wheel opens on personality alone: 26 glyphs across two rings
+  // is a lot to meet at once, and Design is one click away. Restored on the way
+  // out, so the bodygraph is never left with a side hidden the reader never hid,
+  // and it stops managing the toggle the moment the reader uses it themselves.
+  var astroHidDesign = false, designHeld = false;
+  var sideDBtn = document.getElementById('sideD');
+  if (sideDBtn) sideDBtn.addEventListener('click', function () { designHeld = true; });
+  var enterAstro = function () {
+    if (designHeld) return;
+    if (!body.classList.contains('off-s-design')) {
+      body.classList.add('off-s-design');
+      if (sideDBtn) sideDBtn.classList.remove('on');
+      astroHidDesign = true;
+    }
+  };
+  var leaveAstro = function () {
+    if (!astroHidDesign) return;
+    body.classList.remove('off-s-design');
+    if (sideDBtn) sideDBtn.classList.add('on');
+    astroHidDesign = false;
+  };
+
   var view = function (id) {
+    if (id === 'astro') enterAstro(); else leaveAstro();
     body.classList.toggle('view-astro', id === 'astro');
     body.classList.toggle('view-mandala', id === 'mandala');
     body.classList.toggle('view-plain', id === 'plain');
@@ -4000,13 +4028,69 @@ if (DATA.client) {
       ' ' + dg(A.mc % 30) + '</div>';
 
     document.getElementById('astroplanets').innerHTML = A.planets.map(function (p) {
-      return '<div class="line"><i>' + esc(p.label || pretty(p.name)) + '</i><span>' + esc(p.sign) +
+      return '<div class="line pl-row" data-prow="' + esc(p.name) + '"><i>' +
+        esc(p.label || pretty(p.name)) + '</i><span>' + esc(p.sign) +
         ' ' + dg(p.position) + '</span><i>' + (HOUSE_N[p.house] || '') + '</i></div>';
     }).join('');
 
+    // hovering a row in the panel lights that planet on the wheel, the same way
+    // the stats rows light gates. The chart is the answer to the list.
+    var wheelEl = document.querySelector('.astro');
+    var rowsEl = document.getElementById('astroplanets');
+    if (wheelEl && rowsEl) {
+      var clearHover = function () {
+        [].forEach.call(wheelEl.querySelectorAll('.hov-glyph'), function (n) { n.classList.remove('hov-glyph'); });
+        [].forEach.call(wheelEl.querySelectorAll('.spoke'), function (l) {
+          if (l.getAttribute('data-hov')) { l.setAttribute('opacity', '0'); l.removeAttribute('data-hov'); }
+        });
+      };
+      rowsEl.addEventListener('mousemove', function (e) {
+        var r = e.target.closest ? e.target.closest('[data-prow]') : null;
+        clearHover();
+        if (!r) return;
+        var nm = r.getAttribute('data-prow');
+        [].forEach.call(wheelEl.querySelectorAll('[data-aplanet="' + nm + '"][data-side="personality"]'),
+          function (n) { n.classList.add('hov-glyph'); });
+        var sp = wheelEl.querySelector('[data-spoke="personality:' + nm + '"]');
+        if (sp) { sp.setAttribute('opacity', '.5'); sp.setAttribute('data-hov', '1'); }
+      });
+      rowsEl.addEventListener('mouseleave', clearHover);
+
+      // houses: light the house number on the wheel and its cusp
+      var hRows = document.getElementById('astrohouses');
+      if (hRows) {
+        hRows.addEventListener('mousemove', function (e) {
+          var r = e.target.closest ? e.target.closest('[data-hrow]') : null;
+          clearHover();
+          if (!r) return;
+          var h = wheelEl.querySelector('text.hnum[data-house="' + r.getAttribute('data-hrow') + '"]');
+          if (h) h.classList.add('hov-glyph');
+        });
+        hRows.addEventListener('mouseleave', clearHover);
+      }
+
+      // aspects: light both ends and show the chord between them
+      var aRows = document.getElementById('astroaspects');
+      if (aRows) {
+        aRows.addEventListener('mousemove', function (e) {
+          var r = e.target.closest ? e.target.closest('[data-arow]') : null;
+          clearHover();
+          if (!r) return;
+          var pair = r.getAttribute('data-arow').split('|');
+          pair.forEach(function (nm) {
+            [].forEach.call(wheelEl.querySelectorAll('[data-aplanet="' + nm + '"][data-side="personality"]'),
+              function (n) { n.classList.add('hov-glyph'); });
+            var sp = wheelEl.querySelector('[data-spoke="personality:' + nm + '"]');
+            if (sp) { sp.setAttribute('opacity', '.45'); sp.setAttribute('data-hov', '1'); }
+          });
+        });
+        aRows.addEventListener('mouseleave', clearHover);
+      }
+    }
+
     document.getElementById('astrohouses').innerHTML = A.houses.map(function (h, i) {
-      return '<div class="line"><i>House ' + (i + 1) + '</i><span>' + esc(h.sign) +
-        ' ' + dg(h.position) + '</span><i></i></div>';
+      return '<div class="line pl-row" data-hrow="' + (i + 1) + '"><i>House ' + (i + 1) +
+        '</i><span>' + esc(h.sign) + ' ' + dg(h.position) + '</span><i></i></div>';
     }).join('');
 
     var isPlanet = {};
@@ -4016,7 +4100,8 @@ if (DATA.client) {
     }).map(function (x) {
       var core = CLASSIC[x.aspect] && !MINOR_PT[x.p1_name] && !MINOR_PT[x.p2_name] &&
         Math.abs(x.orbit) <= 6;
-      return '<div class="line ' + (core ? 'core' : 'extra') + '"><i>' + esc(labelOf(x.p1_name)) +
+      return '<div class="line pl-row ' + (core ? 'core' : 'extra') +
+        '" data-arow="' + esc(x.p1_name) + '|' + esc(x.p2_name) + '"><i>' + esc(labelOf(x.p1_name)) +
         '</i><span>' + esc(x.aspect) + ' ' + esc(labelOf(x.p2_name)) + '</span><i>' +
         (Math.round(Math.abs(x.orbit) * 10) / 10) + '\u00b0</i></div>';
     }).join('');
