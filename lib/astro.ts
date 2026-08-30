@@ -166,12 +166,26 @@ export async function getAstro(args: {
   /** Placidus by default; the API takes about twenty systems as single letters */
   houseSystem?: string;
   includeProviderSvg?: boolean;
+  /** UTC instant to read instead of the birth moment, for the design side.
+   *  The design side is the same person at a different moment, so it is read
+   *  the same way: another natal chart, about 88 days earlier. Only its planets
+   *  are used on a shared wheel; its own houses and angles belong to a horizon
+   *  that is not the one the chart is drawn on, exactly as in a synastry
+   *  bi-wheel, where the second chart contributes planets and nothing else. */
+  atUtc?: string;
 }): Promise<AstroChart> {
   const loc = await locate(args.place);
   const url = new URL(API_BASE + ASTRO_PATH);
   url.searchParams.set("api_key", apiKey());
-  url.searchParams.set("date", `${args.birthDate} ${args.birthTime}`);
-  url.searchParams.set("timezone", loc.timezone);
+  if (args.atUtc) {
+    // "1983-03-18T22:32:13+00:00" -> "1983-03-18 22:32", read as UTC
+    const d = args.atUtc.slice(0, 16).replace("T", " ");
+    url.searchParams.set("date", d);
+    url.searchParams.set("timezone", "UTC");
+  } else {
+    url.searchParams.set("date", `${args.birthDate} ${args.birthTime}`);
+    url.searchParams.set("timezone", loc.timezone);
+  }
   url.searchParams.set("latitude", String(loc.lat));
   url.searchParams.set("longitude", String(loc.lon));
   url.searchParams.set("house_system", args.houseSystem ?? "P");

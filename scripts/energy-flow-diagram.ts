@@ -610,6 +610,8 @@ const CENTER_FROM_API: Record<CenterName, Center> = {
 };
 
 interface ClientCtx {
+  /** the raw design instant, for reading the design side's astrology */
+  designUtc: string;
   slug: string;
   name: string;
   svg: string;                  // their branded SVG, activations and all
@@ -686,6 +688,8 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
       personality: fmt(chart.birth.utcDate, tz, true),
       design: fmt(chart.birth.designUtcDate, "UTC", false),
     },
+      /** the raw design instant, for reading the design side's astrology */
+      designUtc: chart.birth.designUtcDate,
     channels: new Set(chart.channels.map((c) => pairKey(c.gates[0], c.gates[1]))),
     centers: new Set(
       chart.centers.filter((c) => c.defined).map((c) => CENTER_FROM_API[c.name]),
@@ -2417,6 +2421,10 @@ ${PLANET_ROWS.map((p) => {
 }).join("\n")}
 body.off-s-personality .mandala [data-side="personality"] { display:none; }
 body.off-s-design .mandala [data-side="design"] { display:none; }
+/* the astrology wheel answers to the same two toggles: personality, design, or
+   both at once, which is the overlay. Same person, two moments, one zodiac. */
+body.off-s-personality .astro [data-side="personality"] { display:none; }
+body.off-s-design .astro [data-side="design"] { display:none; }
 body.off-s-personality .prow[data-side="personality"],
 body.off-s-design .prow[data-side="design"] { opacity:.3; }
 /* the gate number follows whatever is still showing */
@@ -4789,6 +4797,7 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
   // moment to draw, and a failure here must not cost her the whole chart: the
   // view simply does not appear.
   let astroChart: AstroChart | null = null;
+  let astroDesign: AstroChart | null = null;
   if (client) {
     try {
       const brief = clientFromSlug(slug);
@@ -4796,12 +4805,22 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
         birthDate: brief.birthDate, birthTime: brief.birthTime,
         place: placeForLookup(brief),
       });
+      // The design side is the same person at the design moment, which the HD
+      // response gives us exactly. A second reading of the same endpoint, not a
+      // different kind of chart.
+      const designUtc = client.designUtc;
+      if (designUtc) {
+        astroDesign = await getAstro({
+          birthDate: brief.birthDate, birthTime: brief.birthTime,
+          place: placeForLookup(brief), atUtc: designUtc,
+        });
+      }
     } catch (err) {
       console.log(`  astrology unavailable: ${(err as Error).message}`);
     }
   }
   const astroHtml = astroChart
-    ? `<div class="astro">${renderWheel(astroChart, client!.name)}</div>`
+    ? `<div class="astro">${renderWheel(astroChart, client!.name, astroDesign)}</div>`
     : "";
   if (astroChart) scene.astro = astroChart;
 

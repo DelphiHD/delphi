@@ -34,8 +34,12 @@ const GLYPH: Record<string, string> = {
   True_Node: "☊", Mean_Node: "☋", Mean_Lilith: "⚸", Chiron: "⚷",
 };
 
+const DESIGN = "#e06666";   // the same red the bodygraph uses for the design side
+
 const CX = 360, CY = 360;
-const R_OUT = 330, R_SIGN = 288, R_TICK = 278, R_PLANET = 250, R_HOUSE = 214, R_ASPECT = 196;
+const R_OUT = 330, R_SIGN = 288, R_TICK = 278, R_PLANET = 252, R_HOUSE = 232, R_ASPECT = 178;
+/** Design planets sit just inside the personality ring, on the same zodiac. */
+const R_DESIGN = 208;
 
 /** Screen angle for a zodiac longitude: Ascendant on the left, signs counterclockwise. */
 function pt(lon: number, asc: number, r: number): [number, number] {
@@ -58,7 +62,7 @@ const degLabel = (pos: number) => {
   return m === 60 ? `${d + 1}°` : `${d}°${String(m).padStart(2, "0")}'`;
 };
 
-export function renderWheel(chart: AstroChart, name: string): string {
+export function renderWheel(chart: AstroChart, name: string, design?: AstroChart | null): string {
   const asc = chart.ascendant;
   const s: string[] = [];
   s.push(`<svg viewBox="0 -66 720 780" width="720" height="780" xmlns="http://www.w3.org/2000/svg" ` +
@@ -140,12 +144,33 @@ export function renderWheel(chart: AstroChart, name: string): string {
     placed.push(lon);
     const [x, y] = pt(lon, asc, R_PLANET);
     const [tx, ty] = pt(lon, asc, R_PLANET - 26);
-    s.push(`<text class="pglyph" data-aplanet="${p.name}" x="${f(x)}" y="${f(y + 8)}" ` +
+    s.push(`<text class="pglyph pside" data-aplanet="${p.name}" data-side="personality" x="${f(x)}" y="${f(y + 8)}" ` +
       `text-anchor="middle" font-size="21" fill="${INK}">` +
       `${GLYPH[p.name] ?? p.name.slice(0, 2)}</text>`);
-    s.push(`<text class="pglyph" data-aplanet="${p.name}" x="${f(tx)}" y="${f(ty + 4)}" ` +
+    s.push(`<text class="pglyph pside" data-aplanet="${p.name}" data-side="personality" x="${f(tx)}" y="${f(ty + 4)}" ` +
       `text-anchor="middle" font-size="9.5" ` +
       `fill="${INK}" opacity=".6" letter-spacing=".02em">${degLabel(p.position)}</text>`);
+  }
+
+  // The design side: the same person 88 degrees of solar arc earlier. Only its
+  // planets come across. Its own houses and angles belong to a horizon this
+  // wheel is not drawn on, exactly as in a synastry bi-wheel where the second
+  // chart contributes planets and nothing else.
+  if (design) {
+    const placedD: number[] = [];
+    for (const p of [...design.planets].sort((a, b) => a.abs_pos - b.abs_pos)) {
+      let lon = p.abs_pos;
+      while (placedD.some((q) => Math.abs(((lon - q + 540) % 360) - 180) < 6)) lon += 3;
+      placedD.push(lon);
+      const [x, y] = pt(lon, asc, R_DESIGN);
+      const [tx, ty] = pt(lon, asc, R_DESIGN - 22);
+      s.push(`<text class="pglyph dside" data-aplanet="${p.name}" data-side="design" ` +
+        `x="${f(x)}" y="${f(y + 7)}" text-anchor="middle" font-size="19" fill="${DESIGN}">` +
+        `${GLYPH[p.name] ?? p.name.slice(0, 2)}</text>`);
+      // no degree label on the design ring: with 26 glyphs on two rings the
+      // numbers collide into noise. The hover carries the exact degree.
+      void tx; void ty;
+    }
   }
 
   // the angles
