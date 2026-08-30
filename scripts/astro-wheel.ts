@@ -41,10 +41,10 @@ const CX = 360, CY = 360;
 /** The 64 gates ride outside the zodiac, on the same wheel and the same
  *  longitudes: the Rave mandala and the zodiac are one circle, anchored at
  *  Gate 41 line 1 = 2 Aquarius = 302 degrees. */
-const R_GATE = 348, R_GATE_IN = 318;
-const R_OUT = 312, R_SIGN = 272, R_TICK = 262, R_PLANET = 238, R_HOUSE = 220, R_ASPECT = 170;
+const R_GATE = 348, R_GATE_IN = 316;
+const R_OUT = 310, R_SIGN = 272, R_TICK = 262, R_PLANET = 244, R_HOUSE = 214, R_ASPECT = 168;
 /** Design planets sit just inside the personality ring, on the same zodiac. */
-const R_DESIGN = 196;
+const R_DESIGN = 200;
 
 /**
  * Screen angle for a zodiac longitude.
@@ -174,19 +174,28 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   }
 
   // planets, nudged apart when they crowd
-  const placed: number[] = [];
+  // Crowded glyphs are staggered INWARD, never sideways. Moving a planet round
+  // the wheel to make room changes the one thing the wheel asserts: Kaycee's Sun
+  // sits at 85.76, inside gate 12, and a 3 degree nudge to clear the North Node
+  // put it visually inside gate 15. With a gate ring outside the zodiac, an
+  // angular nudge is the chart telling a lie. Radius is free; angle is not.
+  const placed: { lon: number; ring: number }[] = [];
   for (const p of [...chart.planets].sort((a, b) => a.abs_pos - b.abs_pos)) {
-    let lon = p.abs_pos;
-    while (placed.some((q) => Math.abs(((lon - q + 540) % 360) - 180) < 6)) lon += 3;
-    placed.push(lon);
-    const [x, y] = pt(lon, asc, R_PLANET);
-    const [tx, ty] = pt(lon, asc, R_PLANET - 26);
+    const lon = p.abs_pos;
+    let ring = 0;
+    while (placed.some((q) => q.ring === ring &&
+      Math.abs(((lon - q.lon + 540) % 360) - 180) < 6)) ring++;
+    placed.push({ lon, ring });
+    const [x, y] = pt(lon, asc, R_PLANET - ring * 21);
+    const [tx, ty] = pt(lon, asc, R_PLANET - ring * 21 - 13);
     s.push(`<text class="pglyph pside" data-aplanet="${p.name}" data-side="personality" x="${f(x)}" y="${f(y + 8)}" ` +
       `text-anchor="middle" font-size="21" fill="${INK}">` +
       `${GLYPH[p.name] ?? p.name.slice(0, 2)}</text>`);
-    s.push(`<text class="pglyph pside" data-aplanet="${p.name}" data-side="personality" x="${f(tx)}" y="${f(ty + 4)}" ` +
-      `text-anchor="middle" font-size="9.5" ` +
-      `fill="${INK}" opacity=".6" letter-spacing=".02em">${degLabel(p.position)}</text>`);
+    // The degree lives in the hover, not on the face. Twenty-six glyphs plus
+    // twenty-six numbers is more ink than the wheel can carry, and the number is
+    // the thing you want when you ask about one planet, not while reading all
+    // of them at once.
+    void tx; void ty;
   }
 
   // The design side: the same person 88 degrees of solar arc earlier. Only its
@@ -194,13 +203,15 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   // wheel is not drawn on, exactly as in a synastry bi-wheel where the second
   // chart contributes planets and nothing else.
   if (design) {
-    const placedD: number[] = [];
+    const placedD: { lon: number; ring: number }[] = [];
     for (const p of [...design.planets].sort((a, b) => a.abs_pos - b.abs_pos)) {
-      let lon = p.abs_pos;
-      while (placedD.some((q) => Math.abs(((lon - q + 540) % 360) - 180) < 6)) lon += 3;
-      placedD.push(lon);
-      const [x, y] = pt(lon, asc, R_DESIGN);
-      const [tx, ty] = pt(lon, asc, R_DESIGN - 22);
+      const lon = p.abs_pos;
+      let ring = 0;
+      while (placedD.some((q) => q.ring === ring &&
+        Math.abs(((lon - q.lon + 540) % 360) - 180) < 6)) ring++;
+      placedD.push({ lon, ring });
+      const [x, y] = pt(lon, asc, R_DESIGN - ring * 19);
+      const [tx, ty] = pt(lon, asc, R_DESIGN - ring * 20 - 12);
       s.push(`<text class="pglyph dside" data-aplanet="${p.name}" data-side="design" ` +
         `x="${f(x)}" y="${f(y + 7)}" text-anchor="middle" font-size="19" fill="${DESIGN}">` +
         `${GLYPH[p.name] ?? p.name.slice(0, 2)}</text>`);
