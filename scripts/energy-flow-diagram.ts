@@ -4058,8 +4058,13 @@ if (DATA.client) {
       var p = byName(n);
       return p && p.label ? p.label : pretty(n);
     };
-    var byName = function (n) {
-      for (var i = 0; i < A.planets.length; i++) if (A.planets[i].name === n) return A.planets[i];
+    // The design side is a different reading of the same planet, with its own
+    // sign, degree and house. Looking one up by name alone returns the
+    // personality reading, so a design glyph drawn in exactly the right place
+    // reported the wrong coordinates. The side is not optional.
+    var byName = function (n, side) {
+      var list = ((side === 'design' ? (A.design || {}) : A).planets) || [];
+      for (var i = 0; i < list.length; i++) if (list[i].name === n) return list[i];
       return null;
     };
     var sun = byName('Sun'), moon = byName('Moon');
@@ -4270,9 +4275,11 @@ if (DATA.client) {
             (note.theme ? '<br><span style="opacity:.5">' + esc(note.element) +
               ' signs: ' + esc(note.theme.toLowerCase()) + '</span>' : '');
         } else {
-          var pl = byName(t.getAttribute('data-aplanet'));
+          var pl = byName(t.getAttribute('data-aplanet'), t.getAttribute('data-side'));
           if (!pl) { tip.hidden = true; return; }
-          html = '<b>' + esc(pl.label || pretty(pl.name)) + ' in ' + esc(pl.sign) + ' ' + dg(pl.position) + '</b>' +
+          var sideNm = t.getAttribute('data-side') === 'design' ? 'Design ' : '';
+          html = '<b>' + esc(sideNm + (pl.label || pretty(pl.name))) + ' in ' + esc(pl.sign) +
+            ' ' + dg(pl.position) + '</b>' +
             pill(pl.quality) + pill(pl.element) +
             (HOUSE_N[pl.house] ? '<span class="pill house">House ' + HOUSE_N[pl.house] + '</span>' : '') +
             (pl.blurb ? '<br><span style="opacity:.72">' + esc(pl.blurb) + '</span>' : '');
