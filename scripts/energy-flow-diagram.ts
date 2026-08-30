@@ -2093,7 +2093,7 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
     <div class="row" id="actrow" hidden>
       <button id="reset" class="gold" data-help="Clears every highlight and selection and returns the chart to how it opened." data-help-label="Reset">Reset</button>
       <button id="snap" data-help="Downloads the chart exactly as it appears now, including whatever you have highlighted." data-help-label="Save Image">Save Image</button>
-      <button id="copytxt" data-help="Copies the data currently on screen as plain text, ready to paste anywhere. Chart data only, never report writing." data-help-label="Copy chart data">Copy chart data</button>
+      <button id="copytxt" data-help="Copies the data currently on screen as plain text, ready to paste anywhere. Chart data only, never report writing." data-help-label="Copy Chart Data">Copy Chart Data</button>
     </div>`;
   const face = [...fonts.entries()].map(([w, buf]) =>
     `@font-face{font-family:Montserrat;font-style:normal;font-weight:${w};font-display:swap;` +
@@ -2613,6 +2613,8 @@ body:not(.astro-all) .astro .asp.extra { display:none; }
 .astro text.lit-band { fill:#845095 !important; opacity:1 !important; }
 .astro .lit-glyph { fill:#f1c232 !important; font-weight:700; }
 .astro .hov-glyph { fill:#f1c232 !important; font-weight:700; }
+.astro path.hov-band { stroke:#f1c232 !important; stroke-width:2 !important; stroke-opacity:1 !important; }
+.astro text.hov-band { fill:#845095 !important; opacity:1 !important; }
 #astroplanets .pl-row { cursor:default; border-radius:5px; margin:0 -5px; padding:0 5px; }
 #astroplanets .pl-row:hover { background:rgba(241,194,50,.16); }
 body:not(.astro-all) #astroaspects .line.extra { display:none; }
@@ -2659,7 +2661,7 @@ ${d.client ? "" : viewControls}
 
     <div id="astrohome">
       <div id="astrometa"></div>
-      <div class="row" id="asprow"><button id="aspAll">Show every aspect</button></div>
+      <div class="row" id="asprow"><button id="aspAll">Show Every Aspect</button></div>
       <details class="drop" open><summary>Placements</summary><div id="astroplanets"></div></details>
       <details class="drop"><summary>Houses</summary><div id="astrohouses"></div></details>
       <details class="drop"><summary>Aspects</summary><div id="astroaspects"></div></details>
@@ -3976,7 +3978,7 @@ if (DATA.client) {
       var txt = body.classList.contains('view-astro') ? astroText() : hdText();
       var done = function (ok) {
         btn.textContent = ok ? 'Copied' : 'Press Cmd C';
-        setTimeout(function () { btn.textContent = 'Copy chart data'; }, 2000);
+        setTimeout(function () { btn.textContent = 'Copy Chart Data'; }, 2000);
       };
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(txt).then(function () { done(true); }, function () { done(false); });
@@ -4010,6 +4012,20 @@ if (DATA.client) {
       return d + '\u00b0' + (m < 10 ? '0' : '') + m + "'";
     };
     var pretty = function (n) { return n.replace(/_/g, ' '); };
+    // Which gate a planet sits in. The astrology endpoint calls the nodes
+    // True_Node and Mean_Node; the chart calls them North Node and South Node,
+    // so match on the label the data carries rather than the raw key. One
+    // lookup, used by both the hover and the click, so they cannot drift apart.
+    var gateForPlanet = function (nm, side) {
+      var src = side === 'design' ? (A.design || {}) : A;
+      var pl = ((src.planets) || []).filter(function (x) { return x.name === nm; })[0];
+      var want = String((pl && pl.label) || nm).replace('_', ' ').toLowerCase();
+      var hit = (DATA.placements || []).filter(function (q) {
+        return q.side === side && q.planet.toLowerCase() === want;
+      })[0];
+      return hit ? hit.gate : null;
+    };
+
     var labelOf = function (n) {
       var p = byName(n);
       return p && p.label ? p.label : pretty(n);
@@ -4038,7 +4054,14 @@ if (DATA.client) {
     var wheelEl = document.querySelector('.astro');
     var rowsEl = document.getElementById('astroplanets');
     if (wheelEl && rowsEl) {
+      var lightGate = function (nm, side) {
+        var g = gateForPlanet(nm, side);
+        if (!g) return;
+        [].forEach.call(wheelEl.querySelectorAll('.gateband[data-gate="' + g + '"]'),
+          function (n) { n.classList.add('hov-band'); });
+      };
       var clearHover = function () {
+        [].forEach.call(wheelEl.querySelectorAll('.hov-band'), function (n) { n.classList.remove('hov-band'); });
         [].forEach.call(wheelEl.querySelectorAll('.hov-glyph'), function (n) { n.classList.remove('hov-glyph'); });
         [].forEach.call(wheelEl.querySelectorAll('.spoke'), function (l) {
           if (l.getAttribute('data-hov')) { l.setAttribute('opacity', '0'); l.removeAttribute('data-hov'); }
@@ -4053,6 +4076,7 @@ if (DATA.client) {
           function (n) { n.classList.add('hov-glyph'); });
         var sp = wheelEl.querySelector('[data-spoke="personality:' + nm + '"]');
         if (sp) { sp.setAttribute('opacity', '.5'); sp.setAttribute('data-hov', '1'); }
+        lightGate(nm, 'personality');
       });
       rowsEl.addEventListener('mouseleave', clearHover);
 
@@ -4069,6 +4093,7 @@ if (DATA.client) {
               function (n) { n.classList.add('hov-glyph'); });
             var sp = wheelEl.querySelector('[data-spoke="personality:' + nm + '"]');
             if (sp) { sp.setAttribute('opacity', '.5'); sp.setAttribute('data-hov', '1'); }
+            lightGate(nm, 'personality');
             return;
           }
           // an angle: light it and its opposite, since they are one axis
@@ -4108,6 +4133,7 @@ if (DATA.client) {
               function (n) { n.classList.add('hov-glyph'); });
             var sp = wheelEl.querySelector('[data-spoke="personality:' + nm + '"]');
             if (sp) { sp.setAttribute('opacity', '.45'); sp.setAttribute('data-hov', '1'); }
+            lightGate(nm, 'personality');
           });
         });
         aRows.addEventListener('mouseleave', clearHover);
@@ -4218,10 +4244,7 @@ if (DATA.client) {
           var hEl = astroEl.querySelector('text.hnum[data-house="' + hn + '"]');
           if (hEl) hEl.classList.add('lit-band');
         }
-        var gate = null;
-        (DATA.placements || []).forEach(function (q) {
-          if (q.side === side && q.planet.toLowerCase() === String(name).replace('_', ' ').toLowerCase()) gate = q.gate;
-        });
+        var gate = gateForPlanet(name, side);
         if (gate) {
           [].forEach.call(astroEl.querySelectorAll('.gateband[data-gate="' + gate + '"]'),
             function (n) { n.classList.add('lit-band'); });
@@ -4233,7 +4256,7 @@ if (DATA.client) {
     ab.onclick = function () {
       var on = body.classList.toggle('astro-all');
       ab.classList.toggle('on', on);
-      ab.textContent = on ? 'Show the classic set' : 'Show every aspect';
+      ab.textContent = on ? 'Show the Classic Set' : 'Show Every Aspect';
     };
   } else {
     var vaGone = document.getElementById('vAstro');
