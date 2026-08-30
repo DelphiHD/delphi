@@ -2607,14 +2607,37 @@ body:not(.astro-all) .astro .asp.extra { display:none; }
   border:1px solid currentColor; }
 .astro text[data-aplanet]:hover { font-weight:600; }
 .astro .spoke { pointer-events:none; transition:opacity .12s; }
-.astro path.lit-band { stroke:#f1c232 !important; stroke-width:2.5 !important; stroke-opacity:1 !important; }
+.astro path.lit-band { fill:#fbf7b2 !important; fill-opacity:1 !important;
+  stroke:#c9a728 !important; stroke-width:1.6 !important; stroke-opacity:1 !important; }
+.astro path.housesector.lit-band { fill-opacity:.6 !important; stroke:none !important; }
 /* a gate number changes colour when it is picked out; it does not thicken.
    Bold gold on a small numeral turns it into a smudge. */
 .astro text.lit-band { fill:#845095 !important; opacity:1 !important; }
 .astro .lit-glyph { fill:#f1c232 !important; font-weight:700; }
 .astro .hov-glyph { fill:#f1c232 !important; font-weight:700; }
-.astro path.hov-band { stroke:#f1c232 !important; stroke-width:2 !important; stroke-opacity:1 !important; }
+/* highlights fill rather than merely outline: on a wheel this busy an outline
+   is easy to miss. The soft yellow is the defined Throat's own colour. */
+.astro path.hov-band { fill:#fbf7b2 !important; fill-opacity:1 !important;
+  stroke:#c9a728 !important; stroke-width:1.4 !important; stroke-opacity:1 !important; }
+.astro path.signband.hov-band { fill:#fbf7b2 !important; fill-opacity:1 !important; }
+.astro path.housesector.hov-band { fill-opacity:.55 !important; stroke:none !important; }
 .astro line.hov-cusp { stroke:#f1c232 !important; stroke-width:2.4 !important; opacity:1 !important; }
+/* per-planet toggles for the wheel, keyed on the astronomical name because the
+   chart and the astrology endpoint name the nodes differently */
+body.off-ap-Sun .astro [data-aplanet="Sun"] { display:none; }
+body.off-ap-Moon .astro [data-aplanet="Moon"] { display:none; }
+body.off-ap-Mercury .astro [data-aplanet="Mercury"] { display:none; }
+body.off-ap-Venus .astro [data-aplanet="Venus"] { display:none; }
+body.off-ap-Mars .astro [data-aplanet="Mars"] { display:none; }
+body.off-ap-Jupiter .astro [data-aplanet="Jupiter"] { display:none; }
+body.off-ap-Saturn .astro [data-aplanet="Saturn"] { display:none; }
+body.off-ap-Uranus .astro [data-aplanet="Uranus"] { display:none; }
+body.off-ap-Neptune .astro [data-aplanet="Neptune"] { display:none; }
+body.off-ap-Pluto .astro [data-aplanet="Pluto"] { display:none; }
+body.off-ap-True_Node .astro [data-aplanet="True_Node"] { display:none; }
+body.off-ap-Mean_Node .astro [data-aplanet="Mean_Node"] { display:none; }
+body.off-ap-Chiron .astro [data-aplanet="Chiron"] { display:none; }
+body.off-ap-Mean_Lilith .astro [data-aplanet="Mean_Lilith"] { display:none; }
 .astro text.hov-band { fill:#845095 !important; opacity:1 !important; }
 #astrohome .pl-row { cursor:default; border-radius:5px; margin:0 -5px; padding:0 5px; }
 #astrohome .pl-row:hover { background:rgba(241,194,50,.16); }
@@ -2663,7 +2686,11 @@ ${d.client ? "" : viewControls}
     <div id="astrohome">
       <div id="astrometa"></div>
       <div class="row" id="asprow"><button id="aspAll">Show Every Aspect</button></div>
-      <details class="drop" open><summary>Placements</summary><div id="astroplanets"></div></details>
+      <details class="drop" open><summary>Placements</summary>
+        <div id="astroplanets"></div>
+        <div class="pgrid" id="astroplanetbx"></div>
+        <div class="row"><button id="apAll">All</button><button id="apNone">None</button></div>
+      </details>
       <details class="drop"><summary>Houses</summary><div id="astrohouses"></div></details>
       <details class="drop"><summary>Aspects</summary><div id="astroaspects"></div></details>
     </div>
@@ -4055,6 +4082,13 @@ if (DATA.client) {
     var wheelEl = document.querySelector('.astro');
     var rowsEl = document.getElementById('astroplanets');
     if (wheelEl && rowsEl) {
+      var lightSign = function (nm, side) {
+        var src = side === 'design' ? (A.design || {}) : A;
+        var pl = ((src.planets) || []).filter(function (x) { return x.name === nm; })[0];
+        if (!pl) return;
+        var sb = wheelEl.querySelector('path.signband[data-asign="' + pl.sign + '"]');
+        if (sb) sb.classList.add('hov-band');
+      };
       var lightGate = function (nm, side) {
         var g = gateForPlanet(nm, side);
         if (!g) return;
@@ -4079,8 +4113,31 @@ if (DATA.client) {
         var sp = wheelEl.querySelector('[data-spoke="personality:' + nm + '"]');
         if (sp) { sp.setAttribute('opacity', '.5'); sp.setAttribute('data-hov', '1'); }
         lightGate(nm, 'personality');
+        lightSign(nm, 'personality');
       });
       rowsEl.addEventListener('mouseleave', clearHover);
+
+      // Per-planet toggles for the wheel, the same idea as the bodygraph's.
+      var bxWrap = document.getElementById('astroplanetbx');
+      if (bxWrap) {
+        bxWrap.innerHTML = (A.planets || []).map(function (p) {
+          return '<label class="cc"><input type="checkbox" class="apbx" data-ap="' +
+            esc(p.name) + '" checked>' + esc(p.label || pretty(p.name)) + '</label>';
+        }).join('');
+        var applyAp = function () {
+          [].forEach.call(document.querySelectorAll('.apbx'), function (b) {
+            body.classList.toggle('off-ap-' + b.getAttribute('data-ap'), !b.checked);
+          });
+        };
+        bxWrap.addEventListener('change', applyAp);
+        var setAllAp = function (on) {
+          [].forEach.call(document.querySelectorAll('.apbx'), function (b) { b.checked = on; });
+          applyAp();
+        };
+        var aA = document.getElementById('apAll'), aN = document.getElementById('apNone');
+        if (aA) aA.onclick = function () { setAllAp(true); };
+        if (aN) aN.onclick = function () { setAllAp(false); };
+      }
 
       // the four summary lines at the top: Sun, Moon, Ascendant, Midheaven
       var metaRows = document.getElementById('astrometa');
@@ -4124,6 +4181,8 @@ if (DATA.client) {
             var cl = wheelEl.querySelector('line.cusp[data-cusp="' + c + '"]');
             if (cl) cl.classList.add('hov-cusp');
           });
+          var sec = wheelEl.querySelector('path.housesector[data-hsector="' + hn + '"]');
+          if (sec) sec.classList.add('hov-band');
         });
         hRows.addEventListener('mouseleave', clearHover);
       }
@@ -5009,7 +5068,9 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
   }
   const astroHtml = astroChart
     ? `<div class="astro">${renderWheel(astroChart, client!.name, astroDesign, "aries",
-        [...new Set(client!.acts.map((a) => a.gate))])}</div>`
+        [...new Set(client!.acts.map((a) => a.gate))],
+        [...new Set(client!.acts.filter((a) => a.side === "personality").map((a) => a.gate))],
+        [...new Set(client!.acts.filter((a) => a.side === "design").map((a) => a.gate))])}</div>`
     : "";
   if (astroChart) scene.astro = astroChart;
   if (astroDesign) scene.astroDesign = astroDesign;

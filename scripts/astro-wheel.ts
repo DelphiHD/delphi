@@ -36,6 +36,7 @@ const GLYPH: Record<string, string> = {
 };
 
 const DESIGN = "#e06666";   // the same red the bodygraph uses for the design side
+const HILITE = "#fbf7b2";   // the defined Throat yellow, for highlights
 
 const CX = 360, CY = 360;
 /** The 64 gates ride outside the zodiac, on the same wheel and the same
@@ -82,7 +83,8 @@ const degLabel = (pos: number) => {
 };
 
 export function renderWheel(chart: AstroChart, name: string, design?: AstroChart | null,
-  anchor: WheelAnchor = "aries", carriedGates: readonly number[] = []): string {
+  anchor: WheelAnchor = "aries", carriedGates: readonly number[] = [],
+  personalityGates: readonly number[] = [], designGates: readonly number[] = []): string {
   ANCHOR = anchor;
   const asc = chart.ascendant;
   const s: string[] = [];
@@ -93,12 +95,22 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   // The 64 gates, outside the zodiac on the same circle. A gate the chart
   // carries is filled; the rest are outline only, the same convention the
   // bodygraph uses for activated and unactivated gates.
+  // A gate is coloured by the side that activates it, the same convention the
+  // bodygraph uses: personality in the brand purple, design in Delphi red. A
+  // gate both sides carry takes the purple fill and a red edge, because it is
+  // genuinely both and neither colour alone is true.
   const carried = new Set(carriedGates);
+  const pSide = new Set(personalityGates);
+  const dSide = new Set(designGates);
   for (const g of GATE_RANGES) {
     const on = carried.has(g.gate);
+    const isP = pSide.has(g.gate), isD = dSide.has(g.gate);
+    const fill = !on ? "none" : (isP ? PURPLE : DESIGN);
+    const edge = on && isP && isD ? DESIGN : INK;
     s.push(`<path class="gateband" data-gate="${g.gate}" d="${arc(g.start, g.end, asc, R_GATE, R_GATE_IN)}" ` +
-      `fill="${on ? PURPLE : "none"}" fill-opacity="${on ? 0.16 : 0}" ` +
-      `stroke="${INK}" stroke-width="0.5" stroke-opacity=".35"/>`);
+      `fill="${fill}" fill-opacity="${on ? 0.16 : 0}" ` +
+      `stroke="${edge}" stroke-width="${on && isP && isD ? 1.1 : 0.5}" ` +
+      `stroke-opacity="${on && isP && isD ? 0.7 : 0.35}"/>`);
     // Gate 25 runs 358.25 to 3.875, the only gate that crosses 0 Aries.
     // Averaging its ends puts the midpoint on the far side of the wheel, which
     // left its number missing from the ring and drew its band inside out.
@@ -140,6 +152,14 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   s.push(`<circle cx="${CX}" cy="${CY}" r="${R_SIGN}" fill="none" stroke="${INK}" stroke-width="1" opacity=".5"/>`);
   s.push(`<circle cx="${CX}" cy="${CY}" r="${R_HOUSE}" fill="none" stroke="${INK}" stroke-width="1" opacity=".35"/>`);
   s.push(`<circle cx="${CX}" cy="${CY}" r="${R_ASPECT}" fill="none" stroke="${INK}" stroke-width="1" opacity=".2"/>`);
+
+  // A sector per house, invisible until highlighted. Lighting a line is too
+  // quiet to find on a wheel this busy; lighting the slice is not.
+  chart.houses.forEach((h, i) => {
+    const next = chart.houses[(i + 1) % 12].abs_pos;
+    s.push(`<path class="housesector" data-hsector="${i + 1}" ` +
+      `d="${arc(h.abs_pos, next, asc, R_SIGN, R_ASPECT)}" fill="${HILITE}" fill-opacity="0"/>`);
+  });
 
   // house cusps, numbered in the space between the house ring and the aspect circle
   chart.houses.forEach((h, i) => {
