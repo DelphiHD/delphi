@@ -4020,11 +4020,11 @@ if (DATA.client) {
     };
     var sun = byName('Sun'), moon = byName('Moon');
     document.getElementById('astrometa').innerHTML =
-      (sun ? '<div class="line"><span>Sun</span> ' + sun.sign + ' ' + dg(sun.position) + '</div>' : '') +
-      (moon ? '<div class="line"><span>Moon</span> ' + moon.sign + ' ' + dg(moon.position) + '</div>' : '') +
-      '<div class="line"><span>Ascendant</span> ' + ZSIGN[Math.floor(A.ascendant / 30) % 12] +
+      (sun ? '<div class="line pl-row" data-prow="Sun"><span>Sun</span> ' + sun.sign + ' ' + dg(sun.position) + '</div>' : '') +
+      (moon ? '<div class="line pl-row" data-prow="Moon"><span>Moon</span> ' + moon.sign + ' ' + dg(moon.position) + '</div>' : '') +
+      '<div class="line pl-row" data-angrow="As"><span>Ascendant</span> ' + ZSIGN[Math.floor(A.ascendant / 30) % 12] +
       ' ' + dg(A.ascendant % 30) + '</div>' +
-      '<div class="line"><span>Midheaven</span> ' + ZSIGN[Math.floor(A.mc / 30) % 12] +
+      '<div class="line pl-row" data-angrow="Mc"><span>Midheaven</span> ' + ZSIGN[Math.floor(A.mc / 30) % 12] +
       ' ' + dg(A.mc % 30) + '</div>';
 
     document.getElementById('astroplanets').innerHTML = A.planets.map(function (p) {
@@ -4055,6 +4055,32 @@ if (DATA.client) {
         if (sp) { sp.setAttribute('opacity', '.5'); sp.setAttribute('data-hov', '1'); }
       });
       rowsEl.addEventListener('mouseleave', clearHover);
+
+      // the four summary lines at the top: Sun, Moon, Ascendant, Midheaven
+      var metaRows = document.getElementById('astrometa');
+      if (metaRows) {
+        metaRows.addEventListener('mousemove', function (e) {
+          var r = e.target.closest ? e.target.closest('[data-prow],[data-angrow]') : null;
+          clearHover();
+          if (!r) return;
+          var nm = r.getAttribute('data-prow');
+          if (nm) {
+            [].forEach.call(wheelEl.querySelectorAll('[data-aplanet="' + nm + '"][data-side="personality"]'),
+              function (n) { n.classList.add('hov-glyph'); });
+            var sp = wheelEl.querySelector('[data-spoke="personality:' + nm + '"]');
+            if (sp) { sp.setAttribute('opacity', '.5'); sp.setAttribute('data-hov', '1'); }
+            return;
+          }
+          // an angle: light it and its opposite, since they are one axis
+          var an = r.getAttribute('data-angrow');
+          var pairFor = { As: ['As', 'Ds'], Mc: ['Mc', 'Ic'] };
+          (pairFor[an] || [an]).forEach(function (a) {
+            var el = wheelEl.querySelector('text[data-angle="' + a + '"]');
+            if (el) el.classList.add('hov-glyph');
+          });
+        });
+        metaRows.addEventListener('mouseleave', clearHover);
+      }
 
       // houses: light the house number on the wheel and its cusp
       var hRows = document.getElementById('astrohouses');
