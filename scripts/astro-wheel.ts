@@ -91,6 +91,11 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   s.push(`<svg viewBox="-54 -118 828 884" width="828" height="884" xmlns="http://www.w3.org/2000/svg" ` +
     `font-family="Montserrat, 'Helvetica Neue', sans-serif">`);
   s.push(`<rect x="-54" y="-118" width="828" height="884" fill="${CREAM}"/>`);
+  s.push(`<defs><radialGradient id="gsplit" gradientUnits="userSpaceOnUse" ` +
+    `cx="${CX}" cy="${CY}" r="${R_GATE}">` +
+    `<stop offset="${(R_GATE_IN / R_GATE).toFixed(4)}" stop-color="${DESIGN}"/>` +
+    `<stop offset="1" stop-color="${PURPLE}"/>` +
+    `</radialGradient></defs>`);
 
   // The 64 gates, outside the zodiac on the same circle. A gate the chart
   // carries is filled; the rest are outline only, the same convention the
@@ -105,19 +110,14 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   for (const g of GATE_RANGES) {
     const on = carried.has(g.gate);
     const isP = pSide.has(g.gate), isD = dSide.has(g.gate);
+    // A gate carried by both sides is filled with a gradient across the band,
+    // Delphi red at the inner edge for design fading to purple at the outer
+    // edge for personality. A hard split read as two separate bands.
     const both = isP && isD;
-    if (both) {
-      // Carried by both sides: the band splits, purple on the outer half for
-      // personality, red on the inner half for design. A coloured border said
-      // the same thing but read as a mistake rather than as information.
-      const mid = (R_GATE + R_GATE_IN) / 2;
-      s.push(`<path class="gateband" data-gate="${g.gate}" d="${arc(g.start, g.end, asc, R_GATE, mid)}" ` +
-        `fill="${PURPLE}" fill-opacity=".16" stroke="none"/>`);
-      s.push(`<path class="gateband" data-gate="${g.gate}" d="${arc(g.start, g.end, asc, mid, R_GATE_IN)}" ` +
-        `fill="${DESIGN}" fill-opacity=".16" stroke="none"/>`);
-    }
-    s.push(`<path class="gateband" data-gate="${g.gate}" d="${arc(g.start, g.end, asc, R_GATE, R_GATE_IN)}" ` +
-      `fill="${!on || both ? "none" : (isP ? PURPLE : DESIGN)}" fill-opacity="${on && !both ? 0.16 : 0}" ` +
+    s.push(`<path class="gateband" data-gate="${g.gate}" ` +
+      `d="${arc(g.start, g.end, asc, R_GATE, R_GATE_IN)}" ` +
+      `fill="${!on ? "none" : both ? "url(#gsplit)" : (isP ? PURPLE : DESIGN)}" ` +
+      `fill-opacity="${on ? 0.3 : 0}" ` +
       `stroke="${INK}" stroke-width="0.5" stroke-opacity=".35"/>`);
     // Gate 25 runs 358.25 to 3.875, the only gate that crosses 0 Aries.
     // Averaging its ends puts the midpoint on the far side of the wheel, which
