@@ -828,7 +828,7 @@ export interface BuildResult {
  * (anything before the first H1) is preserved as-is. For duplicate H1s, the
  * LONGER version wins.
  */
-function normalizePlanetaryStructure(md: string): string {
+export function normalizePlanetaryStructure(md: string): string {
   const parts = md.split(/(?=^# [^#])/m);
   const frontMatter = parts[0];
   const sections = parts.slice(1);
@@ -1006,11 +1006,24 @@ export async function buildPlanetaryOverview(args: BuildArgs): Promise<BuildResu
   // only see what each chapter broke, so report-wide rules survive it. Assembly
   // goes through normalizePlanetaryStructure so the final pass judges exactly
   // the text the validator will judge.
+  // previousMarkdown is seeded with the static opening before any chapter is
+  // written, so chapter i lives at previousMarkdown[i + OPENING]. Pairing them
+  // without this offset paired every chapter with the previous chapter's text,
+  // dropped the last chapter entirely, and wrote rewrites back into the wrong
+  // slot. It cost Chris Kulish, Meelad and Michael Jackson a phantom
+  // "# Your Timeline" missing on 2026-08-30, and made Meelad's report worse
+  // rather than better; only the keep-the-better-draft guard saved it.
+  const OPENING = previousMarkdown.length - accumulated.length;
+
+  // The opening is part of the report the validator sees, but it is not a
+  // chapter and is never rewritten, so it goes in as a fixed prefix.
   const assemble = (parts: { text: string }[]) =>
-    normalizePlanetaryStructure(parts.map((p) => p.text).join("\n\n"));
+    normalizePlanetaryStructure(
+      previousMarkdown.slice(0, OPENING).concat(parts.map((p) => p.text)).join("\n\n"),
+    );
 
   const fp = await runFinalPass({
-    sections: accumulated.map((s, i) => ({ name: s.name, text: previousMarkdown[i] })),
+    sections: accumulated.map((s, i) => ({ name: s.name, text: previousMarkdown[i + OPENING] })),
     dataPass: args.dataPass,
     tier: "planetary",
     assemble,
@@ -1020,9 +1033,9 @@ export async function buildPlanetaryOverview(args: BuildArgs): Promise<BuildResu
   for (const line of fp.log) console.log(`  ${line}`);
 
   fp.sections.forEach((s, i) => {
-    if (s.text !== previousMarkdown[i]) {
+    if (s.text !== previousMarkdown[i + OPENING]) {
       accumulated[i].text = s.text;
-      previousMarkdown[i] = s.text;
+      previousMarkdown[i + OPENING] = s.text;
     }
   });
   totalCents += fp.costCents;
@@ -1033,7 +1046,13 @@ export async function buildPlanetaryOverview(args: BuildArgs): Promise<BuildResu
 
   const rawText = previousMarkdown.join("\n\n");
   const fullText = normalizePlanetaryStructure(rawText);
-  const validation = fp.validation;
+
+  // Always validate the text that is actually written, never whatever the final
+  // pass happened to assemble. Validation is a pure function and costs nothing,
+  // and when those two drifted apart on 2026-08-30 three reports were rejected
+  // for a section that was present in the file the whole time. A reported
+  // failure must always be checkable against the delivered report.
+  const validation = validateReport(fullText, args.dataPass, "planetary");
 
   return {
     text: fullText,

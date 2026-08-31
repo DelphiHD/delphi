@@ -752,7 +752,10 @@ export async function buildFoundationReport(args: BuildArgs): Promise<BuildResul
   totalUsage.cache_read_input_tokens += fp.usage.cache_read_input_tokens;
 
   const fullText = previousMarkdown.join("\n\n");
-  const validation = fp.validation;
+
+  // Validated on the text that is actually written. See the note in planetary.ts:
+  // a reported failure must always be checkable against the delivered report.
+  const validation = validateReport(fullText, args.dataPass);
 
   return {
     text: fullText,
