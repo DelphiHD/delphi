@@ -2900,6 +2900,9 @@ if (DATA.client) {
     for (var i = 0; i < a.length && i < b.length; i++) apply(a[i], b[i]);
   }
   function activeSvg() {
+    // Each view keeps its drawing somewhere different. Astrology was missing
+    // here, so Save Image found nothing and returned in silence.
+    if (body.classList.contains('view-astro')) return document.querySelector('.astro svg');
     if (body.classList.contains('view-mandala')) return document.querySelector('.mandala svg');
     return [].filter.call(document.querySelectorAll('svg.canvas'), function (sv) {
       return getComputedStyle(sv).display !== 'none';
@@ -2907,7 +2910,9 @@ if (DATA.client) {
   }
   function stateLine() {
     var bits = [];
-    bits.push(body.classList.contains('view-mandala') ? 'Mandala'
+    bits.push(body.classList.contains('view-astro') ? 'Astrology'
+      : body.classList.contains('view-transit') ? 'Transit'
+      : body.classList.contains('view-mandala') ? 'Mandala'
       : body.classList.contains('view-plain') ? 'Bodygraph' : 'Circuits');
     var sides = [];
     if (!body.classList.contains('off-s-personality')) sides.push('Personality');
