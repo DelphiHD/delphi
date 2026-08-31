@@ -109,6 +109,45 @@ async function main() {
   const kindLabel = kind === "foundation" ? "Foundation Report" : kind === "planetary" ? "Planetary Overview" : "Quickstart";
   console.log(`\n=== ${kindLabel} for ${brief.name} ===\n`);
 
+  // Every attempt is recorded, not only the ones that finish.
+  //
+  // Kaycee, 2026-08-31: "Sarah Marie's report DID NOT take 19 minutes to run.
+  // That's a lie and you know it. I need to know the truth of things so I can
+  // measure progress." She was right. Her report's first attempt ran 34 minutes
+  // before it was killed, then a second ran 19, and only the 19 was written
+  // down, because the log entry is only written on success. Every failure,
+  // timeout and kill was invisible, so the dashboard reported the best case as
+  // the whole story.
+  //
+  // This record is written on the way out whichever way the run ends.
+  const ATTEMPT_LOG = ".cache/reports/attempts.jsonl";
+  const attemptStart = Date.now();
+  const startedAt = new Date().toISOString();
+  let attemptRecorded = false;
+  const recordAttempt = (outcome: "completed" | "failed" | "killed", note = "") => {
+    if (attemptRecorded) return;
+    attemptRecorded = true;
+    try {
+      mkdirSync(".cache/reports", { recursive: true });
+      appendFileSync(ATTEMPT_LOG, JSON.stringify({
+        at: new Date().toISOString(),
+        started_at: startedAt,
+        client: brief.name,
+        client_slug: brief.slug,
+        report_type: kind === "foundation" ? "Foundation" : kind === "planetary" ? "Planetary Overview" : "Quickstart",
+        elapsed_sec: Math.round((Date.now() - attemptStart) / 10) / 100,
+        outcome,
+        note: note.slice(0, 300),
+      }) + "\n", "utf8");
+    } catch { /* never let bookkeeping take down a run */ }
+  };
+  for (const sig of ["SIGTERM", "SIGINT", "SIGHUP"] as const) {
+    process.on(sig, () => { recordAttempt("killed", "stopped by " + sig); process.exit(130); });
+  }
+  process.on("uncaughtException", (e) => { recordAttempt("failed", String(e)); throw e; });
+  (globalThis as Record<string, unknown>).__recordAttempt = recordAttempt;
+
+
   // 1. Resolve timezone + fetch chart.
   console.log(`Resolving timezone for "${placeForLookup(brief)}"…`);
   const tz = await getTimezoneForLocation(placeForLookup(brief));
@@ -405,6 +444,30 @@ soft_warnings: ${softCount}
     primary_path: primaryMdPath,
     cache_path:   resolve(outPath),
   };
+  recordAttempt("completed");
+
+  // What it actually took to get this report, not what the winning attempt took.
+  //
+  // Kaycee, 2026-08-31, on a row reading "19 min, $1.04, 0/4 retries" for a
+  // report whose first attempt ran 34 minutes before dying: "This entire line is
+  // a lie." It was. The row described the last attempt as though it were the
+  // whole effort. These fields describe the effort.
+  const effort = (() => {
+    try {
+      const day = generatedAt.slice(0, 10);
+      let minutes = 0, attempts = 0, lost = 0;
+      for (const line of readFileSync(ATTEMPT_LOG, "utf8").split("\n").filter(Boolean)) {
+        const a = JSON.parse(line) as { at?: string; client_slug?: string; elapsed_sec?: number; outcome?: string };
+        if (a.client_slug !== brief.slug || !String(a.at ?? "").startsWith(day)) continue;
+        minutes += (a.elapsed_sec ?? 0) / 60;
+        attempts++;
+        if (a.outcome !== "completed") lost++;
+      }
+      return { real_minutes: Math.round(minutes * 10) / 10, attempts, failed_attempts: lost };
+    } catch { return { real_minutes: Number(elapsed) / 60, attempts: 1, failed_attempts: 0 }; }
+  })();
+  Object.assign(logEntry, effort);
+
   appendFileSync(".cache/reports/log.jsonl", JSON.stringify(logEntry) + "\n");
 
   // 6. Lint: no em dashes.
@@ -525,4 +588,10 @@ soft_warnings: ${softCount}
   }
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  const rec = (globalThis as Record<string, unknown>).__recordAttempt as
+    ((o: "completed" | "failed" | "killed", n?: string) => void) | undefined;
+  rec?.("failed", e instanceof Error ? e.message : String(e));
+  console.error(e);
+  process.exit(1);
+});

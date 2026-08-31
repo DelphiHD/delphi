@@ -807,7 +807,7 @@ ${target(2000, 2800)}`,
 
 export interface BuildResult {
   text: string;
-  sections: { name: string; text: string; cost_cents: number; usage: InvokeResult["usage"]; }[];
+  sections: { name: string; text: string; cost_cents: number; usage: InvokeResult["usage"]; retried?: boolean; }[];
   cost_cents: number;
   usage: InvokeResult["usage"];
   retrievedChunkIds: string[];
@@ -942,6 +942,7 @@ export async function buildPlanetaryOverview(args: BuildArgs): Promise<BuildResu
     let text = first.text;
     let combinedCost = first.result.cost_cents;
     let combinedUsage: InvokeResult["usage"] = { ...first.result.usage };
+    let retried = false;
 
     // Delta-based retry loop — only flag NEW hard issues this call introduced.
     const MAX_RETRIES = 2;
@@ -978,6 +979,7 @@ export async function buildPlanetaryOverview(args: BuildArgs): Promise<BuildResu
       const nudge = `\n\nIMPORTANT (${attemptLabel}): a validator just rejected a draft of this section with the hard failures listed below. For EACH failure, the exact violating text from your prior draft is shown as "Detected in current draft" — you MUST REMOVE that specific phrasing from your rewrite. Rewrite the section from scratch, keeping the placement's mechanic and voice, but stripping out every "Detected" snippet and any equivalent phrasing. The Data Pass above is canonical. Do not introduce new failures of the same kind.\n\n${failsForRetry}\n`;
       const retry = await generateSection(section, nudge);
       text = retry.text;
+      retried = true;
       combinedCost = Math.round((combinedCost + retry.result.cost_cents) * 10000) / 10000;
       combinedUsage = {
         input_tokens: combinedUsage.input_tokens + retry.result.usage.input_tokens,
@@ -992,6 +994,12 @@ export async function buildPlanetaryOverview(args: BuildArgs): Promise<BuildResu
       text,
       cost_cents: combinedCost,
       usage: combinedUsage,
+
+      // Without this the Planetary reported "0 retries" on every report
+
+      // ever written, including ones where a chapter was rewritten twice.
+
+      retried,
     });
     totalCents += combinedCost;
     totalUsage.input_tokens += combinedUsage.input_tokens;
@@ -1035,6 +1043,7 @@ export async function buildPlanetaryOverview(args: BuildArgs): Promise<BuildResu
   fp.sections.forEach((s, i) => {
     if (s.text !== previousMarkdown[i + OPENING]) {
       accumulated[i].text = s.text;
+      (accumulated[i] as { retried?: boolean }).retried = true;
       previousMarkdown[i + OPENING] = s.text;
     }
   });

@@ -26,6 +26,91 @@ const DELIVERY_LOG = ".cache/reports/deliveries.jsonl";
 const FAILURE_LOG = ".cache/reports/failures.jsonl";
 const CHANGE_LOG = ".cache/charts/changelog.jsonl";
 
+const ATTEMPT_LOG = ".cache/reports/attempts.jsonl";
+
+/**
+ * The truth about time, including the attempts that never produced a report.
+ *
+ * The report log only gets an entry when a run succeeds, so a report that
+ * failed twice and worked on the third try was recorded as however long the
+ * third try took. Kaycee, 2026-08-31: "I need to know the truth of things so I
+ * can measure progress." Sarah Marie's Planetary showed as 19 minutes when the
+ * real cost of getting it was 53, because a 34-minute attempt was killed and
+ * never written down.
+ *
+ * `wasted` is time spent on attempts that produced nothing.
+ */
+/**
+ * Delivery rows for runs that never went through add-client.
+ *
+ * The delivery record, with its hang measurement, is written by add-client.ts.
+ * Every roster batch since 2026-08-27 was run through generate-report.ts
+ * directly, so the column Kaycee asked for sat empty for four days while the
+ * work carried on around it. Her words, 2026-08-31: "that field keeps
+ * disappearing... I expect to see the truth on the dashboard every time."
+ *
+ * Rather than depend on which script started a run, these rows are derived from
+ * the attempt log, which every run writes to on the way out. Real delivery
+ * records win where they exist; this only fills the gaps.
+ */
+function derivedDeliveries(): Record<string, unknown>[] {
+  if (!existsSync(ATTEMPT_LOG)) return [];
+  const groups = new Map<string, { client: string; slug: string; first: string; last: string;
+    generating: number; hang: number; attempts: number; completed: number }>();
+
+  for (const line of readFileSync(ATTEMPT_LOG, "utf8").split("\n").filter(Boolean)) {
+    let a: Record<string, string | number>;
+    try { a = JSON.parse(line); } catch { continue; }
+    const at = String(a.at ?? "");
+    const slug = String(a.client_slug ?? "");
+    if (!at || !slug) continue;
+    const key = `${slug}::${at.slice(0, 10)}`;
+    const g = groups.get(key) ?? {
+      client: String(a.client ?? slug), slug, first: String(a.started_at ?? at), last: at,
+      generating: 0, hang: 0, attempts: 0, completed: 0,
+    };
+    const mins = Number(a.elapsed_sec ?? 0) / 60;
+    g.attempts++;
+    if (a.outcome === "completed") { g.generating += mins; g.completed++; }
+    else g.hang += mins;
+    if (at > g.last) g.last = at;
+    if (String(a.started_at ?? at) < g.first) g.first = String(a.started_at ?? at);
+    groups.set(key, g);
+  }
+
+  return [...groups.entries()].map(([key, g]) => ({
+    at: g.last,
+    started: g.first,
+    client: g.client,
+    slug: g.slug,
+    id: key,
+    generating_minutes: Math.round(g.generating * 10) / 10,
+    hang_minutes: Math.round(g.hang * 10) / 10,
+    delivered_minutes: Math.round((g.generating + g.hang) * 10) / 10,
+    reports_attempted: g.attempts,
+    outcome: g.completed ? "delivered" : "failed",
+    derived: true,
+  }));
+}
+
+function attemptTotals(day?: string): { total: number; wasted: number; failed: number; killed: number } {
+  if (!existsSync(ATTEMPT_LOG)) return { total: 0, wasted: 0, failed: 0, killed: 0 };
+  let total = 0, wasted = 0, failed = 0, killed = 0;
+  for (const line of readFileSync(ATTEMPT_LOG, "utf8").split("\n").filter(Boolean)) {
+    let a: { at?: string; elapsed_sec?: number; outcome?: string };
+    try { a = JSON.parse(line); } catch { continue; }
+    if (day && !String(a.at ?? "").startsWith(day)) continue;
+    const mins = (a.elapsed_sec ?? 0) / 60;
+    total += mins;
+    if (a.outcome !== "completed") {
+      wasted += mins;
+      if (a.outcome === "killed") killed++; else failed++;
+    }
+  }
+  return { total, wasted, failed, killed };
+}
+
+
 /**
  * Identifies this running copy of the dashboard.
  *
@@ -728,8 +813,10 @@ const PAGE = /* html */ `<!doctype html>
         'Foundation and Planetary reports finished since midnight. Counted from the report log, one entry per completed report.') +
       tile(money(d.today.cost), 'spent today',
         'What today\u2019s reports cost in Claude API charges, added up from each report\u2019s own recorded cost. Charts, publishing and Notion cost nothing.') +
-      tile(d.today.minutes + ' min', 'model time today',
-        'Total time the model spent writing today\u2019s reports. Wall-clock per report added together, so two reports run one after another sum to both.') +
+          tile(Math.round((d.attempts && d.attempts.total) || d.today.minutes) + ' min', 'real time today',
+            'Every minute spent trying today, not just the runs that worked. A report that failed twice and succeeded on the third go counts all three. This is the number that tells you what the day actually cost.') +
+          tile(Math.round((d.attempts && d.attempts.wasted) || 0) + ' min', 'wasted today',
+            'Time spent on attempts that produced nothing: crashed, timed out, or stopped. If this is large, the reports are fighting something and it is worth knowing why rather than reading past it.') +
       tile(money(d.avgCost), 'average per report',
         'Every report ever written, total cost divided by the number of reports. Includes regenerations.') +
       tile(Math.round(d.avgMinutes) + ' min', 'average per report',
@@ -953,8 +1040,19 @@ const PAGE = /* html */ `<!doctype html>
             var when = new Date(r.at);
             return '<tr><td>' + esc(when.toLocaleDateString([], { month: 'short', day: 'numeric' })) +
               '</td><td>' + esc(when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) +
-            '</td><td>' + esc(r.client) + '</td><td>' + esc(r.kind) + '</td><td>' + money(r.cost) +
-              '</td><td>' + r.minutes + '</td><td' +
+            '</td><td>' + esc(r.client) + '</td><td>' + esc(r.kind) + '</td><td' +
+              (r.failed_attempts
+                ? ' data-help-label="a floor, not the total" data-help="' + r.failed_attempts +
+                  ' attempt(s) for this client that day produced nothing and died before their cost was recorded.'
+                  + ' What was spent getting here is higher than this figure."'
+                : '') +
+              '>' + money(r.cost) + (r.failed_attempts ? ' +' : '') + '</td><td' +
+              (r.real_minutes && Math.round(r.real_minutes) !== r.minutes
+                ? ' data-help-label="real time" data-help="' + Math.round(r.real_minutes) +
+                  ' minutes across ' + (r.attempts || 1) + ' attempt(s). The run that succeeded took ' + r.minutes +
+                  '. The rest went on attempts that produced nothing."'
+                : '') +
+              '>' + (r.real_minutes ? Math.round(r.real_minutes) : r.minutes) + '</td><td' +
               (r.retries === null || r.retries === undefined
                 ? ' style="opacity:.35" data-help="Written before retries were recorded."'
                 : r.retries > 0
@@ -1237,6 +1335,8 @@ createServer((req, res) => {
       })(),
       build: BUILD_ID,
       systemChanges: systemChanges(),
+      attempts: attemptTotals(today),
+      attemptsAll: attemptTotals(),
       changes: (() => {
         if (!existsSync(CHANGE_LOG)) return [];
         return readFileSync(CHANGE_LOG, "utf8").split("\n").filter(Boolean)
@@ -1255,6 +1355,9 @@ createServer((req, res) => {
       jobs: jobs.slice(-6).reverse(),
       byClient,
       recent: stats.slice(-30).reverse().map((r: any) => ({
+          real_minutes: r.real_minutes ?? null,
+          attempts: r.attempts ?? null,
+          failed_attempts: r.failed_attempts ?? 0,
         at: r.timestamp, client: r.client, kind: r.report_type, cost: r.cost_usd,
         words: r.words, minutes: Math.round((r.elapsed_sec ?? 0) / 60),
         validation: r.validation,
