@@ -2832,9 +2832,9 @@ body.show-bridges .bridge { opacity:1; }
   display:flex; align-items:center; gap:7px; }
 .chan-item:hover { background:rgba(132,80,149,.14); }
 .chan-item .sw { width:14px; height:4px; border-radius:2px; flex:0 0 14px; }
-#tab-dates h4, #tab-stats h4, #tab-pair h4 { font-size:9.5px; letter-spacing:.18em; font-weight:600; opacity:.6; margin:16px 0 7px;
+#tab-dates h4, #tab-stats h4, #relhome h4 { font-size:9.5px; letter-spacing:.18em; font-weight:600; opacity:.6; margin:16px 0 7px;
   text-transform:uppercase; }
-#tab-dates .line, .pane .line { font-size:11.5px; line-height:1.6; }
+#tab-dates .line, .pane .line, 
 #tab-dates .line span, .pane .line span { opacity:.6; }
 .cyc { font-size:11.5px; line-height:1.5; padding:6px 7px; margin:0 -7px 2px; border-radius:7px; cursor:pointer; }
 .cyc:hover { background:rgba(132,80,149,.14); }
