@@ -2964,8 +2964,6 @@ body:not(.mod-relation) svg.canvas.composite { display:none !important; }
 /* The pair's panel belongs to the relationship chart and appears nowhere else. */
 #relhome { display:none; }
 body.mod-relation #relhome { display:block; }
-#relhome .relpair { font-size:11.5px; font-weight:600; margin:8px 0 2px; }
-#relhome .relsum { font-size:11.5px; line-height:1.6; opacity:.72; margin-bottom:10px; }
 #relhome .two { display:grid; grid-template-columns:1fr 1fr; gap:0 10px; }
 #relhome .two .who { font-size:9px; letter-spacing:.1em; text-transform:uppercase;
   opacity:.75; padding-bottom:3px; border-bottom:1.5px solid currentColor; margin-bottom:5px; }
@@ -3044,7 +3042,6 @@ ${d.client ? "" : viewControls}
         </div>
         <div id="relStatus" class="relnone"></div>
       </div>
-      <div id="relmeta"></div>
       <div class="row" id="partyrow">
         <button id="partyA" class="on" data-help="" data-help-label="">A</button>
         <button id="partyB" class="on" data-help="" data-help-label="">B</button>
@@ -5342,13 +5339,6 @@ function paintRelationship() {
   document.getElementById('partyrow').hidden = !haveOne;
   if (!haveOne) {
     // Nothing above the picker: with nobody chosen there is nothing to say.
-    var meta0 = document.getElementById('relmeta');
-    if (meta0) meta0.innerHTML = '';
-    if (false) {
-      meta0.innerHTML = '<div class="relpair">' + esc((DATA.client && DATA.client.name) || 'This chart') + '</div>' +
-        '<div class="relsum">Their chart on its own. Add a birth date, time and place below to read it ' +
-        'against somebody else.</div>';
-    }
     return;
   }
   // Declared here, not at the top of the script: this function runs before the
@@ -5358,14 +5348,8 @@ function paintRelationship() {
   var KIND_NAME = { electromagnetic: 'Electromagnetic', companionship: 'Companionship',
     dominance: 'Dominance', compromise: 'Compromise' };
   if (!REL) return;
-  var meta = document.getElementById('relmeta');
-  if (meta) {
-    meta.innerHTML =
-      '<div class="relpair"><b>' + esc(REL.a.name) + '</b> and <b>' + esc(REL.b.name) + '</b></div>' +
-
-      '<div class="relsum">Together: ' + esc(REL.definitionLabel) + ', ' +
-        REL.definedTogether.length + ' of 9 centers defined</div>';
-  }
+  // Nothing goes here. The names are already on the chart, and a summary line
+  // repeating them is noise. Kaycee, 2026-09-01: "There should be NOTHING here."
 
   var order = ['electromagnetic', 'companionship', 'dominance', 'compromise'];
   var html = '';
