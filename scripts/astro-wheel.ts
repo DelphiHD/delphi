@@ -230,7 +230,10 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   // put it visually inside gate 15. With a gate ring outside the zodiac, an
   // angular nudge is the chart telling a lie. Radius is free; angle is not.
   const placed: { lon: number; ring: number }[] = [];
-  for (const p of [...chart.planets].sort((a, b) => a.abs_pos - b.abs_pos)) {
+  // With a partner on the wheel the block below draws every set, this one
+  // included, tagged by person. Running this loop as well drew person one's
+  // placements a second time, which is what the doubled glyphs were.
+  for (const p of (partner ? [] : [...chart.planets]).sort((a, b) => a.abs_pos - b.abs_pos)) {
     const lon = p.abs_pos;
     let ring = 0;
     while (placed.some((q) => q.ring === ring &&
