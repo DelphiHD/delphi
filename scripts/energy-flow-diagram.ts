@@ -46,6 +46,7 @@ import { renderFullMandala } from "@/lib/render/mandala";
 import { getAstro, type AstroChart } from "@/lib/astro";
 import { HOUSES, HOUSES_INTRO } from "@/lib/hd/houses";
 import { renderWheel } from "./astro-wheel";
+import { getConnectionChart } from "@/lib/hd/relationship";
 import type { ChartSide, Planet } from "@/lib/render/mandala.types";
 import { getChart, getTimezoneForLocation } from "@/lib/mybodygraph";
 import { CLIENTS, clientFromSlug, clientOutputDir, type ClientBrief, placeForLookup } from "./client-roster";
@@ -78,6 +79,23 @@ const FUNCTION_ORDER = ["Pressure", "Motor", "Awareness", "Identity", "Manifesta
 // Per-channel direction override, e.g. { "26-44": 44 } to make gate 44's end the
 // source. Empty by default; the rule in the header decides everything.
 const FLOW_OVERRIDE: Record<string, number> = {};
+
+/**
+ * The provider names centres as "splenic center", "solar plexus center". The
+ * page keys them as "spleen", "solar-plexus". One translation, in one place, so
+ * a connection's centres line up with the drawing.
+ */
+function centerKeyFromName(name: string): Center | null {
+  const t = String(name).toLowerCase().replace(/\s*center(s)?$/, "").trim();
+  const map: Record<string, Center> = {
+    head: "head", ajna: "ajna", throat: "throat", g: "g", "self": "g",
+    heart: "heart", ego: "heart", will: "heart",
+    splenic: "spleen", spleen: "spleen",
+    sacral: "sacral", "solar plexus": "solar-plexus", emotional: "solar-plexus",
+    root: "root",
+  };
+  return map[t] ?? null;
+}
 
 const CENTER_SVG_ID: Record<Center, string> = {
   head: "head-center",
@@ -1525,7 +1543,43 @@ const FONT_STACK = "Montserrat, 'Helvetica Neue', Helvetica, Arial, sans-serif";
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
+/** One side of a connection, as the provider describes them. */
+interface ConnectionPerson {
+  name: string;
+  type: string;
+  strategy: string;
+  authority: string;
+  age?: number;
+  definedCenters: string[];
+  openCenters: string[];
+  channels: string[];
+  gates: number[];
+  personality: { planet: string; gate: number; line: number; fixingState?: string }[];
+  design: { planet: string; gate: number; line: number; fixingState?: string }[];
+}
+
+/**
+ * A connection, flattened for the page.
+ *
+ * The chart is a baked file, so the pair is resolved at build time and travels
+ * with it. Everything the Relationship module draws and every list in the
+ * control panel comes from here.
+ */
+interface ConnectionScene {
+  a: ConnectionPerson;
+  b: ConnectionPerson;
+  definedTogether: string[];
+  openTogether: string[];
+  definitionLabel: string;
+  themeLabel: string;
+  themeText: string;
+  channels: { kind: string; label: string; name: string; gates: number[] }[];
+  bodygraphSvg?: string;
+}
+
 interface SceneData {
+  /** a second person, present only when the chart was built with a partner */
+  connection?: ConnectionScene;
   /** natal astrology, present only on a client chart */
   astro?: AstroChart;
   /** the design side, read at the design instant */
@@ -2075,12 +2129,17 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
   // On a client chart these dock into the empty corner of the stage instead of
   // the panel, which is where the panel's height was coming from. The teaching
   // diagram has room, so there they stay in the panel.
-  const viewControls = `<div class="sec" id="viewsec" hidden>VIEW</div>
+  const viewControls = `<div class="sec" id="modsec" hidden>CHART</div>
+    <div class="row" id="modrow" hidden>
+      <button id="mSelf" class="on" data-help="This person's own chart, from their birth moment. Everything below reads their design alone." data-help-label="Individual">Individual</button>
+      <button id="mTransit" data-help="Today's sky laid over this chart: what the planets are activating right now and which channels they complete. Circuits are unavailable here, because a transit carries none of its own." data-help-label="Transit">Transit</button>
+      <button id="mRelation" data-help="Two charts read as one. The centres they define together, and every channel between them sorted into the four connection types." data-help-label="Relationship">Relationship</button>
+    </div>
+    <div class="sec" id="viewsec" hidden>VIEW</div>
     <div class="row" id="viewrow" hidden>
       <button id="vPlain" class="on" data-help="The chart as it is normally drawn. Nine centres, the channels between them, and every gate you carry. Defined centres are filled; the rest are white." data-help-label="Bodygraph">Bodygraph</button>
       <button id="vBody" data-help="The same body, coloured by circuit. Shows which of the three circuits each defined channel belongs to: Individual for mutation, Tribal for support, Collective for sharing." data-help-label="Circuits">Circuits</button>
       <button id="vMandala" data-help="The wheel the chart is calculated from. All 64 gates in their zodiac order, with your planets placed where they actually fall." data-help-label="Mandala">Mandala</button>
-      <button id="vTransit" data-help="Today's sky over your chart. Shows which gates the planets are currently activating and what they complete in you." data-help-label="Transit">Transit</button>
       <button id="vAstro" data-help="Your natal chart in the astrological wheel: signs, houses, planets and the aspects between them." data-help-label="Astrology">Astrology</button>
     </div>
     <div class="row" id="siderow" hidden>
@@ -2102,6 +2161,8 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
   ).join("");
 
   const payload = {
+    // the pair, when this chart was built with one
+    connection: d.connection ?? null,
     astro: d.astro ? { ...d.astro, design: d.astroDesign ?? null } : null,
     read: d.read ?? null,
     cycles: d.client?.report.cycles ?? [],
@@ -2435,6 +2496,11 @@ body.chart svg.canvas .gnum { fill:var(--gnum-off); font-weight:400; }
 body.chart svg.canvas .gnum.lit { fill:var(--gnum-on); font-weight:600; }
 body.notables .ptable { display:none; }
 #viewrow button, #actrow button, #hangrow button, #siderow button { font-size:10.5px; padding:5px 8px; }
+#modrow button { font-size:10.5px; padding:5px 9px; font-weight:600; }
+/* A control that cannot apply here reads as unavailable rather than vanishing,
+   so the set of chart views stays the same shape whichever chart is open. */
+button.disabled, button:disabled { opacity:.32; cursor:not-allowed; }
+button.disabled:hover, button:disabled:hover { background:var(--paper); color:inherit; }
 /* client charts: the view controls sit in the stage's empty lower-left corner
    rather than in the panel, so the panel only carries the reading itself */
 .viewdock.docked { position:absolute; left:0; bottom:2px; z-index:5; width:154px;
@@ -2649,6 +2715,39 @@ body:not(.astro-all) #astroaspects .line.extra { display:none; }
 /* this view's home tab is astrology, not Human Design */
 #astrohome { display:none; }
 body.view-astro #astrohome { display:block; }
+/* The Relationship module answers with the pair. The Human Design sections that
+   describe one person stand down while it is open, the same way the Astrology
+   view already does. */
+body.mod-relation #relhome { display:block; }
+/* The Relationship module draws the provider's composite: both people on one
+   bodygraph. The individual chart stands down while it is showing, the same way
+   the wheel replaces it in the Astrology view. */
+.composite { display:none; }
+body.mod-relation:not(.view-astro):not(.view-mandala) .composite {
+  display:flex; align-items:center; justify-content:center; width:100%; }
+body.mod-relation:not(.view-astro):not(.view-mandala) svg.canvas { display:none !important; }
+.composite svg { height:calc(100vh - 36px); width:auto; max-width:100%; display:block; }
+
+#relhome .relpair { font-size:13px; margin-bottom:2px; }
+#relhome .reltheme { font-size:11px; color:var(--purple); font-weight:600; margin-bottom:4px; }
+#relhome .relkind { font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; opacity:.62;
+  margin:11px 0 4px; display:flex; justify-content:space-between; }
+#relhome .relsub { font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; opacity:.5; margin:9px 0 3px; }
+#relhome .relnone { font-size:11px; opacity:.45; padding:2px 0 4px; }
+#relhome .relwho { font-size:10.5px; margin-bottom:4px; }
+#relhome .relch, #relhome .relpl, #relhome .relcen {
+  display:flex; justify-content:space-between; gap:8px; font-size:11.5px;
+  padding:3px 6px; border-radius:6px; cursor:default; }
+#relhome .relch b, #relhome .relpl b { font-weight:500; }
+#relhome .relch .dim, #relhome .relpl .dim { font-variant-numeric:tabular-nums; opacity:.55; }
+/* the same yellow the bodygraph uses when something is picked out */
+#relhome .relch.hi, #relhome .relpl.hi, #relhome .relcen.hi { background:#fbf7b2; }
+#relhome .relcen.open { opacity:.55; }
+#relhome .relpl.design b { color:${DESIGN_RED}; }
+
+body.mod-relation #pmeta, body.mod-relation #placements, body.mod-relation #chandrop,
+body.mod-relation #defdrop, body.mod-relation #circdrop { display:none !important; }
+body.mod-relation #datesec, body.mod-relation #todaysec { display:none !important; }
 body.view-astro #pmeta, body.view-astro #circdrop, body.view-astro #placements,
 body.view-astro #datesec, body.view-astro #todaysec, body.view-astro #chandrop,
 body.view-astro #defdrop { display:none !important; }
@@ -2662,7 +2761,7 @@ body.view-mandala .mandala svg { max-height:calc(100vh - 28px); width:auto; heig
 <body class="skin-paper${d.client ? " chart" : ""}">
 <div class="wrap">
   ${logoSrc ? `<img class="brandmark logo" src="${logoSrc}" alt="Delphi">` : ""}
-  <div class="stage">${canvases}${mandala}${astro}<div class="tip" id="tip" hidden></div><div class="card" id="card" hidden></div>${knowSrc ? `<img class="brandmark know" src="${knowSrc}" alt="Know thyself">` : ""}${d.client ? `<div class="viewdock docked">${viewControls}</div>` : ""}</div>
+  <div class="stage">${canvases}${mandala}${astro}${d.connection?.bodygraphSvg ? `<div class="composite">${d.connection.bodygraphSvg}</div>` : ""}<div class="tip" id="tip" hidden></div><div class="card" id="card" hidden></div>${knowSrc ? `<img class="brandmark know" src="${knowSrc}" alt="Know thyself">` : ""}${d.client ? `<div class="viewdock docked">${viewControls}</div>` : ""}</div>
   <aside class="panel">
 ${d.client ? "" : `<h1 id="ptitle">Centers, function, and flow</h1>
     <p class="sub" id="psub">Nine centers, each labeled with what it does. The moving light follows every channel toward the Throat, the only center that turns energy into expression.</p>`}
@@ -2686,6 +2785,22 @@ ${d.client ? "" : viewControls}
       <div id="circuits"></div>
       <div class="row"><button id="all">All</button><button id="none">None</button></div>
     </details>
+
+    <div id="relhome" hidden>
+      <div id="relmeta"></div>
+      <details class="drop" open><summary>Between You</summary>
+        <div id="relchannels"></div>
+      </details>
+      <details class="drop"><summary id="relasum">Their side</summary>
+        <div id="relaside"></div>
+      </details>
+      <details class="drop"><summary id="relbsum">Their side</summary>
+        <div id="relbside"></div>
+      </details>
+      <details class="drop"><summary>Centres Together</summary>
+        <div id="relcentres"></div>
+      </details>
+    </div>
 
     <div id="astrohome">
       <div id="astrometa"></div>
@@ -3555,6 +3670,8 @@ if (DATA.client) {
   }
 
   document.getElementById('siderow').hidden = false;
+  document.getElementById('modsec').hidden = false;
+  document.getElementById('modrow').hidden = false;
   document.getElementById('viewsec').hidden = false;
   document.getElementById('viewrow').hidden = false;
   // ── the date and time picker ──────────────────────────────────────────────
@@ -3871,26 +3988,73 @@ if (DATA.client) {
     astroHidDesign = false;
   };
 
-  var view = function (id) {
-    if (id === 'astro') enterAstro(); else leaveAstro();
-    body.classList.toggle('view-astro', id === 'astro');
-    body.classList.toggle('view-mandala', id === 'mandala');
-    body.classList.toggle('view-plain', id === 'plain');
-    body.classList.toggle('view-transit', id === 'transit');
-    document.getElementById('vBody').classList.toggle('on', id === 'body');
-    document.getElementById('vPlain').classList.toggle('on', id === 'plain');
-    document.getElementById('vMandala').classList.toggle('on', id === 'mandala');
-    var vt = document.getElementById('vTransit');
-    if (vt) vt.classList.toggle('on', id === 'transit');
-    var va = document.getElementById('vAstro');
-    if (va) va.classList.toggle('on', id === 'astro');
+  // Chart and view are two independent axes. The chart is whose reading this is:
+  // this person alone, this person under today's sky, or this person with
+  // another. The view is how it is drawn. Every view works in every chart
+  // except circuits under a transit, which has no circuitry of its own.
+  var MODULES = ['self', 'transit', 'relation'];
+  var VIEWS = ['plain', 'body', 'mandala', 'astro'];
+  var curMod = 'self';
+  var curView = 'plain';
+
+  var applyView = function () {
+    var v = curView;
+    // Circuits mean nothing over a transit: the button is disabled rather than
+    // hidden, and the drawing falls back to the plain body.
+    if (curMod === 'transit' && v === 'body') v = 'plain';
+    if (v === 'astro') enterAstro(); else leaveAstro();
+
+    // Circuits is signalled by the ABSENCE of a view class, which is how the
+    // stylesheet has always read it. Setting one here would hide the circuit
+    // drawing rather than show it.
+    var transit = curMod === 'transit' && (v === 'plain' || v === 'body');
+    body.classList.toggle('view-astro', v === 'astro');
+    body.classList.toggle('view-mandala', v === 'mandala');
+    body.classList.toggle('view-plain', v === 'plain' && !transit);
+    body.classList.toggle('view-transit', transit);
+
+    [['plain', 'vPlain'], ['body', 'vBody'], ['mandala', 'vMandala'], ['astro', 'vAstro']]
+      .forEach(function (pair) {
+        var b = document.getElementById(pair[1]);
+        if (!b) return;
+        b.classList.toggle('on', pair[0] === curView);
+        var off = (curMod === 'transit' && pair[0] === 'body');
+        b.disabled = off;
+        b.classList.toggle('disabled', off);
+      });
   };
+
+  var setModule = function (id) {
+    curMod = id;
+    MODULES.forEach(function (k) {
+      body.classList.toggle('mod-' + k, k === id);
+      var b = document.getElementById(k === 'self' ? 'mSelf' : k === 'transit' ? 'mTransit' : 'mRelation');
+      if (b) b.classList.toggle('on', k === id);
+    });
+    applyView();
+  };
+
+  var view = function (id) {
+    if (curMod === 'transit' && id === 'body') return;   // disabled, not silently switched
+    curView = id;
+    applyView();
+  };
+
   document.getElementById('vBody').onclick = function () { view('body'); };
-  view('plain');
   document.getElementById('vPlain').onclick = function () { view('plain'); };
   document.getElementById('vMandala').onclick = function () { view('mandala'); };
-  var vt0 = document.getElementById('vTransit');
-  if (vt0) vt0.onclick = function () { view('transit'); };
+  ['self', 'transit', 'relation'].forEach(function (k) {
+    var b = document.getElementById(k === 'self' ? 'mSelf' : k === 'transit' ? 'mTransit' : 'mRelation');
+    if (b) b.onclick = function () { setModule(k); };
+  });
+  // A chart built without a partner has no Relationship module to show, so the
+  // button says so by being unavailable rather than opening an empty panel.
+  var relBtn = document.getElementById('mRelation');
+  if (relBtn && !DATA.connection) { relBtn.disabled = true; relBtn.classList.add('disabled'); }
+  var relHome = document.getElementById('relhome');
+  if (relHome && DATA.connection) relHome.hidden = false;
+  paintRelationship();
+  setModule('self');
   // ---- copy what is on screen, as plain text -------------------------------
   // Chart data only. Never report prose. The format follows chart2txt's shape
   // because it pastes cleanly anywhere, but every value comes from our own Data
@@ -4589,6 +4753,126 @@ function markRowsFor(list) {
     r.classList.toggle('hi', sidesOf(r).some(function (p) { return want[p.side + '|' + p.pid]; }));
   });
 }
+// ---- the Relationship module ---------------------------------------------
+//
+// Everything here comes from the provider's own connection response: the four
+// connection types with their channels, both people's placements, and the
+// centres they define together. Nothing is worked out on this side.
+//
+// Hovering any row lights the gates it names on whichever chart is drawn, the
+// same as every other list in this panel, and every row explains itself.
+// The four connection types arrive named but with their description fields
+// empty, and writing that language is Kaycee's, not mine. Rows carry the
+// provider's own names and gates; the explanations stay blank until she
+// supplies them, at which point they drop straight in here.
+
+function relRow(cls, label, note, gates) {
+  return '<div class="' + cls + '" data-gates="' + gates.join(',') + '"' +
+    (note ? ' data-help-label="' + esc(label) + '" data-help="' + esc(note) + '"' : '') +
+    '><b>' + esc(label) + '</b>' +
+    (gates.length ? '<span class="dim">' + gates.join(' - ') + '</span>' : '') + '</div>';
+}
+
+function paintRelationship() {
+  // Read at call time: this runs before the rest of the panel is set up, and a
+  // hoisted copy was still undefined when it did.
+  var REL = DATA.connection;
+  // Declared here, not at the top of the script: this function runs before the
+  // rest of the panel is built, and module-scope assignments had not happened
+  // yet when it did.
+  var KIND_NOTE = { electromagnetic: '', companionship: '', dominance: '', compromise: '' };
+  var KIND_NAME = { electromagnetic: 'Electromagnetic', companionship: 'Companionship',
+    dominance: 'Dominance', compromise: 'Compromise' };
+  if (!REL) return;
+  var meta = document.getElementById('relmeta');
+  if (meta) {
+    meta.innerHTML =
+      '<div class="relpair"><b>' + esc(REL.a.name) + '</b> and <b>' + esc(REL.b.name) + '</b></div>' +
+      '<div class="reltheme" data-help-label="' + esc(REL.themeLabel) + '" data-help="' + esc(REL.themeText) + '">' +
+        esc(REL.themeLabel) + '</div>' +
+      '<div class="dim">Together: ' + esc(REL.definitionLabel) + ', ' +
+        REL.definedTogether.length + ' of 9 centres defined</div>';
+  }
+
+  var order = ['electromagnetic', 'companionship', 'dominance', 'compromise'];
+  var html = '';
+  order.forEach(function (kind) {
+    var list = REL.channels.filter(function (c) { return c.kind === kind; });
+    html += '<div class="relkind" data-help-label="' + KIND_NAME[kind] + '" data-help="' +
+      esc(KIND_NOTE[kind]) + '">' + KIND_NAME[kind] +
+      '<span class="dim">' + (list.length || 'none') + '</span></div>';
+    if (!list.length) {
+      html += '<div class="relnone">Nothing between you here.</div>';
+      return;
+    }
+    list.forEach(function (c) {
+      html += relRow('relch k-' + kind, c.name, KIND_NOTE[kind], c.gates);
+    });
+  });
+  var ch = document.getElementById('relchannels');
+  if (ch) ch.innerHTML = html;
+
+  [['relasum', 'relaside', REL.a], ['relbsum', 'relbside', REL.b]].forEach(function (t) {
+    var sum = document.getElementById(t[0]);
+    var box = document.getElementById(t[1]);
+    var p = t[2];
+    if (sum) sum.textContent = p.name;
+    if (!box) return;
+    var rows = '<div class="dim relwho">' + esc(p.type) +
+      (p.strategy ? '  &middot;  ' + esc(p.strategy) : '') +
+      (p.authority ? '  &middot;  ' + esc(p.authority) + ' Authority' : '') + '</div>';
+    rows += '<div class="relsub">Channels they carry alone</div>';
+    rows += p.channels.length
+      ? p.channels.map(function (c) {
+          var g = String(c).split('-').map(Number);
+          return relRow('relch solo', c, '', g);
+        }).join('')
+      : '<div class="relnone">No whole channels.</div>';
+    rows += '<div class="relsub">Placements</div>';
+    rows += ['personality', 'design'].map(function (sideKey) {
+      return (p[sideKey] || []).map(function (pl) {
+        return relRow('relpl ' + sideKey, pl.planet + '  ' + pl.gate + '.' + pl.line,
+          (sideKey === 'design' ? 'Design' : 'Personality') +
+            (pl.fixingState ? '  ' + pl.fixingState : ''),
+          [pl.gate]);
+      }).join('');
+    }).join('');
+    box.innerHTML = rows;
+  });
+
+  var cen = document.getElementById('relcentres');
+  if (cen) {
+    cen.innerHTML = REL.definedTogether.map(function (c) {
+      return '<div class="relcen" data-center="' + esc(c) + '"' +
+        '>' +
+        esc(c) + '</div>';
+    }).join('') +
+    (REL.openTogether.length
+      ? '<div class="relsub">Open even together</div>' + REL.openTogether.map(function (c) {
+          return '<div class="relcen open" data-center="' + esc(c) + '"' +
+            '>' +
+            esc(c) + '</div>';
+        }).join('')
+      : '');
+  }
+
+  // Hover lights the chart. Same behaviour as every other list here.
+  [].forEach.call(document.querySelectorAll('#relhome [data-gates]'), function (row) {
+    var gates = (row.dataset.gates || '').split(',').filter(Boolean).map(Number);
+    row.onmouseenter = function () { litGate(gates); row.classList.add('hi'); };
+    row.onmouseleave = function () { litGate(null); row.classList.remove('hi'); };
+  });
+  [].forEach.call(document.querySelectorAll('#relhome .relcen'), function (row) {
+    row.onmouseenter = function () {
+      markCenter(row.dataset.center); row.classList.add('hi');
+    };
+    row.onmouseleave = function () {
+      [].forEach.call(document.querySelectorAll('.cshape'), function (el) { el.classList.remove('lit'); });
+      row.classList.remove('hi');
+    };
+  });
+}
+
 function litGate(gates) {
   var want = {};
   if (gates != null) [].concat(gates).forEach(function (g) { want[g] = 1; });
@@ -5196,7 +5480,12 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
   const args = process.argv.slice(2);
   const wantPublish = args.includes("--publish");
   const wantUnpublish = args.includes("--unpublish");
-  const slug = args.find((a) => !a.startsWith("--")) ?? process.env.CLIENT;
+  // --with <slug> builds the Relationship module against that person. The pair is
+  // resolved now and baked in, because the published page has no server to ask
+  // later. Parsed before the client slug so the partner is never mistaken for it.
+  const withIdx = args.indexOf("--with");
+  const partnerSlug = withIdx >= 0 ? args[withIdx + 1] : undefined;
+  const slug = args.find((a, i) => !a.startsWith("--") && i !== withIdx + 1) ?? process.env.CLIENT;
 
   if (args.includes("--rollback")) {
     if (!slug) throw new Error("--rollback needs a client slug");
@@ -5235,6 +5524,7 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
   for (const skin of [PAPER]) {
     inner[skin.id] = paintCenters(
       neutralize(raw, skin, !!client, client?.gates), skin, fn, client?.centers);
+
   }
 
   const libNames = loadLibraryNames();
@@ -5341,6 +5631,62 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
       console.log(`  astrology unavailable: ${(err as Error).message}`);
     }
   }
+  // The pair, when the chart was built with one. Failing to reach the provider
+  // costs the Relationship module and nothing else, so it is caught here rather
+  // than taking the whole chart down.
+  if (client && partnerSlug) {
+    try {
+      const pb = clientFromSlug(partnerSlug);
+      const me = clientFromSlug(slug!);
+      const tzOf = async (c: { birthPlace: string }) => getTimezoneForLocation(placeForLookup(c as never));
+      const conn = await getConnectionChart(
+        { name: me.name, birthDate: me.birthDate, birthTime: me.birthTime, birthTimezone: await tzOf(me) },
+        { name: pb.name, birthDate: pb.birthDate, birthTime: pb.birthTime, birthTimezone: await tzOf(pb) },
+      );
+      scene.connection = {
+        a: conn.a,
+        b: conn.b,
+        definedTogether: conn.definedTogether,
+        openTogether: conn.openTogether,
+        definitionLabel: conn.definitionLabel,
+        themeLabel: conn.themeLabel,
+        themeText: conn.themeText,
+        channels: conn.channels.map((c) => ({ kind: c.kind, label: c.label, name: c.name, gates: c.gates })),
+        bodygraphSvg: conn.bodygraphSvg,
+      };
+      console.log(`  connection: ${conn.a.name} + ${conn.b.name} — ${conn.themeLabel}, ${conn.channels.length} channels between them`);
+      // The provider returns a composite in black and white, while it returns a
+      // single chart already coloured. Verified against five request variants on
+      // 2026-09-01: none produce a coloured composite. So it goes through the same
+      // painting every other chart on this page gets. Nothing is inferred here: the
+      // centres come from the pair's own DefinedCenters and the gates from both
+      // people's Gates, both straight out of the response.
+      if (scene.connection?.bodygraphSvg) {
+        const both = new Set<number>([...conn.a.gates, ...conn.b.gates]);
+        const joint = new Set<Center>(
+          conn.definedTogether.map(centerKeyFromName).filter((c): c is Center => !!c));
+        // neutralize returns the inner markup without the <svg> wrapper, because the
+        // page normally drops it inside one of its own. This chart has no such
+        // wrapper waiting for it, so the provider's viewBox is kept and put back
+        // round the painted result.
+        // The provider writes it lowercase, as viewbox. Matching case-sensitively meant
+  // falling back to an invented box and stretching their drawing out of true.
+  const box = /viewbox="([^"]+)"/i.exec(scene.connection.bodygraphSvg)?.[1];
+  if (!box) throw new Error("composite has no viewBox; refusing to invent one");
+        const painted = paintCenters(
+          // Not faint: on the individual chart the faint pass is what lets the client's
+  // own gates stand out from the rest of the graph. Here both people's gates
+  // are the subject, so dimming them leaves nothing to look at.
+  neutralize(scene.connection.bodygraphSvg, PAPER, false, both), PAPER, fn, joint);
+        scene.connection.bodygraphSvg =
+          `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${box}" ` +
+          `font-family="${FONT_STACK}">${painted}</svg>`;
+      }
+    } catch (err) {
+      console.log(`  connection unavailable: ${(err as Error).message}`);
+    }
+  }
+
   const astroHtml = astroChart
     ? `<div class="astro">${renderWheel(astroChart, client!.name, astroDesign, "aries",
         [...new Set(client!.acts.map((a) => a.gate))],
