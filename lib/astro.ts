@@ -140,8 +140,13 @@ async function geocode(query: string): Promise<{ lat: number; lon: number }> {
     throw new Error(`geocoder returned no usable coordinates for "${query}"`);
   }
   cache[query] = out;
-  mkdirSync(".cache", { recursive: true });
-  writeFileSync(GEO_CACHE, JSON.stringify(cache, null, 2));
+  // The cache is a convenience, not a requirement. On a serverless host the
+  // filesystem is read-only and this threw, which took down the whole chart
+  // for a reason that had nothing to do with the chart.
+  try {
+    mkdirSync(".cache", { recursive: true });
+    writeFileSync(GEO_CACHE, JSON.stringify(cache, null, 2));
+  } catch { /* in-memory for this request is enough */ }
   return out;
 }
 
