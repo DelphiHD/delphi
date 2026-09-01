@@ -4269,6 +4269,10 @@ if (DATA.client) {
   if (sideDBtn) sideDBtn.addEventListener('click', function () { designHeld = true; });
   var enterAstro = function () {
     if (designHeld) return;
+    // On a connection the wheel's "design" side is the OTHER PERSON, not this
+    // person's design side. Hiding it on entry made a synastry chart look like
+    // one person's chart, which is exactly how it looked.
+    if (body.classList.contains('mod-relation') && DATA.connection) return;
     if (!body.classList.contains('off-s-design')) {
       body.classList.add('off-s-design');
       if (sideDBtn) sideDBtn.classList.remove('on');

@@ -80,12 +80,23 @@ export async function GET(request: Request) {
       // The base chart keeps its ascendant and houses; the second contributes
       // planets only. That is the convention for a bi-wheel.
       const carried = [...new Set([...conn.a.gates, ...conn.b.gates])];
+      // The renderer takes the second chart in its design slot, so it comes back
+      // in the personality/design colours. On a connection those two sides are
+      // two PEOPLE, so they are recoloured to match the bodygraph: the first
+      // person purple, the second teal.
+      const PERSON_A = "#845095";
+      const PERSON_B = "#0d9488";
       wheelSvg = renderWheel(
         mine, `${conn.a.name} and ${conn.b.name}`, theirs, "aries",
         carried,
         [...new Set(conn.a.gates)],
         [...new Set(conn.b.gates)],
       );
+      if (wheelSvg) {
+        wheelSvg = wheelSvg
+          .replace(/(data-side="personality"[^>]*?)fill="#2f2a33"/g, `$1fill="${PERSON_A}"`)
+          .replace(/(data-side="design"[^>]*?)fill="#e06666"/g, `$1fill="${PERSON_B}"`);
+      }
     } catch (e) {
       // Naming the fault rather than silently returning nothing: a wheel that
       // fails to draw should say why, not look like a feature that was never built.
