@@ -82,9 +82,25 @@ const degLabel = (pos: number) => {
   return m === 60 ? `${d + 1}°` : `${d}°${String(m).padStart(2, "0")}'`;
 };
 
+/**
+ * A second person on the wheel.
+ *
+ * Not the `design` argument: that is one person's design side, and borrowing it
+ * for a partner made a synastry chart claim somebody else's placements were this
+ * person's unconscious. A connection has two people and each of them has both
+ * sides, so it is its own thing.
+ */
+export interface WheelPartner {
+  personality: AstroChart;
+  design?: AstroChart | null;
+  colour: string;
+  name: string;
+}
+
 export function renderWheel(chart: AstroChart, name: string, design?: AstroChart | null,
   anchor: WheelAnchor = "aries", carriedGates: readonly number[] = [],
-  personalityGates: readonly number[] = [], designGates: readonly number[] = []): string {
+  personalityGates: readonly number[] = [], designGates: readonly number[] = [],
+  partner?: WheelPartner | null, selfColour?: string): string {
   ANCHOR = anchor;
   const asc = chart.ascendant;
   const s: string[] = [];
@@ -236,7 +252,39 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   // planets come across. Its own houses and angles belong to a horizon this
   // wheel is not drawn on, exactly as in a synastry bi-wheel where the second
   // chart contributes planets and nothing else.
-  if (design) {
+  // A connection: each person keeps both of their own sides, and a person is one
+  // colour with the lighter tone for their design. Nobody's placements are filed
+  // under somebody else's unconscious.
+  if (partner) {
+    const lighten = (hex: string) => {
+      const n = parseInt(hex.slice(1), 16);
+      const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+      const m = (v: number) => Math.round(v + (255 - v) * 0.42);
+      return `#${m(r).toString(16).padStart(2, "0")}${m(g).toString(16).padStart(2, "0")}${m(b).toString(16).padStart(2, "0")}`;
+    };
+    const mine = selfColour ?? PURPLE;
+    const sets: [AstroChart | null | undefined, number, string, string, string][] = [
+      [chart, R_PLANET, mine, "a", "personality"],
+      [design, R_PLANET - 42, lighten(mine), "a", "design"],
+      [partner.personality, R_DESIGN, partner.colour, "b", "personality"],
+      [partner.design, R_DESIGN - 42, lighten(partner.colour), "b", "design"],
+    ];
+    for (const [set, radius, colour, who, side] of sets) {
+      if (!set) continue;
+      const placed: { lon: number; ring: number }[] = [];
+      for (const p of [...set.planets].sort((a, b) => a.abs_pos - b.abs_pos)) {
+        const lon = p.abs_pos;
+        let ring = 0;
+        while (placed.some((q) => q.ring === ring &&
+          Math.abs(((lon - q.lon + 540) % 360) - 180) < 6)) ring++;
+        placed.push({ lon, ring });
+        const [x, y] = pt(lon, asc, radius - ring * 19);
+        s.push(`<text class="pglyph pside" data-aplanet="${p.name}" data-person="${who}" ` +
+          `data-side="${side}" x="${f(x)}" y="${f(y + 7)}" text-anchor="middle" ` +
+          `font-size="19" fill="${colour}">${GLYPH[p.name] ?? p.name.slice(0, 2)}</text>`);
+      }
+    }
+  } else if (design) {
     const placedD: { lon: number; ring: number }[] = [];
     for (const p of [...design.planets].sort((a, b) => a.abs_pos - b.abs_pos)) {
       const lon = p.abs_pos;

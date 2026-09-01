@@ -86,11 +86,21 @@ export async function GET(request: Request) {
       // person purple, the second teal.
       const PERSON_A = "#845095";
       const PERSON_B = "#0d9488";
+      // Each person's design moment comes from their own HD response, which is
+      // where the 88-degree instant is recorded.
+      const designAt = async (utc: string | undefined, birthDate: string, birthTime: string, at: string) =>
+        utc ? getAstro({ birthDate, birthTime, place: at, atUtc: utc }).catch(() => null) : null;
+      const myDesign = await designAt(
+        (conn.a as { designUtc?: string }).designUtc, me.birthDate, me.birthTime, me.birthPlace);
+      const theirDesign = await designAt(
+        (conn.b as { designUtc?: string }).designUtc, date, time, place);
       wheelSvg = renderWheel(
-        mine, `${conn.a.name} and ${conn.b.name}`, theirs, "aries",
-        carried,
+        mine, `${conn.a.name} and ${conn.b.name}`, myDesign, "aries",
+        [...new Set([...conn.a.gates, ...conn.b.gates])],
         [...new Set(conn.a.gates)],
         [...new Set(conn.b.gates)],
+        { personality: theirs, design: theirDesign, colour: PERSON_B, name: conn.b.name },
+        PERSON_A,
       );
       if (wheelSvg) {
         wheelSvg = wheelSvg
