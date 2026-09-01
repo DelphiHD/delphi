@@ -3043,6 +3043,12 @@ body.mod-relation #relhome { display:block; }
 #relcentres .ctbl .s-U { color:#6b6790; opacity:.75; }
 #relcentres .ctbl .s-O { color:#6b6790; opacity:.35; }
 #relcentres .ctbl .lb.hi, #relcentres .ctbl .lb:hover { opacity:1; }
+#relcentres .ctbl .bandrow { grid-column:1 / -1; font-size:9px; letter-spacing:.1em;
+  text-transform:uppercase; opacity:.4; padding:7px 0 2px; border-top:1px solid currentColor;
+  margin-top:3px; cursor:default; }
+#relcentres .ctbl .bandrow:first-of-type { border-top:none; margin-top:0; padding-top:2px; }
+.statfoot { text-align:right; font-size:10px; letter-spacing:.06em; text-transform:uppercase;
+  opacity:.45; padding:4px 2px 2px; }
 #relcentres .ctbl .tally { border-top:1px solid currentColor; margin-top:4px; padding-top:4px;
   opacity:.75; font-weight:600; white-space:nowrap; }
 /* A long name wraps to two lines and a short one does not, so the names sit on
@@ -3753,7 +3759,10 @@ if (DATA.client) {
         sub = (DATA.groupInfo || {})[el.dataset.key] || '';
       } else if (el.dataset.kind === 'center') {
         var c = DATA.centers.filter(function (x) { return x.name === el.dataset.key; })[0];
-        if (c) sub = c.fns.join(' + ') + (c.stateLabel ? ' &middot; ' + c.stateLabel : '') +
+        // The state label is this client's own, so it is left off a bar that
+        // counts two people: the centers table says who has what.
+        if (c) sub = c.fns.join(' + ') +
+          (!el.dataset.split && c.stateLabel ? ' &middot; ' + c.stateLabel : '') +
           (c.biology ? '. ' + c.biology : '');
       } else if (el.dataset.kind === 'sign' && el.className.indexOf('grp') > -1) {
         // an element is a total, so the useful breakdown is which of its three
@@ -3777,9 +3786,17 @@ if (DATA.client) {
         if (GL) sub = esc(GL.name) + (GL.center ? ' &middot; ' + esc(GL.center) : '');
       }
       var gl = pairedAlready ? '' : list.map(function (p) { return p.gate + '.' + p.line; }).join(', ');
-      showTip(e, '<b>' + esc(head) + '</b>' + (sub ? sub + '<br>' : '') +
-        (gl ? '<span style="opacity:.7">' + esc(gl) + '</span>'
-            : (list.length ? '' : 'None in this chart.')));
+      // On a pair the bar counts both of them, so the split says whose is whose.
+      var split = '';
+      if (el.dataset.split) {
+        var s = el.dataset.split.split('|');
+        split = '<span style="color:#845095">' + esc(s[0]) + ' ' + esc(s[1]) + '</span>' +
+          '<span style="opacity:.45"> &middot; </span>' +
+          '<span style="color:#0d9488">' + esc(s[2]) + ' ' + esc(s[3]) + '</span><br>';
+      }
+      showTip(e, '<b>' + esc(head) + '</b>' + split + (sub ? sub + '<br>' : '') +
+        (split ? '' : (gl ? '<span style="opacity:.7">' + esc(gl) + '</span>'
+            : (list.length ? '' : 'None in this chart.'))));
     };
     document.getElementById('tab-stats').addEventListener('mousemove', function (e) {
       // the category heading explains what its table counts
@@ -4704,26 +4721,30 @@ if (DATA.client) {
       });
       return o;
     };
-    var section = function (title, keys, keyOf, note) {
+    // The number on a bar is the two of them together; the mouseover splits it,
+    // and carries the same description the individual chart's stats carry.
+    var possible = A.length + B.length;
+    var section = function (title, keys, keyOf, note, kind) {
       var ta = tally(A, keyOf), tb = tally(B, keyOf);
       var max = 1;
       keys.forEach(function (k) { max = Math.max(max, (ta[k] || 0) + (tb[k] || 0)); });
       var body = keys.map(function (k) {
         var a = ta[k] || 0, b = tb[k] || 0;
         var wa = Math.round((a / max) * 100), wb = Math.round((b / max) * 100);
-        return '<div class="bar rel" data-key="' + esc(String(k)) + '">' +
+        return '<div class="bar rel" data-kind="' + kind + '" data-key="' + esc(String(k)) + '"' +
+          ' data-split="' + esc(conn.a.name) + '|' + a + '|' + esc(conn.b.name) + '|' + b + '">' +
           '<i>' + esc(String(k)) + '</i>' +
           '<div class="track">' +
             '<div class="seg" style="width:' + wa + '%;background:' + COL_A + '"></div>' +
             '<div class="seg" style="width:' + wb + '%;background:' + COL_B + '"></div>' +
           '</div>' +
-          '<b><span style="color:' + COL_A + '">' + a + '</span>' +
-          '<span class="sl">/</span>' +
-          '<span style="color:' + COL_B + '">' + b + '</span></b></div>';
+          '<b>' + (a + b) + '</b></div>';
       }).join('');
+      // what the numbers are out of, so a bar of 9 has a size
+      var foot = '<div class="statfoot">' + possible + ' possible</div>';
       return '<details class="drop" open><summary' +
         (note ? ' data-help="' + esc(note) + '" data-help-label="' + esc(title) + '"' : '') +
-        '>' + title + '</summary>' + body + '</details>';
+        '>' + title + '</summary>' + body + foot + '</details>';
     };
 
     var centers = ['head', 'ajna', 'throat', 'g', 'heart', 'spleen', 'sacral', 'solar-plexus', 'root'];
@@ -4752,24 +4773,77 @@ if (DATA.client) {
       return null;
     };
 
+    // Circuits grouped the way the Circuitry tab groups them: the family total
+    // first, its circuits under it. Reading the balance between the three is the
+    // point, and counting it off a flat list is a chore.
+    var circuitSection = function () {
+      var byGroup = [];
+      (DATA.circuits || []).forEach(function (c) {
+        var g = byGroup.filter(function (x) { return x.name === c.group; })[0];
+        if (!g) { g = { name: c.group, list: [] }; byGroup.push(g); }
+        if (g.list.indexOf(c.name) < 0) g.list.push(c.name);
+      });
+      // Her library labels the integration channels with two circuits at once,
+      // e.g. "Individual: Knowing , Integration". Those names are hers and are
+      // kept whole; they are filed under the family they name first.
+      circuits.forEach(function (n) {
+        var known = byGroup.some(function (g) { return g.list.indexOf(n) > -1; });
+        if (known) return;
+        var head = String(n).split(':')[0].split(',')[0].trim();
+        var g = byGroup.filter(function (x) { return x.name === head; })[0];
+        if (!g) { g = { name: head || 'Other', list: [] }; byGroup.push(g); }
+        g.list.push(n);
+      });
+      var keyOf = function (r) { var L = lib[r.p.gate]; return L ? L.circuit : null; };
+      var ta = tally(A, keyOf), tb = tally(B, keyOf);
+      var max = 1;
+      byGroup.forEach(function (g) {
+        var sa = 0, sb = 0;
+        g.list.forEach(function (n) { sa += ta[n] || 0; sb += tb[n] || 0; });
+        max = Math.max(max, sa + sb);
+      });
+      var bar = function (label, a, b, cls, kind) {
+        var wa = Math.round((a / max) * 100), wb = Math.round((b / max) * 100);
+        return '<div class="bar rel' + (cls ? ' ' + cls : '') + '" data-kind="' + kind +
+          '" data-key="' + esc(label) + '"' +
+          ' data-split="' + esc(conn.a.name) + '|' + a + '|' + esc(conn.b.name) + '|' + b + '">' +
+          '<i>' + esc(label) + '</i>' +
+          '<div class="track">' +
+            '<div class="seg" style="width:' + wa + '%;background:' + COL_A + '"></div>' +
+            '<div class="seg" style="width:' + wb + '%;background:' + COL_B + '"></div>' +
+          '</div><b>' + (a + b) + '</b></div>';
+      };
+      var body = '';
+      byGroup.forEach(function (g) {
+        var sa = 0, sb = 0;
+        g.list.forEach(function (n) { sa += ta[n] || 0; sb += tb[n] || 0; });
+        body += bar(g.name, sa, sb, 'grp', 'group');
+        g.list.forEach(function (n) {
+          body += bar(n, ta[n] || 0, tb[n] || 0, null, 'circuit');
+        });
+      });
+      return '<details class="drop" open><summary data-help="' +
+        'Every activation sorted by the circuit its gate belongs to, gathered into its family.' +
+        '" data-help-label="Activations by Circuit">Activations by Circuit</summary>' +
+        body + '<div class="statfoot">' + possible + ' possible</div></details>';
+    };
+
     var html =
-      section('Activations by Line', [1, 2, 3, 4, 5, 6],
-        function (r) { return r.p.line; },
-        'Every activation sorted by its line number, one bar per line, split by whose it is.') +
+      section('Activations by Line', ['Line 1', 'Line 2', 'Line 3', 'Line 4', 'Line 5', 'Line 6'],
+        function (r) { return 'Line ' + r.p.line; },
+        'Every activation sorted by its line number, one bar per line. The number is both of you; the mouseover splits it.', 'line') +
       section('Activations by Center',
         centers.map(function (c) { return centerName[c] || c; }),
         function (r) { var L = lib[r.p.gate]; return L ? L.center : null; },
-        'Every activation sorted by the center its gate sits in. All nine are listed.') +
-      section('Activations by Circuit', circuits,
-        function (r) { var L = lib[r.p.gate]; return L ? L.circuit : null; },
-        'Every activation sorted by the circuit its gate belongs to.') +
+        'Every activation sorted by the center its gate sits in. All nine are listed.', 'center') +
+      circuitSection() +
       section('Activations by Element', ELEMENTS.map(function (e) { return e[0]; }),
         elementOfRow,
-        'Every activation placed in the zodiac and grouped by element. Fixed by gate and line, so it needs nothing looked up.') +
+        'Every activation placed in the zodiac and grouped by element. Fixed by gate and line, so it needs nothing looked up.', 'sign') +
       section('Activations by Sign',
         ELEMENTS.reduce(function (acc, e) { return acc.concat(e[1]); }, []),
         signOfRow,
-        'Every activation placed in the zodiac. All twelve are listed; a sign with nothing in it says as much as a full one.');
+        'Every activation placed in the zodiac. All twelve are listed; a sign with nothing in it says as much as a full one.', 'sign');
 
     // Conjunctions, one drawer per person: two or more of their planets in the
     // same gate on the same side.
@@ -5924,9 +5998,33 @@ function paintRelationship() {
       if (xd !== yd) return yd - xd;
       return RANK[x.sa] + RANK[x.sb] - RANK[y.sa] - RANK[y.sb];
     });
+    // Three things happen in the defined band and they are not the same thing:
+    // centers you both carry, centers one of you carries and the other receives,
+    // and centers that exist only because you are together.
+    var bandOf = function (r) {
+      if (r.st !== 'D') return r.st === 'U' ? 'und' : 'open';
+      if (r.sa === 'D' && r.sb === 'D') return 'both';
+      return (r.sa === 'D' || r.sb === 'D') ? 'one' : 'between';
+    };
+    var BAND_NOTE = {
+      both: 'You both carry these.',
+      one: 'One of you carries it, the other meets it.',
+      between: 'Defined only by the two of you together.',
+      und: 'Undefined even together: gates, but no channel.',
+      open: 'Open in both of you: nothing activated there.'
+    };
+    var BAND_NAME = { both: 'Both of you', one: 'One of you', between: 'Between you',
+      und: 'Undefined together', open: 'Open together' };
+    var lastBand = null;
     var tally = { a: 0, b: 0, t: 0 };
     scored.forEach(function (row) {
       var c = row.c, sa = row.sa, sb = row.sb, st = row.st;
+      var band = bandOf(row);
+      if (band !== lastBand) {
+        crows += '<div class="bandrow" data-help="' + esc(BAND_NOTE[band]) + '"' +
+          ' data-help-label="' + esc(BAND_NAME[band]) + '">' + esc(BAND_NAME[band]) + '</div>';
+        lastBand = band;
+      }
       if (sa === 'D') tally.a++;
       if (sb === 'D') tally.b++;
       if (st === 'D') tally.t++;
@@ -5937,8 +6035,12 @@ function paintRelationship() {
         return inCentre.filter(function (g) { return set[g]; }).join(',');
       };
       var ga = held(gA), gb = held(gB), gboth = held(both);
-      crows += '<div class="lb" data-center="' + c.key + '" data-gates="' + gboth + '">' +
-        esc(c.label) + '</div>' +
+      // the same description the individual chart gives a center
+      var meta = (DATA.centers || []).filter(function (x) { return x.id === c.key; })[0];
+      var note = meta ? (meta.fns || []).join(' + ') + (meta.biology ? '. ' + meta.biology : '') : '';
+      crows += '<div class="lb" data-center="' + c.key + '" data-gates="' + gboth + '"' +
+        (note ? ' data-help="' + esc(note) + '" data-help-label="' + esc(c.label) + ' Center"' : '') +
+        '>' + esc(c.label) + '</div>' +
         '<div class="vl s-' + sa + '" data-center="' + c.key + '" data-gates="' + ga + '">' + sa + '</div>' +
         '<div class="vl s-' + sb + '" data-center="' + c.key + '" data-gates="' + gb + '">' + sb + '</div>' +
         '<div class="vl s-' + st + '" data-center="' + c.key + '" data-gates="' + gboth + '">' + st + '</div>';
@@ -5947,7 +6049,8 @@ function paintRelationship() {
     crows += '<div class="lb tally">Defined</div>' +
       '<div class="vl tally">' + tally.a + ' of 9</div>' +
       '<div class="vl tally">' + tally.b + ' of 9</div>' +
-      '<div class="vl tally">' + tally.t + ' of 9</div>';
+      '<div class="vl tally">' + tally.t + ' of 9</div>' +
+      '<div class="lb statfoot" style="grid-column:1 / -1">9 possible</div>';
     cen.innerHTML = crows + '</div>' +
       '<div class="relsub" style="opacity:.55;text-transform:none;letter-spacing:0">' +
       'D defined &middot; U undefined &middot; O open</div>';
