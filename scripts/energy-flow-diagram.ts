@@ -2811,7 +2811,7 @@ body.show-bridges .bridge { opacity:1; }
   display:flex; align-items:center; gap:7px; }
 .chan-item:hover { background:rgba(132,80,149,.14); }
 .chan-item .sw { width:14px; height:4px; border-radius:2px; flex:0 0 14px; }
-#tab-dates h4, #tab-stats h4 { font-size:9.5px; letter-spacing:.18em; font-weight:600; opacity:.6; margin:16px 0 7px;
+#tab-dates h4, #tab-stats h4, #tab-pair h4 { font-size:9.5px; letter-spacing:.18em; font-weight:600; opacity:.6; margin:16px 0 7px;
   text-transform:uppercase; }
 #tab-dates .line, .pane .line { font-size:11.5px; line-height:1.6; }
 #tab-dates .line span, .pane .line span { opacity:.6; }
@@ -2939,26 +2939,34 @@ body:not(.mod-relation) svg.canvas.composite { display:none !important; }
 /* The pair reads as two columns so a difference is a glance, not a search. Type
    comes from the panel's own scale: h1 16, sub 11.5, and the same 11.5 body the
    other lists use. Nothing here invents a size. */
-#relhome .relpair { font-size:16px; font-weight:600; margin:0 0 2px; }
+/* The pair's tab uses the panel's own vocabulary: h4 headings and .line bodies,
+   the same as Dates and Stats. Only what is genuinely new to this tab is
+   defined here, so all four tabs stay one thing. */
+/* The pair's panel belongs to the relationship chart and appears nowhere else. */
+#relhome { display:none; }
+body.mod-relation #relhome { display:block; }
+#relhome .relpair { font-size:11.5px; font-weight:600; margin:8px 0 2px; }
 #relhome .reltheme { font-size:11.5px; font-weight:600; margin-bottom:2px; }
-#relhome .relsum { font-size:11.5px; line-height:1.5; opacity:.72; margin-bottom:10px; }
-#relhome h4 { font-size:9.5px; letter-spacing:.16em; text-transform:uppercase;
-  opacity:.55; margin:14px 0 5px; font-weight:600; }
+#relhome .relsum { font-size:11.5px; line-height:1.6; opacity:.72; margin-bottom:10px; }
 #relhome .two { display:grid; grid-template-columns:1fr 1fr; gap:0 10px; }
-#relhome .two .who { font-size:10px; letter-spacing:.1em; text-transform:uppercase;
-  font-weight:600; padding-bottom:3px; border-bottom:1.5px solid currentColor; margin-bottom:5px; }
-#relhome .two .val { font-size:11.5px; line-height:1.55; }
+#relhome .two .who { font-size:9px; letter-spacing:.1em; text-transform:uppercase;
+  opacity:.75; padding-bottom:3px; border-bottom:1.5px solid currentColor; margin-bottom:5px; }
+#relhome .two .val { font-size:11.5px; line-height:1.6; }
 #relhome .two .val.dim { opacity:.45; }
 #relhome .relch, #relhome .relpl, #relhome .relcen {
-  display:flex; justify-content:space-between; gap:8px; font-size:11.5px;
-  padding:3px 6px; border-radius:6px; cursor:default; }
+  display:flex; justify-content:space-between; gap:8px;
+  font-size:11.5px; line-height:1.6; padding:3px 6px; margin:0 -2px;
+  border-radius:7px; cursor:default; }
+#relhome .relch span, #relhome .relpl span { font-weight:400; }
 #relhome .relch .dim, #relhome .relpl .dim { font-variant-numeric:tabular-nums; opacity:.55; }
-#relhome .relkind { font-size:9.5px; letter-spacing:.16em; text-transform:uppercase;
-  opacity:.55; margin:12px 0 4px; display:flex; justify-content:space-between; font-weight:600; }
-#relhome .relnone { font-size:11.5px; opacity:.45; padding:2px 0 4px; }
+#relhome .relkind { font-size:9.5px; letter-spacing:.18em; text-transform:uppercase;
+  opacity:.6; font-weight:600; margin:16px 0 7px; display:flex; justify-content:space-between; }
+#relhome .relnone { font-size:11.5px; line-height:1.6; opacity:.45; padding:2px 0 4px; }
+#relhome .relch:hover, #relhome .relpl:hover, #relhome .relcen:hover { background:rgba(132,80,149,.22); }
 #relhome .relch.hi, #relhome .relpl.hi, #relhome .relcen.hi { background:#fbf7b2; }
 #relhome .relcen.open { opacity:.5; }
 #relhome #partyrow { margin:2px 0 12px; }
+#relhome #partyrow button { font-size:10.5px; padding:5px 9px; }
 #relpick { margin:10px 0 14px; }
 #relpick input { width:100%; box-sizing:border-box; font-family:inherit; font-size:11.5px;
   padding:5px 8px; margin-bottom:6px; border-radius:8px; border:1px solid rgba(132,80,149,.28);
@@ -2966,6 +2974,10 @@ body:not(.mod-relation) svg.canvas.composite { display:none !important; }
 #relpick .two { gap:0 6px; }
 #relpick .two input { margin-bottom:6px; }
 #relStatus { min-height:14px; }
+#relPlaceList { margin:-4px 0 6px; }
+#relPlaceList div { font-size:11.5px; line-height:1.5; padding:4px 8px; border-radius:7px; cursor:pointer; }
+#relPlaceList div:hover, #relPlaceList div.on { background:rgba(132,80,149,.22); }
+#relPlace.unset { border-color:rgba(224,102,102,.6); }
 
 body.mod-relation #pmeta, body.mod-relation #placements, body.mod-relation #chandrop,
 body.mod-relation #defdrop, body.mod-relation #circdrop { display:none !important; }
@@ -2991,28 +3003,30 @@ ${d.client ? "" : `<h1 id="ptitle">Centers, function, and flow</h1>
       <button class="tabbtn on" data-tab="home">Home</button>
       <button class="tabbtn" data-tab="dates">Dates</button>
       <button class="tabbtn" data-tab="stats">Stats</button>
-      <button class="tabbtn" data-tab="pair" id="tabPair" hidden>Together</button>
     </div>
 
 ${d.client ? "" : viewControls}
 
-    <div id="tab-pair" class="pane" hidden>
+    <div id="tab-dates" class="pane" hidden></div>
+    <div id="tab-stats" class="pane" hidden></div>
+
+    <div id="tab-home" class="pane">
     <div id="relhome">
-      <div id="relmeta"></div>
       <div id="relpick">
-        <h4>Run this against someone else</h4>
         <input id="relName" type="text" placeholder="Their name" autocomplete="off">
         <div class="two">
           <input id="relDate" type="date">
           <input id="relTime" type="time">
         </div>
-        <input id="relPlace" type="text" placeholder="City, region, country" autocomplete="off">
+        <input id="relPlace" type="text" placeholder="Start typing a city" autocomplete="off">
+        <div id="relPlaceList"></div>
         <div class="row">
           <button id="relGo" class="gold">Draw the connection</button>
-          <button id="relBack" hidden>Back to the saved pair</button>
+          <button id="relBack" hidden>Back to just this chart</button>
         </div>
         <div id="relStatus" class="relnone"></div>
       </div>
+      <div id="relmeta"></div>
       <div class="row" id="partyrow">
         <button id="partyA" class="on" data-help="" data-help-label="">A</button>
         <button id="partyB" class="on" data-help="" data-help-label="">B</button>
@@ -3027,11 +3041,7 @@ ${d.client ? "" : viewControls}
         <div id="relcentres"></div>
       </details>
     </div>
-    </div>
-    <div id="tab-dates" class="pane" hidden></div>
-    <div id="tab-stats" class="pane" hidden></div>
 
-    <div id="tab-home" class="pane">
     <div id="pmeta"></div>
 
 
@@ -3413,7 +3423,7 @@ if (DATA.client) {
   [].forEach.call(document.querySelectorAll('.tabbtn'), function (b) {
     b.onclick = function () {
       [].forEach.call(document.querySelectorAll('.tabbtn'), function (x) { x.classList.toggle('on', x === b); });
-      ['home', 'dates', 'stats', 'pair'].forEach(function (t) {
+      ['home', 'dates', 'stats'].forEach(function (t) {
         document.getElementById('tab-' + t).hidden = (t !== b.dataset.tab);
       });
     };
@@ -4271,17 +4281,6 @@ if (DATA.client) {
       var b = document.getElementById(k === 'self' ? 'mSelf' : k === 'transit' ? 'mTransit' : 'mRelation');
       if (b) b.classList.toggle('on', k === id);
     });
-    // the pair's tab exists only on the pair's chart, and opening that chart opens
-    // the tab, because it is the reason you went there
-    var pairTab = document.getElementById('tabPair');
-    if (pairTab) {
-      pairTab.hidden = !(id === 'relation' && DATA.connection);
-      if (id === 'relation' && DATA.connection) pairTab.click();
-      else if (pairTab.classList.contains('on')) {
-        var home = document.querySelector('.tabbtn[data-tab="home"]');
-        if (home) home.click();
-      }
-    }
     applyView();
     // labels follow the chart, and both parties come back on when it changes
     if (typeof labelParties === 'function') labelParties();
@@ -4305,8 +4304,167 @@ if (DATA.client) {
   });
   // A chart built without a partner has no Relationship module to show, so the
   // button says so by being unavailable rather than opening an empty panel.
+  // The chart is always available on a client page; it simply opens with nobody
+  // chosen yet.
+  function repaintPair(conn) {
+    var svg = document.querySelector('svg.canvas.composite');
+    if (!svg) return;
+    var A_P = '#845095', A_D = '#b89ac2', B_P = '#0d9488', B_D = '#73c1ba';
+    var gset = function (list) {
+      var o = {}; (list || []).forEach(function (x) { o[x.gate || x] = 1; }); return o;
+    };
+    var ap = gset(conn.a.personality), ad = gset(conn.a.design);
+    var bp = gset(conn.b.personality), bd = gset(conn.b.design);
+    [].forEach.call(svg.querySelectorAll('.pleg, .gdisc'), function (el) {
+      var g = el.dataset.gate;
+      var mine = ap[g] || ad[g], theirs = bp[g] || bd[g];
+      if (!mine && !theirs) { el.style.display = 'none'; return; }
+      el.style.display = '';
+      var overlay = !el.hasAttribute('data-full') && el.classList.contains('pleg');
+      // on a shared gate the full leg is person one and the overlay person two
+      var who = (mine && theirs) ? (overlay ? 'b' : 'a') : (mine ? 'a' : 'b');
+      el.setAttribute('data-party', who);
+      el.setAttribute('fill', who === 'a' ? (ap[g] ? A_P : A_D) : (bp[g] ? B_P : B_D));
+    });
+    var lit = {};
+    (conn.definedTogether || []).forEach(function (c) {
+      // no regex: the template literal eats the backslashes
+      var key = String(c).toLowerCase().split(' center')[0].trim();
+      if (key === 'splenic') key = 'spleen';
+      if (key === 'solar plexus') key = 'solar-plexus';
+      lit[key] = 1;
+    });
+    [].forEach.call(svg.querySelectorAll('.cshape[data-center]'), function (el) {
+      var on = !!lit[el.dataset.center];
+      el.setAttribute('fill', on ? (el.dataset.litfill || el.getAttribute('fill'))
+        : (el.dataset.openfill || '#ffffff'));
+    });
+    var head = svg.querySelector('text');
+    if (head) {
+      head.innerHTML = '<tspan fill="' + A_P + '">' + esc(conn.a.name) + '</tspan>' +
+        '<tspan fill="#6b6790" font-weight="400"> and </tspan>' +
+        '<tspan fill="' + B_P + '">' + esc(conn.b.name) + '</tspan>';
+    }
+    DATA.connection = conn;
+    paintRelationship();
+  }
+
+  // The birth place is chosen from the provider's own list, never typed freehand.
+  // Whatever the reader types is only a search; what gets sent to draw the chart
+  // is the canonical value the provider handed back, so a place that appears in
+  // this list always resolves when the chart is drawn.
+  var placeInput = document.getElementById('relPlace');
+  var placeList = document.getElementById('relPlaceList');
+  var placeChosen = '';
+  if (placeInput && placeList) {
+    var placeTimer = null;
+    var showPlaces = function (places) {
+      if (!places.length) { placeList.innerHTML = ''; return; }
+      placeList.innerHTML = places.map(function (p) {
+        return '<div data-value="' + esc(p.value) + '">' + esc(p.value) + '</div>';
+      }).join('');
+      [].forEach.call(placeList.children, function (row) {
+        row.onclick = function () {
+          placeChosen = row.dataset.value;
+          placeInput.value = placeChosen;
+          placeInput.classList.remove('unset');
+          placeList.innerHTML = '';
+        };
+      });
+    };
+    placeInput.oninput = function () {
+      placeChosen = '';
+      placeInput.classList.add('unset');
+      var q = placeInput.value.trim();
+      if (placeTimer) clearTimeout(placeTimer);
+      if (q.length < 2) { placeList.innerHTML = ''; return; }
+      placeTimer = setTimeout(function () {
+        fetch('/api/places?q=' + encodeURIComponent(q))
+          .then(function (r) { return r.json(); })
+          .then(function (j) { showPlaces((j && j.places) || []); })
+          .catch(function () { placeList.innerHTML = ''; });
+      }, 220);
+    };
+  }
+
+  var relGo = document.getElementById('relGo');
+  if (relGo) {
+    relGo.onclick = function () {
+      var status = document.getElementById('relStatus');
+      // No regex: this script lives inside a template literal, which eats the
+    // backslashes and turns the pattern into a comment.
+    var parts = location.pathname.split('/');
+    var token = parts[parts.length - 1];
+      var d = document.getElementById('relDate').value;
+      var t = document.getElementById('relTime').value;
+      // the canonical value from the list, not what was typed
+    var pl = placeChosen || document.getElementById('relPlace').value.trim();
+      var nm = document.getElementById('relName').value.trim();
+      if (!token) { status.textContent = 'This only works on a published chart.'; return; }
+      if (!d || !t || !pl) { status.textContent = 'Birth date, time and place are all needed.'; return; }
+    if (!placeChosen) {
+      status.textContent = 'Pick the birth place from the list so it matches one the chart service knows.';
+      return;
+    }
+      status.textContent = 'Reading their chart\u2026';
+      relGo.disabled = true;
+      fetch('/api/connection?token=' + token + '&date=' + encodeURIComponent(d) +
+            '&time=' + encodeURIComponent(t) + '&place=' + encodeURIComponent(pl) +
+            '&name=' + encodeURIComponent(nm))
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          relGo.disabled = false;
+          if (!j.ok) { status.textContent = j.error || 'That did not work.'; return; }
+          status.textContent = '';
+          document.getElementById('relBack').hidden = false;
+          repaintPair(j);
+        })
+        .catch(function (e) {
+          relGo.disabled = false;
+          // A fault while drawing lands here too, so name it rather than blaming
+          // the network for something on this side.
+          status.textContent = (e && e.message)
+            ? 'Drew the data but could not paint it: ' + e.message
+            : 'Could not reach the chart service.';
+        });
+    };
+  }
+  var relBack = document.getElementById('relBack');
+  if (relBack) {
+    relBack.onclick = function () {
+      if (SAVED) repaintPair(SAVED);
+      relBack.hidden = true;
+      document.getElementById('relStatus').textContent = '';
+    };
+  }
+
+  function paintShared() {
+    var conn = DATA.connection;
+    var svg = document.querySelector('svg.canvas.composite');
+    if (!conn || !svg) return;
+    var offA = body.classList.contains('off-party-a');
+    var offB = body.classList.contains('off-party-b');
+    var set = function (list) { var o = {}; (list || []).forEach(function (x) { o[x.gate] = 1; }); return o; };
+    var ap = set(conn.a.personality), ad = set(conn.a.design);
+    var bp = set(conn.b.personality), bd = set(conn.b.design);
+    var A_P = '#845095', A_D = '#b89ac2', B_P = '#0d9488', B_D = '#73c1ba';
+    [].forEach.call(svg.querySelectorAll('.pleg, .gdisc'), function (el) {
+      var g = el.dataset.gate;
+      var mine = ap[g] || ad[g], theirs = bp[g] || bd[g];
+      if (!mine && !theirs) { el.style.display = 'none'; return; }
+      // whoever is still on the chart owns the whole gate
+      var who = offA ? 'b' : offB ? 'a' : ((mine && theirs)
+        ? (el.hasAttribute('data-full') ? 'a' : 'b')
+        : (mine ? 'a' : 'b'));
+      if ((who === 'a' && !mine) || (who === 'b' && !theirs)) { el.style.display = 'none'; return; }
+      el.style.display = '';
+      el.setAttribute('data-party', who);
+      el.setAttribute('fill', who === 'a' ? (ap[g] ? A_P : A_D) : (bp[g] ? B_P : B_D));
+    });
+  }
+
   var relBtn = document.getElementById('mRelation');
-  if (relBtn && !DATA.connection) { relBtn.disabled = true; relBtn.classList.add('disabled'); }
+  if (relBtn && !DATA.client) { relBtn.disabled = true; relBtn.classList.add('disabled'); }
   paintRelationship();
   // The two parties on a two-party chart. Labels follow whichever chart is open,
   // because "A" and "B" mean nothing to somebody reading their own chart.
@@ -4338,6 +4496,10 @@ if (DATA.client) {
       partyBtns.forEach(function (x, j) {
         if (x) x.classList.toggle('on', !body.classList.contains(j === 0 ? 'off-party-a' : 'off-party-b'));
       });
+      // With one of them taken off, a gate they share should read wholly as the
+      // person still on the chart; left alone it keeps both tones and looks as
+      // though both were still there.
+      paintShared();
     };
   });
   setModule('self');
@@ -4963,6 +5125,12 @@ function relight() {
   // traditional view: black is Personality, red is Design, and the defined /
   // hanging buttons act on the legs the design itself drew
   [].forEach.call(document.querySelectorAll('.pleg'), function (el) {
+    // The pair's chart is left alone entirely. This loop hides any leg the CLIENT
+    // does not carry, which on a connection chart hid half of the other person:
+    // Tiff's gate 18 was drawn in her colour and then hidden, while the panel
+    // still listed 18-58 between them.
+    var svc = el.closest ? el.closest('svg.canvas') : null;
+    if (svc && svc.classList.contains('composite')) return;
     var g = el.dataset.gate;
     var hidden = !live[g] ||
       (noDef && inDefined[g]) ||
@@ -5063,7 +5231,7 @@ function markRowsFor(list) {
 function relRow(cls, label, note, gates) {
   return '<div class="' + cls + '" data-gates="' + gates.join(',') + '"' +
     (note ? ' data-help-label="' + esc(label) + '" data-help="' + esc(note) + '"' : '') +
-    '><b>' + esc(label) + '</b>' +
+    '><span>' + esc(label) + '</span>' +
     (gates.length ? '<span class="dim">' + gates.join(' - ') + '</span>' : '') + '</div>';
 }
 
@@ -5071,6 +5239,25 @@ function paintRelationship() {
   // Read at call time: this runs before the rest of the panel is set up, and a
   // hoisted copy was still undefined when it did.
   var REL = DATA.connection;
+  // With nobody chosen, the tab is the picker and an explanation of what it does.
+  // Everything that describes a pair stays out of the way until there is one.
+  var pairParts = ['relchannels', 'relside', 'relcentres'];
+  var haveOne = !!REL;
+  [].forEach.call(document.querySelectorAll('#relhome details'), function (d) {
+    d.hidden = !haveOne;
+  });
+  document.getElementById('partyrow').hidden = !haveOne;
+  if (!haveOne) {
+    // Nothing above the picker: with nobody chosen there is nothing to say.
+    var meta0 = document.getElementById('relmeta');
+    if (meta0) meta0.innerHTML = '';
+    if (false) {
+      meta0.innerHTML = '<div class="relpair">' + esc((DATA.client && DATA.client.name) || 'This chart') + '</div>' +
+        '<div class="relsum">Their chart on its own. Add a birth date, time and place below to read it ' +
+        'against somebody else.</div>';
+    }
+    return;
+  }
   // Declared here, not at the top of the script: this function runs before the
   // rest of the panel is built, and module-scope assignments had not happened
   // yet when it did.
@@ -5084,7 +5271,7 @@ function paintRelationship() {
       '<div class="relpair"><b>' + esc(REL.a.name) + '</b> and <b>' + esc(REL.b.name) + '</b></div>' +
       '<div class="reltheme" data-help-label="' + esc(REL.themeLabel) + '" data-help="' + esc(REL.themeText) + '">' +
         esc(REL.themeLabel) + '</div>' +
-      '<div class="dim">Together: ' + esc(REL.definitionLabel) + ', ' +
+      '<div class="relsum">Together: ' + esc(REL.definitionLabel) + ', ' +
         REL.definedTogether.length + ' of 9 centers defined</div>';
   }
 
@@ -5187,83 +5374,6 @@ function paintRelationship() {
   // in place: legs by whose gate it is, centers by what the two define together.
   // Nothing is rebuilt and nothing is saved.
   var SAVED = DATA.connection;
-  function repaintPair(conn) {
-    var svg = document.querySelector('svg.canvas.composite');
-    if (!svg) return;
-    var A_P = '#845095', A_D = '#b89ac2', B_P = '#0d9488', B_D = '#73c1ba';
-    var gset = function (list) {
-      var o = {}; (list || []).forEach(function (x) { o[x.gate || x] = 1; }); return o;
-    };
-    var ap = gset(conn.a.personality), ad = gset(conn.a.design);
-    var bp = gset(conn.b.personality), bd = gset(conn.b.design);
-    [].forEach.call(svg.querySelectorAll('.pleg, .gdisc'), function (el) {
-      var g = el.dataset.gate;
-      var mine = ap[g] || ad[g], theirs = bp[g] || bd[g];
-      if (!mine && !theirs) { el.style.display = 'none'; return; }
-      el.style.display = '';
-      var overlay = !el.hasAttribute('data-full') && el.classList.contains('pleg');
-      // on a shared gate the full leg is person one and the overlay person two
-      var who = (mine && theirs) ? (overlay ? 'b' : 'a') : (mine ? 'a' : 'b');
-      el.setAttribute('data-party', who);
-      el.setAttribute('fill', who === 'a' ? (ap[g] ? A_P : A_D) : (bp[g] ? B_P : B_D));
-    });
-    var lit = {};
-    (conn.definedTogether || []).forEach(function (c) {
-      lit[String(c).toLowerCase().replace(/\s*centers?$/, '').replace('splenic', 'spleen')
-        .replace('solar plexus', 'solar-plexus').trim()] = 1;
-    });
-    [].forEach.call(svg.querySelectorAll('.cshape[data-center]'), function (el) {
-      var on = !!lit[el.dataset.center];
-      el.setAttribute('fill', on ? (el.dataset.litfill || el.getAttribute('fill'))
-        : (el.dataset.openfill || '#ffffff'));
-    });
-    var head = svg.querySelector('text');
-    if (head) {
-      head.innerHTML = '<tspan fill="' + A_P + '">' + esc(conn.a.name) + '</tspan>' +
-        '<tspan fill="#6b6790" font-weight="400"> and </tspan>' +
-        '<tspan fill="' + B_P + '">' + esc(conn.b.name) + '</tspan>';
-    }
-    DATA.connection = conn;
-    paintRelationship();
-  }
-  var relGo = document.getElementById('relGo');
-  if (relGo) {
-    relGo.onclick = function () {
-      var status = document.getElementById('relStatus');
-      var token = (location.pathname.match(/\/c\/([a-f0-9]{32})/) || [])[1];
-      var d = document.getElementById('relDate').value;
-      var t = document.getElementById('relTime').value;
-      var pl = document.getElementById('relPlace').value.trim();
-      var nm = document.getElementById('relName').value.trim();
-      if (!token) { status.textContent = 'This only works on a published chart.'; return; }
-      if (!d || !t || !pl) { status.textContent = 'Birth date, time and place are all needed.'; return; }
-      status.textContent = 'Reading their chart\u2026';
-      relGo.disabled = true;
-      fetch('/api/connection?token=' + token + '&date=' + encodeURIComponent(d) +
-            '&time=' + encodeURIComponent(t) + '&place=' + encodeURIComponent(pl) +
-            '&name=' + encodeURIComponent(nm))
-        .then(function (r) { return r.json(); })
-        .then(function (j) {
-          relGo.disabled = false;
-          if (!j.ok) { status.textContent = j.error || 'That did not work.'; return; }
-          status.textContent = '';
-          document.getElementById('relBack').hidden = false;
-          repaintPair(j);
-        })
-        .catch(function () {
-          relGo.disabled = false;
-          status.textContent = 'Could not reach the chart service.';
-        });
-    };
-  }
-  var relBack = document.getElementById('relBack');
-  if (relBack) {
-    relBack.onclick = function () {
-      if (SAVED) repaintPair(SAVED);
-      relBack.hidden = true;
-      document.getElementById('relStatus').textContent = '';
-    };
-  }
 
   // Hover lights the chart. Same behaviour as every other list here.
   [].forEach.call(document.querySelectorAll('#relhome [data-gates]'), function (row) {
@@ -5894,7 +6004,10 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
   // later. Parsed before the client slug so the partner is never mistaken for it.
   const withIdx = args.indexOf("--with");
   const partnerSlug = withIdx >= 0 ? args[withIdx + 1] : undefined;
-  const slug = args.find((a, i) => !a.startsWith("--") && i !== withIdx + 1) ?? process.env.CLIENT;
+  // Only skip the partner's slug when --with was actually given: with no flag,
+  // withIdx is -1 and this was excluding argument 0, which is the client.
+  const slug = args.find((a, i) => !a.startsWith("--") && !(withIdx >= 0 && i === withIdx + 1))
+    ?? process.env.CLIENT;
 
   if (args.includes("--rollback")) {
     if (!slug) throw new Error("--rollback needs a client slug");
@@ -6038,6 +6151,20 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
   // The pair, when the chart was built with one. Failing to reach the provider
   // costs the Relationship module and nothing else, so it is caught here rather
   // than taking the whole chart down.
+  // The Relationship chart always exists on a client chart, and opens as their
+  // chart alone. Nobody is paired with anybody until the reader picks them: a
+  // partner baked in by default would show a stranger on somebody's own page.
+  if (client && !partnerSlug) {
+    const own = client.acts.filter((a) => a.side === "personality").map((a) => a.gate);
+    const ownD = client.acts.filter((a) => a.side === "design").map((a) => a.gate);
+    scene.composite = compositeInner(
+      raw,
+      { personality: [...new Set(own)], design: [...new Set(ownD)] },
+      { personality: [], design: [] },
+      client.centers,
+    );
+  }
+
   if (client && partnerSlug) {
     try {
       const pb = clientFromSlug(partnerSlug);
