@@ -70,6 +70,7 @@ export async function GET(request: Request) {
     // reader, so the wheel is rendered here rather than left to the page.
     let astro = null;
     let wheelSvg: string | null = null;
+    let wheelSvgB: string | null = null;
     let partnerDesign: unknown = null;
     let wheelError: string | null = null;
     try {
@@ -105,6 +106,17 @@ export async function GET(request: Request) {
         // the gate ring belongs to the two of them, not to personality and design
         { a: PERSON_A, b: PERSON_B },
       );
+      // The same wheel from the other side: their houses and ascendant frame it,
+      // and the two people keep their colours whichever of them is the base.
+      wheelSvgB = renderWheel(
+        theirs, `${conn.b.name} and ${conn.a.name}`, theirDesign, "aries",
+        [...new Set([...conn.a.gates, ...conn.b.gates])],
+        [...new Set(conn.b.gates)],
+        [...new Set(conn.a.gates)],
+        { personality: mine, design: myDesign, colour: PERSON_A, name: conn.a.name },
+        PERSON_B,
+        { a: PERSON_B, b: PERSON_A },
+      );
       partnerDesign = theirDesign;
       if (wheelSvg) {
         wheelSvg = wheelSvg
@@ -124,6 +136,7 @@ export async function GET(request: Request) {
       astro,
       astroDesign: partnerDesign,
       wheelSvg,
+      wheelSvgB,
       wheelError,
       a: conn.a,
       b: conn.b,

@@ -3036,6 +3036,13 @@ body.mod-relation #datesec, body.mod-relation #todaysec { display:none !importan
 body.view-astro #pmeta, body.view-astro #circdrop, body.view-astro #placements,
 body.view-astro #datesec, body.view-astro #todaysec, body.view-astro #chandrop,
 body.view-astro #defdrop { display:none !important; }
+/* The astrology view is an astrology panel. The pair's HD drawers belong to the
+   bodygraph views; the picker and the two party buttons stay, because changing
+   who the chart is of is not a view. */
+body.view-astro #relhome > details { display:none !important; }
+/* The wheel is the only drawing with a base person, so the switch lives there. */
+#relswap { display:none; }
+body.mod-relation.view-astro #relswap { display:inline-flex; }
 #astroplanets .line, #astrohouses .line, #astroaspects .line { display:grid;
   grid-template-columns:74px 1fr auto; gap:6px; font-size:11.5px; line-height:1.85; }
 #astroplanets .line i, #astrohouses .line i, #astroaspects .line i { font-style:normal; opacity:.55; }
@@ -3080,6 +3087,7 @@ ${d.client ? "" : viewControls}
       <div class="row" id="partyrow">
         <button id="partyA" class="on" data-help="" data-help-label="">A</button>
         <button id="partyB" class="on" data-help="" data-help-label="">B</button>
+        <button id="relswap" data-help="The wheel is drawn in one person's houses. This swaps which of you that is." data-help-label="Swap Perspective">Swap Perspective</button>
       </div>
       <details class="drop" open><summary>Between You</summary>
         <div id="relchannels"></div>
@@ -4339,7 +4347,7 @@ if (DATA.client) {
     // connection, this person's own wheel anywhere else
     var abox = document.querySelector('.astro');
     if (abox) {
-      var pair = DATA.connection && DATA.connection.wheelSvg;
+      var pair = window.__pairWheel ? window.__pairWheel() : (DATA.connection && DATA.connection.wheelSvg);
       if (id === 'relation' && pair) {
         if (!window.__soloWheel) window.__soloWheel = abox.innerHTML;
         if (abox.innerHTML !== pair) abox.innerHTML = pair;
@@ -4494,8 +4502,8 @@ if (DATA.client) {
     if (conn.wheelSvg) {
       var astroBox = document.querySelector('.astro');
       if (astroBox) {
-        if (!window.__soloWheel) window.__soloWheel = astroBox.innerHTML;
-        astroBox.innerHTML = conn.wheelSvg;
+          if (!window.__soloWheel) window.__soloWheel = astroBox.innerHTML;
+        astroBox.innerHTML = window.__pairWheel ? window.__pairWheel() : conn.wheelSvg;
       }
     }
     paintRelationship();
@@ -4586,6 +4594,28 @@ if (DATA.client) {
         });
     };
   }
+  // Whose houses the wheel is drawn in. Both wheels arrive with the connection,
+  // so the switch is a swap of what is already here, not another fetch.
+  var baseIsB = false;
+  window.__pairWheel = function () {
+    var C = DATA.connection;
+    if (!C) return null;
+    return (baseIsB && C.wheelSvgB) ? C.wheelSvgB : C.wheelSvg;
+  };
+  var relswap = document.getElementById('relswap');
+  if (relswap) {
+    relswap.onclick = function () {
+      var C = DATA.connection;
+      if (!C || !C.wheelSvgB) return;
+      baseIsB = !baseIsB;
+      var abox = document.querySelector('.astro');
+      // each wheel carries its own title, base person named first, so swapping
+      // the drawing swaps whose perspective it says it is
+      if (abox) abox.innerHTML = window.__pairWheel();
+      relswap.classList.toggle('on', baseIsB);
+    };
+  }
+
   var relBack = document.getElementById('relBack');
   if (relBack) {
     relBack.onclick = function () {

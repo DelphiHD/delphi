@@ -39,7 +39,7 @@ export const CLIENTS: Record<string, ClientBrief> = {
   kaycee:   { id: "HD-005", slug: "kaycee",   name: "Kaycee Vandenberg", birthDate: "1983-06-17", birthTime: "06:29", birthPlace: "Ogden, Utah, United States" },
   paul:     { id: "HD-006", slug: "paul",     name: "Paul Hollingshead", birthDate: "1978-11-07", birthTime: "15:10", birthPlace: "Bountiful, Utah, United States" },
   tiff:     { id: "HD-007", slug: "tiff",     name: "Tiff Polamateer",              birthDate: "1981-12-01", birthTime: "15:05", birthPlace: "Saratoga Springs, New York, United States" },
-  michael:  { id: "HD-008", slug: "michael",  name: "Michael",           birthDate: "1958-08-29", birthTime: "07:33", birthPlace: "Gary, Indiana, United States" },
+  michael:  { id: "HD-008", slug: "michael",  name: "Michael Jackson",           birthDate: "1958-08-29", birthTime: "07:33", birthPlace: "Gary, Indiana, United States" },
   matt:     { id: "HD-009", slug: "matt",     name: "Matt Hollingshead", birthDate: "1984-04-08", birthTime: "07:15", birthPlace: "Bountiful, Utah, United States" },
   brit:     { id: "HD-010", slug: "brit",     name: "Brit",              birthDate: "1988-03-21", birthTime: "13:27", birthPlace: "Payson, Utah, United States" },
   jason:    { id: "HD-011", slug: "jason",    name: "Jason",             birthDate: "1981-09-11", birthTime: "16:51", birthPlace: "Lodi, California, United States" },
@@ -66,6 +66,9 @@ export const CLIENTS: Record<string, ClientBrief> = {
   patrick:  { id: "HD-032", slug: "patrick", name: "Patrick Johns", birthDate: "1984-03-17", birthTime: "11:00", birthPlace: "Ann Arbor, Michigan, United States" },
   joseph:   { id: "HD-034", slug: "joseph", name: "Joseph Jaxin Vandenberg", birthDate: "2002-07-04", birthTime: "10:44", birthPlace: "Ogden, Utah, United States" },
   tori:     { id: "HD-033", slug: "tori", name: "Tori Tarver", birthDate: "1987-12-06", birthTime: "17:30", birthPlace: "Landstuhl (Rheinland-Pfalz), Germany" },
+  brett:    { id: "HD-035", slug: "brett", name: "Brett Bradshaw", birthDate: "1977-03-24", birthTime: "22:10", birthPlace: "Phoenix, Arizona, United States" },
+  sir:      { id: "HD-036", slug: "sir", name: "Sir Alexander Smartwood III", birthDate: "1987-10-05", birthTime: "08:03", birthPlace: "Newport Beach, California, United States" },
+  lisa:     { id: "HD-037", slug: "lisa", name: "Lisa Bradshaw", birthDate: "1979-01-29", birthTime: "14:24", birthPlace: "Bountiful, Utah, United States" },
 };
 
 /** Resolve a slug to a ClientBrief or exit with usage. */

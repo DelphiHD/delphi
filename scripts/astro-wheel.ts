@@ -110,6 +110,13 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   s.push(`<svg viewBox="-54 -118 828 884" width="828" height="884" xmlns="http://www.w3.org/2000/svg" ` +
     `font-family="Montserrat, 'Helvetica Neue', sans-serif">`);
   s.push(`<rect x="-54" y="-118" width="828" height="884" fill="${CREAM}"/>`);
+  if (ringColours) {
+    s.push(`<defs><radialGradient id="pairsplit" gradientUnits="userSpaceOnUse" ` +
+      `cx="${CX}" cy="${CY}" r="${R_GATE}">` +
+      `<stop offset="${(R_GATE_IN / R_GATE).toFixed(4)}" stop-color="${ringColours.b}"/>` +
+      `<stop offset="1" stop-color="${ringColours.a}"/>` +
+      `</radialGradient></defs>`);
+  }
   s.push(`<defs><radialGradient id="gsplit" gradientUnits="userSpaceOnUse" ` +
     `cx="${CX}" cy="${CY}" r="${R_GATE}">` +
     `<stop offset="${(R_GATE_IN / R_GATE).toFixed(4)}" stop-color="${DESIGN}"/>` +
@@ -141,8 +148,10 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
         `fill="${on ? fill : "none"}" fill-opacity="${on ? 0.34 : 0}" ` +
         `stroke="${INK}" stroke-width="0.5" stroke-opacity=".35"/>`;
       if (isP && isD) {
-        s.push(band(R_GATE, R_MID, ringColours.a));
-        s.push(band(R_MID, R_GATE_IN, ringColours.b));
+        // A gate they both carry fades between their two colours, the same way a
+        // doubled placement does on the individual chart. A hard line read as a
+        // border between them rather than something they share.
+        s.push(band(R_GATE, R_GATE_IN, "url(#pairsplit)"));
       } else {
         s.push(band(R_GATE, R_GATE_IN, isP ? ringColours.a : ringColours.b));
       }
@@ -233,11 +242,27 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   // involving a house cusp: the API returns those alongside the planet-to-planet
   // aspects, and drawing "Node opposition First House" as a chord across the
   // wheel says something that isn't true.
-  const planetNames = new Set(chart.planets.map((p) => p.name));
-  for (const a of chart.aspects) {
+  // On a pair each person's own aspects are drawn, in their own colour, so a
+  // line says whose chart it belongs to. Both sets come back from the provider;
+  // neither is worked out here.
+  const aspectSets: { list: readonly typeof chart.aspects[number][]; own?: string; names: Set<string> }[] = [
+    { list: chart.aspects, own: partner ? selfColour : undefined,
+      names: new Set(chart.planets.map((p) => p.name)) },
+  ];
+  if (partner) {
+    aspectSets.push({
+      list: partner.personality.aspects, own: partner.colour,
+      names: new Set(partner.personality.planets.map((p) => p.name)),
+    });
+  }
+  for (const set of aspectSets) {
+  const planetNames = set.names;
+  for (const a of set.list) {
     if (a.aspect === "conjunction") continue;
     if (!planetNames.has(a.p1_name) || !planetNames.has(a.p2_name)) continue;
-    const colour = HARD.has(a.aspect) ? "#c0603c" : SOFT.has(a.aspect) ? PURPLE : "#b9b6bd";
+    const colour = set.own
+      ? set.own
+      : HARD.has(a.aspect) ? "#c0603c" : SOFT.has(a.aspect) ? PURPLE : "#b9b6bd";
     // The classic set is the one most charts draw: a major aspect between two
     // traditional planets, held to a six degree orb. Everything else is real and
     // returned by the API, it is just a denser read than most people want on
@@ -249,6 +274,7 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
     s.push(`<line class="asp ${core ? "core" : "extra"}" x1="${f(x1)}" y1="${f(y1)}" ` +
       `x2="${f(x2)}" y2="${f(y2)}" stroke="${colour}" ` +
       `stroke-width="${HARD.has(a.aspect) ? 0.9 : 0.8}" opacity=".5"/>`);
+  }
   }
 
   // planets, nudged apart when they crowd
