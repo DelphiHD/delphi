@@ -439,7 +439,7 @@ function bridgeLegs(tagged: string, bridgeGates: number[]): string {
   for (const g of new Set(bridgeGates)) {
     s = s.replace(new RegExp(`(<text[^>]*class="pnum)(" data-gate="${g}")`),
       (_m, a: string, b: string) => `${a} bnum${b}`);
-    s = s.replace(new RegExp(`(<[a-z]+ id="personality-${g}"[^>]*?)fill="[^"]*"`),
+    s = s.replace(new RegExp(`(<[a-z]+ [^>]*?id="personality-${g}"[^>]*?)fill="[^"]*"`),
       (_m, head: string) => `${head.replace('id="', 'class="bleg" data-gate="' + g + '" id="')}fill="none"`);
   }
   return s;
@@ -531,6 +531,16 @@ const shiftDate = (date: string, days: number) => {
 // two-toned on its own, which is the point: you can see it is a temporary
 // bridge rather than part of their design.
 const CLIENT_TINT = "#0d9488";
+// A connection chart drops black-and-red, because on two overlaid charts that
+// reads as four things at once. Each person gets one colour instead: the darker
+// tone for their Personality, the lighter for their Design. Kaycee, 2026-09-01:
+// "one color for person 1 (A dark version for p and a light version for d) and
+// another for person 2."
+const PERSON_A = "#845095";                     // the Delphi purple
+const PERSON_B = "#0d9488";                     // the same teal the transit view gives the client
+const personInk = (base: string, side: "personality" | "design") =>
+  side === "personality" ? base : mix(base, "#ffffff", 0.42);
+
 const TRANSIT_INK = "#2b2b33";
 
 // What the Delphi design fills a DEFINED centre with. Harvested from the
@@ -558,25 +568,87 @@ const DEFINED_CENTER_FILL: Record<Center, string> = {
  */
 function compositeInner(
   raw: string,
-  mine: Set<number>,
-  theirs: Set<number>,
+  a: { personality: number[]; design: number[] },
+  b: { personality: number[]; design: number[] },
   definedTogether: Set<Center>,
-  bridgeGates: number[] = [],
 ): string {
-  let s = bridgeLegs(tagChart(raw), bridgeGates);
+  let s = tagChart(raw);
 
-  // The partner's gates light the same way the client's own do, so a channel the
-  // two of them complete reads as complete.
-  for (const g of theirs) {
-    if (mine.has(g)) continue;
-    s = s.replace(new RegExp(`(<[a-z]+ id="personality-${g}"[^>]*?)fill="[^"]*"`),
-      (_m, head: string) => `${head.replace('id="', 'class="pleg" data-gate="' + g + '" id="')}fill="${DESIGN_RED}"`);
-    s = s.replace(new RegExp(`(<path id="_${g}"[^>]*?)fill="[^"]*"`),
-      (_m, head: string) => `${head.replace('id="', 'class="gdisc" data-gate="' + g + '" id="')}fill="${DESIGN_RED}"`);
+  // Every leg is repainted by whose placement it is and which side of them it
+  // came from. Black and red are dropped entirely here: on two overlaid charts
+  // they read as four different things.
+  // Ordered A then B, so on a gate they share the full leg is person one and the
+  // overlay is person two, rather than whichever was written last.
+  const partyOf = new Map<number, string>();
+  const claim = new Map<number, string[]>();
+  const mark = (gates: number[], colour: string) => {
+    for (const g of gates) {
+      const list = claim.get(g) ?? [];
+      if (!list.includes(colour)) list.push(colour);
+      claim.set(g, list);
+    }
+  };
+  mark(a.personality, personInk(PERSON_A, "personality"));
+  mark(a.design, personInk(PERSON_A, "design"));
+  mark(b.personality, personInk(PERSON_B, "personality"));
+  mark(b.design, personInk(PERSON_B, "design"));
+
+  // A gate both of them carry is drawn the way a doubled gate already is on her
+  // charts: the full-width leg in one colour with the half-width overlay laid
+  // over it in the other. Same geometry the design uses for a placement held on
+  // both sides, so a shared gate reads as two colours rather than one winning.
+  for (const [g, colours] of claim) {
+    const full = colours[0];
+    const over = colours.length > 1 ? colours[1] : colours[0];
+    // A leg the client already carries has been through tagChart, which keeps
+    // data-gate and data-full but drops the id. One that only the partner
+    // carries was never touched and still has its id. Both shapes are matched,
+    // or every gate of the client's stays black and red.
+    const paint = (re: RegExp, colour: string) => {
+      s = s.replace(re, (m: string) => m.replace(/\sfill="[^"]*"$/, ` fill="${colour}"`));
+    };
+    paint(new RegExp(`<[a-z]+ [^>]*class="pleg"[^>]*data-gate="${g}"[^>]*data-full="1"[^>]*?\\sfill="[^"]*"`), full);
+    paint(new RegExp(`<[a-z]+ [^>]*class="pleg"(?![^>]*data-full)[^>]*data-gate="${g}"[^>]*?\\sfill="[^"]*"`), over);
+    // whose leg this is, so either person can be taken off the chart
+    partyOf.set(g, colours.length > 1 ? "both" : (colours[0] === personInk(PERSON_A, "personality")
+      || colours[0] === personInk(PERSON_A, "design") ? "a" : "b"));
+    paint(new RegExp(`<[a-z]+ [^>]*class="gdisc"[^>]*data-gate="${g}"[^>]*?\\sfill="[^"]*"`), full);
+    s = s.replace(new RegExp(`(<[a-z]+ [^>]*?id="personality-${g}"[^>]*?)fill="[^"]*"`),
+      (_m, head: string) =>
+        `${head.replace('id="', 'class="pleg" data-full="1" data-gate="' + g + '" id="')}fill="${full}"`);
+    s = s.replace(new RegExp(`(<[a-z]+ [^>]*?id="design-${g}"[^>]*?)fill="[^"]*"`),
+      (_m, head: string) =>
+        `${head.replace('id="', 'class="pleg" data-gate="' + g + '" id="')}fill="${over}"`);
+    s = s.replace(new RegExp(`(<path [^>]*?id="_${g}"[^>]*?)fill="[^"]*"`),
+      (_m, head: string) =>
+        `${head.replace('id="', 'class="gdisc" data-gate="' + g + '" id="')}fill="${full}"`);
   }
 
-  // Exactly the treatment the transit view uses for a centre the combination
-  // defines that the client alone does not.
+  // The Integration channel's legs carry compound ids (34-10, 34-57, 10-57,
+  // 10-20, 34-20) that a per-gate pass never reaches, so any leg still wearing
+  // the single-chart black or red is recoloured here from whoever holds it.
+  s = s.replace(
+    /(<[a-z]+ [^>]*class="(?:pleg|gdisc)"[^>]*data-gate="(\d+)"[^>]*?)\sfill="(?:#000000|#e06666)"/g,
+    (_m: string, head: string, gate: string) => {
+      const colours = claim.get(Number(gate));
+      if (!colours) return `${head} fill="#ffffff"`;
+      const isOverlay = !head.includes('data-full="1"');
+      const c = isOverlay && colours.length > 1 ? colours[1] : colours[0];
+      return `${head} fill="${c}"`;
+    },
+  );
+
+  s = s.replace(/(<[a-z]+ [^>]*class="(?:pleg|gdisc)"[^>]*data-gate="(\d+)")/g,
+    (_m: string, head: string, gate: string) => {
+      const who = partyOf.get(Number(gate));
+      const full = head.includes('data-full="1"');
+      // on a shared gate the full leg is person one and the overlay person two
+      const party = who === "both" ? (full ? "a" : "b") : who;
+      return party ? `${head} data-party="${party}"` : head;
+    });
+
+  // Centres the two charts define together, in the fills harvested from her own
+  // charts. Same treatment the transit view uses for a centre the sky defines.
   for (const center of Object.keys(CENTER_SVG_ID) as Center[]) {
     s = s.replace(new RegExp(`(<path class="cshape" data-center="${center}"[^>]*?)fill="([^"]*)"`),
       (_m, head: string, open: string) =>
@@ -610,6 +682,21 @@ function transitInner(
   // repaint itself for any date the picker asks for.
   const paintable = new Set<number>();
   for (let g = 1; g <= 64; g++) if (!natal.has(g)) paintable.add(g);
+  // A gate they BOTH carry is two-toned rather than left wholly in the client's
+  // colour: their full-width leg stays, and the half-width overlay takes the
+  // sky's ink, exactly as a doubled placement is drawn. Kaycee, 2026-09-01:
+  // "It should work that way on the transit chart too... It just shows the
+  // client color."
+  for (const g of natal) {
+    if (!transit.has(g)) continue;
+    s = s.replace(
+      new RegExp(`(<[a-z]+ [^>]*class="pleg"(?![^>]*data-full)[^>]*data-gate="${g}"[^>]*?)\\sfill="[^"]*"`),
+      (_m, head: string) => `${head} fill="${TRANSIT_INK}"`);
+    s = s.replace(new RegExp(`(<[a-z]+ [^>]*?id="design-${g}"[^>]*?)\\sfill="[^"]*"`),
+      (_m, head: string) =>
+        `${head.replace('id="', 'class="pleg" data-gate="' + g + '" id="')} fill="${TRANSIT_INK}"`);
+  }
+
   for (const g of paintable) {
     const lit = transit.has(g);
     // The design writes "empty" three different ways: none, #ffffff and
@@ -1792,6 +1879,55 @@ function placementTable(
   return s + `</g>`;
 }
 
+/**
+ * One person's column on a connection chart.
+ *
+ * Modelled on the transit view's merged column, which is how Kaycee already
+ * reads two parties side by side: one row per planet, both of that person's
+ * sides in the row. Their colour carries who it is, the darker tone for
+ * Personality and the lighter for Design, so black and red are free to go.
+ */
+function pairTable(
+  person: { name: string; personality: { planet: string; gate: number; line: number }[];
+            design: { planet: string; gate: number; line: number }[] },
+  base: string, skin: Skin, x: number, y: number, side: "left" | "right",
+): string {
+  const zebra = skin.id === "night" ? "rgba(255,255,255,.045)" : "#f6f2f7";
+  const rowH = 30, W = TABLE_W + 18;
+  const byP = new Map(person.personality.map((p) => [p.planet, p]));
+  const byD = new Map(person.design.map((p) => [p.planet, p]));
+  const dark = personInk(base, "personality");
+  const light = personInk(base, "design");
+  let s = `<g class="ptable" data-side="pair-${side}" transform="translate(${x},${y})">`;
+  s += `<text x="${W / 2}" y="0" text-anchor="middle" font-size="12" font-weight="600" ` +
+    `letter-spacing=".16em" fill="${dark}">${esc(person.name.toUpperCase())}</text>`;
+  const headY = 18;
+  s += `<line x1="6" y1="${headY}" x2="${W - 6}" y2="${headY}" stroke="${dark}" stroke-width="1.6"></line>`;
+  s += `<text x="${W * 0.3}" y="${headY + 15}" text-anchor="middle" font-size="9" ` +
+    `letter-spacing=".12em" fill="${dark}">PERS</text>`;
+  s += `<text x="${W * 0.78}" y="${headY + 15}" text-anchor="middle" font-size="9" ` +
+    `letter-spacing=".12em" fill="${light}">DESIGN</text>`;
+  PLANET_ROWS.forEach((planet, i) => {
+    const p = byP.get(planet), d = byD.get(planet);
+    if (!p && !d) return;
+    const ry = headY + 40 + i * rowH;
+    if (i % 2 === 0) {
+      s += `<rect x="4" y="${ry - 19}" width="${W - 8}" height="${rowH - 4}" rx="6" fill="${zebra}"></rect>`;
+    }
+    s += `<text x="${W / 2}" y="${ry}" text-anchor="middle" font-size="13" fill="${skin.muted}">` +
+      `${esc(PLANET_GLYPHS[planet] ?? planet)}</text>`;
+    if (p) {
+      s += `<text class="prow" data-gate="${p.gate}" x="${W * 0.3}" y="${ry}" text-anchor="middle" ` +
+        `font-size="14" font-weight="600" fill="${dark}">${p.gate}.${p.line}</text>`;
+    }
+    if (d) {
+      s += `<text class="prow" data-gate="${d.gate}" x="${W * 0.78}" y="${ry}" text-anchor="middle" ` +
+        `font-size="14" font-weight="600" fill="${light}">${d.gate}.${d.line}</text>`;
+    }
+  });
+  return s + `</g>`;
+}
+
 /** The transit view's own columns, as Kaycee laid them out: the client's two
  *  sides folded into one on the left with the planet glyph between the two
  *  numbers, and the sky on the right with its glyph on the outside. One row per
@@ -1984,7 +2120,12 @@ function buildCanvas(
   const H = LY.h;
   OX = LY.tables ? TABLE_W + TABLE_GAP : 0;
   const tableMarkup = d.client
-    ? (opts.transit && d.sky
+    ? (opts.composite && d.connection
+        // a connection chart reads one person down each side, the way the
+        // transit view already reads the client against the sky
+        ? pairTable(d.connection.a, PERSON_A, skin, 4, 96, "left") +
+          pairTable(d.connection.b, PERSON_B, skin, OX + LY.coreW + TABLE_GAP - 10, 96, "right")
+        : opts.transit && d.sky
         ? mergedClientTable(d.client, skin, 4, 96) +
           transitTable(d.sky, skin, OX + LY.coreW + TABLE_GAP - 10, 96)
         : placementTable("Design", d.client, skin, 12, 96) +
@@ -2097,8 +2238,16 @@ function buildCanvas(
 
   const W = LY.coreW + (LY.tables ? 2 * (TABLE_W + TABLE_GAP) : 0);
   const header = d.client
-    ? `<text x="${r2(OX + LY.coreW / 2)}" y="58" text-anchor="middle" font-size="27" font-weight="600" ` +
-      `letter-spacing=".02em" fill="${skin.ink}">${esc(d.client.name)}</text>`
+    ? (opts.composite && d.connection
+        // both names, each in their own colour, so the chart says whose it is
+        ? `<text x="${r2(OX + LY.coreW / 2)}" y="58" text-anchor="middle" font-size="24" ` +
+          `font-weight="600" letter-spacing=".02em">` +
+          `<tspan fill="${personInk(PERSON_A, "personality")}">${esc(d.connection.a.name)}</tspan>` +
+          `<tspan fill="${skin.muted}" font-weight="400"> and </tspan>` +
+          `<tspan fill="${personInk(PERSON_B, "personality")}">${esc(d.connection.b.name)}</tspan>` +
+          `</text>`
+        : `<text x="${r2(OX + LY.coreW / 2)}" y="58" text-anchor="middle" font-size="27" font-weight="600" ` +
+          `letter-spacing=".02em" fill="${skin.ink}">${esc(d.client.name)}</text>`)
     : `<text x="${OX + 52}" y="60" font-size="25" font-weight="600" letter-spacing=".02em" ` +
       `fill="${skin.ink}">The Nine Centers and the Flow to the Throat</text>` +
       `<text x="${OX + 52}" y="86" font-size="13" fill="${skin.muted}">` +
@@ -2186,6 +2335,10 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
       <button id="vBody" data-help="The same body, coloured by circuit. Shows which of the three circuits each defined channel belongs to: Individual for mutation, Tribal for support, Collective for sharing." data-help-label="Circuits">Circuits</button>
       <button id="vMandala" data-help="The wheel the chart is calculated from. All 64 gates in their zodiac order, with your planets placed where they actually fall." data-help-label="Mandala">Mandala</button>
       <button id="vAstro" data-help="Your natal chart in the astrological wheel: signs, houses, planets and the aspects between them." data-help-label="Astrology">Astrology</button>
+    </div>
+    <div class="row" id="partyrow" hidden>
+      <button id="partyA" class="on" data-help="" data-help-label="">A</button>
+      <button id="partyB" class="on" data-help="" data-help-label="">B</button>
     </div>
     <div class="row" id="siderow" hidden>
       <button id="sideP" class="on" data-help="The conscious side, calculated from the moment of birth. What you know about yourself and can talk about. Shown in black." data-help-label="Personality">Personality</button>
@@ -2764,6 +2917,20 @@ body.view-astro #astrohome { display:block; }
    describe one person stand down while it is open, the same way the Astrology
    view already does. */
 body.mod-relation #relhome { display:block; }
+/* Either party can be taken off a two-party chart: the pair, or the client and
+   the sky. The other side stays exactly as it was drawn. */
+body.off-party-a svg.canvas.composite [data-party="a"],
+body.off-party-b svg.canvas.composite [data-party="b"] { display:none; }
+body.off-party-a svg.canvas.composite .ptable[data-side="pair-left"],
+body.off-party-b svg.canvas.composite .ptable[data-side="pair-right"] { display:none; }
+body.off-party-a svg.canvas.transit .pleg,
+body.off-party-a svg.canvas.transit .gdisc { display:none; }
+body.off-party-b svg.canvas.transit .tleg,
+body.off-party-b svg.canvas.transit .tdisc { display:none; }
+body.off-party-a svg.canvas.transit .ptable[data-side="merged"],
+body.off-party-b svg.canvas.transit .ptable[data-side="transit"] { display:none; }
+body.mod-transit #partyrow, body.mod-relation #partyrow { display:flex; }
+
 /* The Relationship module draws the provider's composite: both people on one
    bodygraph. The individual chart stands down while it is showing, the same way
    the wheel replaces it in the Astrology view. */
@@ -3721,6 +3888,7 @@ if (DATA.client) {
   document.getElementById('modrow').hidden = false;
   document.getElementById('viewsec').hidden = false;
   document.getElementById('viewrow').hidden = false;
+  document.getElementById('partyrow').hidden = false;
   // ── the date and time picker ──────────────────────────────────────────────
   // The chart is a baked file, so moving to another moment cannot re-render it
   // on the server. Instead the page asks for that moment's sky and repaints the
@@ -4079,6 +4247,9 @@ if (DATA.client) {
       if (b) b.classList.toggle('on', k === id);
     });
     applyView();
+    // labels follow the chart, and both parties come back on when it changes
+    if (typeof labelParties === 'function') labelParties();
+    partyBtns.forEach(function (x) { if (x) x.classList.add('on'); });
   };
 
   var view = function (id) {
@@ -4101,6 +4272,38 @@ if (DATA.client) {
   var relHome = document.getElementById('relhome');
   if (relHome && DATA.connection) relHome.hidden = false;
   paintRelationship();
+  // The two parties on a two-party chart. Labels follow whichever chart is open,
+  // because "A" and "B" mean nothing to somebody reading their own chart.
+  var partyBtns = [document.getElementById('partyA'), document.getElementById('partyB')];
+  function labelParties() {
+    var names = curMod === 'relation' && DATA.connection
+      ? [DATA.connection.a.name, DATA.connection.b.name]
+      : [(DATA.client && DATA.client.name) || 'This chart', 'Today\u2019s sky'];
+    var notes = curMod === 'relation'
+      ? ['Take the first person off the chart, leaving the second alone.',
+         'Take the second person off the chart, leaving the first alone.']
+      : ['Take their own chart off, leaving only what the sky is doing.',
+         'Take the sky off, leaving their chart alone.'];
+    partyBtns.forEach(function (b, i) {
+      if (!b) return;
+      b.textContent = names[i];
+      b.setAttribute('data-help-label', names[i]);
+      b.setAttribute('data-help', notes[i]);
+    });
+  }
+  partyBtns.forEach(function (b, i) {
+    if (!b) return;
+    b.onclick = function () {
+      var cls = i === 0 ? 'off-party-a' : 'off-party-b';
+      var other = i === 0 ? 'off-party-b' : 'off-party-a';
+      // never hide both: turning one off brings the other back
+      if (body.classList.contains(other)) body.classList.remove(other);
+      body.classList.toggle(cls);
+      partyBtns.forEach(function (x, j) {
+        if (x) x.classList.toggle('on', !body.classList.contains(j === 0 ? 'off-party-a' : 'off-party-b'));
+      });
+    };
+  });
   setModule('self');
   // ---- copy what is on screen, as plain text -------------------------------
   // Chart data only. Never report prose. The format follows chart2txt's shape
@@ -5707,12 +5910,12 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
       // so the two charts cannot drift apart.
       const jointCentres = new Set<Center>(conn.definedTogether.map((n) => centerKeyFromName(n))
         .filter((c): c is Center => !!c));
+      const gatesOf = (side: { gate: number }[]) => [...new Set(side.map((p) => p.gate))];
       scene.composite = compositeInner(
         raw,
-        new Set<number>(conn.a.gates),
-        new Set<number>(conn.b.gates),
+        { personality: gatesOf(conn.a.personality), design: gatesOf(conn.a.design) },
+        { personality: gatesOf(conn.b.personality), design: gatesOf(conn.b.design) },
         jointCentres,
-        definitionMap(scene).bridges.map((b) => b.gate),
       );
     } catch (err) {
       console.log(`  connection unavailable: ${(err as Error).message}`);
