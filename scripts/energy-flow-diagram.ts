@@ -4359,6 +4359,7 @@ if (DATA.client) {
     // connection, this person alone anywhere else
     if (window.__paintAstroRows) window.__paintAstroRows();
     if (window.__paintAstroMeta) window.__paintAstroMeta();
+    if (window.__paintAspects) window.__paintAspects();
     // labels follow the chart, and both parties come back on when it changes
     if (typeof labelParties === 'function') labelParties();
     if (typeof partyBtns !== 'undefined' && partyBtns) {
@@ -4510,6 +4511,7 @@ if (DATA.client) {
     // the placements panel now has a second person to show
     if (window.__paintAstroRows) window.__paintAstroRows();
     if (window.__paintAstroMeta) window.__paintAstroMeta();
+    if (window.__paintAspects) window.__paintAspects();
     // the two buttons are named after who is on the chart, so they follow the pick
     if (typeof labelParties === 'function') labelParties();
   }
@@ -4625,6 +4627,7 @@ if (DATA.client) {
       DATA.connection = null;
       if (window.__paintAstroRows) window.__paintAstroRows();
       if (window.__paintAstroMeta) window.__paintAstroMeta();
+      if (window.__paintAspects) window.__paintAspects();
       if (SAVED) repaintPair(SAVED); else location.reload();
       relBack.hidden = true;
       document.getElementById('relStatus').textContent = '';
@@ -5297,18 +5300,37 @@ if (DATA.client) {
         '</i><span>' + esc(h.sign) + ' ' + dg(h.position) + '</span><i></i></div>';
     }).join('');
 
-    var isPlanet = {};
-    A.planets.forEach(function (p) { isPlanet[p.name] = 1; });
-    document.getElementById('astroaspects').innerHTML = A.aspects.filter(function (x) {
-      return isPlanet[x.p1_name] && isPlanet[x.p2_name];
-    }).map(function (x) {
-      var core = CLASSIC[x.aspect] && !MINOR_PT[x.p1_name] && !MINOR_PT[x.p2_name] &&
-        Math.abs(x.orbit) <= 6;
-      return '<div class="line pl-row ' + (core ? 'core' : 'extra') +
-        '" data-arow="' + esc(x.p1_name) + '|' + esc(x.p2_name) + '"><i>' + esc(labelOf(x.p1_name)) +
-        '</i><span>' + esc(x.aspect) + ' ' + esc(labelOf(x.p2_name)) + '</span><i>' +
-        (Math.round(Math.abs(x.orbit) * 10) / 10) + '\u00b0</i></div>';
-    }).join('');
+    // Both people's aspects when there are two, each under their own name, the
+    // same sets the wheel draws.
+    var paintAspects = function () {
+      var isPlanet = {};
+      A.planets.forEach(function (p) { isPlanet[p.name] = 1; });
+      var one = function (list, colour) {
+        return (list || []).filter(function (x) {
+          return isPlanet[x.p1_name] && isPlanet[x.p2_name];
+        }).map(function (x) {
+          var core = CLASSIC[x.aspect] && !MINOR_PT[x.p1_name] && !MINOR_PT[x.p2_name] &&
+            Math.abs(x.orbit) <= 6;
+          return '<div class="line pl-row ' + (core ? 'core' : 'extra') +
+            '" data-arow="' + esc(x.p1_name) + '|' + esc(x.p2_name) + '"' +
+            (colour ? ' style="border-left:2px solid ' + colour + ';padding-left:6px"' : '') +
+            '><i>' + esc(labelOf(x.p1_name)) +
+            '</i><span>' + esc(x.aspect) + ' ' + esc(labelOf(x.p2_name)) + '</span><i>' +
+            (Math.round(Math.abs(x.orbit) * 10) / 10) + '\u00b0</i></div>';
+        }).join('');
+      };
+      var C = (body.classList.contains('mod-relation') && DATA.connection
+        && DATA.connection.astro) ? DATA.connection : null;
+      var box = document.getElementById('astroaspects');
+      if (!C) { box.innerHTML = one(A.aspects, null); return; }
+      box.innerHTML =
+        '<div class="relsub" style="color:#845095">' + esc(C.a.name) + '</div>' +
+        one(A.aspects, '#845095') +
+        '<div class="relsub" style="color:#0d9488">' + esc(C.b.name) + '</div>' +
+        one(C.astro.aspects, '#0d9488');
+    };
+    window.__paintAspects = paintAspects;
+    paintAspects();
 
     // Hovering the wheel. Element and modality belong to the sign itself, so
     // they are counted rather than asked for; the sentence is the provider's
