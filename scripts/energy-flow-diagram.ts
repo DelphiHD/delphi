@@ -4335,6 +4335,18 @@ if (DATA.client) {
       if (b) b.classList.toggle('on', k === id);
     });
     applyView();
+    // the wheel belongs to whichever chart is up too: the synastry wheel on a
+    // connection, this person's own wheel anywhere else
+    var abox = document.querySelector('.astro');
+    if (abox) {
+      var pair = DATA.connection && DATA.connection.wheelSvg;
+      if (id === 'relation' && pair) {
+        if (!window.__soloWheel) window.__soloWheel = abox.innerHTML;
+        if (abox.innerHTML !== pair) abox.innerHTML = pair;
+      } else if (window.__soloWheel && abox.innerHTML !== window.__soloWheel) {
+        abox.innerHTML = window.__soloWheel;
+      }
+    }
     // the astrology panel belongs to whichever chart is up: the pair on a
     // connection, this person alone anywhere else
     if (window.__paintAstroRows) window.__paintAstroRows();
