@@ -17,7 +17,9 @@ import { CLIENTS, clientFromSlug, placeForLookup } from "./client-roster";
 
 const PURPLE = "#845095";
 const INK = "#2f2a33";
-const CREAM = "#fdfcfd";
+// White, matching the page. The old off-white carried a pink cast that read as
+// a different background from every other view.
+const CREAM = "#ffffff";
 
 // Two purples and two greys, the way the four elements read on the design page.
 const ELEMENT: Record<string, string> = {

@@ -11,6 +11,8 @@
  * comes back empty.
  */
 
+import { getChart } from "../mybodygraph";
+
 const CHART_HOST = "https://api.bodygraphchart.com";
 const CHART_PATH = "/v221006/hd-data";
 
@@ -54,6 +56,16 @@ export interface PersonSide {
   openCenters: string[];
   channels: string[];
   gates: number[];
+  profile: string;
+  definition: string;
+  incarnationCross: string;
+  signature: string;
+  notSelfTheme: string;
+  digestion: string;
+  environment: string;
+  motivation: string;
+  perspective: string;
+  variables: { digestion: string; environment: string; motivation: string; perspective: string };
   personality: Placement[];
   design: Placement[];
   /** The 88-degree instant, for drawing their design side on a wheel. */
@@ -126,6 +138,7 @@ function side(name: string, raw: Record<string, unknown>): PersonSide {
       ?? (v as { id?: string }).id ?? "");
     return v == null ? "" : String(v);
   };
+
   return {
     name,
     // Read from the response, not worked out here. The provider is the authority
@@ -133,6 +146,21 @@ function side(name: string, raw: Record<string, unknown>): PersonSide {
     type: val("Type"),
     strategy: val("Strategy"),
     authority: val("InnerAuthority"),
+    // Everything the individual chart's home panel shows, so the pair can be
+    // read side by side without dropping to a single chart to see it.
+    // The pair response carries only these three per person. Profile, definition,
+    // cross, frequencies and the four variables come from each person's own
+    // chart call, filled in by getConnectionChart below.
+    profile: "",
+    definition: "",
+    incarnationCross: "",
+    signature: "",
+    notSelfTheme: "",
+    digestion: "",
+    environment: "",
+    motivation: "",
+    perspective: "",
+    variables: { digestion: "", environment: "", motivation: "", perspective: "" },
     age: props.Age == null ? undefined : Number(props.Age),
     definedCenters: (raw.DefinedCenters as string[]) ?? [],
     openCenters: (raw.OpenCenters as string[]) ?? [],
@@ -178,9 +206,41 @@ export async function getConnectionChart(a: PersonInput, b: PersonInput): Promis
     }
   }
 
+  // Each person's own chart, for everything the pair response leaves out. Two
+  // provider calls, no extra cost, and the numbers come from the same authority
+  // the individual chart panel reads.
+  const sides = [side(a.name, j["0"] ?? {}), side(b.name, j["1"] ?? {})];
+  await Promise.all([a, b].map(async (who, i) => {
+    try {
+      const own = await getChart({
+        birthDate: who.birthDate,
+        birthTime: who.birthTime,
+        timezone: who.birthTimezone,
+      });
+      const s = sides[i];
+      s.profile = own.profile.value;
+      s.definition = own.definition.value;
+      s.incarnationCross = own.incarnationCross.value;
+      s.signature = own.signature.value;
+      s.notSelfTheme = own.notSelfTheme.value;
+      s.digestion = own.variables.determination.theme;
+      s.environment = own.variables.environment.theme;
+      s.motivation = own.variables.motivation.theme;
+      s.perspective = own.variables.perspective.theme;
+      s.variables = {
+        digestion: own.variables.determination.arrow,
+        environment: own.variables.environment.arrow,
+        motivation: own.variables.motivation.arrow,
+        perspective: own.variables.perspective.arrow,
+      };
+    } catch {
+      // A missing own-chart leaves those rows blank rather than losing the pair.
+    }
+  }));
+
   return {
-    a: side(a.name, j["0"] ?? {}),
-    b: side(b.name, j["1"] ?? {}),
+    a: sides[0],
+    b: sides[1],
     bodygraphSvg: (combined.SVG ?? j.SVG) as string | undefined,
     definedTogether: combined.DefinedCenters ?? [],
     openTogether: combined.OpenCenters ?? [],

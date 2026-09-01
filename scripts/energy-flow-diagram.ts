@@ -3002,12 +3002,17 @@ body.mod-relation #relhome { display:block; }
 .bar.rel b .sl { opacity:.35; margin:0 2px; }
 
 /* Label down the left, one column each. Same type as the rest of the panel. */
-#relhome .ptbl { display:grid; grid-template-columns:auto 1fr 1fr; gap:0 8px;
+#relhome .ptbl, #astroplanets .ptbl, #astrometa .ptbl { display:grid; grid-template-columns:auto 1fr 1fr; gap:0 8px;
   font-size:11.5px; line-height:1.6; align-items:baseline; }
-#relhome .ptbl .hd { font-size:9px; letter-spacing:.1em; text-transform:uppercase;
+#relhome .ptbl .hd, #astroplanets .ptbl .hd, #astrometa .ptbl .hd { font-size:9px; letter-spacing:.1em; text-transform:uppercase;
   font-weight:600; padding-bottom:3px; border-bottom:1.5px solid currentColor; margin-bottom:4px; }
-#relhome .ptbl .lb { opacity:.55; padding:2px 0; }
-#relhome .ptbl .vl { font-variant-numeric:tabular-nums; padding:2px 0; }
+#relhome .ptbl .lb, #astroplanets .ptbl .lb, #astrometa .ptbl .lb { opacity:.55; padding:2px 0; }
+#relhome .ptbl .vl, #astroplanets .ptbl .vl, #astrometa .ptbl .vl { font-variant-numeric:tabular-nums; padding:2px 0; }
+/* A sign and degree is longer than a gate number, so this panel's columns are cut
+   to fit one on a line. The bodygraph comparison table keeps its own widths. */
+#astroplanets .ptbl, #astrometa .ptbl { grid-template-columns:auto 1fr 1fr; gap:0 6px; }
+#astroplanets .ptbl .lb, #astrometa .ptbl .lb { padding-right:2px; white-space:nowrap; }
+#astroplanets .ptbl .vl, #astrometa .ptbl .vl { font-size:10.5px; white-space:nowrap; }
 #relhome .ptbl .lb[data-gates] { cursor:default; }
 #relhome .ptbl .lb.hi, #relhome .ptbl .lb.hi + .vl, #relhome .ptbl .lb.hi + .vl + .vl {
   background:#fbf7b2; border-radius:5px; }
@@ -3081,6 +3086,9 @@ ${d.client ? "" : viewControls}
       </details>
       <details class="drop" open><summary>Them, side by side</summary>
         <div id="relside"></div>
+      </details>
+      <details class="drop"><summary>Placements</summary>
+        <div id="relplacements"></div>
       </details>
       <details class="drop"><summary>Centers Together</summary>
         <div id="relcentres"></div>
@@ -4475,6 +4483,9 @@ if (DATA.client) {
       }
     }
     paintRelationship();
+    // the placements panel now has a second person to show
+    if (window.__paintAstroRows) window.__paintAstroRows();
+    if (window.__paintAstroMeta) window.__paintAstroMeta();
     // the two buttons are named after who is on the chart, so they follow the pick
     if (typeof labelParties === 'function') labelParties();
   }
@@ -4565,6 +4576,9 @@ if (DATA.client) {
       // back to just this chart: the single wheel returns with it
       var abox = document.querySelector('.astro');
       if (abox && window.__soloWheel) abox.innerHTML = window.__soloWheel;
+      DATA.connection = null;
+      if (window.__paintAstroRows) window.__paintAstroRows();
+      if (window.__paintAstroMeta) window.__paintAstroMeta();
       if (SAVED) repaintPair(SAVED); else location.reload();
       relBack.hidden = true;
       document.getElementById('relStatus').textContent = '';
@@ -5004,6 +5018,36 @@ if (DATA.client) {
       return null;
     };
     var sun = byName('Sun'), moon = byName('Moon');
+    var paintAstroMeta = function () {
+    var relMeta = (body.classList.contains('mod-relation') && DATA.connection
+      && DATA.connection.astro) ? DATA.connection : null;
+    if (relMeta) {
+      // The four headline placements read as a table too, so the pair lines up
+      // the same way it does everywhere else on this view.
+      var t = {};
+      (relMeta.astro.planets || []).forEach(function (p) { t[p.name] = p; });
+      var sgn = function (deg) {
+        return ZSIGN[Math.floor(deg / 30) % 12] + ' ' + dg(deg % 30);
+      };
+      var mrow = function (label, mark, mine, theirs) {
+        return '<div class="lb"' + mark + '>' + label + '</div>' +
+          '<div class="vl"' + mark + '>' + mine + '</div>' +
+          '<div class="vl"' + mark + '>' + theirs + '</div>';
+      };
+      document.getElementById('astrometa').innerHTML =
+        '<div class="ptbl">' +
+        '<div class="hd"></div>' +
+        '<div class="hd" style="color:#845095">' + esc(relMeta.a.name) + '</div>' +
+        '<div class="hd" style="color:#0d9488">' + esc(relMeta.b.name) + '</div>' +
+        (sun ? mrow('Sun', ' data-prow="Sun"', sun.sign + ' ' + dg(sun.position),
+          t.Sun ? esc(t.Sun.sign) + ' ' + dg(t.Sun.position) : '\u2014') : '') +
+        (moon ? mrow('Moon', ' data-prow="Moon"', moon.sign + ' ' + dg(moon.position),
+          t.Moon ? esc(t.Moon.sign) + ' ' + dg(t.Moon.position) : '\u2014') : '') +
+        mrow('Ascendant', ' data-angrow="As"', sgn(A.ascendant), sgn(relMeta.astro.ascendant)) +
+        mrow('Midheaven', ' data-angrow="Mc"', sgn(A.mc), sgn(relMeta.astro.mc)) +
+        '</div>';
+      return;
+    }
     document.getElementById('astrometa').innerHTML =
       (sun ? '<div class="line pl-row" data-prow="Sun"><span>Sun</span> ' + sun.sign + ' ' + dg(sun.position) + '</div>' : '') +
       (moon ? '<div class="line pl-row" data-prow="Moon"><span>Moon</span> ' + moon.sign + ' ' + dg(moon.position) + '</div>' : '') +
@@ -5011,12 +5055,42 @@ if (DATA.client) {
       ' ' + dg(A.ascendant % 30) + '</div>' +
       '<div class="line pl-row" data-angrow="Mc"><span>Midheaven</span> ' + ZSIGN[Math.floor(A.mc / 30) % 12] +
       ' ' + dg(A.mc % 30) + '</div>';
+    };
+    window.__paintAstroMeta = paintAstroMeta;
+    paintAstroMeta();
 
-    document.getElementById('astroplanets').innerHTML = A.planets.map(function (p) {
-      return '<div class="line pl-row" data-prow="' + esc(p.name) + '"><i>' +
-        esc(p.label || pretty(p.name)) + '</i><span>' + esc(p.sign) +
-        ' ' + dg(p.position) + '</span><i>' + (HOUSE_N[p.house] || '') + '</i></div>';
-    }).join('');
+    // On a connection the placements read as a table, both people side by side,
+    // the same shape the bodygraph view uses. Alone it stays a plain list.
+    // Named, because the pair can arrive or leave long after this runs.
+    var paintAstroRows = function () {
+    var relAstro = (body.classList.contains('mod-relation') && DATA.connection
+      && DATA.connection.astro) ? DATA.connection : null;
+    if (relAstro) {
+      var them = {};
+      (relAstro.astro.planets || []).forEach(function (p) { them[p.name] = p; });
+      document.getElementById('astroplanets').innerHTML =
+        '<div class="ptbl">' +
+        '<div class="hd"></div>' +
+        '<div class="hd" style="color:#845095">' + esc(relAstro.a.name) + '</div>' +
+        '<div class="hd" style="color:#0d9488">' + esc(relAstro.b.name) + '</div>' +
+        A.planets.map(function (p) {
+          var q = them[p.name];
+          var pr = ' data-prow="' + esc(p.name) + '"';
+          return '<div class="lb"' + pr + '>' +
+            esc(p.label || pretty(p.name)) + '</div>' +
+            '<div class="vl"' + pr + '>' + esc(p.sign) + ' ' + dg(p.position) + '</div>' +
+            '<div class="vl"' + pr + '>' + (q ? esc(q.sign) + ' ' + dg(q.position) : '\u2014') + '</div>';
+        }).join('') + '</div>';
+    } else {
+      document.getElementById('astroplanets').innerHTML = A.planets.map(function (p) {
+        return '<div class="line pl-row" data-prow="' + esc(p.name) + '"><i>' +
+          esc(p.label || pretty(p.name)) + '</i><span>' + esc(p.sign) +
+          ' ' + dg(p.position) + '</span><i>' + (HOUSE_N[p.house] || '') + '</i></div>';
+      }).join('');
+    }
+    };
+    window.__paintAstroRows = paintAstroRows;
+    paintAstroRows();
 
     // hovering a row in the panel lights that planet on the wheel, the same way
     // the stats rows light gates. The chart is the answer to the list.
@@ -5502,7 +5576,7 @@ function paintRelationship() {
   var REL = DATA.connection;
   // With nobody chosen, the tab is the picker and an explanation of what it does.
   // Everything that describes a pair stays out of the way until there is one.
-  var pairParts = ['relchannels', 'relside', 'relcentres'];
+  var pairParts = ['relchannels', 'relside', 'relplacements', 'relcentres'];
   var haveOne = !!REL;
   [].forEach.call(document.querySelectorAll('#relhome details'), function (d) {
     d.hidden = !haveOne;
@@ -5554,11 +5628,40 @@ function paintRelationship() {
       '<div class="vl">' + (a ? esc(a) : '\u2014') + '</div>' +
       '<div class="vl">' + (b ? esc(b) : '\u2014') + '</div>';
   };
+  // Everything the individual chart's home panel carries, for both of them.
+  var vr = function (theme, arrow) {
+    if (!theme) return '';
+    return theme + (arrow ? ' (' + arrow + ')' : '');
+  };
+  var AV = A.variables || {}, BV = B.variables || {};
+  row('Profile', A.profile, B.profile);
   row('Type', A.type, B.type);
   row('Strategy', A.strategy, B.strategy);
   row('Authority', A.authority, B.authority);
+  row('Definition', A.definition, B.definition);
+  row('Frequencies',
+    A.signature ? A.signature + ' / ' + A.notSelfTheme : '',
+    B.signature ? B.signature + ' / ' + B.notSelfTheme : '');
+  row('Incarnation Cross', A.incarnationCross, B.incarnationCross);
+  row('Digestion', vr(A.digestion, AV.digestion), vr(B.digestion, BV.digestion));
+  row('Environment', vr(A.environment, AV.environment), vr(B.environment, BV.environment));
+  row('Motivation', vr(A.motivation, AV.motivation), vr(B.motivation, BV.motivation));
+  row('Perspective', vr(A.perspective, AV.perspective), vr(B.perspective, BV.perspective));
   row('Centers', A.definedCenters.length + ' of 9', B.definedCenters.length + ' of 9');
   row('Channels', (A.channels || []).join(', '), (B.channels || []).join(', '));
+  rows += '</div>';
+
+  // Placements get their own toggle, the way they do on the individual chart,
+  // so the panel opens on who these two are rather than on 30 planet rows.
+  var prows = '<div class="ptbl">' +
+    '<div class="hd"></div>' +
+    '<div class="hd" style="color:' + COL_A + '">' + esc(A.name) + '</div>' +
+    '<div class="hd" style="color:' + COL_B + '">' + esc(B.name) + '</div>';
+  row = function (label, a, b, gates) {
+    prows += '<div class="lb"' + (gates ? ' data-gates="' + gates + '"' : '') + '>' + esc(label) + '</div>' +
+      '<div class="vl"' + (gates ? ' data-gates="' + gates + '"' : '') + '>' + (a ? esc(a) : '\u2014') + '</div>' +
+      '<div class="vl"' + (gates ? ' data-gates="' + gates + '"' : '') + '>' + (b ? esc(b) : '\u2014') + '</div>';
+  };
 
   var byPlanet = {};
   [['a', A], ['b', B]].forEach(function (pair) {
@@ -5583,9 +5686,11 @@ function paintRelationship() {
     });
     row(planet, cell(e.apersonality, e.adesign), cell(e.bpersonality, e.bdesign), gates.join(','));
   });
-  rows += '</div>';
+  prows += '</div>';
   var sideBox = document.getElementById('relside');
   if (sideBox) sideBox.innerHTML = rows;
+  var placeBox = document.getElementById('relplacements');
+  if (placeBox) placeBox.innerHTML = prows;
 
   var cen = document.getElementById('relcentres');
   if (cen) {
