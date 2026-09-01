@@ -2373,6 +2373,15 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
     // the pair, when this chart was built with one
     connection: d.connection ?? null,
     // what the page needs to redraw the two columns for a partner chosen later
+    // The sign a placement falls in is fixed by its gate and line, so it is the
+    // same for anybody and can be worked out here once rather than asked for.
+    signByGateLine: (() => {
+      const o: Record<string, string> = {};
+      for (let g = 1; g <= 64; g++) {
+        for (let l = 1; l <= 6; l++) o[`${g}.${l}`] = signOf(g, l).sign;
+      }
+      return o;
+    })(),
     planetGlyphs: PLANET_GLYPHS,
     planetOrder: PLANET_ROWS,
     tableGeom: { w: TABLE_W + 18, rowH: 30, leftX: 4, rightX: OX + LY.coreW + TABLE_GAP - 10, y: 96 },
@@ -4604,6 +4613,23 @@ if (DATA.client) {
       if (c && circuits.indexOf(c) < 0) circuits.push(c);
     });
 
+    // Signs, grouped by element the way the individual chart groups them. The
+    // sign is fixed by gate and line, so it needs nothing fetched for either
+    // person: 41.1 is 2 degrees of Aquarius on anybody's chart.
+    var SIGN_OF = DATA.signByGateLine || {};
+    var ELEMENTS = [
+      ['Air', ['Gemini', 'Libra', 'Aquarius']],
+      ['Earth', ['Taurus', 'Virgo', 'Capricorn']],
+      ['Fire', ['Aries', 'Leo', 'Sagittarius']],
+      ['Water', ['Cancer', 'Scorpio', 'Pisces']]
+    ];
+    var signOfRow = function (r) { return SIGN_OF[r.p.gate + '.' + r.p.line] || null; };
+    var elementOfRow = function (r) {
+      var s = signOfRow(r);
+      for (var i = 0; i < ELEMENTS.length; i++) if (ELEMENTS[i][1].indexOf(s) > -1) return ELEMENTS[i][0];
+      return null;
+    };
+
     var html =
       section('Activations by Line', [1, 2, 3, 4, 5, 6],
         function (r) { return r.p.line; },
@@ -4614,7 +4640,14 @@ if (DATA.client) {
         'Every activation sorted by the center its gate sits in. All nine are listed.') +
       section('Activations by Circuit', circuits,
         function (r) { var L = lib[r.p.gate]; return L ? L.circuit : null; },
-        'Every activation sorted by the circuit its gate belongs to.');
+        'Every activation sorted by the circuit its gate belongs to.') +
+      section('Activations by Element', ELEMENTS.map(function (e) { return e[0]; }),
+        elementOfRow,
+        'Every activation placed in the zodiac and grouped by element. Fixed by gate and line, so it needs nothing looked up.') +
+      section('Activations by Sign',
+        ELEMENTS.reduce(function (acc, e) { return acc.concat(e[1]); }, []),
+        signOfRow,
+        'Every activation placed in the zodiac. All twelve are listed; a sign with nothing in it says as much as a full one.');
 
     // Conjunctions, one drawer per person: two or more of their planets in the
     // same gate on the same side.

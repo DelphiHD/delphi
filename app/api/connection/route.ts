@@ -12,6 +12,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { getConnectionChart } from "@/lib/hd/relationship";
 import { getTimezoneForLocation } from "@/lib/mybodygraph";
+import { getAstro } from "@/lib/astro";
 import { CLIENTS } from "@/scripts/client-roster";
 
 export const dynamic = "force-dynamic";
@@ -60,8 +61,19 @@ export async function GET(request: Request) {
       { name: me.name, birthDate: me.birthDate, birthTime: me.birthTime, birthTimezone: mineTz },
       { name, birthDate: date, birthTime: time, birthTimezone: theirTz },
     );
+    // The partner's natal astrology, fetched alongside the connection. The
+    // synastry wheel needs it, and a failure there must not cost the connection
+    // itself, so it is caught separately.
+    let astro = null;
+    try {
+      astro = await getAstro({ birthDate: date, birthTime: time, place });
+    } catch {
+      astro = null;
+    }
+
     return NextResponse.json({
       ok: true,
+      astro,
       a: conn.a,
       b: conn.b,
       definedTogether: conn.definedTogether,
