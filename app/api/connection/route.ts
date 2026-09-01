@@ -70,6 +70,7 @@ export async function GET(request: Request) {
     // reader, so the wheel is rendered here rather than left to the page.
     let astro = null;
     let wheelSvg: string | null = null;
+    let wheelError: string | null = null;
     try {
       const [mine, theirs] = await Promise.all([
         getAstro({ birthDate: me.birthDate, birthTime: me.birthTime, place: me.birthPlace }),
@@ -85,15 +86,19 @@ export async function GET(request: Request) {
         [...new Set(conn.a.gates)],
         [...new Set(conn.b.gates)],
       );
-    } catch {
+    } catch (e) {
+      // Naming the fault rather than silently returning nothing: a wheel that
+      // fails to draw should say why, not look like a feature that was never built.
       astro = null;
       wheelSvg = null;
+      wheelError = (e as Error).message.slice(0, 200);
     }
 
     return NextResponse.json({
       ok: true,
       astro,
       wheelSvg,
+      wheelError,
       a: conn.a,
       b: conn.b,
       definedTogether: conn.definedTogether,
