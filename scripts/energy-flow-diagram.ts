@@ -2967,7 +2967,6 @@ body:not(.mod-relation) svg.canvas.composite { display:none !important; }
 #relhome { display:none; }
 body.mod-relation #relhome { display:block; }
 #relhome .relpair { font-size:11.5px; font-weight:600; margin:8px 0 2px; }
-#relhome .reltheme { font-size:11.5px; font-weight:600; margin-bottom:2px; }
 #relhome .relsum { font-size:11.5px; line-height:1.6; opacity:.72; margin-bottom:10px; }
 #relhome .two { display:grid; grid-template-columns:1fr 1fr; gap:0 10px; }
 #relhome .two .who { font-size:9px; letter-spacing:.1em; text-transform:uppercase;
@@ -5365,7 +5364,7 @@ function paintRelationship() {
   if (meta) {
     meta.innerHTML =
       '<div class="relpair"><b>' + esc(REL.a.name) + '</b> and <b>' + esc(REL.b.name) + '</b></div>' +
-      '<div class="reltheme">' + esc(REL.themeLabel) + '</div>' +
+
       '<div class="relsum">Together: ' + esc(REL.definitionLabel) + ', ' +
         REL.definedTogether.length + ' of 9 centers defined</div>';
   }
