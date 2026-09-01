@@ -647,6 +647,23 @@ function compositeInner(
       return party ? `${head} data-party="${party}"` : head;
     });
 
+  // Every gate is tagged, not only the ones this pair happens to carry. The
+  // partner is chosen after the page is built, so a leg that is nobody's today
+  // has to be findable when somebody brings that gate tomorrow. Untagged legs
+  // were why most of a live partner's gates never appeared.
+  for (let g = 1; g <= 64; g++) {
+    if (claim.has(g)) continue;
+    s = s.replace(new RegExp(`(<[a-z]+ [^>]*?id="personality-${g}"[^>]*?)\\sfill="[^"]*"`),
+      (_m, head: string) =>
+        `${head.replace('id="', 'class="pleg" data-full="1" data-gate="' + g + '" id="')} fill="none"`);
+    s = s.replace(new RegExp(`(<[a-z]+ [^>]*?id="design-${g}"[^>]*?)\\sfill="[^"]*"`),
+      (_m, head: string) =>
+        `${head.replace('id="', 'class="pleg" data-gate="' + g + '" id="')} fill="none"`);
+    s = s.replace(new RegExp(`(<path [^>]*?id="_${g}"[^>]*?)\\sfill="[^"]*"`),
+      (_m, head: string) =>
+        `${head.replace('id="', 'class="gdisc" data-gate="' + g + '" id="')} fill="none"`);
+  }
+
   // Centres the two charts define together, in the fills harvested from her own
   // charts. Same treatment the transit view uses for a center the sky defines.
   for (const center of Object.keys(CENTER_SVG_ID) as Center[]) {
@@ -2357,6 +2374,10 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
   const payload = {
     // the pair, when this chart was built with one
     connection: d.connection ?? null,
+    // what the page needs to redraw the two columns for a partner chosen later
+    planetGlyphs: PLANET_GLYPHS,
+    planetOrder: PLANET_ROWS,
+    tableGeom: { w: TABLE_W + 18, rowH: 30, leftX: 4, rightX: OX + LY.coreW + TABLE_GAP - 10, y: 96 },
     astro: d.astro ? { ...d.astro, design: d.astroDesign ?? null } : null,
     read: d.read ?? null,
     cycles: d.client?.report.cycles ?? [],
@@ -3021,8 +3042,8 @@ ${d.client ? "" : viewControls}
         <input id="relPlace" type="text" placeholder="Start typing a city" autocomplete="off">
         <div id="relPlaceList"></div>
         <div class="row">
-          <button id="relGo" class="gold">Draw the connection</button>
-          <button id="relBack" hidden>Back to just this chart</button>
+          <button id="relGo" class="gold">Create Chart</button>
+          <button id="relBack" hidden>Back To My Chart</button>
         </div>
         <div id="relStatus" class="relnone"></div>
       </div>
@@ -4306,6 +4327,78 @@ if (DATA.client) {
   // button says so by being unavailable rather than opening an empty panel.
   // The chart is always available on a client page; it simply opens with nobody
   // chosen yet.
+  // The two columns beside the chart: this person on the left, whoever they
+  // picked on the right. Rebuilt from the API answer, because the page was baked
+  // before anybody was chosen and the columns it shipped with are one person's.
+  var PLANET_GLYPH_JS = DATA.planetGlyphs || {};
+  var PLANET_ORDER_JS = DATA.planetOrder || [];
+  function pairColumns(conn) {
+    var svg = document.querySelector('svg.canvas.composite');
+    if (!svg) return;
+    var geo = DATA.tableGeom || { w: 150, rowH: 30, leftX: 4, rightX: 700, y: 96 };
+    var A_P = '#845095', A_D = '#b89ac2', B_P = '#0d9488', B_D = '#73c1ba';
+    var NS = 'http://www.w3.org/2000/svg';
+    [].forEach.call(svg.querySelectorAll('.ptable'), function (t) { t.remove(); });
+
+    [[conn.a, A_P, A_D, geo.leftX, 'left'], [conn.b, B_P, B_D, geo.rightX, 'right']]
+      .forEach(function (spec) {
+        var person = spec[0], dark = spec[1], light = spec[2], x = spec[3];
+        var g = document.createElementNS(NS, 'g');
+        g.setAttribute('class', 'ptable');
+        g.setAttribute('data-side', 'pair-' + spec[4]);
+        g.setAttribute('transform', 'translate(' + x + ',' + geo.y + ')');
+        var txt = function (s, xx, yy, size, fill, weight, anchor) {
+          var e = document.createElementNS(NS, 'text');
+          e.setAttribute('x', xx); e.setAttribute('y', yy);
+          e.setAttribute('font-size', size); e.setAttribute('fill', fill);
+          if (weight) e.setAttribute('font-weight', weight);
+          if (anchor) e.setAttribute('text-anchor', anchor);
+          e.textContent = s;
+          return e;
+        };
+        g.appendChild(txt(String(person.name || '').toUpperCase(), geo.w / 2, 0, 12, dark, '600', 'middle'));
+        var line = document.createElementNS(NS, 'line');
+        line.setAttribute('x1', 6); line.setAttribute('y1', 18);
+        line.setAttribute('x2', geo.w - 6); line.setAttribute('y2', 18);
+        line.setAttribute('stroke', dark); line.setAttribute('stroke-width', '1.6');
+        g.appendChild(line);
+        g.appendChild(txt('PERS', geo.w * 0.3, 33, 9, dark, null, 'middle'));
+        g.appendChild(txt('DESIGN', geo.w * 0.78, 33, 9, light, null, 'middle'));
+        var byP = {}, byD = {};
+        (person.personality || []).forEach(function (pl) { byP[pl.planet] = pl; });
+        (person.design || []).forEach(function (pl) { byD[pl.planet] = pl; });
+        PLANET_ORDER_JS.forEach(function (planet, i) {
+          var pp = byP[planet], dd = byD[planet];
+          if (!pp && !dd) return;
+          var ry = 58 + i * geo.rowH;
+          // Uranus has no usable character, which is why the rest of the chart
+          // draws it in strokes. Printing the word instead collided with the
+          // numbers, so this row draws the same shape.
+          var gl = PLANET_GLYPH_JS[planet];
+          if (gl) {
+            g.appendChild(txt(gl, geo.w / 2, ry, 13, '#6b6790', null, 'middle'));
+          } else if (planet === 'Uranus') {
+            var c = geo.w / 2, col = '#6b6790';
+            var mk = function (tag, attrs) {
+              var e = document.createElementNS(NS, tag);
+              Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+              return e;
+            };
+            var grp = mk('g', { stroke: col, 'stroke-width': '1.4', fill: 'none', 'stroke-linecap': 'round' });
+            grp.appendChild(mk('line', { x1: c - 4.4, y1: ry - 10.5, x2: c - 4.4, y2: ry - 2.2 }));
+            grp.appendChild(mk('line', { x1: c + 4.4, y1: ry - 10.5, x2: c + 4.4, y2: ry - 2.2 }));
+            grp.appendChild(mk('line', { x1: c - 4.4, y1: ry - 6.4, x2: c + 4.4, y2: ry - 6.4 }));
+            grp.appendChild(mk('line', { x1: c, y1: ry - 6.4, x2: c, y2: ry - 0.8 }));
+            grp.appendChild(mk('circle', { cx: c, cy: ry + 1, r: 1.7, fill: col, stroke: 'none' }));
+            g.appendChild(grp);
+          }
+          if (pp) g.appendChild(txt(pp.gate + '.' + pp.line, geo.w * 0.3, ry, 14, dark, '600', 'middle'));
+          if (dd) g.appendChild(txt(dd.gate + '.' + dd.line, geo.w * 0.78, ry, 14, light, '600', 'middle'));
+        });
+        svg.appendChild(g);
+      });
+  }
+
   function repaintPair(conn) {
     var svg = document.querySelector('svg.canvas.composite');
     if (!svg) return;
@@ -4346,7 +4439,10 @@ if (DATA.client) {
         '<tspan fill="' + B_P + '">' + esc(conn.b.name) + '</tspan>';
     }
     DATA.connection = conn;
+    pairColumns(conn);
     paintRelationship();
+    // the two buttons are named after who is on the chart, so they follow the pick
+    if (typeof labelParties === 'function') labelParties();
   }
 
   // The birth place is chosen from the provider's own list, never typed freehand.
@@ -5269,8 +5365,7 @@ function paintRelationship() {
   if (meta) {
     meta.innerHTML =
       '<div class="relpair"><b>' + esc(REL.a.name) + '</b> and <b>' + esc(REL.b.name) + '</b></div>' +
-      '<div class="reltheme" data-help-label="' + esc(REL.themeLabel) + '" data-help="' + esc(REL.themeText) + '">' +
-        esc(REL.themeLabel) + '</div>' +
+      '<div class="reltheme">' + esc(REL.themeLabel) + '</div>' +
       '<div class="relsum">Together: ' + esc(REL.definitionLabel) + ', ' +
         REL.definedTogether.length + ' of 9 centers defined</div>';
   }
