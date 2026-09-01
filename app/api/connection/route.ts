@@ -70,6 +70,7 @@ export async function GET(request: Request) {
     // reader, so the wheel is rendered here rather than left to the page.
     let astro = null;
     let wheelSvg: string | null = null;
+    let partnerDesign: unknown = null;
     let wheelError: string | null = null;
     try {
       const [mine, theirs] = await Promise.all([
@@ -102,6 +103,7 @@ export async function GET(request: Request) {
         { personality: theirs, design: theirDesign, colour: PERSON_B, name: conn.b.name },
         PERSON_A,
       );
+      partnerDesign = theirDesign;
       if (wheelSvg) {
         wheelSvg = wheelSvg
           .replace(/(data-side="personality"[^>]*?)fill="#2f2a33"/g, `$1fill="${PERSON_A}"`)
@@ -118,6 +120,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ok: true,
       astro,
+      astroDesign: partnerDesign,
       wheelSvg,
       wheelError,
       a: conn.a,

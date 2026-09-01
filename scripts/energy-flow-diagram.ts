@@ -4990,8 +4990,16 @@ if (DATA.client) {
     // sign, degree and house. Looking one up by name alone returns the
     // personality reading, so a design glyph drawn in exactly the right place
     // reported the wrong coordinates. The side is not optional.
-    var byName = function (n, side) {
-      var list = ((side === 'design' ? (A.design || {}) : A).planets) || [];
+    // Which person's chart to read. Without this, hovering the second person's
+    // glyph looked their planet up in the first person's chart and reported the
+    // wrong sign and degree for every one of their placements.
+    var chartFor = function (who, side) {
+      var C = DATA.connection;
+      if (who === 'b' && C) return side === 'design' ? (C.astroDesign || {}) : (C.astro || {});
+      return side === 'design' ? (A.design || {}) : A;
+    };
+    var byName = function (n, side, who) {
+      var list = (chartFor(who, side).planets) || [];
       for (var i = 0; i < list.length; i++) if (list[i].name === n) return list[i];
       return null;
     };
@@ -5224,7 +5232,8 @@ if (DATA.client) {
             (note.theme ? '<br><span style="opacity:.5">' + esc(note.element) +
               ' signs: ' + esc(note.theme.toLowerCase()) + '</span>' : '');
         } else {
-          var pl = byName(t.getAttribute('data-aplanet'), t.getAttribute('data-side'));
+          var pl = byName(t.getAttribute('data-aplanet'), t.getAttribute('data-side'),
+            t.getAttribute('data-person'));
           if (!pl) { tip.hidden = true; return; }
           var sideNm = t.getAttribute('data-side') === 'design' ? 'Design ' : '';
           html = '<b>' + esc(sideNm + (pl.label || pretty(pl.name))) + ' in ' + esc(pl.sign) +
