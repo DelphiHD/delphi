@@ -110,6 +110,9 @@ const CENTER_LABEL: Record<Center, string> = {
   root: "Root",
 };
 
+// An undefined centre is white on the branded bodygraph.
+const OPEN_CENTER_FILL = "#ffffff";
+
 const CENTER_SVG_ID: Record<Center, string> = {
   head: "head-center",
   ajna: "ajna-center",
@@ -681,9 +684,14 @@ function compositeInner(
   // charts. Same treatment the transit view uses for a center the sky defines.
   for (const center of Object.keys(CENTER_SVG_ID) as Center[]) {
     s = s.replace(new RegExp(`(<path class="cshape" data-center="${center}"[^>]*?)fill="([^"]*)"`),
-      (_m, head: string, open: string) =>
-        `${head}data-openfill="${open}" data-litfill="${DEFINED_CENTER_FILL[center]}" ` +
-        `fill="${definedTogether.has(center) ? DEFINED_CENTER_FILL[center] : open}"`);
+      (_m, head: string) =>
+        // White, not whatever the source SVG carried. Taking it from the source
+        // recorded the client's own defined centres as their "open" colour, so
+        // those centres could never blank when he was taken off the chart:
+        // Kaycee, 2026-09-01, on the Root. The transit view above keeps the
+        // source fill on purpose, because there "open" means his own chart.
+        `${head}data-openfill="${OPEN_CENTER_FILL}" data-litfill="${DEFINED_CENTER_FILL[center]}" ` +
+        `fill="${definedTogether.has(center) ? DEFINED_CENTER_FILL[center] : OPEN_CENTER_FILL}"`);
   }
   return s.replace(/^[\s\S]*?<svg\b[^>]*>/, "").replace(/<\/svg>\s*$/, "");
 }
@@ -3035,6 +3043,8 @@ body.mod-relation #relhome { display:block; }
 #relcentres .ctbl .s-U { color:#6b6790; opacity:.75; }
 #relcentres .ctbl .s-O { color:#6b6790; opacity:.35; }
 #relcentres .ctbl .lb.hi, #relcentres .ctbl .lb:hover { opacity:1; }
+#relcentres .ctbl .tally { border-top:1px solid currentColor; margin-top:4px; padding-top:4px;
+  opacity:.75; font-weight:600; white-space:nowrap; }
 /* A long name wraps to two lines and a short one does not, so the names sit on
    the baseline and every rule under them lands at the same height. The empty
    corner cell carries no rule at all. */
@@ -4812,6 +4822,24 @@ if (DATA.client) {
       el.setAttribute('data-party', who);
       el.setAttribute('fill', who === 'a' ? (ap[g] ? A_P : A_D) : (bp[g] ? B_P : B_D));
     });
+    // A center defined only by the two of them together is not defined when one
+    // of them steps off the chart, so the centers follow whoever is still on it.
+    // All three lists come from the provider; none of this is worked out here.
+    var defined = offA ? conn.b.definedCenters
+      : offB ? conn.a.definedCenters
+      : conn.definedTogether;
+    var lit = {};
+    (defined || []).forEach(function (c) {
+      var key = String(c).toLowerCase().split(' center')[0].trim();
+      if (key === 'splenic') key = 'spleen';
+      if (key === 'solar plexus') key = 'solar-plexus';
+      lit[key] = 1;
+    });
+    [].forEach.call(svg.querySelectorAll('.cshape[data-center]'), function (el) {
+      var on = !!lit[el.dataset.center];
+      el.setAttribute('fill', on ? (el.dataset.litfill || el.getAttribute('fill'))
+        : (el.dataset.openfill || '#ffffff'));
+    });
   }
 
   var relBtn = document.getElementById('mRelation');
@@ -5874,12 +5902,34 @@ function paintRelationship() {
       '<div class="hd" style="color:' + COL_A + '">' + esc(A.name) + '</div>' +
       '<div class="hd" style="color:' + COL_B + '">' + esc(B.name) + '</div>' +
       '<div class="hd">Together</div>';
-    (DATA.centerRows || []).forEach(function (c) {
-      var both = {};
-      Object.keys(gA).forEach(function (g) { both[g] = 1; });
-      Object.keys(gB).forEach(function (g) { both[g] = 1; });
-      var sa = state(c.key, defA, gA), sb = state(c.key, defB, gB),
-        st = state(c.key, defBoth, both);
+    var both = {};
+    Object.keys(gA).forEach(function (g) { both[g] = 1; });
+    Object.keys(gB).forEach(function (g) { both[g] = 1; });
+    // Defined together at the top, then what the two of you build between you,
+    // then what stays undefined, then what is open in all three. Within a band,
+    // the centers each of you already carry come first.
+    var RANK = { D: 0, U: 1, O: 2 };
+    var scored = (DATA.centerRows || []).map(function (c) {
+      return {
+        c: c,
+        sa: state(c.key, defA, gA),
+        sb: state(c.key, defB, gB),
+        st: state(c.key, defBoth, both),
+      };
+    });
+    scored.sort(function (x, y) {
+      if (RANK[x.st] !== RANK[y.st]) return RANK[x.st] - RANK[y.st];
+      var xd = (x.sa === 'D' ? 1 : 0) + (x.sb === 'D' ? 1 : 0);
+      var yd = (y.sa === 'D' ? 1 : 0) + (y.sb === 'D' ? 1 : 0);
+      if (xd !== yd) return yd - xd;
+      return RANK[x.sa] + RANK[x.sb] - RANK[y.sa] - RANK[y.sb];
+    });
+    var tally = { a: 0, b: 0, t: 0 };
+    scored.forEach(function (row) {
+      var c = row.c, sa = row.sa, sb = row.sb, st = row.st;
+      if (sa === 'D') tally.a++;
+      if (sb === 'D') tally.b++;
+      if (st === 'D') tally.t++;
       // the label lights what both of them have in that center; a cell lights
       // only that person's, the same rule the other tables follow
       var inCentre = (DATA.centerGates || {})[c.key] || [];
@@ -5893,6 +5943,11 @@ function paintRelationship() {
         '<div class="vl s-' + sb + '" data-center="' + c.key + '" data-gates="' + gb + '">' + sb + '</div>' +
         '<div class="vl s-' + st + '" data-center="' + c.key + '" data-gates="' + gboth + '">' + st + '</div>';
     });
+    // How many each of you carries alone, and how many stand between you.
+    crows += '<div class="lb tally">Defined</div>' +
+      '<div class="vl tally">' + tally.a + ' of 9</div>' +
+      '<div class="vl tally">' + tally.b + ' of 9</div>' +
+      '<div class="vl tally">' + tally.t + ' of 9</div>';
     cen.innerHTML = crows + '</div>' +
       '<div class="relsub" style="opacity:.55;text-transform:none;letter-spacing:0">' +
       'D defined &middot; U undefined &middot; O open</div>';
