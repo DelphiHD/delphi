@@ -544,6 +544,48 @@ const DEFINED_CENTER_FILL: Record<Center, string> = {
   spleen: "#a86bbd", root: "#bcbcbc",
 };
 
+/**
+ * The pair on one bodygraph.
+ *
+ * Built from the client's own chart SVG, the same source the individual view
+ * draws, so it is the same graph in the same colours rather than a second
+ * drawing that has to be kept in step. Only two things change: centres defined
+ * by the two charts together take the defined fill, and the partner's gates are
+ * marked as carried.
+ *
+ * The provider's own composite comes back with no colour at all, under every
+ * design including their stock one, so it cannot be used for this.
+ */
+function compositeInner(
+  raw: string,
+  mine: Set<number>,
+  theirs: Set<number>,
+  definedTogether: Set<Center>,
+  bridgeGates: number[] = [],
+): string {
+  let s = bridgeLegs(tagChart(raw), bridgeGates);
+
+  // The partner's gates light the same way the client's own do, so a channel the
+  // two of them complete reads as complete.
+  for (const g of theirs) {
+    if (mine.has(g)) continue;
+    s = s.replace(new RegExp(`(<[a-z]+ id="personality-${g}"[^>]*?)fill="[^"]*"`),
+      (_m, head: string) => `${head.replace('id="', 'class="pleg" data-gate="' + g + '" id="')}fill="${DESIGN_RED}"`);
+    s = s.replace(new RegExp(`(<path id="_${g}"[^>]*?)fill="[^"]*"`),
+      (_m, head: string) => `${head.replace('id="', 'class="gdisc" data-gate="' + g + '" id="')}fill="${DESIGN_RED}"`);
+  }
+
+  // Exactly the treatment the transit view uses for a centre the combination
+  // defines that the client alone does not.
+  for (const center of Object.keys(CENTER_SVG_ID) as Center[]) {
+    s = s.replace(new RegExp(`(<path class="cshape" data-center="${center}"[^>]*?)fill="([^"]*)"`),
+      (_m, head: string, open: string) =>
+        `${head}data-openfill="${open}" data-litfill="${DEFINED_CENTER_FILL[center]}" ` +
+        `fill="${definedTogether.has(center) ? DEFINED_CENTER_FILL[center] : open}"`);
+  }
+  return s.replace(/^[\s\S]*?<svg\b[^>]*>/, "").replace(/<\/svg>\s*$/, "");
+}
+
 /** The client's chart with a moment's sky laid over it. */
 function transitInner(
   raw: string,
@@ -1588,6 +1630,8 @@ interface SceneData {
   inner: Record<string, string>;            // skin id -> neutralized bodygraph markup
   plain?: string;                           // the chart as the design draws it
   transit?: string;                         // the same chart with today's sky over it
+  /** the pair on one graph, drawn from the same source as `plain` */
+  composite?: string;
   sky?: { date: string; time: string; positions: { planet: string; gate: number; line: number; fixingState: string }[] };
   read?: DayRead;
   channels: ChannelGeom[];
@@ -1933,7 +1977,8 @@ function gateHalos(d: SceneData, skin: Skin): string {
 }
 
 function buildCanvas(
-  skin: Skin, d: SceneData, opts: { animate: boolean; legend: boolean; plain?: boolean; transit?: boolean },
+  skin: Skin, d: SceneData,
+  opts: { animate: boolean; legend: boolean; plain?: boolean; transit?: boolean; composite?: boolean },
 ): string {
   LY = layoutFor(!!d.client, opts.legend);
   const H = LY.h;
@@ -2060,7 +2105,7 @@ function buildCanvas(
       `Every channel carries its energy toward the Throat, the only center that can manifest. ` +
       `Color shows which circuit the channel belongs to.</text>`;
   return (
-    `<svg class="canvas${opts.plain ? " plain" : ""}${opts.transit ? " transit" : ""}" data-skin="${opts.transit ? "transit" : opts.plain ? "plain" : skin.id}" viewBox="0 0 ${r2(W)} ${r2(H)}" ` +
+    `<svg class="canvas${opts.plain ? " plain" : ""}${opts.transit ? " transit" : ""}${opts.composite ? " composite" : ""}" data-skin="${opts.transit ? "transit" : opts.plain ? "plain" : skin.id}" viewBox="0 0 ${r2(W)} ${r2(H)}" ` +
     `data-vb-wide="0 0 ${r2(W)} ${r2(H)}" data-vb-core="${r2(OX)} 0 ${r2(LY.coreW)} ${r2(H)}" ` +
     `xmlns="http://www.w3.org/2000/svg" font-family="${FONT_STACK}">` +
     `<rect x="0" y="0" width="${r2(W)}" height="${r2(H)}" fill="${skin.bg}"></rect>` +
@@ -2068,7 +2113,7 @@ function buildCanvas(
     header +
     tableMarkup +
     `<g class="labels">${labels}</g>` +
-    `<g transform="translate(${OX + LY.tx},${LY.ty}) scale(${LY.sc})">${opts.transit ? d.transit : opts.plain ? d.plain : d.inner[skin.id]}<g class="flows">${flows}</g>${variableArrows(d)}</g>` +
+    `<g transform="translate(${OX + LY.tx},${LY.ty}) scale(${LY.sc})">${opts.composite ? d.composite : opts.transit ? d.transit : opts.plain ? d.plain : d.inner[skin.id]}<g class="flows">${flows}</g>${variableArrows(d)}</g>` +
     gateHalos(d, skin) +
     (opts.legend ? `<g class="legend">${legendBlock(OX + 30, H - (d.client ? 170 : 96), skin, !!d.client)}</g>` : "") +
     `</svg>`
@@ -2722,11 +2767,13 @@ body.mod-relation #relhome { display:block; }
 /* The Relationship module draws the provider's composite: both people on one
    bodygraph. The individual chart stands down while it is showing, the same way
    the wheel replaces it in the Astrology view. */
-.composite { display:none; }
-body.mod-relation:not(.view-astro):not(.view-mandala) .composite {
-  display:flex; align-items:center; justify-content:center; width:100%; }
-body.mod-relation:not(.view-astro):not(.view-mandala) svg.canvas { display:none !important; }
-.composite svg { height:calc(100vh - 36px); width:auto; max-width:100%; display:block; }
+/* The pair's chart is a canvas like any other, so it inherits every rule the
+   individual chart already has. It shows only in the Relationship module, and
+   the single-person canvases stand down while it does. */
+svg.canvas.composite { display:none; }
+body.mod-relation:not(.view-astro):not(.view-mandala) svg.canvas.composite { display:block; }
+body.mod-relation:not(.view-astro):not(.view-mandala) svg.canvas:not(.composite) { display:none !important; }
+body:not(.mod-relation) svg.canvas.composite { display:none !important; }
 
 #relhome .relpair { font-size:13px; margin-bottom:2px; }
 #relhome .reltheme { font-size:11px; color:var(--purple); font-weight:600; margin-bottom:4px; }
@@ -2761,7 +2808,7 @@ body.view-mandala .mandala svg { max-height:calc(100vh - 28px); width:auto; heig
 <body class="skin-paper${d.client ? " chart" : ""}">
 <div class="wrap">
   ${logoSrc ? `<img class="brandmark logo" src="${logoSrc}" alt="Delphi">` : ""}
-  <div class="stage">${canvases}${mandala}${astro}${d.connection?.bodygraphSvg ? `<div class="composite">${d.connection.bodygraphSvg}</div>` : ""}<div class="tip" id="tip" hidden></div><div class="card" id="card" hidden></div>${knowSrc ? `<img class="brandmark know" src="${knowSrc}" alt="Know thyself">` : ""}${d.client ? `<div class="viewdock docked">${viewControls}</div>` : ""}</div>
+  <div class="stage">${canvases}${mandala}${astro}<div class="tip" id="tip" hidden></div><div class="card" id="card" hidden></div>${knowSrc ? `<img class="brandmark know" src="${knowSrc}" alt="Know thyself">` : ""}${d.client ? `<div class="viewdock docked">${viewControls}</div>` : ""}</div>
   <aside class="panel">
 ${d.client ? "" : `<h1 id="ptitle">Centers, function, and flow</h1>
     <p class="sub" id="psub">Nine centers, each labeled with what it does. The moving light follows every channel toward the Throat, the only center that turns energy into expression.</p>`}
@@ -4663,7 +4710,11 @@ function relight() {
     // chart, so left alone it runs on load and paints every transit-defined
     // centre back to open. The transit canvas owns its own centres.
     var sv = el.closest ? el.closest('svg.canvas') : null;
-    if (sv && sv.classList.contains('transit')) return;
+    // The pair's chart owns its centres for the same reason the transit one does:
+    // its definition is the two charts together, which this repaint knows nothing
+    // about. Left in, it painted every jointly-defined centre back to open and the
+    // composite came out identical to the individual chart.
+    if (sv && (sv.classList.contains('transit') || sv.classList.contains('composite'))) return;
     var on = !!defCenters[el.dataset.center];
     el.setAttribute('fill', on ? el.dataset.on : el.dataset.off);
     el.classList.toggle('open', !on);
@@ -5600,11 +5651,6 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
 
   // the client file is the thing she hands over, so it carries the brand name
   const stem = client ? `${client.name} - Delphi Human Design` : "Bodygraph - Energy Flow";
-  const canvases = [PAPER]
-    .map((sk) => buildCanvas(sk, scene, { animate: true, legend: false }))
-    .join("\n") +
-    (client ? "\n" + buildCanvas(PAPER, scene, { animate: false, legend: false, plain: true }) : "") +
-    (client ? "\n" + buildCanvas(PAPER, scene, { animate: false, legend: false, plain: true, transit: true }) : "");
   // The natal wheel, for the Astrology view. Only a client chart has a birth
   // moment to draw, and a failure here must not cost her the whole chart: the
   // view simply does not appear.
@@ -5655,33 +5701,19 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
         bodygraphSvg: conn.bodygraphSvg,
       };
       console.log(`  connection: ${conn.a.name} + ${conn.b.name} — ${conn.themeLabel}, ${conn.channels.length} channels between them`);
-      // The provider returns a composite in black and white, while it returns a
-      // single chart already coloured. Verified against five request variants on
-      // 2026-09-01: none produce a coloured composite. So it goes through the same
-      // painting every other chart on this page gets. Nothing is inferred here: the
-      // centres come from the pair's own DefinedCenters and the gates from both
-      // people's Gates, both straight out of the response.
-      if (scene.connection?.bodygraphSvg) {
-        const both = new Set<number>([...conn.a.gates, ...conn.b.gates]);
-        const joint = new Set<Center>(
-          conn.definedTogether.map(centerKeyFromName).filter((c): c is Center => !!c));
-        // neutralize returns the inner markup without the <svg> wrapper, because the
-        // page normally drops it inside one of its own. This chart has no such
-        // wrapper waiting for it, so the provider's viewBox is kept and put back
-        // round the painted result.
-        // The provider writes it lowercase, as viewbox. Matching case-sensitively meant
-  // falling back to an invented box and stretching their drawing out of true.
-  const box = /viewbox="([^"]+)"/i.exec(scene.connection.bodygraphSvg)?.[1];
-  if (!box) throw new Error("composite has no viewBox; refusing to invent one");
-        const painted = paintCenters(
-          // Not faint: on the individual chart the faint pass is what lets the client's
-  // own gates stand out from the rest of the graph. Here both people's gates
-  // are the subject, so dimming them leaves nothing to look at.
-  neutralize(scene.connection.bodygraphSvg, PAPER, false, both), PAPER, fn, joint);
-        scene.connection.bodygraphSvg =
-          `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${box}" ` +
-          `font-family="${FONT_STACK}">${painted}</svg>`;
-      }
+      // Drawn here, from the client's own chart SVG, because the provider's
+      // composite comes back with no colour under any design including their
+      // stock one. Same source graph as the individual view, same centre fills,
+      // so the two charts cannot drift apart.
+      const jointCentres = new Set<Center>(conn.definedTogether.map((n) => centerKeyFromName(n))
+        .filter((c): c is Center => !!c));
+      scene.composite = compositeInner(
+        raw,
+        new Set<number>(conn.a.gates),
+        new Set<number>(conn.b.gates),
+        jointCentres,
+        definitionMap(scene).bridges.map((b) => b.gate),
+      );
     } catch (err) {
       console.log(`  connection unavailable: ${(err as Error).message}`);
     }
@@ -5697,6 +5729,13 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
   if (astroDesign) scene.astroDesign = astroDesign;
 
   const htmlPath = join(outDir, `${stem}.html`);
+  const canvases = [PAPER]
+    .map((sk) => buildCanvas(sk, scene, { animate: true, legend: false }))
+    .join("\n") +
+    (client ? "\n" + buildCanvas(PAPER, scene, { animate: false, legend: false, plain: true }) : "") +
+    (client ? "\n" + buildCanvas(PAPER, scene, { animate: false, legend: false, plain: true, transit: true }) : "")
+      // the pair, drawn by the same builder as the chart above it
+      + (scene.composite ? "\n" + buildCanvas(PAPER, scene, { animate: false, legend: false, plain: true, composite: true }) : "");
   const html = buildHtml(scene, canvases, mandalaView(scene), astroHtml, fonts);
   writeFileSync(htmlPath, html);
   console.log(`\n✓ ${htmlPath}`);
