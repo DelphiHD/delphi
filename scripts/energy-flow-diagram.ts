@@ -4335,6 +4335,10 @@ if (DATA.client) {
       if (b) b.classList.toggle('on', k === id);
     });
     applyView();
+    // the astrology panel belongs to whichever chart is up: the pair on a
+    // connection, this person alone anywhere else
+    if (window.__paintAstroRows) window.__paintAstroRows();
+    if (window.__paintAstroMeta) window.__paintAstroMeta();
     // labels follow the chart, and both parties come back on when it changes
     if (typeof labelParties === 'function') labelParties();
     if (typeof partyBtns !== 'undefined' && partyBtns) {
@@ -4956,8 +4960,8 @@ if (DATA.client) {
     // lookup, used by both the hover and the click, so they cannot drift apart.
     // One tooltip for a planet, wherever it is hovered: the wheel, the summary
     // lines, or the placements list. Built once so the three cannot drift.
-    var planetTip = function (nm, side) {
-      var pl = byName(nm, side);
+    var planetTip = function (nm, side, who) {
+      var pl = byName(nm, side, who);
       if (!pl) return '';
       var pill = function (w) {
         if (!w) return '';
@@ -5031,8 +5035,8 @@ if (DATA.client) {
       };
       var mrow = function (label, mark, mine, theirs) {
         return '<div class="lb"' + mark + '>' + label + '</div>' +
-          '<div class="vl"' + mark + '>' + mine + '</div>' +
-          '<div class="vl"' + mark + '>' + theirs + '</div>';
+          '<div class="vl"' + mark + ' data-person="a">' + mine + '</div>' +
+          '<div class="vl"' + mark + ' data-person="b">' + theirs + '</div>';
       };
       document.getElementById('astrometa').innerHTML =
         '<div class="ptbl">' +
@@ -5078,8 +5082,9 @@ if (DATA.client) {
           var pr = ' data-prow="' + esc(p.name) + '"';
           return '<div class="lb"' + pr + '>' +
             esc(p.label || pretty(p.name)) + '</div>' +
-            '<div class="vl"' + pr + '>' + esc(p.sign) + ' ' + dg(p.position) + '</div>' +
-            '<div class="vl"' + pr + '>' + (q ? esc(q.sign) + ' ' + dg(q.position) : '\u2014') + '</div>';
+            '<div class="vl"' + pr + ' data-person="a">' + esc(p.sign) + ' ' + dg(p.position) + '</div>' +
+            '<div class="vl"' + pr + ' data-person="b">' +
+            (q ? esc(q.sign) + ' ' + dg(q.position) : '\u2014') + '</div>';
         }).join('') + '</div>';
     } else {
       document.getElementById('astroplanets').innerHTML = A.planets.map(function (p) {
@@ -5124,7 +5129,9 @@ if (DATA.client) {
         clearHover();
         if (!r) return;
         var nm = r.getAttribute('data-prow');
-        showTip(e, planetTip(nm, 'personality'));
+        // A cell in the second column belongs to the second person, so it reads
+        // their placement rather than the client's.
+        showTip(e, planetTip(nm, 'personality', r.getAttribute('data-person')));
         [].forEach.call(wheelEl.querySelectorAll('[data-aplanet="' + nm + '"][data-side="personality"]'),
           function (n) { n.classList.add('hov-glyph'); });
         var sp = wheelEl.querySelector('[data-spoke="personality:' + nm + '"]');
@@ -5654,14 +5661,10 @@ function paintRelationship() {
   // Placements get their own toggle, the way they do on the individual chart,
   // so the panel opens on who these two are rather than on 30 planet rows.
   var prows = '<div class="ptbl">' +
-    '<div class="hd"></div>' +
+    '<div class="hd" style="opacity:.5">pers / design</div>' +
     '<div class="hd" style="color:' + COL_A + '">' + esc(A.name) + '</div>' +
     '<div class="hd" style="color:' + COL_B + '">' + esc(B.name) + '</div>';
-  row = function (label, a, b, gates) {
-    prows += '<div class="lb"' + (gates ? ' data-gates="' + gates + '"' : '') + '>' + esc(label) + '</div>' +
-      '<div class="vl"' + (gates ? ' data-gates="' + gates + '"' : '') + '>' + (a ? esc(a) : '\u2014') + '</div>' +
-      '<div class="vl"' + (gates ? ' data-gates="' + gates + '"' : '') + '>' + (b ? esc(b) : '\u2014') + '</div>';
-  };
+
 
   var byPlanet = {};
   [['a', A], ['b', B]].forEach(function (pair) {
@@ -5672,11 +5675,19 @@ function paintRelationship() {
       });
     });
   });
-  var cell = function (pers, des) {
+  // Dark is personality, light is design, the same reading the chart itself uses.
+  var A_D = '#b89ac2', B_D = '#73c1ba';
+  var cell = function (pers, des, dark, light) {
     var bits = [];
-    if (pers) bits.push(pers.gate + '.' + pers.line);
-    if (des) bits.push(des.gate + '.' + des.line);
-    return bits.join('  ');
+    if (pers) bits.push('<b style="color:' + dark + '">' + pers.gate + '.' + pers.line + '</b>');
+    if (des) bits.push('<b style="color:' + light + '">' + des.gate + '.' + des.line + '</b>');
+    return bits.join(' ');
+  };
+  var prow = function (label, a, b, gates) {
+    var mk = ' data-gates="' + gates + '"';
+    prows += '<div class="lb"' + mk + '>' + esc(label) + '</div>' +
+      '<div class="vl"' + mk + '>' + (a || '\u2014') + '</div>' +
+      '<div class="vl"' + mk + '>' + (b || '\u2014') + '</div>';
   };
   Object.keys(byPlanet).forEach(function (planet) {
     var e = byPlanet[planet];
@@ -5684,7 +5695,8 @@ function paintRelationship() {
     ['apersonality', 'adesign', 'bpersonality', 'bdesign'].forEach(function (k) {
       if (e[k]) gates.push(e[k].gate);
     });
-    row(planet, cell(e.apersonality, e.adesign), cell(e.bpersonality, e.bdesign), gates.join(','));
+    prow(planet, cell(e.apersonality, e.adesign, COL_A, A_D),
+      cell(e.bpersonality, e.bdesign, COL_B, B_D), gates.join(','));
   });
   prows += '</div>';
   var sideBox = document.getElementById('relside');

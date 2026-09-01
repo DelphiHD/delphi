@@ -71,3 +71,19 @@ Two ways in from the portal, with different consent models: a client authorising
 another client to see their chart, and a client entering someone's birth details
 to pull a connection chart. The second is view-only and stores nothing, pending a
 pricing model for saving.
+
+## What the pair endpoint does not return (2026-09-01)
+
+`relationship=1` gives, per person, only `Type`, `Strategy`, `InnerAuthority` and
+the birth/design dates. Profile, definition, incarnation cross, signature,
+not-self theme and the four variables are absent from that response, and its
+`Combined` block carries only `Definition`, `ConnectionTheme` and
+`RelationshipChannels`.
+
+So `getConnectionChart` also pulls each person's own `hd-data` chart and fills
+those fields in. Two extra provider calls per connection, no LLM cost. That is
+what lets the relationship panel show everything the individual chart's home
+panel shows, for both people, side by side.
+
+Placements live in their own toggle, as they do on the individual chart.
+Personality reads in the person's dark colour, design in their light one.
