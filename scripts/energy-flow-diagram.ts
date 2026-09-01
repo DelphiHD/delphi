@@ -521,7 +521,7 @@ const shiftDate = (date: string, days: number) => {
 // ── transit overlay ─────────────────────────────────────────────────────────
 // Kaycee's colours: the client in island teal, today's sky in neutral
 // charcoal. Charcoal rather than a colour on purpose: the two awareness
-// centres are purple, so indigo and magenta discs sink into them, and the warm
+// centers are purple, so indigo and magenta discs sink into them, and the warm
 // end is already spoken for by the design red in the columns. Neutral dark is
 // the only family free on this chart, and "the weather" should not look like a
 // second identity anyway. Gold stays reserved for highlights, so nothing on the chart is
@@ -546,7 +546,7 @@ const TRANSIT_INK = "#2b2b33";
 // What the Delphi design fills a DEFINED centre with. Harvested from the
 // roster's own charts rather than guessed: pressure and motor centres grey,
 // awareness centres purple, throat and G yellow. Needed because a transit can
-// define a centre that is open in the client's chart, and the client's own SVG
+// define a center that is open in the client's chart, and the client's own SVG
 // only knows the colour of the centres they already have.
 const DEFINED_CENTER_FILL: Record<Center, string> = {
   head: "#bcbcbc", ajna: "#a86bbd", throat: "#fbf7b2", g: "#fbf7b2",
@@ -559,7 +559,7 @@ const DEFINED_CENTER_FILL: Record<Center, string> = {
  *
  * Built from the client's own chart SVG, the same source the individual view
  * draws, so it is the same graph in the same colours rather than a second
- * drawing that has to be kept in step. Only two things change: centres defined
+ * drawing that has to be kept in step. Only two things change: centers defined
  * by the two charts together take the defined fill, and the partner's gates are
  * marked as carried.
  *
@@ -648,7 +648,7 @@ function compositeInner(
     });
 
   // Centres the two charts define together, in the fills harvested from her own
-  // charts. Same treatment the transit view uses for a centre the sky defines.
+  // charts. Same treatment the transit view uses for a center the sky defines.
   for (const center of Object.keys(CENTER_SVG_ID) as Center[]) {
     s = s.replace(new RegExp(`(<path class="cshape" data-center="${center}"[^>]*?)fill="([^"]*)"`),
       (_m, head: string, open: string) =>
@@ -723,7 +723,7 @@ function transitInner(
   for (const g of natal) setNum(g, "#ffffff");
   for (const g of transit) if (!natal.has(g)) setNum(g, "#ffffff");
 
-  // 3. a centre defined only by a transit-completed channel has to show as
+  // 3. a center defined only by a transit-completed channel has to show as
   //    defined, or the chart says the opposite of what the overlay means
   // Each centre keeps the fill it wears when open, so stepping to a date where
   // nothing completes there can put it back. Captured before anything is
@@ -1156,7 +1156,7 @@ function gateMeta(chunks: Chunk[]): Record<number, GateMeta> {
   return out;
 }
 
-/** The three states of a centre in Kaycee's own words. Her HD Centers database
+/** The three states of a center in Kaycee's own words. Her HD Centers database
  *  carries both her fields and the Definitive Book's: the DBHD ones open with an
  *  all-caps banner and a population percentage and are written about a reader in
  *  the third person, hers are written to the person holding the chart. The chart
@@ -2327,18 +2327,14 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
     <div class="row" id="modrow" hidden>
       <button id="mSelf" class="on" data-help="This person's own chart, from their birth moment. Everything below reads their design alone." data-help-label="Individual">Individual</button>
       <button id="mTransit" data-help="Today's sky laid over this chart: what the planets are activating right now and which channels they complete. Circuits are unavailable here, because a transit carries none of its own." data-help-label="Transit">Transit</button>
-      <button id="mRelation" data-help="Two charts read as one. The centres they define together, and every channel between them sorted into the four connection types." data-help-label="Relationship">Relationship</button>
+      <button id="mRelation" data-help="Two charts read as one. The centers they define together, and every channel between them sorted into the four connection types." data-help-label="Relationship">Relationship</button>
     </div>
     <div class="sec" id="viewsec" hidden>VIEW</div>
     <div class="row" id="viewrow" hidden>
-      <button id="vPlain" class="on" data-help="The chart as it is normally drawn. Nine centres, the channels between them, and every gate you carry. Defined centres are filled; the rest are white." data-help-label="Bodygraph">Bodygraph</button>
+      <button id="vPlain" class="on" data-help="The chart as it is normally drawn. Nine centers, the channels between them, and every gate you carry. Defined centers are filled; the rest are white." data-help-label="Bodygraph">Bodygraph</button>
       <button id="vBody" data-help="The same body, coloured by circuit. Shows which of the three circuits each defined channel belongs to: Individual for mutation, Tribal for support, Collective for sharing." data-help-label="Circuits">Circuits</button>
       <button id="vMandala" data-help="The wheel the chart is calculated from. All 64 gates in their zodiac order, with your planets placed where they actually fall." data-help-label="Mandala">Mandala</button>
       <button id="vAstro" data-help="Your natal chart in the astrological wheel: signs, houses, planets and the aspects between them." data-help-label="Astrology">Astrology</button>
-    </div>
-    <div class="row" id="partyrow" hidden>
-      <button id="partyA" class="on" data-help="" data-help-label="">A</button>
-      <button id="partyB" class="on" data-help="" data-help-label="">B</button>
     </div>
     <div class="row" id="siderow" hidden>
       <button id="sideP" class="on" data-help="The conscious side, calculated from the moment of birth. What you know about yourself and can talk about. Shown in black." data-help-label="Personality">Personality</button>
@@ -2533,7 +2529,7 @@ body.view-transit svg.canvas.plain:not(.transit) { display:none !important; }
 body.view-transit svg.canvas.transit { display:block; }
 body.view-transit { background:#ffffff; color:#1c1a2e; }
 body.view-transit .bridge, body.view-transit .halo { display:none; }
-/* The client tint is a light purple and the awareness centres are a mid purple,
+/* The client tint is a light purple and the awareness centers are a mid purple,
    so a gate disc sitting on the spleen or the solar plexus disappears into it.
    A thin dark rim gives every disc an edge on any centre colour. */
 svg.canvas.transit .gdisc { stroke:#0a5f57; stroke-width:1.1; }
@@ -2916,7 +2912,6 @@ body.view-astro #astrohome { display:block; }
 /* The Relationship module answers with the pair. The Human Design sections that
    describe one person stand down while it is open, the same way the Astrology
    view already does. */
-body.mod-relation #relhome { display:block; }
 /* Either party can be taken off a two-party chart: the pair, or the client and
    the sky. The other side stays exactly as it was drawn. */
 body.off-party-a svg.canvas.composite [data-party="a"],
@@ -2929,7 +2924,6 @@ body.off-party-b svg.canvas.transit .tleg,
 body.off-party-b svg.canvas.transit .tdisc { display:none; }
 body.off-party-a svg.canvas.transit .ptable[data-side="merged"],
 body.off-party-b svg.canvas.transit .ptable[data-side="transit"] { display:none; }
-body.mod-transit #partyrow, body.mod-relation #partyrow { display:flex; }
 
 /* The Relationship module draws the provider's composite: both people on one
    bodygraph. The individual chart stands down while it is showing, the same way
@@ -2942,22 +2936,36 @@ body.mod-relation:not(.view-astro):not(.view-mandala) svg.canvas.composite { dis
 body.mod-relation:not(.view-astro):not(.view-mandala) svg.canvas:not(.composite) { display:none !important; }
 body:not(.mod-relation) svg.canvas.composite { display:none !important; }
 
-#relhome .relpair { font-size:13px; margin-bottom:2px; }
-#relhome .reltheme { font-size:11px; color:var(--purple); font-weight:600; margin-bottom:4px; }
-#relhome .relkind { font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; opacity:.62;
-  margin:11px 0 4px; display:flex; justify-content:space-between; }
-#relhome .relsub { font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; opacity:.5; margin:9px 0 3px; }
-#relhome .relnone { font-size:11px; opacity:.45; padding:2px 0 4px; }
-#relhome .relwho { font-size:10.5px; margin-bottom:4px; }
+/* The pair reads as two columns so a difference is a glance, not a search. Type
+   comes from the panel's own scale: h1 16, sub 11.5, and the same 11.5 body the
+   other lists use. Nothing here invents a size. */
+#relhome .relpair { font-size:16px; font-weight:600; margin:0 0 2px; }
+#relhome .reltheme { font-size:11.5px; font-weight:600; margin-bottom:2px; }
+#relhome .relsum { font-size:11.5px; line-height:1.5; opacity:.72; margin-bottom:10px; }
+#relhome h4 { font-size:9.5px; letter-spacing:.16em; text-transform:uppercase;
+  opacity:.55; margin:14px 0 5px; font-weight:600; }
+#relhome .two { display:grid; grid-template-columns:1fr 1fr; gap:0 10px; }
+#relhome .two .who { font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+  font-weight:600; padding-bottom:3px; border-bottom:1.5px solid currentColor; margin-bottom:5px; }
+#relhome .two .val { font-size:11.5px; line-height:1.55; }
+#relhome .two .val.dim { opacity:.45; }
 #relhome .relch, #relhome .relpl, #relhome .relcen {
   display:flex; justify-content:space-between; gap:8px; font-size:11.5px;
   padding:3px 6px; border-radius:6px; cursor:default; }
-#relhome .relch b, #relhome .relpl b { font-weight:500; }
 #relhome .relch .dim, #relhome .relpl .dim { font-variant-numeric:tabular-nums; opacity:.55; }
-/* the same yellow the bodygraph uses when something is picked out */
+#relhome .relkind { font-size:9.5px; letter-spacing:.16em; text-transform:uppercase;
+  opacity:.55; margin:12px 0 4px; display:flex; justify-content:space-between; font-weight:600; }
+#relhome .relnone { font-size:11.5px; opacity:.45; padding:2px 0 4px; }
 #relhome .relch.hi, #relhome .relpl.hi, #relhome .relcen.hi { background:#fbf7b2; }
-#relhome .relcen.open { opacity:.55; }
-#relhome .relpl.design b { color:${DESIGN_RED}; }
+#relhome .relcen.open { opacity:.5; }
+#relhome #partyrow { margin:2px 0 12px; }
+#relpick { margin:10px 0 14px; }
+#relpick input { width:100%; box-sizing:border-box; font-family:inherit; font-size:11.5px;
+  padding:5px 8px; margin-bottom:6px; border-radius:8px; border:1px solid rgba(132,80,149,.28);
+  background:var(--paper); color:inherit; }
+#relpick .two { gap:0 6px; }
+#relpick .two input { margin-bottom:6px; }
+#relStatus { min-height:14px; }
 
 body.mod-relation #pmeta, body.mod-relation #placements, body.mod-relation #chandrop,
 body.mod-relation #defdrop, body.mod-relation #circdrop { display:none !important; }
@@ -2983,10 +2991,43 @@ ${d.client ? "" : `<h1 id="ptitle">Centers, function, and flow</h1>
       <button class="tabbtn on" data-tab="home">Home</button>
       <button class="tabbtn" data-tab="dates">Dates</button>
       <button class="tabbtn" data-tab="stats">Stats</button>
+      <button class="tabbtn" data-tab="pair" id="tabPair" hidden>Together</button>
     </div>
 
 ${d.client ? "" : viewControls}
 
+    <div id="tab-pair" class="pane" hidden>
+    <div id="relhome">
+      <div id="relmeta"></div>
+      <div id="relpick">
+        <h4>Run this against someone else</h4>
+        <input id="relName" type="text" placeholder="Their name" autocomplete="off">
+        <div class="two">
+          <input id="relDate" type="date">
+          <input id="relTime" type="time">
+        </div>
+        <input id="relPlace" type="text" placeholder="City, region, country" autocomplete="off">
+        <div class="row">
+          <button id="relGo" class="gold">Draw the connection</button>
+          <button id="relBack" hidden>Back to the saved pair</button>
+        </div>
+        <div id="relStatus" class="relnone"></div>
+      </div>
+      <div class="row" id="partyrow">
+        <button id="partyA" class="on" data-help="" data-help-label="">A</button>
+        <button id="partyB" class="on" data-help="" data-help-label="">B</button>
+      </div>
+      <details class="drop" open><summary>Between You</summary>
+        <div id="relchannels"></div>
+      </details>
+      <details class="drop" open><summary>Them, side by side</summary>
+        <div id="relside"></div>
+      </details>
+      <details class="drop"><summary>Centers Together</summary>
+        <div id="relcentres"></div>
+      </details>
+    </div>
+    </div>
     <div id="tab-dates" class="pane" hidden></div>
     <div id="tab-stats" class="pane" hidden></div>
 
@@ -3000,21 +3041,6 @@ ${d.client ? "" : viewControls}
       <div class="row"><button id="all">All</button><button id="none">None</button></div>
     </details>
 
-    <div id="relhome" hidden>
-      <div id="relmeta"></div>
-      <details class="drop" open><summary>Between You</summary>
-        <div id="relchannels"></div>
-      </details>
-      <details class="drop"><summary id="relasum">Their side</summary>
-        <div id="relaside"></div>
-      </details>
-      <details class="drop"><summary id="relbsum">Their side</summary>
-        <div id="relbside"></div>
-      </details>
-      <details class="drop"><summary>Centres Together</summary>
-        <div id="relcentres"></div>
-      </details>
-    </div>
 
     <div id="astrohome">
       <div id="astrometa"></div>
@@ -3387,7 +3413,7 @@ if (DATA.client) {
   [].forEach.call(document.querySelectorAll('.tabbtn'), function (b) {
     b.onclick = function () {
       [].forEach.call(document.querySelectorAll('.tabbtn'), function (x) { x.classList.toggle('on', x === b); });
-      ['home', 'dates', 'stats'].forEach(function (t) {
+      ['home', 'dates', 'stats', 'pair'].forEach(function (t) {
         document.getElementById('tab-' + t).hidden = (t !== b.dataset.tab);
       });
     };
@@ -3432,7 +3458,7 @@ if (DATA.client) {
       var NOTE = {
         line: 'Every activation sorted by its line number, 1 to 6. The line is the second number in a placement: in 12.4 the line is 4. Lines carry the same theme in any gate, so the shape of this list says something about how the whole design behaves.',
         group: 'Every activation sorted by the circuit its gate belongs to. Individual keeps mutation, Tribal keeps support and bargain, Collective keeps sharing. Integration is the small group that serves survival of the self.',
-        center: 'Every activation sorted by the centre its gate sits in. All nine are listed. A centre showing zero has no activations at all, which is as much a fact about the design as a full one.',
+        center: 'Every activation sorted by the center its gate sits in. All nine are listed. A center showing zero has no activations at all, which is as much a fact about the design as a full one.',
         sign: 'Every activation placed in the zodiac, grouped by element and heaviest first. The mandala and the zodiac are the same wheel, so each gate and line falls at an exact degree of a sign.'
       };
       var note = NOTE[kind] || '';
@@ -3888,7 +3914,6 @@ if (DATA.client) {
   document.getElementById('modrow').hidden = false;
   document.getElementById('viewsec').hidden = false;
   document.getElementById('viewrow').hidden = false;
-  document.getElementById('partyrow').hidden = false;
   // ── the date and time picker ──────────────────────────────────────────────
   // The chart is a baked file, so moving to another moment cannot re-render it
   // on the server. Instead the page asks for that moment's sky and repaints the
@@ -3999,7 +4024,7 @@ if (DATA.client) {
         n.setAttribute('fill', on ? '#ffffff' : DIM);
       });
 
-      // a centre a transit has just defined has to read as defined, and a
+      // a center a transit has just defined has to read as defined, and a
       // centre that was only defined a moment ago has to open again
       var have = {};
       Object.keys(natal).forEach(function (g) { have[g] = 1; });
@@ -4246,10 +4271,23 @@ if (DATA.client) {
       var b = document.getElementById(k === 'self' ? 'mSelf' : k === 'transit' ? 'mTransit' : 'mRelation');
       if (b) b.classList.toggle('on', k === id);
     });
+    // the pair's tab exists only on the pair's chart, and opening that chart opens
+    // the tab, because it is the reason you went there
+    var pairTab = document.getElementById('tabPair');
+    if (pairTab) {
+      pairTab.hidden = !(id === 'relation' && DATA.connection);
+      if (id === 'relation' && DATA.connection) pairTab.click();
+      else if (pairTab.classList.contains('on')) {
+        var home = document.querySelector('.tabbtn[data-tab="home"]');
+        if (home) home.click();
+      }
+    }
     applyView();
     // labels follow the chart, and both parties come back on when it changes
     if (typeof labelParties === 'function') labelParties();
-    partyBtns.forEach(function (x) { if (x) x.classList.add('on'); });
+    if (typeof partyBtns !== 'undefined' && partyBtns) {
+      partyBtns.forEach(function (x) { if (x) x.classList.add('on'); });
+    }
   };
 
   var view = function (id) {
@@ -4269,8 +4307,6 @@ if (DATA.client) {
   // button says so by being unavailable rather than opening an empty panel.
   var relBtn = document.getElementById('mRelation');
   if (relBtn && !DATA.connection) { relBtn.disabled = true; relBtn.classList.add('disabled'); }
-  var relHome = document.getElementById('relhome');
-  if (relHome && DATA.connection) relHome.hidden = false;
   paintRelationship();
   // The two parties on a two-party chart. Labels follow whichever chart is open,
   // because "A" and "B" mean nothing to somebody reading their own chart.
@@ -4941,6 +4977,10 @@ function relight() {
     // and red straight back over the overlay's own fills.
     var sv = el.closest ? el.closest('svg.canvas') : null;
     if (sv && sv.classList.contains('transit')) col = CLIENT_TINT_JS;
+    // The pair's chart carries its own colours, one per person. This repaint knows
+    // only the traditional black and red and would put them straight back over it,
+    // which is what made the connection chart look like a single chart after load.
+    if (sv && sv.classList.contains('composite')) return;
     el.setAttribute('fill', col);
   });
   [].forEach.call(document.querySelectorAll('.gdisc'), function (el) {
@@ -5045,7 +5085,7 @@ function paintRelationship() {
       '<div class="reltheme" data-help-label="' + esc(REL.themeLabel) + '" data-help="' + esc(REL.themeText) + '">' +
         esc(REL.themeLabel) + '</div>' +
       '<div class="dim">Together: ' + esc(REL.definitionLabel) + ', ' +
-        REL.definedTogether.length + ' of 9 centres defined</div>';
+        REL.definedTogether.length + ' of 9 centers defined</div>';
   }
 
   var order = ['electromagnetic', 'companionship', 'dominance', 'compromise'];
@@ -5066,33 +5106,63 @@ function paintRelationship() {
   var ch = document.getElementById('relchannels');
   if (ch) ch.innerHTML = html;
 
-  [['relasum', 'relaside', REL.a], ['relbsum', 'relbside', REL.b]].forEach(function (t) {
-    var sum = document.getElementById(t[0]);
-    var box = document.getElementById(t[1]);
-    var p = t[2];
-    if (sum) sum.textContent = p.name;
-    if (!box) return;
-    var rows = '<div class="dim relwho">' + esc(p.type) +
-      (p.strategy ? '  &middot;  ' + esc(p.strategy) : '') +
-      (p.authority ? '  &middot;  ' + esc(p.authority) + ' Authority' : '') + '</div>';
-    rows += '<div class="relsub">Channels they carry alone</div>';
-    rows += p.channels.length
-      ? p.channels.map(function (c) {
-          var g = String(c).split('-').map(Number);
-          return relRow('relch solo', c, '', g);
-        }).join('')
-      : '<div class="relnone">No whole channels.</div>';
-    rows += '<div class="relsub">Placements</div>';
-    rows += ['personality', 'design'].map(function (sideKey) {
-      return (p[sideKey] || []).map(function (pl) {
-        return relRow('relpl ' + sideKey, pl.planet + '  ' + pl.gate + '.' + pl.line,
-          (sideKey === 'design' ? 'Design' : 'Personality') +
-            (pl.fixingState ? '  ' + pl.fixingState : ''),
-          [pl.gate]);
-      }).join('');
-    }).join('');
-    box.innerHTML = rows;
+  // Side by side, so a similarity or a difference is a glance rather than a
+  // search through two drawers. Each column wears its own person's colour.
+  var A = REL.a, B = REL.b;
+  var COL_A = '#845095', COL_B = '#0d9488';
+  function col(v, dim) {
+    return '<div class="val' + (dim ? ' dim' : '') + '">' + (v ? esc(v) : '\u2014') + '</div>';
+  }
+  function pairRows(rows) {
+    var h = '';
+    rows.forEach(function (r) {
+      h += '<h4>' + esc(r[0]) + '</h4><div class="two">' + col(r[1], !r[1]) + col(r[2], !r[2]) + '</div>';
+    });
+    return h;
+  }
+  var side = '<div class="two">' +
+    '<div class="who" style="color:' + COL_A + '">' + esc(A.name) + '</div>' +
+    '<div class="who" style="color:' + COL_B + '">' + esc(B.name) + '</div>' +
+    '</div>' +
+    pairRows([
+      ['Type', A.type, B.type],
+      ['Strategy', A.strategy, B.strategy],
+      ['Authority', A.authority, B.authority],
+      ['Defined centers', A.definedCenters.length + ' of 9', B.definedCenters.length + ' of 9'],
+      ['Channels they carry alone', A.channels.join(', '), B.channels.join(', ')],
+    ]);
+
+  // placements next to each other, one row per planet
+  side += '<h4>Placements</h4>';
+  var byPlanet = {};
+  [['a', A], ['b', B]].forEach(function (pair) {
+    ['personality', 'design'].forEach(function (k) {
+      (pair[1][k] || []).forEach(function (pl) {
+        byPlanet[pl.planet] = byPlanet[pl.planet] || {};
+        byPlanet[pl.planet][pair[0] + k] = pl;
+      });
+    });
   });
+  Object.keys(byPlanet).forEach(function (planet) {
+    var e = byPlanet[planet];
+    var cell = function (pers, des, colour) {
+      var bits = [];
+      if (pers) bits.push('<span style="color:' + colour + '">' + pers.gate + '.' + pers.line + '</span>');
+      if (des) bits.push('<span style="color:' + colour + ';opacity:.55">' + des.gate + '.' + des.line + '</span>');
+      return bits.length ? bits.join('  ') : '\u2014';
+    };
+    var gates = [];
+    ['apersonality', 'adesign', 'bpersonality', 'bdesign'].forEach(function (k) {
+      if (e[k]) gates.push(e[k].gate);
+    });
+    side += '<h4>' + esc(planet) + '</h4>' +
+      '<div class="two" data-gates="' + gates.join(',') + '">' +
+      '<div class="val">' + cell(e.apersonality, e.adesign, COL_A) + '</div>' +
+      '<div class="val">' + cell(e.bpersonality, e.bdesign, COL_B) + '</div>' +
+      '</div>';
+  });
+  var sideBox = document.getElementById('relside');
+  if (sideBox) sideBox.innerHTML = side;
 
   var cen = document.getElementById('relcentres');
   if (cen) {
@@ -5108,6 +5178,91 @@ function paintRelationship() {
             esc(c) + '</div>';
         }).join('')
       : '');
+  }
+
+  // Running the pair against somebody else.
+  //
+  // The page is a baked file with no provider key, so it asks /api/connection,
+  // the same way the transit picker asks /api/sky. The answer repaints the chart
+  // in place: legs by whose gate it is, centers by what the two define together.
+  // Nothing is rebuilt and nothing is saved.
+  var SAVED = DATA.connection;
+  function repaintPair(conn) {
+    var svg = document.querySelector('svg.canvas.composite');
+    if (!svg) return;
+    var A_P = '#845095', A_D = '#b89ac2', B_P = '#0d9488', B_D = '#73c1ba';
+    var gset = function (list) {
+      var o = {}; (list || []).forEach(function (x) { o[x.gate || x] = 1; }); return o;
+    };
+    var ap = gset(conn.a.personality), ad = gset(conn.a.design);
+    var bp = gset(conn.b.personality), bd = gset(conn.b.design);
+    [].forEach.call(svg.querySelectorAll('.pleg, .gdisc'), function (el) {
+      var g = el.dataset.gate;
+      var mine = ap[g] || ad[g], theirs = bp[g] || bd[g];
+      if (!mine && !theirs) { el.style.display = 'none'; return; }
+      el.style.display = '';
+      var overlay = !el.hasAttribute('data-full') && el.classList.contains('pleg');
+      // on a shared gate the full leg is person one and the overlay person two
+      var who = (mine && theirs) ? (overlay ? 'b' : 'a') : (mine ? 'a' : 'b');
+      el.setAttribute('data-party', who);
+      el.setAttribute('fill', who === 'a' ? (ap[g] ? A_P : A_D) : (bp[g] ? B_P : B_D));
+    });
+    var lit = {};
+    (conn.definedTogether || []).forEach(function (c) {
+      lit[String(c).toLowerCase().replace(/\s*centers?$/, '').replace('splenic', 'spleen')
+        .replace('solar plexus', 'solar-plexus').trim()] = 1;
+    });
+    [].forEach.call(svg.querySelectorAll('.cshape[data-center]'), function (el) {
+      var on = !!lit[el.dataset.center];
+      el.setAttribute('fill', on ? (el.dataset.litfill || el.getAttribute('fill'))
+        : (el.dataset.openfill || '#ffffff'));
+    });
+    var head = svg.querySelector('text');
+    if (head) {
+      head.innerHTML = '<tspan fill="' + A_P + '">' + esc(conn.a.name) + '</tspan>' +
+        '<tspan fill="#6b6790" font-weight="400"> and </tspan>' +
+        '<tspan fill="' + B_P + '">' + esc(conn.b.name) + '</tspan>';
+    }
+    DATA.connection = conn;
+    paintRelationship();
+  }
+  var relGo = document.getElementById('relGo');
+  if (relGo) {
+    relGo.onclick = function () {
+      var status = document.getElementById('relStatus');
+      var token = (location.pathname.match(/\/c\/([a-f0-9]{32})/) || [])[1];
+      var d = document.getElementById('relDate').value;
+      var t = document.getElementById('relTime').value;
+      var pl = document.getElementById('relPlace').value.trim();
+      var nm = document.getElementById('relName').value.trim();
+      if (!token) { status.textContent = 'This only works on a published chart.'; return; }
+      if (!d || !t || !pl) { status.textContent = 'Birth date, time and place are all needed.'; return; }
+      status.textContent = 'Reading their chart\u2026';
+      relGo.disabled = true;
+      fetch('/api/connection?token=' + token + '&date=' + encodeURIComponent(d) +
+            '&time=' + encodeURIComponent(t) + '&place=' + encodeURIComponent(pl) +
+            '&name=' + encodeURIComponent(nm))
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          relGo.disabled = false;
+          if (!j.ok) { status.textContent = j.error || 'That did not work.'; return; }
+          status.textContent = '';
+          document.getElementById('relBack').hidden = false;
+          repaintPair(j);
+        })
+        .catch(function () {
+          relGo.disabled = false;
+          status.textContent = 'Could not reach the chart service.';
+        });
+    };
+  }
+  var relBack = document.getElementById('relBack');
+  if (relBack) {
+    relBack.onclick = function () {
+      if (SAVED) repaintPair(SAVED);
+      relBack.hidden = true;
+      document.getElementById('relStatus').textContent = '';
+    };
   }
 
   // Hover lights the chart. Same behaviour as every other list here.
@@ -5232,7 +5387,7 @@ function ctrHtml(k) {
     extra += '<span class="meta"><i>Not-self theme:</i> ' + esc(k.notSelf) + '</span>';
   }
   // their own reading first when this chart has one, Kaycee's general text for
-  // the state otherwise, so a centre always says something
+  // the state otherwise, so a center always says something
   return '<b>' + esc(k.name) + '</b>' + tags(t) +
     (k.biology ? '<span class="meta">' + esc(k.biology) + '</span>' : '') + extra +
     prose(k.report || k.stateText);
@@ -5790,7 +5945,7 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
     console.warn(`  only ${Object.keys(anchors).length}/64 gate anchors parsed; some placement marks will be missing`);
   }
   // Today's sky, laid over the client's chart. A transit gate completes a
-  // channel with one of their natal gates, and that channel defines a centre
+  // channel with one of their natal gates, and that channel defines a center
   // even when the centre is open in their own design, so the combined set is
   // what the overlay must draw.
   let transitInnerSvg: string | undefined;
