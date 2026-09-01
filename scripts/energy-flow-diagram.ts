@@ -2982,6 +2982,15 @@ body.mod-relation #relhome { display:block; }
 #relhome .relch.hi, #relhome .relpl.hi, #relhome .relcen.hi { background:#fbf7b2; }
 #relhome .relcen.open { opacity:.5; }
 #relhome #partyrow { margin:2px 0 12px; }
+/* A connection's stat bar carries both people in one track, so the row reads as
+   a share rather than two numbers to compare by eye. */
+.bar.rel .track { display:flex; overflow:hidden; }
+.bar.rel .seg { height:100%; }
+.bar.rel .seg:first-child { border-radius:5px 0 0 5px; }
+.bar.rel .seg:last-child { border-radius:0 5px 5px 0; }
+.bar.rel b { font-variant-numeric:tabular-nums; }
+.bar.rel b .sl { opacity:.35; margin:0 2px; }
+
 /* Label down the left, one column each. Same type as the rest of the panel. */
 #relhome .ptbl { display:grid; grid-template-columns:auto 1fr 1fr; gap:0 8px;
   font-size:11.5px; line-height:1.6; align-items:baseline; }
@@ -4445,6 +4454,7 @@ if (DATA.client) {
     }
     DATA.connection = conn;
     pairColumns(conn);
+    relStats(conn);
     paintRelationship();
     // the two buttons are named after who is on the chart, so they follow the pick
     if (typeof labelParties === 'function') labelParties();
@@ -4537,6 +4547,101 @@ if (DATA.client) {
       relBack.hidden = true;
       document.getElementById('relStatus').textContent = '';
     };
+  }
+
+  // The Stats tab on a connection chart: one bar per row, split by person, so a
+  // count reads as "how much each of us brings" rather than two tables to hold in
+  // your head. Kaycee, 2026-09-01: "one bar per stat that shows the count for
+  // each segmented by color."
+  function relStats(conn) {
+    var pane = document.getElementById('tab-stats');
+    if (!pane || !conn) return;
+    var COL_A = '#845095', COL_B = '#0d9488';
+    var lib = DATA.gateLib || {};
+    var all = function (person) {
+      return (person.personality || []).map(function (x) { return { p: x, side: 'personality' }; })
+        .concat((person.design || []).map(function (x) { return { p: x, side: 'design' }; }));
+    };
+    var A = all(conn.a), B = all(conn.b);
+
+    var tally = function (list, keyOf) {
+      var o = {};
+      list.forEach(function (r) {
+        var k = keyOf(r);
+        if (k == null) return;
+        o[k] = (o[k] || 0) + 1;
+      });
+      return o;
+    };
+    var section = function (title, keys, keyOf, note) {
+      var ta = tally(A, keyOf), tb = tally(B, keyOf);
+      var max = 1;
+      keys.forEach(function (k) { max = Math.max(max, (ta[k] || 0) + (tb[k] || 0)); });
+      var body = keys.map(function (k) {
+        var a = ta[k] || 0, b = tb[k] || 0;
+        var wa = Math.round((a / max) * 100), wb = Math.round((b / max) * 100);
+        return '<div class="bar rel" data-key="' + esc(String(k)) + '">' +
+          '<i>' + esc(String(k)) + '</i>' +
+          '<div class="track">' +
+            '<div class="seg" style="width:' + wa + '%;background:' + COL_A + '"></div>' +
+            '<div class="seg" style="width:' + wb + '%;background:' + COL_B + '"></div>' +
+          '</div>' +
+          '<b><span style="color:' + COL_A + '">' + a + '</span>' +
+          '<span class="sl">/</span>' +
+          '<span style="color:' + COL_B + '">' + b + '</span></b></div>';
+      }).join('');
+      return '<details class="drop" open><summary' +
+        (note ? ' data-help="' + esc(note) + '" data-help-label="' + esc(title) + '"' : '') +
+        '>' + title + '</summary>' + body + '</details>';
+    };
+
+    var centers = ['head', 'ajna', 'throat', 'g', 'heart', 'spleen', 'sacral', 'solar-plexus', 'root'];
+    var centerName = {};
+    Object.keys(lib).forEach(function (g) { if (lib[g].cid) centerName[lib[g].cid] = lib[g].center; });
+    var circuits = [];
+    Object.keys(lib).forEach(function (g) {
+      var c = lib[g].circuit;
+      if (c && circuits.indexOf(c) < 0) circuits.push(c);
+    });
+
+    var html =
+      section('Activations by Line', [1, 2, 3, 4, 5, 6],
+        function (r) { return r.p.line; },
+        'Every activation sorted by its line number, one bar per line, split by whose it is.') +
+      section('Activations by Center',
+        centers.map(function (c) { return centerName[c] || c; }),
+        function (r) { var L = lib[r.p.gate]; return L ? L.center : null; },
+        'Every activation sorted by the center its gate sits in. All nine are listed.') +
+      section('Activations by Circuit', circuits,
+        function (r) { var L = lib[r.p.gate]; return L ? L.circuit : null; },
+        'Every activation sorted by the circuit its gate belongs to.');
+
+    // Conjunctions, one drawer per person: two or more of their planets in the
+    // same gate on the same side.
+    var conjFor = function (person, colour) {
+      var out = [];
+      ['personality', 'design'].forEach(function (side) {
+        var byGate = {};
+        (person[side] || []).forEach(function (pl) { (byGate[pl.gate] = byGate[pl.gate] || []).push(pl); });
+        Object.keys(byGate).forEach(function (g) {
+          if (byGate[g].length > 1) out.push({ side: side, gate: +g, list: byGate[g] });
+        });
+      });
+      out.sort(function (x, y) { return y.list.length - x.list.length || x.gate - y.gate; });
+      var rows = out.length
+        ? out.map(function (c) {
+            var who = c.list.map(function (pl) { return pl.planet + ' ' + pl.gate + '.' + pl.line; }).join(', ');
+            return '<div class="cyc" data-gates="' + c.gate + '">' +
+              '<b style="color:' + colour + '">' +
+              (c.side === 'design' ? 'Design' : 'Personality') + ' &middot; Gate ' + c.gate +
+              ' &times; ' + c.list.length + '</b><span>' + esc(who) + '</span></div>';
+          }).join('')
+        : '<div class="line"><span>No two planets share a gate on the same side.</span></div>';
+      return '<details class="drop"><summary>' + esc(person.name) + ' &middot; Conjunctions</summary>' +
+        rows + '</details>';
+    };
+    html += conjFor(conn.a, COL_A) + conjFor(conn.b, COL_B);
+    pane.innerHTML = html;
   }
 
   function paintShared() {
