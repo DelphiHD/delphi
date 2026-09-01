@@ -2992,10 +2992,33 @@ if (DATA.client) {
       g.fillStyle = 'rgba(28,26,46,.55)';
       g.font = '400 17px Montserrat, sans-serif';
       g.fillText(stateLine(), 200, y0 + 172);
-      var a = document.createElement('a');
-      a.download = DATA.client.name + ' - ' + stateLine().split('  ·  ')[0] + '.png';
-      a.href = cv.toDataURL('image/png');
-      a.click();
+      // Hand the browser a real file, not a data URL.
+      //
+      // A chart is saved by the client who owns it, usually on a phone, and a
+      // data URL is the fragile way to do that: Safari refuses large ones
+      // outright and other browsers truncate them, so the button appears to do
+      // nothing on exactly the devices these get opened on. A blob has none of
+      // those limits. toDataURL stays as a fallback for anything that cannot
+      // make one.
+      var name = DATA.client.name + ' - ' + stateLine().split('  ·  ')[0] + '.png';
+      var give = function (href, revoke) {
+        var a = document.createElement('a');
+        a.download = name;
+        a.href = href;
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        if (revoke) setTimeout(function () { URL.revokeObjectURL(href); }, 60000);
+      };
+      if (cv.toBlob) {
+        cv.toBlob(function (blob) {
+          if (blob && window.URL && URL.createObjectURL) give(URL.createObjectURL(blob), true);
+          else give(cv.toDataURL('image/png'), false);
+        }, 'image/png');
+      } else {
+        give(cv.toDataURL('image/png'), false);
+      }
     };
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)));
   };
