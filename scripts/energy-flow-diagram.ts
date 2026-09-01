@@ -2982,6 +2982,17 @@ body.mod-relation #relhome { display:block; }
 #relhome .relch.hi, #relhome .relpl.hi, #relhome .relcen.hi { background:#fbf7b2; }
 #relhome .relcen.open { opacity:.5; }
 #relhome #partyrow { margin:2px 0 12px; }
+/* Label down the left, one column each. Same type as the rest of the panel. */
+#relhome .ptbl { display:grid; grid-template-columns:auto 1fr 1fr; gap:0 8px;
+  font-size:11.5px; line-height:1.6; align-items:baseline; }
+#relhome .ptbl .hd { font-size:9px; letter-spacing:.1em; text-transform:uppercase;
+  font-weight:600; padding-bottom:3px; border-bottom:1.5px solid currentColor; margin-bottom:4px; }
+#relhome .ptbl .lb { opacity:.55; padding:2px 0; }
+#relhome .ptbl .vl { font-variant-numeric:tabular-nums; padding:2px 0; }
+#relhome .ptbl .lb[data-gates] { cursor:default; }
+#relhome .ptbl .lb.hi, #relhome .ptbl .lb.hi + .vl, #relhome .ptbl .lb.hi + .vl + .vl {
+  background:#fbf7b2; border-radius:5px; }
+
 #relhome #partyrow button { font-size:10.5px; padding:5px 9px; }
 #relpick { margin:10px 0 14px; }
 #relpick input { width:100%; box-sizing:border-box; font-family:inherit; font-size:11.5px;
@@ -5369,34 +5380,26 @@ function paintRelationship() {
   var ch = document.getElementById('relchannels');
   if (ch) ch.innerHTML = html;
 
-  // Side by side, so a similarity or a difference is a glance rather than a
-  // search through two drawers. Each column wears its own person's colour.
+  // One table: what it is down the left, one column each. Kaycee, 2026-09-01,
+  // with a sketch: a row per attribute rather than a heading per attribute, so
+  // a difference is a glance and the panel stays short.
   var A = REL.a, B = REL.b;
   var COL_A = '#845095', COL_B = '#0d9488';
-  function col(v, dim) {
-    return '<div class="val' + (dim ? ' dim' : '') + '">' + (v ? esc(v) : '\u2014') + '</div>';
-  }
-  function pairRows(rows) {
-    var h = '';
-    rows.forEach(function (r) {
-      h += '<h4>' + esc(r[0]) + '</h4><div class="two">' + col(r[1], !r[1]) + col(r[2], !r[2]) + '</div>';
-    });
-    return h;
-  }
-  var side = '<div class="two">' +
-    '<div class="who" style="color:' + COL_A + '">' + esc(A.name) + '</div>' +
-    '<div class="who" style="color:' + COL_B + '">' + esc(B.name) + '</div>' +
-    '</div>' +
-    pairRows([
-      ['Type', A.type, B.type],
-      ['Strategy', A.strategy, B.strategy],
-      ['Authority', A.authority, B.authority],
-      ['Defined centers', A.definedCenters.length + ' of 9', B.definedCenters.length + ' of 9'],
-      ['Channels they carry alone', A.channels.join(', '), B.channels.join(', ')],
-    ]);
+  var rows = '<div class="ptbl">' +
+    '<div class="hd"></div>' +
+    '<div class="hd" style="color:' + COL_A + '">' + esc(A.name) + '</div>' +
+    '<div class="hd" style="color:' + COL_B + '">' + esc(B.name) + '</div>';
+  var row = function (label, a, b, gates) {
+    rows += '<div class="lb"' + (gates ? ' data-gates="' + gates + '"' : '') + '>' + esc(label) + '</div>' +
+      '<div class="vl">' + (a ? esc(a) : '\u2014') + '</div>' +
+      '<div class="vl">' + (b ? esc(b) : '\u2014') + '</div>';
+  };
+  row('Type', A.type, B.type);
+  row('Strategy', A.strategy, B.strategy);
+  row('Authority', A.authority, B.authority);
+  row('Centers', A.definedCenters.length + ' of 9', B.definedCenters.length + ' of 9');
+  row('Channels', (A.channels || []).join(', '), (B.channels || []).join(', '));
 
-  // placements next to each other, one row per planet
-  side += '<h4>Placements</h4>';
   var byPlanet = {};
   [['a', A], ['b', B]].forEach(function (pair) {
     ['personality', 'design'].forEach(function (k) {
@@ -5406,26 +5409,23 @@ function paintRelationship() {
       });
     });
   });
+  var cell = function (pers, des) {
+    var bits = [];
+    if (pers) bits.push(pers.gate + '.' + pers.line);
+    if (des) bits.push(des.gate + '.' + des.line);
+    return bits.join('  ');
+  };
   Object.keys(byPlanet).forEach(function (planet) {
     var e = byPlanet[planet];
-    var cell = function (pers, des, colour) {
-      var bits = [];
-      if (pers) bits.push('<span style="color:' + colour + '">' + pers.gate + '.' + pers.line + '</span>');
-      if (des) bits.push('<span style="color:' + colour + ';opacity:.55">' + des.gate + '.' + des.line + '</span>');
-      return bits.length ? bits.join('  ') : '\u2014';
-    };
     var gates = [];
     ['apersonality', 'adesign', 'bpersonality', 'bdesign'].forEach(function (k) {
       if (e[k]) gates.push(e[k].gate);
     });
-    side += '<h4>' + esc(planet) + '</h4>' +
-      '<div class="two" data-gates="' + gates.join(',') + '">' +
-      '<div class="val">' + cell(e.apersonality, e.adesign, COL_A) + '</div>' +
-      '<div class="val">' + cell(e.bpersonality, e.bdesign, COL_B) + '</div>' +
-      '</div>';
+    row(planet, cell(e.apersonality, e.adesign), cell(e.bpersonality, e.bdesign), gates.join(','));
   });
+  rows += '</div>';
   var sideBox = document.getElementById('relside');
-  if (sideBox) sideBox.innerHTML = side;
+  if (sideBox) sideBox.innerHTML = rows;
 
   var cen = document.getElementById('relcentres');
   if (cen) {
