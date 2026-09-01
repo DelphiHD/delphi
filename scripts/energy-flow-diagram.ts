@@ -4464,6 +4464,15 @@ if (DATA.client) {
     DATA.connection = conn;
     pairColumns(conn);
     relStats(conn);
+    // The synastry wheel arrives drawn, so the Astrology view on a connection
+    // shows the pair without asking the reader for anything further.
+    if (conn.wheelSvg) {
+      var astroBox = document.querySelector('.astro');
+      if (astroBox) {
+        if (!window.__soloWheel) window.__soloWheel = astroBox.innerHTML;
+        astroBox.innerHTML = conn.wheelSvg;
+      }
+    }
     paintRelationship();
     // the two buttons are named after who is on the chart, so they follow the pick
     if (typeof labelParties === 'function') labelParties();
@@ -4552,7 +4561,10 @@ if (DATA.client) {
   var relBack = document.getElementById('relBack');
   if (relBack) {
     relBack.onclick = function () {
-      if (SAVED) repaintPair(SAVED);
+      // back to just this chart: the single wheel returns with it
+      var abox = document.querySelector('.astro');
+      if (abox && window.__soloWheel) abox.innerHTML = window.__soloWheel;
+      if (SAVED) repaintPair(SAVED); else location.reload();
       relBack.hidden = true;
       document.getElementById('relStatus').textContent = '';
     };

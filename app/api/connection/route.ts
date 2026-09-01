@@ -13,6 +13,7 @@ import { NextResponse } from "next/server";
 import { getConnectionChart } from "@/lib/hd/relationship";
 import { getTimezoneForLocation } from "@/lib/mybodygraph";
 import { getAstro } from "@/lib/astro";
+import { renderWheel } from "@/scripts/astro-wheel";
 import { CLIENTS } from "@/scripts/client-roster";
 
 export const dynamic = "force-dynamic";
@@ -64,16 +65,35 @@ export async function GET(request: Request) {
     // The partner's natal astrology, fetched alongside the connection. The
     // synastry wheel needs it, and a failure there must not cost the connection
     // itself, so it is caught separately.
+    // Both wheels, and the synastry drawing made from them. Clicking Astrology on
+    // a connection should simply show the pair, with nothing else asked of the
+    // reader, so the wheel is rendered here rather than left to the page.
     let astro = null;
+    let wheelSvg: string | null = null;
     try {
-      astro = await getAstro({ birthDate: date, birthTime: time, place });
+      const [mine, theirs] = await Promise.all([
+        getAstro({ birthDate: me.birthDate, birthTime: me.birthTime, place: me.birthPlace }),
+        getAstro({ birthDate: date, birthTime: time, place }),
+      ]);
+      astro = theirs;
+      // The base chart keeps its ascendant and houses; the second contributes
+      // planets only. That is the convention for a bi-wheel.
+      const carried = [...new Set([...conn.a.gates, ...conn.b.gates])];
+      wheelSvg = renderWheel(
+        mine, `${conn.a.name} and ${conn.b.name}`, theirs, "aries",
+        carried,
+        [...new Set(conn.a.gates)],
+        [...new Set(conn.b.gates)],
+      );
     } catch {
       astro = null;
+      wheelSvg = null;
     }
 
     return NextResponse.json({
       ok: true,
       astro,
+      wheelSvg,
       a: conn.a,
       b: conn.b,
       definedTogether: conn.definedTogether,
