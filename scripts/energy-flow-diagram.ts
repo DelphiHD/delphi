@@ -37,7 +37,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { join } from "node:path";
 
 import { CHANNELS } from "@/lib/hd/channels";
-import { centerOf, type Center } from "@/lib/hd/gate-center";
+import { CENTER_GATES, centerOf, type Center } from "@/lib/hd/gate-center";
 import { longitudeOf, GATE_RANGES, GATE_ARC_DEGREES, LINE_ARC_DEGREES } from "@/lib/hd/gate-longitude";
 import type { CenterName } from "@/lib/chart/types";
 import { gateName } from "@/lib/hd/gate-names";
@@ -96,6 +96,19 @@ function centerKeyFromName(name: string): Center | null {
   };
   return map[t] ?? null;
 }
+
+// Center -> the short name the panel's rows use.
+const CENTER_LABEL: Record<Center, string> = {
+  head: "Head",
+  ajna: "Ajna",
+  throat: "Throat",
+  g: "G",
+  heart: "Heart",
+  spleen: "Spleen",
+  sacral: "Sacral",
+  "solar-plexus": "Solar Plexus",
+  root: "Root",
+};
 
 const CENTER_SVG_ID: Record<Center, string> = {
   head: "head-center",
@@ -2385,6 +2398,10 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
     planetGlyphs: PLANET_GLYPHS,
     planetOrder: PLANET_ROWS,
     tableGeom: { w: TABLE_W + 18, rowH: 30, leftX: 4, rightX: OX + LY.coreW + TABLE_GAP - 10, y: 96 },
+    // Which gates sit in which center, so the panel can tell an undefined center
+    // (no channel, but gates activated) from an open one (nothing activated).
+    centerGates: CENTER_GATES,
+    centerRows: (Object.keys(CENTER_GATES) as Center[]).map((k) => ({ key: k, label: CENTER_LABEL[k] })),
     astro: d.astro ? { ...d.astro, design: d.astroDesign ?? null } : null,
     read: d.read ?? null,
     cycles: d.client?.report.cycles ?? [],
@@ -3004,6 +3021,20 @@ body.mod-relation #relhome { display:block; }
 /* Label down the left, one column each. Same type as the rest of the panel. */
 #relhome .ptbl, #astroplanets .ptbl, #astrometa .ptbl { display:grid; grid-template-columns:auto 1fr 1fr; gap:0 8px;
   font-size:11.5px; line-height:1.6; align-items:baseline; }
+/* The centers table: a row per center, a column each and one for the pair. The
+   letter carries the state, so it is sized and weighted to be read down a column. */
+#relcentres .ctbl { display:grid; grid-template-columns:auto 1fr 1fr 1fr; gap:0 6px;
+  font-size:11.5px; line-height:1.6; align-items:baseline; }
+#relcentres .ctbl .hd { font-size:9px; letter-spacing:.1em; text-transform:uppercase;
+  font-weight:600; display:flex; align-items:flex-end; align-self:stretch; min-height:2.6em;
+  padding-bottom:3px; border-bottom:1.5px solid currentColor; margin-bottom:4px; text-align:center;
+  justify-content:center; }
+#relcentres .ctbl .lb { opacity:.55; padding:2px 0; white-space:nowrap; cursor:default; }
+#relcentres .ctbl .vl { padding:2px 0; text-align:center; font-weight:600; }
+#relcentres .ctbl .s-D { color:#845095; }
+#relcentres .ctbl .s-U { color:#6b6790; opacity:.75; }
+#relcentres .ctbl .s-O { color:#6b6790; opacity:.35; }
+#relcentres .ctbl .lb.hi, #relcentres .ctbl .lb:hover { opacity:1; }
 /* A long name wraps to two lines and a short one does not, so the names sit on
    the baseline and every rule under them lands at the same height. The empty
    corner cell carries no rule at all. */
@@ -3097,13 +3128,13 @@ ${d.client ? "" : viewControls}
       <details class="drop" open><summary>Between You</summary>
         <div id="relchannels"></div>
       </details>
-      <details class="drop" open><summary>Them, side by side</summary>
+      <details class="drop" open><summary>Side by Side</summary>
         <div id="relside"></div>
       </details>
       <details class="drop"><summary>Placements</summary>
         <div id="relplacements"></div>
       </details>
-      <details class="drop"><summary>Centers Together</summary>
+      <details class="drop"><summary>Centers</summary>
         <div id="relcentres"></div>
       </details>
     </div>
@@ -5808,18 +5839,63 @@ function paintRelationship() {
 
   var cen = document.getElementById('relcentres');
   if (cen) {
-    cen.innerHTML = REL.definedTogether.map(function (c) {
-      return '<div class="relcen" data-center="' + esc(c) + '"' +
-        '>' +
-        esc(c) + '</div>';
-    }).join('') +
-    (REL.openTogether.length
-      ? '<div class="relsub">Open even together</div>' + REL.openTogether.map(function (c) {
-          return '<div class="relcen open" data-center="' + esc(c) + '"' +
-            '>' +
-            esc(c) + '</div>';
-        }).join('')
-      : '');
+    // Every center, a column each and one for the two of them together.
+    // D is defined. U is undefined: no channel, but gates activated in it.
+    // O is open: nothing activated there at all.
+    var ckey = function (c) {
+      var k = String(c).toLowerCase().split(' center')[0].trim();
+      if (k === 'splenic') k = 'spleen';
+      if (k === 'solar plexus' || k === 'emotional') k = 'solar-plexus';
+      if (k === 'self') k = 'g';
+      if (k === 'ego' || k === 'will') k = 'heart';
+      return k;
+    };
+    var defSet = function (list) {
+      var s = {};
+      (list || []).forEach(function (c) { s[ckey(c)] = 1; });
+      return s;
+    };
+    var gateSet = function (gates) {
+      var s = {};
+      (gates || []).forEach(function (g) { s[g] = 1; });
+      return s;
+    };
+    var defA = defSet(A.definedCenters), defB = defSet(B.definedCenters);
+    var defBoth = defSet(REL.definedTogether);
+    var gA = gateSet(A.gates), gB = gateSet(B.gates);
+    var state = function (key, defined, gates) {
+      if (defined[key]) return 'D';
+      var list = (DATA.centerGates || {})[key] || [];
+      for (var i = 0; i < list.length; i++) if (gates[list[i]]) return 'U';
+      return 'O';
+    };
+    var crows = '<div class="ctbl">' +
+      '<div class="hd" style="border-bottom:none"></div>' +
+      '<div class="hd" style="color:' + COL_A + '">' + esc(A.name) + '</div>' +
+      '<div class="hd" style="color:' + COL_B + '">' + esc(B.name) + '</div>' +
+      '<div class="hd">Together</div>';
+    (DATA.centerRows || []).forEach(function (c) {
+      var both = {};
+      Object.keys(gA).forEach(function (g) { both[g] = 1; });
+      Object.keys(gB).forEach(function (g) { both[g] = 1; });
+      var sa = state(c.key, defA, gA), sb = state(c.key, defB, gB),
+        st = state(c.key, defBoth, both);
+      // the label lights what both of them have in that center; a cell lights
+      // only that person's, the same rule the other tables follow
+      var inCentre = (DATA.centerGates || {})[c.key] || [];
+      var held = function (set) {
+        return inCentre.filter(function (g) { return set[g]; }).join(',');
+      };
+      var ga = held(gA), gb = held(gB), gboth = held(both);
+      crows += '<div class="lb" data-center="' + c.key + '" data-gates="' + gboth + '">' +
+        esc(c.label) + '</div>' +
+        '<div class="vl s-' + sa + '" data-center="' + c.key + '" data-gates="' + ga + '">' + sa + '</div>' +
+        '<div class="vl s-' + sb + '" data-center="' + c.key + '" data-gates="' + gb + '">' + sb + '</div>' +
+        '<div class="vl s-' + st + '" data-center="' + c.key + '" data-gates="' + gboth + '">' + st + '</div>';
+    });
+    cen.innerHTML = crows + '</div>' +
+      '<div class="relsub" style="opacity:.55;text-transform:none;letter-spacing:0">' +
+      'D defined &middot; U undefined &middot; O open</div>';
   }
 
   // Running the pair against somebody else.
@@ -5836,12 +5912,18 @@ function paintRelationship() {
     row.onmouseenter = function () { litGate(gates); row.classList.add('hi'); };
     row.onmouseleave = function () { litGate(null); row.classList.remove('hi'); };
   });
-  [].forEach.call(document.querySelectorAll('#relhome .relcen'), function (row) {
+  // A centers-table cell carries both a center and the gates held in it, so it
+  // lights both. Assigning onmouseenter twice would have kept only the last one.
+  [].forEach.call(document.querySelectorAll('#relhome [data-center]'), function (row) {
+    var gates = (row.dataset.gates || '').split(',').filter(Boolean).map(Number);
     row.onmouseenter = function () {
-      markCenter(row.dataset.center); row.classList.add('hi');
+      markCenter(row.dataset.center);
+      if (gates.length) litGate(gates);
+      row.classList.add('hi');
     };
     row.onmouseleave = function () {
       [].forEach.call(document.querySelectorAll('.cshape'), function (el) { el.classList.remove('lit'); });
+      if (gates.length) litGate(null);
       row.classList.remove('hi');
     };
   });
