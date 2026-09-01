@@ -1717,8 +1717,6 @@ interface ConnectionScene {
   definedTogether: string[];
   openTogether: string[];
   definitionLabel: string;
-  themeLabel: string;
-  themeText: string;
   channels: { kind: string; label: string; name: string; gates: number[] }[];
   bodygraphSvg?: string;
 }
@@ -6274,12 +6272,10 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
         definedTogether: conn.definedTogether,
         openTogether: conn.openTogether,
         definitionLabel: conn.definitionLabel,
-        themeLabel: conn.themeLabel,
-        themeText: conn.themeText,
         channels: conn.channels.map((c) => ({ kind: c.kind, label: c.label, name: c.name, gates: c.gates })),
         bodygraphSvg: conn.bodygraphSvg,
       };
-      console.log(`  connection: ${conn.a.name} + ${conn.b.name} — ${conn.themeLabel}, ${conn.channels.length} channels between them`);
+      console.log(`  connection: ${conn.a.name} + ${conn.b.name}, ${conn.channels.length} channels between them`);
       // Drawn here, from the client's own chart SVG, because the provider's
       // composite comes back with no colour under any design including their
       // stock one. Same source graph as the individual view, same centre fills,

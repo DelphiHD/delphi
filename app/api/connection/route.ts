@@ -67,8 +67,6 @@ export async function GET(request: Request) {
       definedTogether: conn.definedTogether,
       openTogether: conn.openTogether,
       definitionLabel: conn.definitionLabel,
-      themeLabel: conn.themeLabel,
-      themeText: conn.themeText,
       channels: conn.channels,
     });
   } catch (e) {

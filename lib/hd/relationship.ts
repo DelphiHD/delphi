@@ -68,9 +68,9 @@ export interface ConnectionChart {
   openTogether: string[];
   /** Joint definition, computed across both charts. */
   definitionLabel: string;
-  /** e.g. "7 - 2, Work To Do", the only piece that arrives with prose. */
-  themeLabel: string;
-  themeText: string;
+  // The provider's connection theme, "7 - 2, Work To Do" and its paragraph, is
+  // deliberately NOT carried. Kaycee, 2026-09-01: "I never want to see it again.
+  // ever. Anywhere." It is not read out of the response, so it cannot reappear.
   channels: ConnectionChannel[];
 }
 
@@ -182,8 +182,6 @@ export async function getConnectionChart(a: PersonInput, b: PersonInput): Promis
     definedTogether: combined.DefinedCenters ?? [],
     openTogether: combined.OpenCenters ?? [],
     definitionLabel: props.Definition?.option ?? props.Definition?.id ?? "",
-    themeLabel: props.ConnectionTheme?.option ?? props.ConnectionTheme?.id ?? "",
-    themeText: props.ConnectionTheme?.description ?? "",
     channels,
   };
 }
