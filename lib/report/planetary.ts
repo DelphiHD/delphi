@@ -32,7 +32,6 @@ import type { Chart } from "@/lib/chart/types";
 import type { ChunkRow, RetrievalResult } from "@/lib/retrieval/chartChunks";
 import { renderDataPassMarkdown, type DataPass } from "@/lib/chart/datapass";
 import { validateReport, type ValidationResult } from "@/lib/report/validate";
-import { runFinalPass } from "@/lib/report/finalpass";
 
 export interface BuildArgs {
   client: { name: string };
@@ -1010,48 +1009,20 @@ export async function buildPlanetaryOverview(args: BuildArgs): Promise<BuildResu
     previousMarkdown.push(text);
   }
 
-  // The final pass. See lib/report/finalpass.ts: the per-section loop above can
-  // only see what each chapter broke, so report-wide rules survive it. Assembly
-  // goes through normalizePlanetaryStructure so the final pass judges exactly
-  // the text the validator will judge.
-  // previousMarkdown is seeded with the static opening before any chapter is
-  // written, so chapter i lives at previousMarkdown[i + OPENING]. Pairing them
-  // without this offset paired every chapter with the previous chapter's text,
-  // dropped the last chapter entirely, and wrote rewrites back into the wrong
-  // slot. It cost Chris Kulish, Meelad and Michael Jackson a phantom
-  // "# Your Timeline" missing on 2026-08-30, and made Meelad's report worse
-  // rather than better; only the keep-the-better-draft guard saved it.
-  const OPENING = previousMarkdown.length - accumulated.length;
-
-  // The opening is part of the report the validator sees, but it is not a
-  // chapter and is never rewritten, so it goes in as a fixed prefix.
-  const assemble = (parts: { text: string }[]) =>
-    normalizePlanetaryStructure(
-      previousMarkdown.slice(0, OPENING).concat(parts.map((p) => p.text)).join("\n\n"),
-    );
-
-  const fp = await runFinalPass({
-    sections: accumulated.map((s, i) => ({ name: s.name, text: previousMarkdown[i + OPENING] })),
-    dataPass: args.dataPass,
-    tier: "planetary",
-    assemble,
-    regenerate: async (index, nudge) => generateSection(sections[index], nudge),
-  });
-
-  for (const line of fp.log) console.log(`  ${line}`);
-
-  fp.sections.forEach((s, i) => {
-    if (s.text !== previousMarkdown[i + OPENING]) {
-      accumulated[i].text = s.text;
-      (accumulated[i] as { retried?: boolean }).retried = true;
-      previousMarkdown[i + OPENING] = s.text;
-    }
-  });
-  totalCents += fp.costCents;
-  totalUsage.input_tokens += fp.usage.input_tokens;
-  totalUsage.output_tokens += fp.usage.output_tokens;
-  totalUsage.cache_creation_input_tokens += fp.usage.cache_creation_input_tokens;
-  totalUsage.cache_read_input_tokens += fp.usage.cache_read_input_tokens;
+  // The final pass is OFF for the Planetary Overview.
+  //
+  // It works on the Foundation, taking one run from five hard failures to one.
+  // On the Planetary it ran four times and helped none of them: Meelad went from
+  // four failures to five, Jason from one to three, Sarah Marie stayed at two,
+  // and each time its own guard threw the rewrite away and kept the earlier
+  // draft. Every one of those runs was paid for and changed nothing. Kaycee,
+  // 2026-09-01: "Yes disable the final pass."
+  //
+  // The code stays and is still wired for the Foundation. Turning it back on
+  // here means restoring the runFinalPass call below, and it should not happen
+  // without understanding why a chapter rewrite makes a Planetary worse rather
+  // than better; the off-by-one that misread the chapter offsets was one cause
+  // and may not have been the only one.
 
   const rawText = previousMarkdown.join("\n\n");
   const fullText = normalizePlanetaryStructure(rawText);
