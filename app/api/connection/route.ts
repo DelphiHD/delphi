@@ -102,6 +102,8 @@ export async function GET(request: Request) {
         [...new Set(conn.b.gates)],
         { personality: theirs, design: theirDesign, colour: PERSON_B, name: conn.b.name },
         PERSON_A,
+        // the gate ring belongs to the two of them, not to personality and design
+        { a: PERSON_A, b: PERSON_B },
       );
       partnerDesign = theirDesign;
       if (wheelSvg) {

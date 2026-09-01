@@ -102,7 +102,8 @@ export interface WheelPartner {
 export function renderWheel(chart: AstroChart, name: string, design?: AstroChart | null,
   anchor: WheelAnchor = "aries", carriedGates: readonly number[] = [],
   personalityGates: readonly number[] = [], designGates: readonly number[] = [],
-  partner?: WheelPartner | null, selfColour?: string): string {
+  partner?: WheelPartner | null, selfColour?: string,
+  ringColours?: { a: string; b: string } | null): string {
   ANCHOR = anchor;
   const asc = chart.ascendant;
   const s: string[] = [];
@@ -125,9 +126,34 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   const carried = new Set(carriedGates);
   const pSide = new Set(personalityGates);
   const dSide = new Set(designGates);
+  // On a pair the two sets are two people, not two sides of one chart, so the
+  // ring reads by person: each in their own colour, and a gate they both carry
+  // split across the band rather than blended into a third colour that is
+  // neither of them.
+  const R_MID = (R_GATE + R_GATE_IN) / 2;
   for (const g of GATE_RANGES) {
     const on = carried.has(g.gate);
     const isP = pSide.has(g.gate), isD = dSide.has(g.gate);
+    if (ringColours) {
+      const band = (outer: number, inner: number, fill: string) =>
+        `<path class="gateband" data-gate="${g.gate}" ` +
+        `d="${arc(g.start, g.end, asc, outer, inner)}" ` +
+        `fill="${on ? fill : "none"}" fill-opacity="${on ? 0.34 : 0}" ` +
+        `stroke="${INK}" stroke-width="0.5" stroke-opacity=".35"/>`;
+      if (isP && isD) {
+        s.push(band(R_GATE, R_MID, ringColours.a));
+        s.push(band(R_MID, R_GATE_IN, ringColours.b));
+      } else {
+        s.push(band(R_GATE, R_GATE_IN, isP ? ringColours.a : ringColours.b));
+      }
+      const span0 = ((g.end - g.start) % 360 + 360) % 360;
+      const mid0 = (g.start + span0 / 2) % 360;
+      const [tx, ty] = pt(mid0, asc, R_MID);
+      s.push(`<text class="gateband" data-gate="${g.gate}" x="${f(tx)}" y="${f(ty + 4)}" ` +
+        `text-anchor="middle" font-size="11" font-weight="${on ? 600 : 400}" ` +
+        `fill="${INK}" opacity="${on ? 0.95 : 0.4}">${g.gate}</text>`);
+      continue;
+    }
     // A gate carried by both sides is filled with a gradient across the band,
     // Delphi red at the inner edge for design fading to purple at the outer
     // edge for personality. A hard split read as two separate bands.
