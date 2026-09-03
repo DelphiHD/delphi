@@ -4783,9 +4783,10 @@ if (DATA.client) {
         if (!g) { g = { name: c.group, list: [] }; byGroup.push(g); }
         if (g.list.indexOf(c.name) < 0) g.list.push(c.name);
       });
-      // Her library labels the integration channels with two circuits at once,
-      // e.g. "Individual: Knowing , Integration". Those names are hers and are
-      // kept whole; they are filed under the family they name first.
+      // Gates 10, 34 and 57 sit in Integration channels and in Individual ones,
+      // so their Circuits field in the library names both. The value is shown
+      // exactly as it reads there, filed under the family it names first.
+      // How these should be counted is Kaycee's call, not settled here.
       circuits.forEach(function (n) {
         var known = byGroup.some(function (g) { return g.list.indexOf(n) > -1; });
         if (known) return;
