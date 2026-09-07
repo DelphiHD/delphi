@@ -727,12 +727,15 @@ function transitInner(
   // client color."
   for (const g of natal) {
     if (!transit.has(g)) continue;
+    // data-sky marks the half that belongs to the sky. Without it the runtime
+    // repaint below puts the client's tint back over every leg on this canvas,
+    // which is why a gate carried by both kept reading as the client's alone.
     s = s.replace(
       new RegExp(`(<[a-z]+ [^>]*class="pleg"(?![^>]*data-full)[^>]*data-gate="${g}"[^>]*?)\\sfill="[^"]*"`),
-      (_m, head: string) => `${head} fill="${TRANSIT_INK}"`);
+      (_m, head: string) => `${head} data-sky="1" fill="${TRANSIT_INK}"`);
     s = s.replace(new RegExp(`(<[a-z]+ [^>]*?id="design-${g}"[^>]*?)\\sfill="[^"]*"`),
       (_m, head: string) =>
-        `${head.replace('id="', 'class="pleg" data-gate="' + g + '" id="')} fill="${TRANSIT_INK}"`);
+        `${head.replace('id="', 'class="pleg" data-gate="' + g + '" data-sky="1" id="')} fill="${TRANSIT_INK}"`);
   }
 
   for (const g of paintable) {
@@ -2203,6 +2206,31 @@ function buildCanvas(
 
   // in the plain view the channels are only hit areas: the design has already
   // colored them the traditional way
+  // Gates 10, 34 and 57 reach into Integration and into an Individual circuit,
+  // and their library page names both. Where a gate's own circuits are doubled
+  // like that, its leg carries both colours side by side rather than picking
+  // one: Kaycee, 2026-09-07. Everything else keeps the single channel colour,
+  // because a channel belongs to one circuit.
+  const legDefs: string[] = [];
+  const doubledFill = (gate: number, channelColor: string): string => {
+    const named = String(d.gateInfo[gate]?.circuit ?? "").split(",")
+      .map((n) => n.trim()).filter(Boolean);
+    if (named.length < 2) return "";
+    const cols = named.map((n) => {
+      const hit = CIRCUITS.find((c) => c.name.trim().toLowerCase() === n.toLowerCase());
+      return hit ? hit.color : null;
+    }).filter(Boolean) as string[];
+    if (cols.length < 2) return "";
+    // the channel's own colour first, so the leg still reads as its channel
+    const order = cols.indexOf(channelColor) > 0 ? [channelColor, cols.find((c) => c !== channelColor)!] : cols;
+    const id = `dbl-${gate}-${order[0].slice(1)}-${order[1].slice(1)}`;
+    if (!legDefs.some((s) => s.indexOf(`id="${id}"`) > -1)) {
+      legDefs.push(`<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">` +
+        `<stop offset="50%" stop-color="${order[0]}"/>` +
+        `<stop offset="50%" stop-color="${order[1]}"/></linearGradient>`);
+    }
+    return `url(#${id})`;
+  };
   const flows = d.channels.map((ch) => {
     const color = CIRCUITS.find((c) => c.id === ch.circuit)!.color;
     if (opts.plain) {
@@ -2219,10 +2247,11 @@ function buildCanvas(
       if (!hang.length) return "";
       const shapes = hang.map((h, i) => {
         const cid = `hp-${ch.key}-${i}-${skin.id}`;
+        const paint = doubledFill(h.gate, color) || color;
         const body = h.stripes === 1
-          ? reshape(h.el, `fill="${color}" fill-opacity="0.3"`)
+          ? reshape(h.el, `fill="${paint}" fill-opacity="0.3"`)
           : `<clipPath id="${cid}">${reshape(h.el, "")}</clipPath><g clip-path="url(#${cid})">` +
-            band(h, `fill="${color}" fill-opacity="0.3"`, false) + `</g>`;
+            band(h, `fill="${paint}" fill-opacity="0.3"`, false) + `</g>`;
         return `<g class="leg" data-gate="${h.gate}">${body}</g>`;
       }).join("");
       return `<g class="ch hang" data-ch="${ch.key}" data-circuit="${ch.circuit}">${shapes}</g>`;
@@ -3236,6 +3265,7 @@ ${d.client ? "" : `<div class="readout" id="readout"><b>Hover the bodygraph</b><
 <script>
 var DATA = ${JSON.stringify(payload)};
 var CLIENT_TINT_JS = ${JSON.stringify(CLIENT_TINT)};
+var TRANSIT_INK_JS = ${JSON.stringify(TRANSIT_INK)};
 // the brand font again, so a saved image carries it too (an SVG drawn into a
 // canvas cannot reach the page's fonts)
 var FONTCSS = ${JSON.stringify(face)};
@@ -3596,13 +3626,26 @@ if (DATA.client) {
       }).join('') + '</details>';
     };
     var pick = function (fn) { return P.filter(fn); };
+    // The circuit of the channel this gate completes on this chart, if it does.
+    var formedCircuit = function (gate) {
+      var live = (DATA.client && DATA.client.defined) || [];
+      var hit = (DATA.channels || []).filter(function (c) {
+        return (c.srcGate === gate || c.tgtGate === gate) && live.indexOf(c.key) > -1;
+      })[0];
+      return hit ? hit.circuitName : null;
+    };
     var lineRows = [1, 2, 3, 4, 5, 6].map(function (n) {
       var list = pick(function (p) { return p.line === n; });
       return ['Line ' + n, list.length, list];
     });
 
+    // Kaycee's rule, 2026-09-07: an activation belongs to the circuit of the
+    // channel it actually forms. Gates 10, 34 and 57 sit in Integration channels
+    // and in Individual ones, so which it is depends on what completes. A gate
+    // hanging on its own keeps the circuit its own gate page names.
     var group = function (p) {
-      var c = (L[p.gate] || {}).circuit || '';
+      var formed = formedCircuit(p.gate);
+      var c = formed || (L[p.gate] || {}).circuit || '';
       if (!c) return '';
       return c.split(':')[0].trim();
     };
@@ -3881,12 +3924,33 @@ if (DATA.client) {
     var tok = chartToken();
     // opened as a file rather than through the link: only the baked day exists
     if (!tok) { renderRead(null, d); return; }
-    renderRead(null, d);
-    fetch('/api/read?token=' + tok + '&date=' + d).then(function (r) { return r.json(); }).then(function (j) {
-      if (!j || !j.ok) throw new Error('no read');
-      readCache[d] = j.read || null;
-      if (readWanted === d) renderRead(j.read || null, d);
-    }).catch(function () {
+    // Waiting, not "none written". Painting the empty state first told a client
+    // their day had no reading every time the request was slow, and a cold start
+    // that answered 502 left that message standing: Kaycee, 2026-09-07.
+    var waitEl = document.getElementById('todayread');
+    if (waitEl) waitEl.innerHTML = '<div class="noread">Loading the reading for ' +
+      esc(shortDate(d)) + '\u2026</div>';
+    var tries = 0;
+    var ask = function () {
+      tries++;
+      return fetch('/api/read?token=' + tok + '&date=' + d).then(function (r) {
+        if (!r.ok) throw new Error('http ' + r.status);
+        return r.json();
+      }).then(function (j) {
+        if (!j || !j.ok) throw new Error('no read');
+        readCache[d] = j.read || null;
+        if (readWanted === d) renderRead(j.read || null, d);
+      }).catch(function (err) {
+        // A server that is waking up answers 502 for a second or two. Two more
+        // goes at widening intervals, because one flaky request should never
+        // read as a day Kaycee skipped.
+        if (tries < 3 && readWanted === d) {
+          return new Promise(function (res) { setTimeout(res, tries * 900); }).then(ask);
+        }
+        throw err;
+      });
+    };
+    ask().catch(function () {
       if (readWanted !== d) return;
       // The copy baked in at publish time, used only when the server cannot be
       // reached, and only for the day it was baked for.
@@ -4795,8 +4859,29 @@ if (DATA.client) {
         if (!g) { g = { name: head || 'Other', list: [] }; byGroup.push(g); }
         g.list.push(n);
       });
-      var keyOf = function (r) { var L = lib[r.p.gate]; return L ? L.circuit : null; };
-      var ta = tally(A, keyOf), tb = tally(B, keyOf);
+      // Kaycee's rule, 2026-09-07: an activation belongs to the circuit of the
+      // channel it actually forms for that person. Gates 10, 34 and 57 reach into
+      // Integration and into Individual, so what completes decides it; a gate
+      // hanging on its own keeps the circuit its own gate page names.
+      var gateSetOf = function (person) {
+        var s = {};
+        (person.gates || []).forEach(function (g) { s[g] = 1; });
+        return s;
+      };
+      var setA = gateSetOf(conn.a), setB = gateSetOf(conn.b);
+      var keyFor = function (set) {
+        return function (r) {
+          var g = r.p.gate;
+          var hit = (DATA.channels || []).filter(function (c) {
+            return (c.srcGate === g || c.tgtGate === g) && set[c.srcGate] && set[c.tgtGate];
+          })[0];
+          if (hit) return hit.circuitName;
+          var L = lib[g];
+          return L ? L.circuit : null;
+        };
+      };
+      var keyOf = keyFor(setA);
+      var ta = tally(A, keyFor(setA)), tb = tally(B, keyFor(setB));
       var max = 1;
       byGroup.forEach(function (g) {
         var sa = 0, sb = 0;
@@ -5704,7 +5789,9 @@ function relight() {
     // load and on every toggle, and without this it puts the traditional black
     // and red straight back over the overlay's own fills.
     var sv = el.closest ? el.closest('svg.canvas') : null;
-    if (sv && sv.classList.contains('transit')) col = CLIENT_TINT_JS;
+    // the client is one colour on this overlay, except the half that is the
+    // sky's: a gate they both carry reads in both, the way a doubled placement does
+    if (sv && sv.classList.contains('transit')) col = el.dataset.sky ? TRANSIT_INK_JS : CLIENT_TINT_JS;
     // The pair's chart carries its own colours, one per person. This repaint knows
     // only the traditional black and red and would put them straight back over it,
     // which is what made the connection chart look like a single chart after load.

@@ -147,7 +147,8 @@ function personReadItems(impacts: ClientImpact[], names: LibraryNames, library: 
     const comps = i.completions.map((c) =>
       `- ${c.planet} in gate ${c.transitGate} (${names.gate(c.transitGate)}) completes channel ${c.channelId} ${c.channelName} with their natal ${c.natalGate} (${names.gate(c.natalGate)})`
       + (c.bridgesSplit ? "; BRIDGES SPLIT" : "")
-      + (c.definesOpenCenter ? `; lights their open ${c.center} center` : `; ${c.center} center`)
+      + (c.definesOpenCenter ? `; lights their open ${c.center} center`
+            : `; their ${c.center} center, which is already defined`)
       + ` [${c.duration}]`).join("\n");
     const label = `${i.name} — ${i.definitionLabel}\n${rule}\nCompletions today:\n${comps || `(no channel completions; ${i.reinforcements} natal gate(s) reinforced)`}`;
     // Grounded source: the library bodies for the channels completed and the
@@ -198,7 +199,8 @@ function renderWhoSection(impacts: ClientImpact[], reads: Record<string, string>
       out.push(
         `- ${c.planet} in ${c.transitGate} (${names.gate(c.transitGate)}) completes ${c.channelId} ${c.channelName} with natal ${c.natalGate} (${names.gate(c.natalGate)})` +
           (c.bridgesSplit ? "; bridges their split" : "") +
-          (c.definesOpenCenter ? `; lights their open ${c.center} center` : `; ${c.center} center`) +
+          (c.definesOpenCenter ? `; lights their open ${c.center} center`
+            : `; their ${c.center} center, which is already defined`) +
           ` [${c.duration}]`,
       );
     }
