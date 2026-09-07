@@ -66,6 +66,9 @@ export interface ClientImpact {
   definition: Definition;
   /** Short label, e.g. "Split Definition (simple)". */
   definitionLabel: string;
+  /** Their centers by state, so a written read can be checked against the chart. */
+  openCenterNames: string[];
+  definedCenterNames: string[];
 }
 
 function openCenters(chart: Chart): Set<CenterName> {
@@ -136,6 +139,8 @@ export function computeImpact(
     reinforcements,
     definition,
     definitionLabel: definitionLabel(definition),
+    openCenterNames: chart.centers.filter((c) => !c.defined).map((c) => String(c.name)),
+    definedCenterNames: chart.centers.filter((c) => c.defined).map((c) => String(c.name)),
   };
 }
 

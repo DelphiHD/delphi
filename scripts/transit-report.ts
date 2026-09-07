@@ -32,6 +32,7 @@ import { notifyMac } from "@/lib/notify";
 import { castSkyAt, scanDay, castNatalChart, castTransitBodygraph, moonPhases, assertTraditionalBodies, type SkyMoment, type DayScan, type TransitPosition } from "@/lib/transit/sky";
 import type { PhaseChart } from "./render-transit-html";
 import { rankImpacts, type ClientImpact } from "@/lib/transit/impact";
+import { centreFaults } from "@/lib/transit/validate-read";
 import { buildTransitReport, buildBabyOverview, buildSyntheses, buildPersonReads } from "@/lib/report/transit";
 import { renderTransitHtml, type BabyEntry } from "./render-transit-html";
 
@@ -516,6 +517,38 @@ async function main() {
   // self-check below so the backup run regenerates instead of shipping silently.
   const readGaps = personItems.filter((it) => !personReads[it.key]).map((it) => it.key.replace(/^person:/, ""));
   if (readGaps.length) console.log(`  ⚠ ${readGaps.length} person synthesis(es) MISSING after retries: ${readGaps.join(", ")}`);
+  // Telling the model plainly is not enough on its own: on 2026-09-07 two of the
+  // 37 reads still called a defined center open with the data line in front of
+  // them saying otherwise. So a read that contradicts the chart is written
+  // again, up to twice, with the contradiction named. Only what survives that
+  // fails the report.
+  const faultsFor = (slug: string, name: string, open: string[], def: string[]): string[] => {
+    const written = personReads[`person:${slug}`];
+    if (!written) return [];
+    return centreFaults(written, open, def)
+      .map((f) => `${name}: "${f.phrase}" but their ${f.centre} center is ${f.truth}`);
+  };
+  for (let round = 1; round <= 2; round++) {
+    const failing = impacts.filter((im) =>
+      faultsFor(im.slug, im.name, im.openCenterNames, im.definedCenterNames).length);
+    if (!failing.length) break;
+    console.log(`\n  ${failing.length} read(s) contradict the chart; rewriting (round ${round})…`);
+    const retryItems = failing.map((im) => {
+      const base = personItems.find((it) => it.key === `person:${im.slug}`);
+      const stated = `\n\nTHESE ARE ${im.name.toUpperCase()}'S CENTERS AND THEY ARE NOT NEGOTIABLE.\n` +
+        `Defined: ${im.definedCenterNames.join(", ") || "none"}.\n` +
+        `Open: ${im.openCenterNames.join(", ") || "none"}.\n` +
+        `Do not call a defined center open or an open center defined. A previous ` +
+        `draft did, which is why you are writing this one.`;
+      return { key: `person:${im.slug}`, label: base?.label ?? im.name, source: (base?.source ?? "") + stated };
+    });
+    const rewritten = await buildPersonReads({
+      people: retryItems, identityMd, voiceMd, apiKey,
+      hardCostCeilingCents: Number(process.env.HARD_COST_CEILING_CENTS ?? 0) || undefined,
+    });
+    for (const [k, v] of Object.entries(rewritten)) if (v) personReads[k] = v;
+  }
+
   const whoSection = renderWhoSection(impacts, personReads, names);
 
   // 5a2. Grounded one-line syntheses for the popups + shift-table columns.
@@ -671,6 +704,31 @@ shifts:        ${scan.shifts.length}
   const verdict = verifyReportHtml(htmlPath, { expectBabies: babyPhases.length > 0 });
   // Fold in per-person synthesis completeness (the HTML verifier can't see it):
   // if any active person is missing their read, the report is NOT complete.
+  // Every written read, against the chart it is about. A read that calls a
+  // defined center open is wrong in a way a client would notice and believe,
+  // so it fails the report the same way a missing synthesis does and the backup
+  // pass regenerates it. Kaycee, 2026-09-07.
+  const centreFaultLines: string[] = [];
+  for (const im of impacts) {
+    centreFaultLines.push(...faultsFor(im.slug, im.name, im.openCenterNames, im.definedCenterNames));
+  }
+  if (centreFaultLines.length) {
+    console.log(`\n  ⚠ ${centreFaultLines.length} read(s) contradict the chart:`);
+    for (const l of centreFaultLines) console.log(`     ${l}`);
+  }
+  verdict.checks.push({
+    name: "Center states in the reads",
+    pass: centreFaultLines.length === 0,
+    detail: centreFaultLines.length
+      ? `${centreFaultLines.length} claim(s) contradict the chart: ${centreFaultLines[0]}`
+      : `all ${impacts.length} read(s) agree with their charts`,
+  });
+  if (centreFaultLines.length) {
+    verdict.pass = false;
+    verdict.summary = `${verdict.summary === "all complete" ? "" : verdict.summary + "; "}` +
+      `${centreFaultLines.length} read(s) contradict the chart`;
+  }
+
   verdict.checks.push({ name: "Person syntheses", pass: readGaps.length === 0, detail: readGaps.length ? `${readGaps.length} missing: ${readGaps.join(", ")}` : "all present" });
   if (readGaps.length) {
     verdict.pass = false;
