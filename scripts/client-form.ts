@@ -518,6 +518,21 @@ const PAGE = /* html */ `<!doctype html>
   .li-done b { color:#0d9488; }
   .li-doing b { color:#f1c232; }
   .li-blocked b { color:#e06666; }
+  /* the heartbeat strip: on screen whichever tab is open */
+  .hb { display:flex; flex-wrap:wrap; gap:7px; margin:0 0 14px; align-items:stretch; }
+  .hbcard { flex:1 1 150px; background:#fff; border:1px solid var(--line); border-left-width:4px;
+    border-radius:12px; padding:8px 11px; min-width:0; }
+  .hbcard.ok { border-left-color:#0d9488; }
+  .hbcard.bad { border-left-color:#c0392b; background:#fff5f4; }
+  .hbcard.unknown { border-left-color:#c9c4d2; }
+  .hbcard.busy { border-left-color:#f1c232; }
+  .hbname { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--purple); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .hbwhat { font-size:11px; opacity:.55; line-height:1.35; margin-top:1px; }
+  .hbdetail { font-size:12px; margin-top:3px; font-variant-numeric:tabular-nums; }
+  .hbcard.bad .hbdetail { color:#c0392b; font-weight:600; }
+  .hbhead { width:100%; font-size:11px; letter-spacing:.1em; text-transform:uppercase;
+    opacity:.55; margin-bottom:-2px; }
   /* the list of everyone */
   .tblwrap { overflow-x:auto; border:1px solid var(--line); border-radius:14px; background:#fff; }
   table.ptable { width:100%; border-collapse:collapse; font-size:13px; }
@@ -628,6 +643,7 @@ const PAGE = /* html */ `<!doctype html>
   @media (max-width:620px) { .grid { grid-template-columns:1fr; } }
 </style></head><body><div class="wrap">
 <div class="hint" id="hint" hidden></div>
+<div id="heartbeat" class="hb"></div>
 <div class="tabs">
   <button type="button" class="tab on" id="tabAdd">Add a client</button>
   <button type="button" class="tab" id="tabStatus">Status</button>
@@ -860,6 +876,30 @@ const PAGE = /* html */ `<!doctype html>
   // every tile explains itself: what it is, and how it is worked out
   function tile(value, label, help) {
     return '<div class="tile" data-help="' + esc(help) + '"><b>' + value + '</b><span>' + esc(label) + '</span></div>';
+  }
+
+  // ---- the heartbeat -------------------------------------------------------
+  // Above the tabs, so a job that stopped running is visible without going
+  // looking for it. Refreshes itself while the dashboard is open.
+  async function loadHeartbeat() {
+    var el = document.getElementById('heartbeat');
+    if (!el.innerHTML) el.innerHTML = '<div class="hbhead">Checking every scheduled job…</div>';
+    var j;
+    try { j = await (await fetch('/heartbeat')).json(); }
+    catch (e) { el.innerHTML = '<div class="hbhead">Could not read the heartbeat</div>'; return; }
+    var jobs = j.jobs || [];
+    var bad = jobs.filter(function (x) { return x.ok === false; }).length;
+    el.innerHTML = '<div class="hbhead">' +
+      (bad ? bad + ' thing' + (bad > 1 ? 's' : '') + ' need' + (bad > 1 ? '' : 's') + ' a look'
+           : 'Everything ran') + '</div>' +
+      jobs.map(function (x) {
+        var cls = x.detail === 'running now' ? 'busy'
+          : x.ok === true ? 'ok' : x.ok === false ? 'bad' : 'unknown';
+        return '<div class="hbcard ' + cls + '">' +
+          '<div class="hbname">' + esc(x.name) + '</div>' +
+          '<div class="hbwhat">' + esc(x.what) + '</div>' +
+          '<div class="hbdetail">' + esc(x.detail) + '</div></div>';
+      }).join('');
   }
 
   // ---- Funnel ------------------------------------------------------------
@@ -1403,6 +1443,9 @@ const PAGE = /* html */ `<!doctype html>
   Object.keys(TABS).forEach(function (k) {
     document.getElementById(TABS[k]).onclick = function () { show(k); };
   });
+  loadHeartbeat();
+  setInterval(loadHeartbeat, 120000);
+
   // deep links, so either view can be bookmarked on its own
   if (location.hash === '#status') show('status');
   if (location.hash === '#metrics') show('metrics');
@@ -1630,6 +1673,137 @@ createServer((req, res) => {
   // where they came from and what they have. Two sources today, because an
   // account is not yet linked to a chart; that link arrives with the charts
   // table in Phase 1 and this merges on it then.
+  // The heartbeat of everything that runs on a schedule. A job that stops
+  // running has to be as visible as one that crashes: the nightly sync was
+  // cancelled eighty times in a row and said nothing, because the only place it
+  // spoke was a log file nobody opens. Kaycee, 2026-09-09.
+  if (req.method === "GET" && path === "/heartbeat") {
+    void (async () => {
+      const out: { jobs: unknown[]; error?: string } = { jobs: [] };
+      const jobs: {
+        name: string; what: string; lastRun: string | null; ok: boolean | null;
+        detail: string; every: string;
+      }[] = [];
+
+      const ageOf = (iso: string | null): string => {
+        if (!iso) return "never";
+        const h = (Date.now() - new Date(iso).getTime()) / 3600000;
+        if (h < 1) return `${Math.round(h * 60)} min ago`;
+        if (h < 48) return `${Math.round(h)} hours ago`;
+        return `${Math.round(h / 24)} days ago`;
+      };
+
+      // Each LaunchAgent writes a dated marker and, on failure, the word FAILED.
+      const logFor = (agent: string) => {
+        const p = `${process.env.HOME}/Library/Logs/com.delphihd.${agent}.log`;
+        if (!existsSync(p)) return { last: null as string | null, failed: false, tail: "no log yet" };
+        const text = readFileSync(p, "utf8");
+        const blocks = text.split("=== ").filter(Boolean);
+        const last = blocks[blocks.length - 1] ?? "";
+        const stamp = last.split(" ===")[0]?.trim() ?? null;
+        const when = stamp ? new Date(stamp) : null;
+        return {
+          last: when && !isNaN(when.getTime()) ? when.toISOString() : null,
+          failed: /FAILED|Error:/i.test(last),
+          tail: (last.split(" ===")[1] ?? "").trim().split("\n").filter(Boolean).slice(-1)[0] ?? "ran clean",
+        };
+      };
+
+      // A daily job that has not run since yesterday has stopped, whatever its
+      // last run said. Silence is the failure mode this panel exists for: the
+      // cloud sync was cancelled eighty nights running and never once "failed".
+      const OVERDUE_HOURS = 26;
+      for (const [agent, what, every] of [
+        ["sync", "Notion library into the database", "3:30am daily"],
+        ["transit-report", "The day's transit report and everyone's read", "6:00am daily"],
+        ["evening-echoes", "Evening Echoes", "6:00pm daily"],
+        ["health-check", "Morning health digest", "5:00am daily"],
+        ["delphi-pull", "Keeps this repo up to date", "daily"],
+      ] as [string, string, string][]) {
+        const l = logFor(agent);
+        const hours = l.last ? (Date.now() - new Date(l.last).getTime()) / 3600000 : Infinity;
+        const overdue = hours > OVERDUE_HOURS;
+        jobs.push({
+          name: agent, what, every, lastRun: l.last,
+          ok: l.last === null ? null : (!l.failed && !overdue),
+          detail: l.failed ? l.tail
+            : overdue ? `has not run in ${ageOf(l.last).replace(" ago", "")}`
+            : ageOf(l.last),
+        });
+      }
+
+      // The cloud sync. A cancelled run is not a failure to GitHub and sends no
+      // mail, which is exactly how eighty of them went unnoticed.
+      try {
+        const { execFileSync } = await import("node:child_process");
+        // The LaunchAgent's PATH does not include Homebrew, so "gh" alone is not
+        // found and the cloud sync silently reads as unknown.
+        const GH = [
+          `${process.env.HOME}/.local/bin/gh`,
+          "/opt/homebrew/bin/gh",
+          "/usr/local/bin/gh",
+          "gh",
+        ].find((c) => c === "gh" || existsSync(c))!;
+        const raw = execFileSync(GH, [
+          "run", "list", "--workflow=sync-notion.yml", "--limit", "1",
+          "--json", "status,conclusion,createdAt,url",
+        ], { cwd: process.cwd(), encoding: "utf8", timeout: 15000 });
+        const [r] = JSON.parse(raw) as {
+          status: string; conclusion: string; createdAt: string; url: string;
+        }[];
+        if (r) {
+          jobs.push({
+            name: "sync (cloud)", what: "The same sync, run by GitHub", every: "5:30am daily",
+            lastRun: r.createdAt,
+            ok: r.status !== "completed" ? null : r.conclusion === "success",
+            detail: r.status !== "completed" ? "running now"
+              : r.conclusion === "success" ? ageOf(r.createdAt) : `${r.conclusion} · ${ageOf(r.createdAt)}`,
+          });
+        }
+      } catch {
+        jobs.push({
+          name: "sync (cloud)", what: "The same sync, run by GitHub", every: "5:30am daily",
+          lastRun: null, ok: null, detail: "could not read GitHub from here",
+        });
+      }
+
+      // What the library actually holds right now.
+      try {
+        const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        if (url && key) {
+          const { createClient } = await import("@supabase/supabase-js");
+          const db = createClient(url, key, { auth: { persistSession: false } });
+          // Counted, not fetched. Pulling 860 bodies to count them took the best
+          // part of a minute and left this strip blank while it ran.
+          const countWhere = async (build: (q: any) => any) => {
+            const { count } = await build(db.from("chunks").select("*", { count: "exact", head: true }));
+            return count ?? 0;
+          };
+          const total = await countWhere((q: any) => q);
+          const withBody = await countWhere((q: any) => q.neq("body", ""));
+          const withMeta = await countWhere((q: any) => q.neq("metadata", "{}"));
+          const { data: newestRow } = await db.from("chunks")
+            .select("updated_at").order("updated_at", { ascending: false }).limit(1);
+          const newest = newestRow?.[0]?.updated_at ?? null;
+          jobs.push({
+            name: "library", what: "Your source material in the database", every: "written by the sync",
+            lastRun: newest,
+            ok: total > 0 && withBody === total && withMeta > 0,
+            detail: `${total} pages · ${withBody} with content · ${withMeta} with properties · updated ${ageOf(newest)}`,
+          });
+        }
+      } catch (e) {
+        out.error = e instanceof Error ? e.message : String(e);
+      }
+
+      out.jobs = jobs;
+      res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      res.end(JSON.stringify(out));
+    })();
+    return;
+  }
+
   if (req.method === "GET" && path === "/people") {
     void (async () => {
       const out: Record<string, unknown> = { people: [] };
