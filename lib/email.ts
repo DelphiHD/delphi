@@ -87,6 +87,9 @@ export async function sendChartEmail(args: {
       body: JSON.stringify({
         from: process.env.RESEND_FROM_EMAIL,
         to: [args.to],
+        // Replies land in her actual inbox. send.delphihd.com only sends;
+        // somebody answering their chart email must not vanish into it.
+        reply_to: "hello@delphihd.com",
         subject: "Your Human Design chart",
         html: chartEmailHtml(args.name, args.url),
         text: `Your chart: ${args.url}\n\nThe link is yours and it stays live.`,
