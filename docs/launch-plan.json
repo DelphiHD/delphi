@@ -35,14 +35,14 @@
         {
           "id": "p1d",
           "title": "Public birth-details form with account signup",
-          "status": "todo",
-          "note": "Provider's own place lookup and pickers. Magic link, no password. Birth-time accuracy question: exact / approximate / unknown."
+          "status": "doing",
+          "note": "The form is built at /chart: place chosen from the provider's lookup, birth time asked honestly with a part-of-day fallback, long-form birth certificate guidance and a rectification booking link. Still to add: the account itself, magic link rather than just an email field."
         },
         {
           "id": "p1e",
           "title": "Free tier renders the Delphi Basic layer",
           "status": "todo",
-          "note": "Centres use Delphi Defined/Undefined/Open Basic; channels use Delphi Free Chart. Gates have no Basic field yet, so the keynote stands in."
+          "note": "Centres use Delphi Defined/Undefined/Open Basic; channels use Delphi Free Chart. Gates have no Basic field yet, so the keynote stands in. Kaycee is adding a Delphi Free Chart field to the gates database; the wiring waits on that sync."
         },
         {
           "id": "p1f",
@@ -192,6 +192,9 @@
     },
     {
       "what": "Whether to add a Delphi Basic field to the gates database in Notion."
+    },
+    {
+      "what": "A rectification session does not exist on Cal.com yet. The form links to the booking page; it should link to that event type once it is created."
     }
   ],
   "brief": "https://claude.ai/code/artifact/3428e24e-262a-4fd7-86a6-93468244cb44"
