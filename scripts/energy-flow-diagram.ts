@@ -370,7 +370,9 @@ async function blankBodygraph(): Promise<string> {
     throw new Error("mybodygraph returned no branded SVG (design=delphi). Cannot build the diagram.");
   }
   if (!tryMkdir(cacheRoot())) return svg;
-  writeFileSync(BLANK_CACHE, svg);
+  try {
+    writeFileSync(BLANK_CACHE, svg);
+  } catch { /* same: caching is a convenience */ }
   return svg;
 }
 
@@ -528,7 +530,9 @@ async function skyForDate(date: string, time: string): Promise<{ planet: string;
     planet: p.planet, gate: p.gate, line: p.line, fixingState: p.fixingState,
   }));
   mkdirSync(dir, { recursive: true });
-  writeFileSync(file, JSON.stringify(out));
+  try {
+    writeFileSync(file, JSON.stringify(out));
+  } catch { /* a cache miss next time is cheaper than a failed chart */ }
   return out;
 }
 
@@ -1753,7 +1757,9 @@ async function montserrat(): Promise<Map<number, Buffer>> {
         const url = block?.match(/url\((https:[^)]+\.ttf)\)/)?.[1];
         if (!url) continue;
         const buf = Buffer.from(await (await fetch(url)).arrayBuffer());
-        writeFileSync(join(FONT_DIR, `Montserrat-${w}.ttf`), buf);
+        try {
+          writeFileSync(join(FONT_DIR, `Montserrat-${w}.ttf`), buf);
+        } catch { /* the bundled copy is the one that matters */ }
       }
     } catch {
       console.warn("  (could not fetch Montserrat; falling back to system fonts)");
@@ -6786,8 +6792,13 @@ function recordChange(
     "|---|---|---|---|",
     "",
   ].join("\n");
-  if (!existsSync(CHANGELOG_MD)) writeFileSync(CHANGELOG_MD, header, "utf8");
-  appendFileSync(CHANGELOG_MD, `${line}\n`, "utf8");
+  // The change log is Kaycee's record of what she changed and when, kept beside
+  // the code. A chart published by the website has nowhere to write it and no
+  // business trying: this is her log, not the deploy's.
+  try {
+    if (!existsSync(CHANGELOG_MD)) writeFileSync(CHANGELOG_MD, header, "utf8");
+    appendFileSync(CHANGELOG_MD, `${line}\n`, "utf8");
+  } catch { /* read-only filesystem: the chart is what matters */ }
 }
 
 const CHANGELOG_MD = "docs/CHART_CHANGELOG.md";
