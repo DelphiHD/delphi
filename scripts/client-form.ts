@@ -518,6 +518,25 @@ const PAGE = /* html */ `<!doctype html>
   .li-done b { color:#0d9488; }
   .li-doing b { color:#f1c232; }
   .li-blocked b { color:#e06666; }
+  /* the list of everyone */
+  .tblwrap { overflow-x:auto; border:1px solid var(--line); border-radius:14px; background:#fff; }
+  table.ptable { width:100%; border-collapse:collapse; font-size:13px; }
+  table.ptable th, table.ptable td { text-align:left; padding:9px 13px; border-top:1px solid var(--line); white-space:nowrap; }
+  table.ptable thead th { border-top:0; background:rgba(132,80,149,.06); cursor:pointer; user-select:none;
+    font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--purple); font-weight:600; }
+  table.ptable thead th:hover { background:rgba(132,80,149,.12); }
+  table.ptable thead th.on { color:var(--ink); }
+  table.ptable tbody tr:hover { background:rgba(132,80,149,.04); }
+  table.ptable tr.off td { opacity:.45; text-decoration:line-through; }
+  table.ptable a { color:var(--purple); }
+  .tnum { font-variant-numeric:tabular-nums; }
+  /* where everything lives */
+  .links { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; margin:12px 0 6px; }
+  .linkcard { display:block; background:#fff; border:1px solid var(--line); border-radius:14px;
+    padding:12px 14px; text-decoration:none; color:inherit; }
+  .linkcard:hover { border-color:var(--purple); }
+  .linkcard b { display:block; color:var(--purple); font-size:13px; margin-bottom:2px; }
+  .linkcard span { font-size:11.5px; opacity:.6; line-height:1.45; display:block; }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--ink);
     font-family:Montserrat,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
@@ -683,7 +702,26 @@ const PAGE = /* html */ `<!doctype html>
 
 <div class="dash" id="launch" hidden>
   <h1 style="margin-bottom:2px">Launch</h1>
-  <p class="sub">The client portal, phase by phase.</p>
+  <p class="sub">The client portal, phase by phase. Everything else you might need is linked below.</p>
+  <h2>Where everything lives</h2>
+  <div class="links">
+    <a class="linkcard" href="https://claude.ai/code/artifact/3428e24e-262a-4fd7-86a6-93468244cb44" target="_blank" rel="noreferrer">
+      <b>The launch brief</b><span>Phases, pricing and what everything costs. Tap a task to change its status.</span></a>
+    <a class="linkcard" href="https://charts.delphihd.com" target="_blank" rel="noreferrer">
+      <b>Published charts</b><span>Where every client chart is served from.</span></a>
+    <a class="linkcard" href="https://cal.com/DelphiHumanDesign" target="_blank" rel="noreferrer">
+      <b>Booking and payments</b><span>Your three session types. Stripe takes payment on booking.</span></a>
+    <a class="linkcard" href="https://dashboard.stripe.com" target="_blank" rel="noreferrer">
+      <b>Stripe</b><span>The money itself.</span></a>
+    <a class="linkcard" href="https://supabase.com/dashboard" target="_blank" rel="noreferrer">
+      <b>Supabase</b><span>Accounts, charts, the library and the daily reads.</span></a>
+    <a class="linkcard" href="https://vercel.com/dashboard" target="_blank" rel="noreferrer">
+      <b>Vercel</b><span>The website and the API the charts call.</span></a>
+    <a class="linkcard" href="https://www.notion.so" target="_blank" rel="noreferrer">
+      <b>Notion</b><span>Your source library. Everything the reports are written from.</span></a>
+    <a class="linkcard" href="https://delphihd.com" target="_blank" rel="noreferrer">
+      <b>Your website</b><span>The live Wix site. The chart tool gets replaced here.</span></a>
+  </div>
   <div id="launchBody"></div>
 </div>
 
@@ -838,7 +876,7 @@ const PAGE = /* html */ `<!doctype html>
         '<div class="mlab">' + esc(label) + '</div>' +
         (note ? '<div class="mnote">' + esc(note) + '</div>' : '') + '</div>';
     };
-    el.innerHTML =
+    var head =
       '<div class="mgrid">' +
       card('Accounts', j.accounts, 'people who signed up') +
       card('Clients', j.clients, 'have a written report') +
@@ -852,6 +890,96 @@ const PAGE = /* html */ `<!doctype html>
         ? '<h2>Not wired yet</h2><ul class="plain">' +
           j.notWired.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul>'
         : '');
+    el.innerHTML = head + '<h2>Everyone <span class="sub" id="peopleCount"></span></h2>' +
+      '<div class="row" style="margin:0 0 8px">' +
+      '<button type="button" class="ghost" id="copyEmails">Copy every email</button>' +
+      '<button type="button" class="ghost" id="downloadCsv">Download as a spreadsheet</button>' +
+      '</div><div id="peopleTable"><p class="sub">Reading…</p></div>';
+    loadPeople();
+  }
+
+  // ---- the list of everyone -------------------------------------------------
+  var PEOPLE = [], SORT = { key: 'name', dir: 1 };
+  var COLS = [
+    { key: 'name',    label: 'Name' },
+    { key: 'email',   label: 'Email' },
+    { key: 'source',  label: 'How they got here' },
+    { key: 'joined',  label: 'Since' },
+    { key: 'reports', label: 'Reports' },
+    { key: 'chart',   label: 'Chart' }
+  ];
+  async function loadPeople() {
+    var box = document.getElementById('peopleTable');
+    try {
+      var j = await (await fetch('/people')).json();
+      if (j.error) { box.innerHTML = '<p class="sub">' + esc(j.error) + '</p>'; return; }
+      PEOPLE = j.people || [];
+    } catch (e) { box.innerHTML = '<p class="sub">Could not read the list.</p>'; return; }
+    drawPeople();
+  }
+  function drawPeople() {
+    var box = document.getElementById('peopleTable');
+    var rows = PEOPLE.slice().sort(function (a, b) {
+      var x = a[SORT.key], y = b[SORT.key];
+      if (x === null || x === undefined || x === '') return 1;
+      if (y === null || y === undefined || y === '') return -1;
+      return String(x).localeCompare(String(y), undefined, { numeric: true }) * SORT.dir;
+    });
+    var count = document.getElementById('peopleCount');
+    if (count) {
+      var signups = PEOPLE.filter(function (p) { return p.source === 'signup'; }).length;
+      count.textContent = PEOPLE.length + ' people · ' + signups + ' signed up · ' +
+        (PEOPLE.length - signups) + ' on the roster';
+    }
+    box.innerHTML = '<div class="tblwrap"><table class="ptable"><thead><tr>' +
+      COLS.map(function (c) {
+        var on = SORT.key === c.key;
+        return '<th data-k="' + c.key + '" class="' + (on ? 'on' : '') + '">' + esc(c.label) +
+          (on ? (SORT.dir > 0 ? ' ↑' : ' ↓') : '') + '</th>';
+      }).join('') + '</tr></thead><tbody>' +
+      rows.map(function (p) {
+        return '<tr' + (p.revoked ? ' class="off"' : '') + '>' +
+          '<td>' + esc(p.name) + '</td>' +
+          '<td>' + (p.email ? '<a href="mailto:' + esc(p.email) + '">' + esc(p.email) + '</a>' : '<span class="sub">—</span>') + '</td>' +
+          '<td>' + (p.source === 'signup' ? 'Signed up' : 'Roster') + '</td>' +
+          '<td class="tnum">' + (p.joined ? esc(String(p.joined).slice(0, 10)) : '—') + '</td>' +
+          '<td>' + (p.reports === 'both' ? 'Both' : p.reports === 'none' ? '<span class="sub">none</span>' : esc(p.reports)) + '</td>' +
+          '<td>' + (p.chart ? '<a href="' + esc(p.chart) + '" target="_blank" rel="noreferrer">open</a>' : '<span class="sub">—</span>') + '</td>' +
+          '</tr>';
+      }).join('') + '</tbody></table></div>';
+    [].forEach.call(box.querySelectorAll('th[data-k]'), function (th) {
+      th.onclick = function () {
+        var k = th.dataset.k;
+        SORT.dir = (SORT.key === k) ? -SORT.dir : 1;
+        SORT.key = k;
+        drawPeople();
+      };
+    });
+    var copy = document.getElementById('copyEmails');
+    if (copy) copy.onclick = function () {
+      var list = PEOPLE.map(function (p) { return p.email; }).filter(Boolean).join(', ');
+      if (!list) { copy.textContent = 'No emails yet'; return; }
+      navigator.clipboard.writeText(list).then(function () {
+        copy.textContent = 'Copied ' + list.split(',').length + ' emails';
+        setTimeout(function () { copy.textContent = 'Copy every email'; }, 2200);
+      });
+    };
+    var csv = document.getElementById('downloadCsv');
+    if (csv) csv.onclick = function () {
+      var q = function (v) { return '"' + String(v === null || v === undefined ? '' : v).replace(/"/g, '""') + '"'; };
+      // no backslash escapes in this file: it lives inside a template literal
+      // and they are eaten before the browser ever sees them
+      var NL = String.fromCharCode(10);
+      var lines = [COLS.map(function (c) { return q(c.label); }).join(',')];
+      PEOPLE.forEach(function (p) {
+        lines.push(COLS.map(function (c) { return q(p[c.key]); }).join(','));
+      });
+      var text = lines.join(NL);
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv' }));
+      a.download = 'delphi-people.csv';
+      a.click();
+    };
   }
 
   // ---- Launch plan --------------------------------------------------------
@@ -1489,6 +1617,74 @@ createServer((req, res) => {
           subs === null ? "subscriptions (Phase 4)" : null,
           "bookings (Cal.com is not connected to this dashboard)",
         ].filter(Boolean);
+      } catch (e) {
+        out.error = e instanceof Error ? e.message : String(e);
+      }
+      res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      res.end(JSON.stringify(out));
+    })();
+    return;
+  }
+
+  // Every person we know about, in one list: who they are, how to reach them,
+  // where they came from and what they have. Two sources today, because an
+  // account is not yet linked to a chart; that link arrives with the charts
+  // table in Phase 1 and this merges on it then.
+  if (req.method === "GET" && path === "/people") {
+    void (async () => {
+      const out: Record<string, unknown> = { people: [] };
+      try {
+        const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        if (!url || !key) throw new Error("no Supabase credentials in this shell");
+        const { createClient } = await import("@supabase/supabase-js");
+        const db = createClient(url, key, { auth: { persistSession: false } });
+
+        const { data: charts } = await db.from("client_charts")
+          .select("client_slug, client_name, token, created_at, revoked_at");
+        const { data: accounts } = await db.from("profiles")
+          .select("email, full_name, created_at");
+
+        // which reports each person actually has
+        const reports: Record<string, Set<string>> = {};
+        if (existsSync(".cache/reports")) {
+          for (const f of readdirSync(".cache/reports")) {
+            const m = f.match(/^(.+?)-(foundation|planetary)\.md$/);
+            if (m) (reports[m[1]] = reports[m[1]] ?? new Set()).add(m[2]);
+          }
+        }
+
+        type Person = {
+          name: string; email: string | null; source: string; joined: string | null;
+          chart: string | null; reports: string; revoked: boolean;
+        };
+        const people: Person[] = [];
+        for (const c of charts ?? []) {
+          const got = reports[c.client_slug] ?? new Set<string>();
+          people.push({
+            name: c.client_name ?? c.client_slug,
+            email: null,
+            source: "roster",
+            joined: c.created_at ?? null,
+            chart: c.token ? `https://charts.delphihd.com/c/${c.token}` : null,
+            reports: got.size === 2 ? "both" : got.size === 1 ? [...got][0] : "none",
+            revoked: !!c.revoked_at,
+          });
+        }
+        const named = new Set(people.map((p) => p.name.toLowerCase()));
+        for (const a of accounts ?? []) {
+          const nm = a.full_name ?? (a.email ?? "").split("@")[0];
+          // an account whose name already appears on the roster is the same
+          // person, so fill in their email rather than listing them twice
+          const hit = people.find((p) => p.name.toLowerCase() === String(nm).toLowerCase());
+          if (hit) { hit.email = a.email ?? null; continue; }
+          people.push({
+            name: nm, email: a.email ?? null, source: "signup",
+            joined: a.created_at ?? null, chart: null, reports: "none", revoked: false,
+          });
+          named.add(String(nm).toLowerCase());
+        }
+        out.people = people;
       } catch (e) {
         out.error = e instanceof Error ? e.message : String(e);
       }
