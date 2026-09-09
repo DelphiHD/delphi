@@ -40,6 +40,7 @@ import { join } from "node:path";
 import { CHANNELS } from "@/lib/hd/channels";
 import { CENTER_GATES, centerOf, type Center } from "@/lib/hd/gate-center";
 import { loadLibraryChunks } from "@/lib/hd/chunks-source";
+import { cacheDir, cacheRoot, tryMkdir } from "@/lib/cache-dir";
 import { chartByToken, briefFromRecord } from "@/lib/hd/chart-record";
 import { longitudeOf, GATE_RANGES, GATE_ARC_DEGREES, LINE_ARC_DEGREES } from "@/lib/hd/gate-longitude";
 import type { CenterName } from "@/lib/chart/types";
@@ -352,7 +353,7 @@ function elementsIn(body: string, idPrefix: string): Map<string, El> {
 }
 
 // ── the branded blank bodygraph ─────────────────────────────────────────────
-const BLANK_CACHE = ".cache/blank-bodygraph.svg";
+const BLANK_CACHE = join(cacheRoot(), "blank-bodygraph.svg");
 
 async function blankBodygraph(): Promise<string> {
   if (existsSync(BLANK_CACHE) && !process.env.ENERGY_REFETCH) {
@@ -368,7 +369,7 @@ async function blankBodygraph(): Promise<string> {
   if (!svg || !svg.includes("<svg")) {
     throw new Error("mybodygraph returned no branded SVG (design=delphi). Cannot build the diagram.");
   }
-  mkdirSync(".cache", { recursive: true });
+  if (!tryMkdir(cacheRoot())) return svg;
   writeFileSync(BLANK_CACHE, svg);
   return svg;
 }
@@ -517,7 +518,7 @@ function paintCenters(
  *  cast once and reused for every client and every rebuild after. Kaycee's plan
  *  has unlimited charts, so this is about speed, not money. */
 async function skyForDate(date: string, time: string): Promise<{ planet: string; gate: number; line: number; fixingState: string }[]> {
-  const dir = join(".cache", "transits");
+  const dir = cacheDir("transits");
   const file = join(dir, `sky-${date}-${time.replace(":", "")}.json`);
   if (existsSync(file)) {
     try { return JSON.parse(readFileSync(file, "utf8")); } catch { /* fall through and re-cast */ }
@@ -1714,7 +1715,7 @@ function favicon(): string {
 // "ENOENT: mkdir '.cache/fonts'". Kaycee, from her phone, 2026-09-09.
 // Montserrat is under the Open Font License, so it travels with the repo.
 const FONT_BUNDLED = "assets/fonts";
-const FONT_DIR = ".cache/fonts";
+const FONT_DIR = join(cacheRoot(), "fonts");
 const FONT_WEIGHTS = [400, 600];
 
 /** Where this weight actually is, bundled first. */
@@ -6762,8 +6763,14 @@ function recordChange(
 
   const entry = { at, slug: client.slug, client: client.name, what, rollback: rolledFrom };
 
-  mkdirSync(".cache/charts", { recursive: true });
-  appendFileSync(".cache/charts/changelog.jsonl", `${JSON.stringify(entry)}\n`, "utf8");
+  // A note in a log, which is not worth a chart. On a server there is nowhere
+  // to write it and that must not be fatal.
+  const dir = cacheDir("charts");
+  if (tryMkdir(dir)) {
+    try {
+      appendFileSync(join(dir, "changelog.jsonl"), `${JSON.stringify(entry)}\n`, "utf8");
+    } catch { /* the chart matters; the note does not */ }
+  }
 
   const day = at.slice(0, 10);
   const time = at.slice(11, 16);

@@ -12,6 +12,8 @@
  */
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { cacheRoot, tryMkdir } from "@/lib/cache-dir";
 
 const API_BASE = "https://api.bodygraphchart.com";
 const ASTRO_PATH = "/v240815/astro-data";
@@ -91,7 +93,7 @@ export interface AstroChart {
  * the provider and the coordinates come from OpenStreetMap, cached on disk so a
  * place is only ever looked up once.
  */
-const GEO_CACHE = ".cache/geocode.json";
+const GEO_CACHE = join(cacheRoot(), "geocode.json");
 
 /** Kaycee's own words. A sign on the wheel is a sign, not a claim about whoever
  *  is reading, so these are written about the sign itself. Her copy, verbatim. */
@@ -144,8 +146,7 @@ async function geocode(query: string): Promise<{ lat: number; lon: number }> {
   // filesystem is read-only and this threw, which took down the whole chart
   // for a reason that had nothing to do with the chart.
   try {
-    mkdirSync(".cache", { recursive: true });
-    writeFileSync(GEO_CACHE, JSON.stringify(cache, null, 2));
+    if (tryMkdir(cacheRoot())) writeFileSync(GEO_CACHE, JSON.stringify(cache, null, 2));
   } catch { /* in-memory for this request is enough */ }
   return out;
 }

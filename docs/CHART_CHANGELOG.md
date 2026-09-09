@@ -179,3 +179,10 @@ was kept and can be restored.
 | 2026-09-09 23:09 | Sarah Gallardo | page only | yes |
 | 2026-09-09 23:09 | Lance Wall | page only | yes |
 | 2026-09-09 23:09 | Daniela Montoya | page only | yes |
+| 2026-09-09 23:09 | David Whiting | page only | yes |
+| 2026-09-09 23:09 | Patrick Johns | page only | yes |
+| 2026-09-09 23:10 | Joseph Jaxin Vandenberg | page only | yes |
+| 2026-09-09 23:10 | Tori Tarver | page only | yes |
+| 2026-09-09 23:10 | Brett Bradshaw | page only | yes |
+| 2026-09-09 23:10 | Sir Alexander Smartwood III | page only | yes |
+| 2026-09-09 23:10 | Lisa Bradshaw | page only | yes |
