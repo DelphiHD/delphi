@@ -12,9 +12,11 @@ name: Sync Notion to Supabase
 
 on:
   schedule:
-    # 5:30 UTC nightly. Master plan reserves 5:50 UTC for the Phase 4 cache
-    # warmer; we run 20 minutes earlier so the warmer hits fresh chunks.
-    - cron: "30 5 * * *"
+    # Weekly, Mondays at 5:30 UTC. Kaycee edits the library every few weeks, so
+    # a nightly run was sixty half-hour runs between edits: all risk, no benefit.
+    # Her own edits reach the database through Sync now on the dashboard; this is
+    # the net that catches anything she forgets to push.
+    - cron: "30 5 * * 1"
   workflow_dispatch: {}
 
 jobs:

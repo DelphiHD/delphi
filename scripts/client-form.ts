@@ -532,7 +532,13 @@ const PAGE = /* html */ `<!doctype html>
   .hbdetail { font-size:12px; margin-top:3px; font-variant-numeric:tabular-nums; }
   .hbcard.bad .hbdetail { color:#c0392b; font-weight:600; }
   .hbhead { width:100%; font-size:11px; letter-spacing:.1em; text-transform:uppercase;
-    opacity:.55; margin-bottom:-2px; }
+    opacity:.55; margin-bottom:-2px; display:flex; align-items:center; gap:10px; }
+  .hbbtn { font: inherit; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase;
+    font-weight:600; padding:4px 12px; border-radius:999px; border:1px solid var(--purple);
+    background:transparent; color:var(--purple); cursor:pointer; }
+  .hbbtn:hover { background:var(--purple); color:#fff; }
+  .hbbtn:disabled { opacity:.45; cursor:default; }
+  .hbsaid { text-transform:none; letter-spacing:0; font-size:11.5px; opacity:.75; }
   /* the list of everyone */
   .tblwrap { overflow-x:auto; border:1px solid var(--line); border-radius:14px; background:#fff; }
   table.ptable { width:100%; border-collapse:collapse; font-size:13px; }
@@ -891,7 +897,9 @@ const PAGE = /* html */ `<!doctype html>
     var bad = jobs.filter(function (x) { return x.ok === false; }).length;
     el.innerHTML = '<div class="hbhead">' +
       (bad ? bad + ' thing' + (bad > 1 ? 's' : '') + ' need' + (bad > 1 ? '' : 's') + ' a look'
-           : 'Everything ran') + '</div>' +
+           : 'Everything ran') +
+      '<button type="button" id="syncNow" class="hbbtn">Sync now</button>' +
+      '<span id="syncSaid" class="hbsaid"></span></div>' +
       jobs.map(function (x) {
         var cls = x.detail === 'running now' ? 'busy'
           : x.ok === true ? 'ok' : x.ok === false ? 'bad' : 'unknown';
@@ -900,6 +908,18 @@ const PAGE = /* html */ `<!doctype html>
           '<div class="hbwhat">' + esc(x.what) + '</div>' +
           '<div class="hbdetail">' + esc(x.detail) + '</div></div>';
       }).join('');
+    var btn = document.getElementById('syncNow');
+    if (btn) btn.onclick = async function () {
+      var said = document.getElementById('syncSaid');
+      btn.disabled = true;
+      said.textContent = 'Starting…';
+      try {
+        var r = await (await fetch('/sync-now', { method: 'POST' })).json();
+        said.textContent = r.message;
+        if (r.ok) setTimeout(loadHeartbeat, 6000);
+      } catch (e) { said.textContent = 'Could not start it.'; }
+      setTimeout(function () { btn.disabled = false; }, 8000);
+    };
   }
 
   // ---- Funnel ------------------------------------------------------------
@@ -1677,6 +1697,32 @@ createServer((req, res) => {
   // running has to be as visible as one that crashes: the nightly sync was
   // cancelled eighty times in a row and said nothing, because the only place it
   // spoke was a log file nobody opens. Kaycee, 2026-09-09.
+  // Sync now: Kaycee edits Notion, presses this, and watches the heartbeat.
+  // Runs in GitHub, not here, so it does not depend on this laptop staying awake.
+  if (req.method === "POST" && path === "/sync-now") {
+    void (async () => {
+      const say = (ok: boolean, message: string) => {
+        res.writeHead(ok ? 200 : 500, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+        res.end(JSON.stringify({ ok, message }));
+      };
+      try {
+        const { execFileSync } = await import("node:child_process");
+        const GH = [
+          `${process.env.HOME}/.local/bin/gh`,
+          "/opt/homebrew/bin/gh",
+          "/usr/local/bin/gh",
+          "gh",
+        ].find((c) => c === "gh" || existsSync(c))!;
+        execFileSync(GH, ["workflow", "run", "sync-notion.yml"],
+          { cwd: process.cwd(), encoding: "utf8", timeout: 20000 });
+        say(true, "Started. It takes about half an hour; watch the sync (cloud) card.");
+      } catch (e) {
+        say(false, e instanceof Error ? e.message : String(e));
+      }
+    })();
+    return;
+  }
+
   if (req.method === "GET" && path === "/heartbeat") {
     void (async () => {
       const out: { jobs: unknown[]; error?: string } = { jobs: [] };
@@ -1720,7 +1766,7 @@ createServer((req, res) => {
       // cloud sync was cancelled eighty nights running and never once "failed".
       const OVERDUE_HOURS = 26;
       for (const [agent, what, every] of [
-        ["sync", "Notion library into the database", "3:30am daily"],
+
         ["transit-report", "The day's transit report and everyone's read", "6:00am daily"],
         ["evening-echoes", "Evening Echoes", "6:00pm daily"],
         ["health-check", "Morning health digest", "5:00am daily"],
@@ -1759,7 +1805,7 @@ createServer((req, res) => {
         }[];
         if (r) {
           jobs.push({
-            name: "sync (cloud)", what: "The same sync, run by GitHub", every: "5:30am daily",
+            name: "sync", what: "Your Notion library into the database", every: "Mondays, or when you press Sync now",
             lastRun: r.createdAt,
             ok: r.status !== "completed" ? null : r.conclusion === "success",
             detail: r.status !== "completed" ? "running now"

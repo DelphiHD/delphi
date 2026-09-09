@@ -173,6 +173,14 @@
     {
       "on": "2026-09-09",
       "what": "The cloud library was six weeks stale (853 rows, last written 24 July) and four gates had unresolved Quarters. A full sync fixed both: 860 rows, all resolving. Found by comparing a database build against a file build."
+    },
+    {
+      "on": "2026-09-09",
+      "what": "The sync runs weekly in GitHub, plus a Sync now button on the dashboard. Kaycee edits the library every few weeks, so nightly was sixty half-hour runs between edits: all risk, no benefit."
+    },
+    {
+      "on": "2026-09-09",
+      "what": "The local 3:30am sync LaunchAgent is retired (moved to ~/Library/LaunchAgents/retired, not deleted). One sync, in the cloud."
     }
   ],
   "open": [
