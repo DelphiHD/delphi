@@ -1,0 +1,68 @@
+{
+  "project": "Client Portal",
+  "goal": "Free chart is the hook. Account required. Reports, extra charts and a subscription are what sells.",
+  "updated": "2026-09-09",
+  "event": { "label": "Kaycee's event", "date": "2026-09-16", "target": "Phase 1 live: self-serve free chart with account signup" },
+  "phases": [
+    {
+      "id": "p1",
+      "title": "Phase 1 — Free chart, self-serve",
+      "target": "2026-09-15",
+      "why": "A stranger on the website gets a real chart in ten seconds, in the cloud, and leaves an email behind.",
+      "items": [
+        { "id": "p1a", "title": "Chart builder reads the library from Supabase, not the local cache", "status": "todo", "note": "853 chunks already in the chunks table; same shape as the file. This is what takes the laptop out of the chart path." },
+        { "id": "p1b", "title": "Charts become database rows, not a hardcoded roster", "status": "todo", "note": "New table with RLS. Migrates the existing 37 in as rows owned by Kaycee. Needs her sign-off on the schema." },
+        { "id": "p1c", "title": "Chart builds run as a Vercel function", "status": "todo", "note": "About ten seconds a chart; Pro allows five minutes." },
+        { "id": "p1d", "title": "Public birth-details form with account signup", "status": "todo", "note": "Provider's own place lookup and pickers. Magic link, no password. Birth-time accuracy question: exact / approximate / unknown." },
+        { "id": "p1e", "title": "Free tier renders the Delphi Basic layer", "status": "todo", "note": "Centres use Delphi Defined/Undefined/Open Basic; channels use Delphi Free Chart. Gates have no Basic field yet, so the keynote stands in." },
+        { "id": "p1f", "title": "Paid content held back on the free tier", "status": "todo", "note": "Report prose becomes an unlock prompt. Daily transit read is subscriber-only." },
+        { "id": "p1g", "title": "Replace the chart tool on the Wix site with an embed", "status": "todo", "note": "Points at charts.delphihd.com. The apex never moves." }
+      ]
+    },
+    {
+      "id": "p2",
+      "title": "Phase 2 — Paid reports",
+      "target": "2026-09-23",
+      "why": "The chart they already own fills in with Kaycee's synthesis. Better than a PDF arriving.",
+      "items": [
+        { "id": "p2a", "title": "Inngest wired for long jobs", "status": "todo", "note": "Reports run seven minutes to two hours. Nothing on Vercel or Supabase holds a job that long." },
+        { "id": "p2b", "title": "Stripe checkout in the app", "status": "todo", "note": "Account and prices already exist on the Cal.com side. This is wiring, not setup." },
+        { "id": "p2c", "title": "Webhook as the source of truth for what someone owns", "status": "todo", "note": "Signature verified before any write. On its own branch, per the git policy." },
+        { "id": "p2d", "title": "Purchase triggers the report, chart republishes with it", "status": "todo" }
+      ]
+    },
+    {
+      "id": "p3",
+      "title": "Phase 3 — Charts for friends and family",
+      "target": "2026-09-30",
+      "why": "Highest margin item in the model. No LLM cost at all, just a chart.",
+      "items": [
+        { "id": "p3a", "title": "Buy a chart for someone else from inside the portal", "status": "todo" },
+        { "id": "p3b", "title": "Ownership and sharing rules", "status": "todo", "note": "Who can see a chart bought for them, and what happens if they make their own account." }
+      ]
+    },
+    {
+      "id": "p4",
+      "title": "Phase 4 — Subscription",
+      "target": "2026-10-07",
+      "why": "Unlimited charts plus the daily transit synthesis. Recurring revenue.",
+      "items": [
+        { "id": "p4a", "title": "Daily transit run moves to Vercel Cron", "status": "todo", "note": "Retires the LaunchAgents on the Mac." },
+        { "id": "p4b", "title": "Transit reads become subscriber-driven, not roster-driven", "status": "todo", "note": "Biggest downstream change in the plan. The existing 37 keep working throughout." },
+        { "id": "p4c", "title": "Subscription checkout and lifecycle", "status": "todo" }
+      ]
+    }
+  ],
+  "decided": [
+    { "on": "2026-09-09", "what": "Inngest for long-running jobs. Kaycee: \"I don't want to run anything.\"" },
+    { "on": "2026-09-09", "what": "Account required for a free chart, for email capture." },
+    { "on": "2026-09-09", "what": "Free basic chart is the hook, not a product. Supersedes the old INTENT line about not being a free chart calculator." },
+    { "on": "2026-09-09", "what": "Chart publishes first; the report is added to it on purchase." },
+    { "on": "2026-09-09", "what": "Money at the event goes through the existing booking page. No new payment code in launch week." }
+  ],
+  "open": [
+    { "what": "Prices: full synthesis, extra chart, monthly." },
+    { "what": "Charts table schema, including the birth-time accuracy field. Needs Kaycee's sign-off before the migration runs." },
+    { "what": "Whether to add a Delphi Basic field to the gates database in Notion." }
+  ]
+}

@@ -504,6 +504,20 @@ const PAGE = /* html */ `<!doctype html>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root { --purple:#845095; --ink:#1c1a2e; --line:rgba(132,80,149,.25); --bg:#faf7fb; }
+  /* Funnel and Launch: one card per number, one line per task. */
+  .mgrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:12px 0 4px; }
+  .mcard { background:#fff; border:1px solid var(--line); border-radius:14px; padding:12px 14px; }
+  .mval { font-size:26px; font-weight:600; color:var(--purple); font-variant-numeric:tabular-nums; line-height:1.1; }
+  .mlab { font-size:11px; letter-spacing:.09em; text-transform:uppercase; opacity:.6; margin-top:4px; }
+  .mnote { font-size:11.5px; opacity:.6; margin-top:4px; line-height:1.45; }
+  ul.plain { list-style:none; padding:0; margin:6px 0 14px; }
+  ul.plain li { background:#fff; border:1px solid var(--line); border-radius:12px;
+    padding:9px 12px; margin-bottom:6px; font-size:13px; line-height:1.5; }
+  ul.plain li b { color:var(--purple); margin-right:6px; }
+  .li-done { opacity:.55; }
+  .li-done b { color:#0d9488; }
+  .li-doing b { color:#f1c232; }
+  .li-blocked b { color:#e06666; }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--ink);
     font-family:Montserrat,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
@@ -601,6 +615,8 @@ const PAGE = /* html */ `<!doctype html>
   <button type="button" class="tab" id="tabMetrics">Metrics</button>
   <button type="button" class="tab" id="tabFailures">Failures</button>
   <button type="button" class="tab" id="tabChanges">Changes</button>
+  <button type="button" class="tab" id="tabFunnel">Funnel</button>
+  <button type="button" class="tab" id="tabLaunch">Launch</button>
 </div>
 <div id="viewAdd">
 <h1>Add a Client</h1>
@@ -657,6 +673,18 @@ const PAGE = /* html */ `<!doctype html>
   <p class="sub">Every issue the validator has found, one line each. Hover an excerpt to read the whole thing.</p>
   <div class="row" style="margin-top:0" id="failFilters"></div>
   <div id="failTable"></div>
+</div>
+
+<div class="dash" id="funnel" hidden>
+  <h1 style="margin-bottom:2px">Funnel</h1>
+  <p class="sub">Accounts, clients and the gap between them. Numbers fill in as each phase lands.</p>
+  <div id="funnelBody"></div>
+</div>
+
+<div class="dash" id="launch" hidden>
+  <h1 style="margin-bottom:2px">Launch</h1>
+  <p class="sub">The client portal, phase by phase.</p>
+  <div id="launchBody"></div>
 </div>
 
 <div class="dash" id="changes" hidden>
@@ -794,6 +822,86 @@ const PAGE = /* html */ `<!doctype html>
   // every tile explains itself: what it is, and how it is worked out
   function tile(value, label, help) {
     return '<div class="tile" data-help="' + esc(help) + '"><b>' + value + '</b><span>' + esc(label) + '</span></div>';
+  }
+
+  // ---- Funnel ------------------------------------------------------------
+  async function loadFunnel() {
+    var el = document.getElementById('funnelBody');
+    el.innerHTML = '<p class="sub">Reading…</p>';
+    var j;
+    try { j = await (await fetch('/funnel')).json(); }
+    catch (e) { el.innerHTML = '<p class="sub">Could not read the funnel.</p>'; return; }
+    if (j.error) { el.innerHTML = '<p class="sub">' + esc(j.error) + '</p>'; return; }
+    var n = function (v) { return (v === null || v === undefined) ? '—' : String(v); };
+    var card = function (label, value, note) {
+      return '<div class="mcard"><div class="mval">' + n(value) + '</div>' +
+        '<div class="mlab">' + esc(label) + '</div>' +
+        (note ? '<div class="mnote">' + esc(note) + '</div>' : '') + '</div>';
+    };
+    el.innerHTML =
+      '<div class="mgrid">' +
+      card('Accounts', j.accounts, 'people who signed up') +
+      card('Clients', j.clients, 'have a written report') +
+      card('Charts, no report', j.chartsNoReport, 'the upsell list') +
+      card('Charts published', j.charts, '') +
+      card('Purchases', j.orders, 'Phase 2') +
+      card('Subscribers', j.subscriptions, 'Phase 4') +
+      card('Conversion', j.conversion === null ? null : j.conversion + '%', 'accounts to clients') +
+      '</div>' +
+      (j.notWired && j.notWired.length
+        ? '<h2>Not wired yet</h2><ul class="plain">' +
+          j.notWired.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul>'
+        : '');
+  }
+
+  // ---- Launch plan --------------------------------------------------------
+  async function loadLaunch() {
+    var el = document.getElementById('launchBody');
+    el.innerHTML = '<p class="sub">Reading…</p>';
+    var j;
+    try { j = await (await fetch('/launch')).json(); }
+    catch (e) { el.innerHTML = '<p class="sub">Could not read the launch plan.</p>'; return; }
+    if (j.error) { el.innerHTML = '<p class="sub">' + esc(j.error) + '</p>'; return; }
+    var all = 0, done = 0;
+    (j.phases || []).forEach(function (p) {
+      (p.items || []).forEach(function (i) { all++; if (i.status === 'done') done++; });
+    });
+    var pct = all ? Math.round((done / all) * 100) : 0;
+    var days = null;
+    if (j.event && j.event.date) {
+      days = Math.round((new Date(j.event.date) - new Date()) / 86400000);
+    }
+    var html = '<div class="mgrid">' +
+      '<div class="mcard"><div class="mval">' + done + ' / ' + all + '</div><div class="mlab">tasks done</div>' +
+      '<div class="mnote">' + pct + '% of the plan</div></div>' +
+      (j.event ? '<div class="mcard"><div class="mval">' + (days === null ? '—' : days) + '</div>' +
+        '<div class="mlab">days to ' + esc(j.event.label || 'the event') + '</div>' +
+        '<div class="mnote">' + esc(j.event.target || '') + '</div></div>' : '') +
+      '</div>';
+    (j.phases || []).forEach(function (p) {
+      var pdone = (p.items || []).filter(function (i) { return i.status === 'done'; }).length;
+      html += '<h2>' + esc(p.title) + ' <span class="sub">' + pdone + '/' + (p.items || []).length +
+        (p.target ? ' &middot; target ' + esc(p.target) : '') + '</span></h2>';
+      if (p.why) html += '<p class="sub">' + esc(p.why) + '</p>';
+      html += '<ul class="plain">';
+      (p.items || []).forEach(function (i) {
+        var mark = i.status === 'done' ? '✓' : i.status === 'doing' ? '◐' : i.status === 'blocked' ? '✗' : '○';
+        html += '<li class="li-' + esc(i.status) + '"><b>' + mark + '</b> ' + esc(i.title) +
+          (i.note ? '<div class="mnote">' + esc(i.note) + '</div>' : '') + '</li>';
+      });
+      html += '</ul>';
+    });
+    if (j.decided && j.decided.length) {
+      html += '<h2>Decided</h2><ul class="plain">' + j.decided.map(function (d) {
+        return '<li>' + esc(d.what) + ' <span class="sub">' + esc(d.on) + '</span></li>';
+      }).join('') + '</ul>';
+    }
+    if (j.open && j.open.length) {
+      html += '<h2>Still open</h2><ul class="plain">' + j.open.map(function (d) {
+        return '<li>' + esc(d.what) + '</li>';
+      }).join('') + '</ul>';
+    }
+    el.innerHTML = html;
   }
 
   async function refresh() {
@@ -1151,14 +1259,18 @@ const PAGE = /* html */ `<!doctype html>
   refresh();
   setInterval(refresh, 5000);
 
-  var VIEWS = { add: 'viewAdd', status: 'dash', metrics: 'metrics', failures: 'failures', changes: 'changes' };
-  var TABS = { add: 'tabAdd', status: 'tabStatus', metrics: 'tabMetrics', failures: 'tabFailures', changes: 'tabChanges' };
+  var VIEWS = { add: 'viewAdd', status: 'dash', metrics: 'metrics', failures: 'failures', changes: 'changes',
+    funnel: 'funnel', launch: 'launch' };
+  var TABS = { add: 'tabAdd', status: 'tabStatus', metrics: 'tabMetrics', failures: 'tabFailures', changes: 'tabChanges',
+    funnel: 'tabFunnel', launch: 'tabLaunch' };
   function show(which) {
     Object.keys(VIEWS).forEach(function (k) {
       document.getElementById(VIEWS[k]).hidden = (k !== which);
       document.getElementById(TABS[k]).classList.toggle('on', k === which);
     });
-    if (which !== 'add') refresh();
+    if (which === 'funnel') loadFunnel();
+    else if (which === 'launch') loadLaunch();
+    else if (which !== 'add') refresh();
   }
   Object.keys(TABS).forEach(function (k) {
     document.getElementById(TABS[k]).onclick = function () { show(k); };
@@ -1168,6 +1280,8 @@ const PAGE = /* html */ `<!doctype html>
   if (location.hash === '#metrics') show('metrics');
   if (location.hash === '#failures') show('failures');
   if (location.hash === '#changes') show('changes');
+  if (location.hash === '#funnel') show('funnel');
+  if (location.hash === '#launch') show('launch');
 
   go.onclick = async function () {
     err.textContent = '';
@@ -1306,6 +1420,81 @@ createServer((req, res) => {
     saveJobs(keep);
     res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
     res.end(JSON.stringify({ dropped, left: keep.length }));
+    return;
+  }
+
+  // The launch plan, read from docs/launch-plan.json so it is version-controlled
+  // and moves with the work rather than living in a chat.
+  if (req.method === "GET" && path === "/launch") {
+    res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+    try {
+      res.end(readFileSync("docs/launch-plan.json", "utf8"));
+    } catch {
+      res.end(JSON.stringify({ error: "docs/launch-plan.json not found" }));
+    }
+    return;
+  }
+
+  // Who has an account, who is a paying client, and the gap between them. The
+  // metrics are defined now and fill in as each phase lands: a number that says
+  // "not wired yet" is more useful than a zero pretending to be a measurement.
+  if (req.method === "GET" && path === "/funnel") {
+    void (async () => {
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      const out: Record<string, unknown> = {};
+      try {
+        if (!url || !key) throw new Error("no Supabase credentials in this shell");
+        const { createClient } = await import("@supabase/supabase-js");
+        const db = createClient(url, key, { auth: { persistSession: false } });
+        const countOf = async (table: string) => {
+          const { count, error } = await db.from(table).select("*", { count: "exact", head: true });
+          return error ? null : count ?? 0;
+        };
+        const accounts = await countOf("profiles");
+        const orders = await countOf("orders");
+        const subs = await countOf("subscriptions");
+
+        // Charts that exist, and which of those people have a written report.
+        // Counting report FILES overcounts badly: 71 files, two per person plus
+        // hand-versioned drafts. The charts table is the roll of real people.
+        const { data: chartRows } = await db.from("client_charts")
+          .select("client_slug, revoked_at");
+        const live = (chartRows ?? []).filter((r: { revoked_at: string | null }) => !r.revoked_at);
+        const slugs = new Set(live.map((r: { client_slug: string }) => r.client_slug));
+        const withReports = new Set<string>();
+        const dir = ".cache/reports";
+        if (existsSync(dir)) {
+          for (const f of readdirSync(dir)) {
+            const m = f.match(/^(.+?)-(foundation|planetary)\.md$/);
+            if (m && slugs.has(m[1])) withReports.add(m[1]);
+          }
+        }
+
+        out.accounts = accounts;
+        out.charts = slugs.size;
+        out.clients = withReports.size;
+        out.chartsNoReport = slugs.size - withReports.size;
+        out.orders = orders;
+        out.subscriptions = subs;
+        // Accounts are not linked to charts until the charts table lands in
+        // Phase 1, so signup-to-client conversion is not measurable yet. A
+        // number here now would be an artefact of three test profiles, not a
+        // measurement.
+        out.freeAccounts = null;
+        out.conversion = null;
+        out.notWired = [
+          "signup to client conversion (needs the charts table, Phase 1)",
+          orders === null ? "purchases (no orders table yet, Phase 2)" : null,
+          subs === null ? "subscriptions (Phase 4)" : null,
+          "bookings (Cal.com is not connected to this dashboard)",
+        ].filter(Boolean);
+      } catch (e) {
+        out.error = e instanceof Error ? e.message : String(e);
+      }
+      res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      res.end(JSON.stringify(out));
+    })();
     return;
   }
 
