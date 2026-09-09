@@ -17,8 +17,8 @@
         {
           "id": "p1a",
           "title": "Chart builder reads the library from Supabase, not the local cache",
-          "status": "todo",
-          "note": "853 chunks already in the chunks table; same shape as the file. This is what takes the laptop out of the chart path."
+          "status": "done",
+          "note": "Done 9 September. Proved by building a chart with the local library moved away entirely. Notion multi-selects and relations are normalised so the database and the file produce byte-identical charts."
         },
         {
           "id": "p1b",
@@ -55,6 +55,13 @@
           "title": "Replace the chart tool on the Wix site with an embed",
           "status": "todo",
           "note": "Points at charts.delphihd.com. The apex never moves."
+        },
+        {
+          "id": "p1h",
+          "title": "Reach the dashboard from anywhere, not just this Mac",
+          "status": "todo",
+          "priority": "low",
+          "note": "It runs on the laptop today, so it is only visible while that laptop is on. Lower priority than the launch itself: Kaycee, 9 September."
         }
       ]
     },
@@ -162,6 +169,10 @@
     {
       "on": "2026-09-09",
       "what": "Signups and emails live in the database, shown on the dashboard. Not Notion: Notion is the source library, not a customer list."
+    },
+    {
+      "on": "2026-09-09",
+      "what": "The cloud library was six weeks stale (853 rows, last written 24 July) and four gates had unresolved Quarters. A full sync fixed both: 860 rows, all resolving. Found by comparing a database build against a file build."
     }
   ],
   "open": [

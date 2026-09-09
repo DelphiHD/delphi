@@ -38,6 +38,7 @@ import { join } from "node:path";
 
 import { CHANNELS } from "@/lib/hd/channels";
 import { CENTER_GATES, centerOf, type Center } from "@/lib/hd/gate-center";
+import { loadLibraryChunks } from "@/lib/hd/chunks-source";
 import { longitudeOf, GATE_RANGES, GATE_ARC_DEGREES, LINE_ARC_DEGREES } from "@/lib/hd/gate-longitude";
 import type { CenterName } from "@/lib/chart/types";
 import { gateName } from "@/lib/hd/gate-names";
@@ -1151,10 +1152,12 @@ interface Chunk {
   body?: string;
   metadata?: Record<string, string>;
 }
-function loadChunks(path = ".cache/chunks.json"): Chunk[] {
-  if (!existsSync(path)) throw new Error(`${path} not found — run the Notion sync first.`);
-  const d = JSON.parse(readFileSync(path, "utf8"));
-  return Array.isArray(d) ? d : (d.chunks ?? []);
+// The library comes from the chunks table when it can be reached, and from the
+// local dump otherwise, so a chart builds the same way here and on a server.
+// Set HD_LIBRARY_LOCAL=1 to force the local copy while working on a sync that
+// has not been pushed.
+async function loadChunks(): Promise<Chunk[]> {
+  return await loadLibraryChunks({ preferLocal: process.env.HD_LIBRARY_LOCAL === "1" });
 }
 
 function centerFunctions(chunks: Chunk[]): Record<Center, string[]> {
@@ -6816,7 +6819,7 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
     : join(process.env.HOME ?? "", "Desktop", "Mandala Renderer Output", "Educational");
   mkdirSync(outDir, { recursive: true });
 
-  const chunks = loadChunks();
+  const chunks = await loadChunks();
   const fn = centerFunctions(chunks);
   const biology = centerBiology(chunks);
   const circuits = channelCircuits(chunks);
