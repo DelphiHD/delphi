@@ -314,7 +314,10 @@ export default function ChartPage() {
           background: #fff; color: var(--ink); cursor: pointer; text-align: center;
           text-decoration: none;
         }
-        .go:hover { background: var(--purple); color: #fff; }
+        /* Gold is the action colour across Delphi: it is what the Reset button
+           on her dashboard wears. The pale throat yellow means "defined" on a
+           chart, which is a state rather than an invitation. */
+        .go:hover { background: var(--gold); color: var(--ink); }
         .go:disabled { opacity: 0.32; cursor: default; }
         .card.done h2 { font-weight: 300; font-size: 27px; color: #fff; margin: 0 0 12px; }
         .card.done p { color: rgba(255, 255, 255, 0.86); font-size: 14.5px; line-height: 1.65; }
