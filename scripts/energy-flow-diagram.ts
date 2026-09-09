@@ -6809,9 +6809,17 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
   return r.render().asPng();
 }
 
-(async () => {
+/**
+ * The builder, as something that can be called rather than only run.
+ *
+ * It was 7,000 lines inside a block that started itself, which is fine for a
+ * command and impossible for a web request. The body is unchanged: it takes the
+ * same arguments it always did, and the command line below hands it the same
+ * ones. What is new is that a server can ask for a chart too.
+ */
+export async function runBuilder(argv: string[] = process.argv.slice(2)): Promise<void> {
   // no argument: the teaching diagram. A client slug: that person's own chart.
-  const args = process.argv.slice(2);
+  const args = argv;
   const wantPublish = args.includes("--publish");
   const wantUnpublish = args.includes("--unpublish");
   // --with <slug> builds the Relationship module against that person. The pair is
@@ -7065,8 +7073,23 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
     console.log(`✓ link: ${link}`);
   }
 
-  const still = buildCanvas(PAPER, scene, { animate: false, legend: true });
-  writeFileSync(join(outDir, `${stem}.svg`), still);
-  writeFileSync(join(outDir, `${stem}.png`), await rasterize(still, 2360));
-  console.log(`✓ ${join(outDir, `${stem}.png`)}`);
-})();
+
+  // The still and its raster are Kaycee's deliverables, for her folder. A chart
+  // built for the website has nowhere to put them and no need of them, and the
+  // rasteriser is a native library that has no business inside a web request.
+  if (!args.includes("--no-png")) {
+    const still = buildCanvas(PAPER, scene, { animate: false, legend: true });
+    writeFileSync(join(outDir, `${stem}.svg`), still);
+    writeFileSync(join(outDir, `${stem}.png`), await rasterize(still, 2360));
+    console.log(`✓ ${join(outDir, `${stem}.png`)}`);
+  }
+}
+
+// Run when this file is the command, stay quiet when it is imported.
+if (process.argv[1] && process.argv[1].endsWith("energy-flow-diagram.ts")) {
+  runBuilder().catch((e) => {
+    console.error(e instanceof Error ? e.message : e);
+    process.exit(1);
+  });
+}
+
