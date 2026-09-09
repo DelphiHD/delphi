@@ -680,23 +680,35 @@ async function persistChunks(chunks: Chunk[]): Promise<void> {
     // a property renamed, a partial fetch. Writing it anyway is how a library
     // loses material silently, which is exactly what happened on 2026-09-09.
     // Louder is better: refuse, say what is missing, and change nothing.
-    const incoming = group.length;
-    const incomingMeta = group.filter((c) => Object.keys(c.metadata ?? {}).length).length;
+    // Page content and properties are both the material. Neither is ever the
+    // one to sacrifice, and a run that arrives short of either is a broken run,
+    // not a smaller library. Kaycee has had to say this more than once, so it is
+    // a mechanism here rather than a promise.
+    const measure = (rows: { body?: string | null; metadata?: Record<string, unknown> | null }[]) => ({
+      rows: rows.length,
+      withMeta: rows.filter((r) => Object.keys(r.metadata ?? {}).length).length,
+      withBody: rows.filter((r) => (r.body ?? "").trim().length > 0).length,
+      chars: rows.reduce((n, r) => n + (r.body ?? "").length, 0),
+    });
+    const incoming = measure(group);
     const { data: standing } = await supabase
       .from("chunks")
-      .select("metadata")
+      .select("body, metadata")
       .eq("source_kind", kind);
-    const standingCount = (standing ?? []).length;
-    const standingMeta = (standing ?? []).filter(
-      (r: { metadata?: Record<string, unknown> | null }) => Object.keys(r.metadata ?? {}).length,
-    ).length;
-    if (standingCount && (incoming < standingCount || incomingMeta < standingMeta)) {
-      throw new Error(
-        `refusing to overwrite ${kind}: the database holds ${standingCount} rows ` +
-        `(${standingMeta} with metadata) and this run produced ${incoming} ` +
-        `(${incomingMeta} with metadata). Nothing was changed. Check that every ` +
-        `${kind} page is still shared with the sync before running again.`,
-      );
+    const held = measure(standing ?? []);
+    if (held.rows) {
+      const short: string[] = [];
+      if (incoming.rows < held.rows) short.push(`rows ${incoming.rows} < ${held.rows}`);
+      if (incoming.withMeta < held.withMeta) short.push(`with metadata ${incoming.withMeta} < ${held.withMeta}`);
+      if (incoming.withBody < held.withBody) short.push(`with page content ${incoming.withBody} < ${held.withBody}`);
+      // a tenth of the words gone is a broken fetch, not an edit
+      if (incoming.chars < held.chars * 0.9) short.push(`characters ${incoming.chars} < ${held.chars}`);
+      if (short.length) {
+        throw new Error(
+          `refusing to overwrite ${kind}: ${short.join(", ")}. Nothing was changed. ` +
+          `Check that every ${kind} page is still shared with the sync, then run again.`,
+        );
+      }
     }
 
     // Delete old chunks of this kind, then insert the fresh batch. Atomic
@@ -751,19 +763,21 @@ async function persistChunks(chunks: Chunk[]): Promise<void> {
     // anything looking wrong.
     const { data: after } = await supabase
       .from("chunks")
-      .select("metadata")
+      .select("body, metadata")
       .eq("source_kind", kind);
-    const landed = (after ?? []).length;
-    const landedMeta = (after ?? []).filter(
-      (r: { metadata?: Record<string, unknown> | null }) => Object.keys(r.metadata ?? {}).length,
-    ).length;
-    if (landed !== incoming || landedMeta !== incomingMeta) {
+    const landed = measure(after ?? []);
+    if (landed.rows !== incoming.rows || landed.withMeta !== incoming.withMeta
+      || landed.withBody !== incoming.withBody || landed.chars !== incoming.chars) {
       throw new Error(
-        `${kind} did not land whole: sent ${incoming} rows (${incomingMeta} with ` +
-        `metadata), the database now holds ${landed} (${landedMeta} with metadata).`,
+        `${kind} did not land whole. Sent ${incoming.rows} rows, ${incoming.withMeta} ` +
+        `with metadata, ${incoming.withBody} with page content, ${incoming.chars} characters. ` +
+        `The database now holds ${landed.rows} / ${landed.withMeta} / ${landed.withBody} / ${landed.chars}.`,
       );
     }
-    process.stdout.write(` done (${landed} rows, ${landedMeta} with metadata)\n`);
+    process.stdout.write(
+      ` done (${landed.rows} rows, ${landed.withMeta} with metadata, ` +
+      `${landed.withBody} with page content)\n`,
+    );
   }
 }
 
