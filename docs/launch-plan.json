@@ -66,8 +66,8 @@
         {
           "id": "p1i",
           "title": "The chart itself has to work on a phone",
-          "status": "todo",
-          "note": "Checked at 375px on 9 September: the control panel lands on top of the logo, the bodygraph is pushed off screen, and the chart and view buttons are cut off. The layout puts the panel beside the canvas, which cannot hold at phone width. At an event people are on phones, so a free chart they cannot read is not a hook."
+          "status": "doing",
+          "note": "The bodygraph now stacks properly at 375px and reads well. Still to check on a real phone: tap behaviour for the mouseover cards, and the astrology wheel and composite at that width."
         }
       ]
     },

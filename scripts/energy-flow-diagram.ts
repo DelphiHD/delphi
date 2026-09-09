@@ -2597,6 +2597,17 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- What a shared link shows. Deliberately the brand rather than the chart:
+     a preview is cached and re-shown by every messaging app it passes through,
+     and somebody's bodygraph is their data, not a thumbnail. Kaycee noticed the
+     host's own logo showing when she pasted a link to her phone, 2026-09-09. -->
+<meta property="og:title" content="Delphi Human Design">
+<meta property="og:description" content="A Human Design chart, cast and drawn by Delphi.">
+<meta property="og:image" content="https://charts.delphihd.com/og.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Delphi Human Design">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://charts.delphihd.com/og.png">
 <title>${esc(d.client ? `${d.client.name} - Delphi Human Design` : "The Nine Centers and the Flow to the Throat")}</title>
 ${iconSrc ? `<link rel="icon" href="${iconSrc}">` : ""}
 <style>

@@ -16,6 +16,16 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Delphi Human Design",
   description: "Personalized Human Design readings.",
+  // Without these a shared link shows whatever the host offers, which is how
+  // Vercel's own mark ended up in the preview.
+  openGraph: {
+    title: "Delphi Human Design",
+    description: "A Human Design chart, cast and drawn by Delphi.",
+    siteName: "Delphi Human Design",
+    images: ["https://charts.delphihd.com/og.png"],
+    type: "website",
+  },
+  twitter: { card: "summary_large_image", images: ["https://charts.delphihd.com/og.png"] },
 };
 
 // Without this a phone renders the page at desktop width and shrinks it, so
