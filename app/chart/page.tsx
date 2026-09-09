@@ -46,7 +46,8 @@ export default function ChartPage() {
   const [options, setOptions] = useState<Place[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [result, setResult] = useState<{ url: string; account?: boolean } | null>(null);
+  const [result, setResult] = useState<
+    { url: string; account?: boolean; emailed?: boolean } | null>(null);
   const lookup = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // The place is never taken on trust: what the person types is only a search,
@@ -92,7 +93,7 @@ export default function ChartPage() {
       });
       const j = await r.json();
       if (!j.ok) throw new Error(j.error ?? "something went wrong");
-      setResult({ url: j.url, account: j.account });
+      setResult({ url: j.url, account: j.account, emailed: j.emailed });
     } catch (e) {
       setError(e instanceof Error ? e.message : "something went wrong");
     } finally {
@@ -113,9 +114,11 @@ export default function ChartPage() {
           </p>
           <a className="go" href={result.url}>Open My Chart</a>
           <p className="fine">
-            {result.account
-              ? `Saved to ${email}, so you can find it again later.`
-              : "Save the link: it is the only way back to this chart."}
+            {result.emailed
+              ? `Sent to ${email} as well, so you have it twice.`
+              : result.account
+                ? `Saved to ${email}, so you can find it again later.`
+                : "Save the link: it is the only way back to this chart."}
           </p>
         </section>
       ) : (

@@ -139,10 +139,23 @@ export async function POST(request: Request): Promise<Response> {
     return bad(`the chart could not be drawn: ${e instanceof Error ? e.message : e}`, 500);
   }
 
+  // The link, in their inbox, so closing the tab does not lose the chart. This
+  // happens after the chart exists and cannot undo it: mail is a convenience on
+  // top of something they are already looking at.
+  const chartUrl = `https://charts.delphihd.com/c/${token}`;
+  let emailed = false;
+  if (emailGiven) {
+    const { sendChartEmail } = await import("@/lib/email");
+    const sent = await sendChartEmail({ to: emailGiven, name, url: chartUrl });
+    emailed = sent.sent;
+    if (!sent.sent && sent.reason) console.warn(`chart ${token}: not emailed — ${sent.reason}`);
+  }
+
   return Response.json({
     ok: true,
     token,
-    url: `https://charts.delphihd.com/c/${token}`,
+    url: chartUrl,
     account: !!ownerId,
+    emailed,
   });
 }
