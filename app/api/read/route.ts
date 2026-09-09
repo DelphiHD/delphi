@@ -38,6 +38,36 @@ export async function GET(request: Request) {
     .maybeSingle();
   if (chartErr || !chart || chart.revoked_at) return bad("unknown chart", 404);
 
+  // The day's reading is the subscription's whole draw, so it is not part of a
+  // free chart. Kaycee's own roster keeps it: those charts predate the portal
+  // and those people are her clients, not signups.
+  //
+  // Anyone else needs a live subscription. There are none yet, which is the
+  // honest answer for now rather than a placeholder that quietly says yes.
+  const { data: record } = await db
+    .from("charts")
+    .select("tier, owner_id")
+    .eq("token", token)
+    .maybeSingle();
+  const entitled = await (async () => {
+    if (!record) return true;              // predates the charts table: her own
+    if (record.tier === "seed") return true;
+    if (!record.owner_id) return false;
+    const { data: sub } = await db
+      .from("subscriptions")
+      .select("status")
+      .eq("user_id", record.owner_id)
+      .in("status", ["active", "trialing"])
+      .maybeSingle();
+    return !!sub;
+  })().catch(() => false);
+  if (!entitled) {
+    // Not an error and not an empty day: this chart is simply not one that
+    // carries a reading, and the page hides the section rather than showing a
+    // gap where somebody else's words would be.
+    return NextResponse.json({ ok: true, date, read: null, entitled: false });
+  }
+
   const { data, error } = await db
     .from("transit_reads")
     .select("date, written_at, paragraph, completions")

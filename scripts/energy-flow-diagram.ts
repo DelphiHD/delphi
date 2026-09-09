@@ -4076,6 +4076,7 @@ if (DATA.client) {
         return r.json();
       }).then(function (j) {
         if (!j || !j.ok) throw new Error('no read');
+        if (j.entitled === false) READ_ENTITLED = false;
         readCache[d] = j.read || null;
         if (readWanted === d) renderRead(j.read || null, d);
       }).catch(function (err) {
@@ -4104,6 +4105,9 @@ if (DATA.client) {
   /** Paint one day's read into the TODAY section. Called for the day the chart
    *  was built with, and again whenever the date picker lands on a day Kaycee
    *  has written a report for. */
+  // Set by the endpoint the first time it answers: whether this chart carries
+  // written readings at all, as opposed to today simply not having one.
+  var READ_ENTITLED = null;
   function renderRead(R, forDate) {
     var lab0 = document.getElementById('todaylab');
     var readEl = document.getElementById('todayread');
@@ -4118,8 +4122,16 @@ if (DATA.client) {
     if (survey) survey.style.display = R ? '' : 'none';
     if (!R) {
       lab0.textContent = shortDate(day);
-      readEl.innerHTML = '<div class="noread">No written read for this day. ' +
-        "The chart above still shows that day's sky.</div>";
+      // Two different silences. A day Kaycee has not written is ordinary. A
+      // chart that does not carry readings at all is not missing anything: it
+      // is a free chart, and this is what the subscription is for.
+      readEl.innerHTML = (READ_ENTITLED === false)
+        ? '<div class="noread">The sky above is today&rsquo;s, and it moves every day. ' +
+          'A written reading of what it is doing to <b>your</b> chart, each morning, ' +
+          'comes with a subscription. ' +
+          '<a href="https://cal.com/DelphiHumanDesign" target="_blank" rel="noreferrer">Ask Kaycee</a>.</div>'
+        : '<div class="noread">No written read for this day. ' +
+          "The chart above still shows that day's sky.</div>";
       listEl.innerHTML = '';
       return;
     }
