@@ -20,7 +20,11 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Every scheduled run from June and July was cancelled at exactly 20 minutes:
+    # the walk needs longer than the cap it was given, so the nightly sync has
+    # never once completed and the database sat on 24 July material for six
+    # weeks. GitHub allows six hours.
+    timeout-minutes: 60
     concurrency:
       group: sync-notion
       cancel-in-progress: false

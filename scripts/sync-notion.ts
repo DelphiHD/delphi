@@ -734,7 +734,10 @@ async function persistChunks(chunks: Chunk[]): Promise<void> {
         // this was written left the database with bodies and no properties.
         // Kaycee, 2026-09-09: "EVERY BIT OF METADATA AND PAGE CONTENT IS
         // IMPORTANT, IT'S THE ENTIRE BACKBONE OF THE OPERATION."
-        metadata: c.metadata,
+        // Empty object, never null: the column is NOT NULL, and the 448 line
+        // records carry no properties of their own. Passing null through cost
+        // every line row on 2026-09-09.
+        metadata: c.metadata ?? {},
         embedding: c.embedding,
       }));
       const { error: insErr } = await supabase.from("chunks").insert(slice);
