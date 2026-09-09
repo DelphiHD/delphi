@@ -674,6 +674,31 @@ async function persistChunks(chunks: Chunk[]): Promise<void> {
   for (const [kind, group] of byKind) {
     process.stdout.write(`  persisting ${group.length} ${kind} chunks…`);
 
+    // Never delete more than we are about to replace. This sync deletes a whole
+    // source_kind and re-inserts it, so a batch that arrives thinner than what
+    // is already stored means something upstream failed: a Notion page unshared,
+    // a property renamed, a partial fetch. Writing it anyway is how a library
+    // loses material silently, which is exactly what happened on 2026-09-09.
+    // Louder is better: refuse, say what is missing, and change nothing.
+    const incoming = group.length;
+    const incomingMeta = group.filter((c) => Object.keys(c.metadata ?? {}).length).length;
+    const { data: standing } = await supabase
+      .from("chunks")
+      .select("metadata")
+      .eq("source_kind", kind);
+    const standingCount = (standing ?? []).length;
+    const standingMeta = (standing ?? []).filter(
+      (r: { metadata?: Record<string, unknown> | null }) => Object.keys(r.metadata ?? {}).length,
+    ).length;
+    if (standingCount && (incoming < standingCount || incomingMeta < standingMeta)) {
+      throw new Error(
+        `refusing to overwrite ${kind}: the database holds ${standingCount} rows ` +
+        `(${standingMeta} with metadata) and this run produced ${incoming} ` +
+        `(${incomingMeta} with metadata). Nothing was changed. Check that every ` +
+        `${kind} page is still shared with the sync before running again.`,
+      );
+    }
+
     // Delete old chunks of this kind, then insert the fresh batch. Atomic
     // would be nicer but PostgREST doesn't expose transactions; in practice a
     // brief gap during the swap is acceptable (sync runs at off-hours).
@@ -703,6 +728,13 @@ async function persistChunks(chunks: Chunk[]): Promise<void> {
         tokens: c.tokens,
         gate_number: c.gate_number,
         line_number: c.line_number,
+        // Every property off the Notion page. This column was missing from the
+        // insert, so the sync captured metadata, wrote it into the local
+        // checkpoint, and dropped it on the way to Postgres: every run since
+        // this was written left the database with bodies and no properties.
+        // Kaycee, 2026-09-09: "EVERY BIT OF METADATA AND PAGE CONTENT IS
+        // IMPORTANT, IT'S THE ENTIRE BACKBONE OF THE OPERATION."
+        metadata: c.metadata,
         embedding: c.embedding,
       }));
       const { error: insErr } = await supabase.from("chunks").insert(slice);
@@ -711,7 +743,24 @@ async function persistChunks(chunks: Chunk[]): Promise<void> {
         throw insErr;
       }
     }
-    process.stdout.write(" done\n");
+    // Read back what actually landed. An insert that reports no error can still
+    // have written a column short, which is how metadata went missing without
+    // anything looking wrong.
+    const { data: after } = await supabase
+      .from("chunks")
+      .select("metadata")
+      .eq("source_kind", kind);
+    const landed = (after ?? []).length;
+    const landedMeta = (after ?? []).filter(
+      (r: { metadata?: Record<string, unknown> | null }) => Object.keys(r.metadata ?? {}).length,
+    ).length;
+    if (landed !== incoming || landedMeta !== incomingMeta) {
+      throw new Error(
+        `${kind} did not land whole: sent ${incoming} rows (${incomingMeta} with ` +
+        `metadata), the database now holds ${landed} (${landedMeta} with metadata).`,
+      );
+    }
+    process.stdout.write(` done (${landed} rows, ${landedMeta} with metadata)\n`);
   }
 }
 
