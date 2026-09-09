@@ -70,6 +70,32 @@ export async function POST(request: Request): Promise<Response> {
   if (!url || !key) return bad("this server cannot reach the database", 500);
   const db = createClient(url, key, { auth: { persistSession: false } });
 
+  // The account, made now rather than when they click something in an email.
+  // Their address is the hook's whole purpose, and a signup that depends on an
+  // email arriving is a signup that half of them never complete. No password:
+  // they come back through a magic link when we can send one.
+  const emailGiven = (body.forEmail ?? "").trim().toLowerCase();
+  let ownerId: string | null = null;
+  if (emailGiven) {
+    try {
+      const made = await db.auth.admin.createUser({
+        email: emailGiven,
+        email_confirm: true,
+        user_metadata: { full_name: name, source: "free chart" },
+      });
+      if (made.data.user) ownerId = made.data.user.id;
+      // Already here: this is somebody's second chart, or a client Kaycee
+      // already knows. Find them rather than refusing them.
+      if (!ownerId && made.error) {
+        const { data: list } = await db.auth.admin.listUsers({ page: 1, perPage: 200 });
+        ownerId = list?.users.find((u) => (u.email ?? "").toLowerCase() === emailGiven)?.id ?? null;
+      }
+    } catch {
+      // An account that cannot be made must not cost somebody their chart.
+      ownerId = null;
+    }
+  }
+
   // 32 hex characters, the same shape every existing link has.
   const token = randomBytes(16).toString("hex");
   const storagePath = `${token}.html`;
@@ -85,6 +111,7 @@ export async function POST(request: Request): Promise<Response> {
   if (linkErr) return bad(`could not reserve a link: ${linkErr.message}`, 500);
 
   const { error: chartErr } = await db.from("charts").insert({
+    owner_id: ownerId,
     person_name: name,
     birth_date: birthDate,
     birth_time: timeAccuracy === "unknown" ? null : birthTime,
@@ -116,5 +143,6 @@ export async function POST(request: Request): Promise<Response> {
     ok: true,
     token,
     url: `https://charts.delphihd.com/c/${token}`,
+    account: !!ownerId,
   });
 }

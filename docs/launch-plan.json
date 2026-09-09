@@ -36,7 +36,7 @@
           "id": "p1d",
           "title": "Public birth-details form with account signup",
           "status": "doing",
-          "note": "The form is built at /chart: place chosen from the provider's lookup, birth time asked honestly with a part-of-day fallback, long-form birth certificate guidance and a rectification booking link. Still to add: the account itself, magic link rather than just an email field."
+          "note": "The form is built at /chart: place chosen from the provider's lookup, birth time asked honestly with a part-of-day fallback, long-form birth certificate guidance and a rectification booking link. Still to add: the account itself, magic link rather than just an email field. Mobile: inputs are 16px so Safari does not zoom on focus, and the app declares a viewport."
         },
         {
           "id": "p1e",
@@ -62,6 +62,12 @@
           "status": "todo",
           "priority": "low",
           "note": "It runs on the laptop today, so it is only visible while that laptop is on. Lower priority than the launch itself: Kaycee, 9 September."
+        },
+        {
+          "id": "p1i",
+          "title": "The chart itself has to work on a phone",
+          "status": "todo",
+          "note": "Checked at 375px on 9 September: the control panel lands on top of the logo, the bodygraph is pushed off screen, and the chart and view buttons are cut off. The layout puts the panel beside the canvas, which cannot hold at phone width. At an event people are on phones, so a free chart they cannot read is not a hook."
         }
       ]
     },

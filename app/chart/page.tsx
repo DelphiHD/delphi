@@ -46,7 +46,7 @@ export default function ChartPage() {
   const [options, setOptions] = useState<Place[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [result, setResult] = useState<{ url: string } | null>(null);
+  const [result, setResult] = useState<{ url: string; account?: boolean } | null>(null);
   const lookup = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // The place is never taken on trust: what the person types is only a search,
@@ -92,7 +92,7 @@ export default function ChartPage() {
       });
       const j = await r.json();
       if (!j.ok) throw new Error(j.error ?? "something went wrong");
-      setResult({ url: j.url });
+      setResult({ url: j.url, account: j.account });
     } catch (e) {
       setError(e instanceof Error ? e.message : "something went wrong");
     } finally {
@@ -108,11 +108,15 @@ export default function ChartPage() {
         <section className="card done">
           <h2>Your chart is ready.</h2>
           <p>
-            This is yours to keep. The link works on any device, and it stays
-            live, so save it somewhere you will find it again.
+            This link is yours. It works on any device and it stays live, so
+            save it somewhere you will find it again.
           </p>
           <a className="go" href={result.url}>Open My Chart</a>
-          <p className="fine">We have also sent it to {email}.</p>
+          <p className="fine">
+            {result.account
+              ? `Saved to ${email}, so you can find it again later.`
+              : "Save the link: it is the only way back to this chart."}
+          </p>
         </section>
       ) : (
         <section className="card">
@@ -262,7 +266,10 @@ export default function ChartPage() {
         input {
           width: 100%;
           font: inherit;
-          font-size: 15.5px;
+          /* 16px exactly. Safari zooms the whole page in when a field smaller
+             than this takes focus, which on a phone throws the layout sideways
+             mid-form. */
+          font-size: 16px;
           padding: 11px 2px;
           border: 0;
           border-bottom: 1px solid rgba(255, 255, 255, 0.28);

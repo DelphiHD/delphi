@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { VersionToast } from "@/components/version-toast";
 import "./globals.css";
@@ -14,8 +14,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HD Reports",
+  title: "Delphi Human Design",
   description: "Personalized Human Design readings.",
+};
+
+// Without this a phone renders the page at desktop width and shrinks it, so
+// everything arrives too small to read and too small to tap.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
