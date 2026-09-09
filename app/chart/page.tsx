@@ -21,14 +21,14 @@ type Accuracy = "document" | "told" | "approximate" | "unknown";
 interface Place { value: string; timezone: string }
 
 const ACCURACY_LABEL: Record<Accuracy, string> = {
-  document: "It's on my birth certificate",
-  told: "I was told the time",
-  approximate: "I know roughly",
-  unknown: "I don't know it",
+  document: "It's On My Birth Certificate",
+  told: "I Was Told The Time",
+  approximate: "I Know Roughly",
+  unknown: "I Don't Know It",
 };
 
 const PART_OF_DAY: { key: string; label: string; time: string }[] = [
-  { key: "early", label: "Small hours", time: "03:00" },
+  { key: "early", label: "Small Hours", time: "03:00" },
   { key: "morning", label: "Morning", time: "09:00" },
   { key: "afternoon", label: "Afternoon", time: "15:00" },
   { key: "evening", label: "Evening", time: "21:00" },
@@ -102,8 +102,7 @@ export default function ChartPage() {
 
   return (
     <main className="wrap">
-      <h1>Know Thyself.</h1>
-      <p className="sub">Your Human Design chart, cast from your birth details and yours to keep.</p>
+      <h1>View Your Birth Chart</h1>
 
       {result ? (
         <section className="card done">
@@ -112,7 +111,7 @@ export default function ChartPage() {
             This is yours to keep. The link works on any device, and it stays
             live, so save it somewhere you will find it again.
           </p>
-          <a className="go" href={result.url}>Open my chart</a>
+          <a className="go" href={result.url}>Open My Chart</a>
           <p className="fine">We have also sent it to {email}.</p>
         </section>
       ) : (
@@ -197,7 +196,7 @@ export default function ChartPage() {
               </p>
               <p>
                 <a href="https://cal.com/DelphiHumanDesign" target="_blank" rel="noreferrer">
-                  Book a rectification session
+                  Book A Rectification Session
                 </a>{" "}
                 if you would rather work it out from your life than from paperwork.
               </p>
@@ -207,9 +206,8 @@ export default function ChartPage() {
           {error && <p className="error">{error}</p>}
 
           <button className="go" disabled={!ready || busy} onClick={submit}>
-            {busy ? "Casting your chart…" : "Create my chart"}
+            {busy ? "Casting Your Chart…" : "Create My Chart"}
           </button>
-          <p className="fine">Takes about ten seconds.</p>
         </section>
       )}
 
@@ -217,53 +215,43 @@ export default function ChartPage() {
         @import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap");
         :root {
           --purple: #845095;
-          --purple-deep: #5d3569;
+          --purple-light: #b89ac2;
           --ink: #1c1a2e;
           --muted: #6f6880;
-          --line: rgba(132, 80, 149, 0.18);
+          --gold: #f1c232;
         }
         * { box-sizing: border-box; }
         body {
+          /* The white box is the page; the form inside it carries the night sky.
+             The other way round put a dark slab on top of her own hero image. */
           margin: 0;
-          /* The site opens on a starfield. This is that feeling built from
-             colour rather than borrowing an image that belongs to the page it
-             sits in front of. */
-          background:
-            radial-gradient(1100px 620px at 22% -8%, rgba(132, 80, 149, 0.5), transparent 62%),
-            radial-gradient(900px 520px at 84% 8%, rgba(58, 78, 140, 0.42), transparent 58%),
-            #0b0913;
-          background-attachment: fixed;
+          background: #fff;
           font-family: Montserrat, "Helvetica Neue", Arial, sans-serif;
           color: var(--ink);
           -webkit-font-smoothing: antialiased;
         }
-        .wrap { max-width: 560px; margin: 0 auto; padding: 64px 20px 90px; }
+        .wrap { max-width: 560px; margin: 0 auto; padding: 40px 20px 56px; }
         h1 {
-          font-weight: 300;
-          font-size: clamp(34px, 7vw, 52px);
+          font-weight: 400;
+          font-size: clamp(21px, 4vw, 27px);
           letter-spacing: 0.02em;
-          color: #fff;
+          color: var(--ink);
           text-align: center;
-          margin: 0 0 8px;
+          margin: 0 0 22px;
           text-wrap: balance;
         }
-        .sub {
-          text-align: center;
-          color: rgba(255, 255, 255, 0.66);
-          font-size: 14.5px;
-          font-weight: 400;
-          margin: 0 0 34px;
-          line-height: 1.6;
-        }
         .card {
-          background: #fff;
+          background:
+            radial-gradient(760px 420px at 20% -10%, rgba(132, 80, 149, 0.55), transparent 62%),
+            radial-gradient(620px 380px at 88% 6%, rgba(58, 78, 140, 0.45), transparent 58%),
+            #0b0913;
           border-radius: 20px;
           padding: 30px 28px 32px;
-          box-shadow: 0 24px 70px rgba(0, 0, 0, 0.4);
+          box-shadow: 0 18px 46px rgba(28, 26, 46, 0.22);
         }
         label {
           display: block;
-          color: var(--muted);
+          color: rgba(255, 255, 255, 0.62);
           font-size: 10.5px;
           font-weight: 600;
           letter-spacing: 0.13em;
@@ -277,56 +265,59 @@ export default function ChartPage() {
           font-size: 15.5px;
           padding: 11px 2px;
           border: 0;
-          border-bottom: 1px solid var(--line);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.28);
           border-radius: 0;
           background: transparent;
-          color: var(--ink);
+          color: #fff;
         }
-        input:focus { outline: none; border-bottom-color: var(--purple); }
-        input:focus-visible { outline: none; }
-        .fine { color: var(--muted); font-size: 12px; margin: 7px 0 0; line-height: 1.55; }
-        .fine.ok { color: var(--purple); font-weight: 500; }
+        input::placeholder { color: rgba(255, 255, 255, 0.42); }
+        input:focus { outline: none; border-bottom-color: var(--purple-light); }
+        /* The date and time pickers draw their own controls; without this they
+           come out as dark glyphs on a dark field and look broken. */
+        input[type="date"], input[type="time"] { color-scheme: dark; }
+        .fine { color: rgba(255, 255, 255, 0.6); font-size: 12px; margin: 7px 0 0; line-height: 1.55; }
+        .fine.ok { color: var(--purple-light); font-weight: 500; }
         .error {
-          background: #fdf3f2; color: #a8443a; border-radius: 12px;
+          background: rgba(224, 102, 102, 0.16); color: #ffd9d5; border-radius: 12px;
           padding: 11px 14px; font-size: 13px; margin: 16px 0 0; line-height: 1.5;
         }
         .places {
           list-style: none; margin: 4px 0 0; padding: 4px;
-          border: 1px solid var(--line); border-radius: 12px;
+          background: rgba(255, 255, 255, 0.07); border-radius: 12px;
         }
         .places button {
           display: block; width: 100%; text-align: left; font: inherit; font-size: 14px;
-          padding: 9px 11px; border: 0; border-radius: 8px; background: transparent; cursor: pointer;
-          color: var(--ink);
+          padding: 9px 11px; border: 0; border-radius: 8px; background: transparent;
+          cursor: pointer; color: #fff;
         }
-        .places button:hover { background: #f6f1f8; }
+        .places button:hover { background: rgba(255, 255, 255, 0.12); }
         .chips { display: flex; flex-wrap: wrap; gap: 7px; }
         .chip {
           font: inherit; font-size: 12.5px; padding: 8px 15px; border-radius: 999px;
-          border: 1px solid var(--line); background: #fff; color: var(--muted); cursor: pointer;
+          border: 1px solid rgba(255, 255, 255, 0.3); background: transparent;
+          color: rgba(255, 255, 255, 0.8); cursor: pointer;
         }
-        .chip:hover { border-color: var(--purple); color: var(--purple); }
-        .chip.on { background: var(--purple); border-color: var(--purple); color: #fff; font-weight: 600; }
+        .chip:hover { border-color: #fff; color: #fff; }
+        .chip.on { background: #fff; border-color: #fff; color: var(--ink); font-weight: 600; }
         .note {
-          background: #faf7fb; border: 1px solid var(--line); border-radius: 14px;
-          padding: 16px 18px; margin-top: 20px; font-size: 13px; line-height: 1.65; color: var(--ink);
+          background: rgba(255, 255, 255, 0.08); border-radius: 14px;
+          padding: 16px 18px; margin-top: 20px; font-size: 13px; line-height: 1.65;
+          color: rgba(255, 255, 255, 0.86);
         }
         .note p { margin: 0 0 11px; }
         .note p:last-child { margin-bottom: 0; }
-        .note strong { color: var(--purple); }
-        .note a { color: var(--purple); font-weight: 600; }
+        .note strong { color: #fff; }
+        .note a { color: var(--gold); font-weight: 600; }
         .go {
           display: block; width: 100%; margin-top: 26px; font: inherit; font-weight: 600;
           font-size: 15px; letter-spacing: 0.02em; padding: 15px; border-radius: 999px; border: 0;
-          background: var(--purple); color: #fff; cursor: pointer; text-align: center;
+          background: #fff; color: var(--ink); cursor: pointer; text-align: center;
           text-decoration: none;
         }
-        .go:hover { background: var(--purple-deep); }
-        .go:disabled { opacity: 0.4; cursor: default; }
-        .card.done h2 {
-          font-weight: 300; font-size: 27px; color: var(--purple); margin: 0 0 12px;
-        }
-        .card.done p { color: var(--ink); font-size: 14.5px; line-height: 1.65; }
+        .go:hover { background: var(--purple); color: #fff; }
+        .go:disabled { opacity: 0.32; cursor: default; }
+        .card.done h2 { font-weight: 300; font-size: 27px; color: #fff; margin: 0 0 12px; }
+        .card.done p { color: rgba(255, 255, 255, 0.86); font-size: 14.5px; line-height: 1.65; }
         @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
       `}</style>
     </main>
