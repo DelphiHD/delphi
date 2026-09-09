@@ -71,8 +71,9 @@ create table public.charts (
   --
   -- If they have bought the synthesis, that report is now written about a chart
   -- that no longer exists. Kaycee's rule, 2026-09-09: they reverify their birth
-  -- details, and the first rewrite is free.
-  free_rewrite_used boolean not null default false,
+  -- details and then contact her, rather than the rewrite being automatic. An
+  -- automatic free rewrite is too easy to play with, and a real correction is
+  -- worth a conversation. What she decides is recorded on chart_edits.
 
   -- The link. Same 32 hex characters as client_charts, and the same row.
   token          text not null unique
