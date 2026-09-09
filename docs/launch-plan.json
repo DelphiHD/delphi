@@ -29,8 +29,8 @@
         {
           "id": "p1c",
           "title": "Chart builds run as a Vercel function",
-          "status": "todo",
-          "note": "About ten seconds a chart; Pro allows five minutes."
+          "status": "done",
+          "note": "Done 9 September. POST birth details to /api/chart, get a published link in about 11 seconds. Proven end to end against a production build: place lookup, chart cast, published, served from charts.delphihd.com, synthesis withheld because the tier says free."
         },
         {
           "id": "p1d",
