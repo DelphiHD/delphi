@@ -1,0 +1,105 @@
+/**
+ * A chart in the database, as something the builder can cast.
+ *
+ * The builder has only ever been able to draw somebody who was written into
+ * scripts/client-roster.ts by hand. The portal needs it to draw a stranger who
+ * filled in a form thirty seconds ago, so this turns a row of public.charts into
+ * the same brief the roster produces. One builder, two ways in.
+ *
+ * The timezone travels with the row rather than being resolved again: the
+ * provider already answered that question when the chart was created, and its
+ * answer is what the chart was cast from. Asking twice invites two answers.
+ */
+
+import { createClient } from "@supabase/supabase-js";
+
+export interface ChartRecord {
+  id: string;
+  token: string;
+  personName: string;
+  birthDate: string;
+  birthTime: string | null;
+  birthPlace: string;
+  birthTimezone: string;
+  timeAccuracy: "document" | "told" | "approximate" | "unknown";
+  tier: "seed" | "free" | "purchased" | "gift";
+  visibility: "private" | "shared" | "public";
+  ownerId: string | null;
+}
+
+function db() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error("Supabase credentials are not set");
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+const shape = (r: Record<string, unknown>): ChartRecord => ({
+  id: String(r.id),
+  token: String(r.token),
+  personName: String(r.person_name),
+  birthDate: String(r.birth_date),
+  birthTime: (r.birth_time as string | null) ?? null,
+  birthPlace: String(r.birth_place),
+  birthTimezone: String(r.birth_timezone),
+  timeAccuracy: r.time_accuracy as ChartRecord["timeAccuracy"],
+  tier: r.tier as ChartRecord["tier"],
+  visibility: r.visibility as ChartRecord["visibility"],
+  ownerId: (r.owner_id as string | null) ?? null,
+});
+
+/** One chart by its link token. Null when there is no such chart. */
+export async function chartByToken(token: string): Promise<ChartRecord | null> {
+  const { data, error } = await db().from("charts").select("*").eq("token", token).limit(1);
+  if (error) throw new Error(`could not read chart ${token}: ${error.message}`);
+  const row = (data ?? [])[0];
+  return row ? shape(row) : null;
+}
+
+/**
+ * The brief the builder works from. `slug` is the token, because a portal chart
+ * has no roster slug and the token is the one thing it is guaranteed to have.
+ */
+export function briefFromRecord(r: ChartRecord): {
+  id: string; slug: string; name: string;
+  birthDate: string; birthTime: string; birthPlace: string; birthTimezone: string;
+  tier: string;
+} {
+  return {
+    tier: r.tier,
+    id: r.id,
+    slug: r.token,
+    name: r.personName,
+    birthDate: r.birthDate,
+    // No time means the chart is cast for noon and everything the time governs
+    // is marked unreliable rather than presented as fact. A missing time is not
+    // midnight: midnight is a real birth time and would look like an answer.
+    // Postgres hands back a time as HH:MM:SS; the provider wants HH:MM and
+    // answers 500 to anything else.
+    birthTime: (r.birthTime ?? "12:00").slice(0, 5),
+    birthPlace: r.birthPlace,
+    birthTimezone: r.birthTimezone,
+  };
+}
+
+/** Record a correction to a chart's birth details, and what it cost. */
+export async function recordEdit(args: {
+  chartId: string;
+  field: string;
+  oldValue: string | null;
+  newValue: string | null;
+  editedBy?: string | null;
+  recast?: boolean;
+  rewroteReport?: boolean;
+}): Promise<void> {
+  const { error } = await db().from("chart_edits").insert({
+    chart_id: args.chartId,
+    field: args.field,
+    old_value: args.oldValue,
+    new_value: args.newValue,
+    edited_by: args.editedBy ?? null,
+    recast: args.recast ?? true,
+    rewrote_report: args.rewroteReport ?? false,
+  });
+  if (error) throw new Error(`could not record the edit: ${error.message}`);
+}

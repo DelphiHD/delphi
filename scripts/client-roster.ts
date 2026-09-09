@@ -13,6 +13,11 @@ export interface ClientBrief {
   name: string;
   birthDate: string;   // YYYY-MM-DD
   birthTime: string;   // HH:MM (24h)
+  /** Set when the chart came from the database rather than this file: the
+   *  provider already resolved this place's timezone when the chart was
+   *  created, and its answer is what the chart was cast from. Asking again
+   *  invites a second answer. */
+  birthTimezone?: string;
   birthPlace: string;  // what the chart prints, and the truth about where they were born
   /** Only when birthPlace is a town the chart provider has never heard of. The
    *  provider's gazetteer stops at fairly large places, so a birth in Salmon,

@@ -32,13 +32,15 @@ import { config as loadEnv } from "dotenv";
 loadEnv({ path: ".env.local", override: true });
 
 import { randomBytes } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { join } from "node:path";
 
 import { CHANNELS } from "@/lib/hd/channels";
 import { CENTER_GATES, centerOf, type Center } from "@/lib/hd/gate-center";
 import { loadLibraryChunks } from "@/lib/hd/chunks-source";
+import { chartByToken, briefFromRecord } from "@/lib/hd/chart-record";
 import { longitudeOf, GATE_RANGES, GATE_ARC_DEGREES, LINE_ARC_DEGREES } from "@/lib/hd/gate-longitude";
 import type { CenterName } from "@/lib/chart/types";
 import { gateName } from "@/lib/hd/gate-names";
@@ -823,8 +825,29 @@ function profileWithLines(value: string): string {
   return `${value} ${lines.join(" ")}`.trim();
 }
 
+/**
+ * Whether this chart gets Kaycee's written synthesis in its popups.
+ *
+ * Her own roster always does. A chart made through the portal does only when it
+ * has been bought: the free tier shows the library's own language, which is the
+ * hook, and leaves the synthesis as the thing worth paying for.
+ */
+function entitledToReports(brief: ClientBrief): boolean {
+  const tier = (brief as { tier?: string }).tier;
+  if (!tier) return true;                       // roster: unchanged
+  return tier === "seed" || tier === "purchased";
+}
+
+/** The shape loadReports returns when there is nothing to show. */
+function emptyReports(): ReportText {
+  return { centers: {}, channels: {}, gates: {}, props: {}, cycles: [], conjunctions: {} };
+}
+
 async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
-  const tz = await getTimezoneForLocation(placeForLookup(brief));
+  // A chart from the database already knows its timezone, resolved by the
+  // provider when the chart was made. Resolving it again would be a second
+  // question with its own chance of a different answer.
+  const tz = brief.birthTimezone ?? await getTimezoneForLocation(placeForLookup(brief));
   const chart = await getChart({
     birthDate: brief.birthDate, birthTime: brief.birthTime, timezone: tz,
     locationQuery: placeForLookup(brief), brandedSvg: true,
@@ -885,9 +908,15 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
       chart.centers.filter((c) => c.defined).map((c) => CENTER_FROM_API[c.name]),
     ),
     gates,
-    report: loadReports(brief.slug, brief.name, clientOutputDir(brief), {
-      signature: chart.signature.value, notSelf: chart.notSelfTheme.value,
-    }),
+    // Kaycee's written synthesis, and only for a chart entitled to it. Reports
+    // are found on disk by the person's name, so a portal chart for somebody who
+    // happens to share a name with a client would have picked theirs up. What
+    // decides it is the tier on the chart, not what is lying in a folder.
+    report: entitledToReports(brief)
+      ? loadReports(brief.slug, brief.name, clientOutputDir(brief), {
+          signature: chart.signature.value, notSelf: chart.notSelfTheme.value,
+        })
+      : emptyReports(),
     // the four PHS arrows, in the clusters the report cover uses: Design red on
     // the left, Personality black on the right
     variables: [
@@ -6812,11 +6841,29 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
       : `no published link found for ${brief.name}`);
     return;
   }
-  const client = slug ? await loadClient(clientFromSlug(slug)) : undefined;
+  // Two ways in. A slug is somebody on Kaycee's roster, whose deliverables land
+  // in her Desktop folder. A token is a chart in the database, made by somebody
+  // on the website, which has no folder and no roster entry: it is built to a
+  // scratch directory and published to storage under the token it already has.
+  const tokenArg = args.includes("--token") ? args[args.indexOf("--token") + 1] : undefined;
+  let fromDb = false;
+  let brief: ClientBrief | undefined;
+  if (tokenArg) {
+    const record = await chartByToken(tokenArg);
+    if (!record) throw new Error(`no chart in the database with token ${tokenArg}`);
+    brief = briefFromRecord(record) as ClientBrief;
+    fromDb = true;
+  } else if (slug) {
+    brief = clientFromSlug(slug);
+  }
+  const built = brief;
+  const client = brief ? await loadClient(brief) : undefined;
 
-  const outDir = client
-    ? client.outDir
-    : join(process.env.HOME ?? "", "Desktop", "Mandala Renderer Output", "Educational");
+  const outDir = fromDb
+    ? mkdtempSync(join(tmpdir(), "delphi-chart-"))
+    : client
+      ? client.outDir
+      : join(process.env.HOME ?? "", "Desktop", "Mandala Renderer Output", "Educational");
   mkdirSync(outDir, { recursive: true });
 
   const chunks = await loadChunks();
@@ -6915,7 +6962,10 @@ async function rasterize(svg: string, width: number): Promise<Buffer> {
   let astroDesign: AstroChart | null = null;
   if (client) {
     try {
-      const brief = clientFromSlug(slug);
+      // the same person the chart was built from, whether that came from the
+      // roster or the database; resolving the slug again would look the token
+      // up in the roster and fail
+      const brief = built!;
       astroChart = await getAstro({
         birthDate: brief.birthDate, birthTime: brief.birthTime,
         place: placeForLookup(brief),

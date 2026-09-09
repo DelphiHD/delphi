@@ -23,8 +23,8 @@
         {
           "id": "p1b",
           "title": "Charts become database rows, not a hardcoded roster",
-          "status": "todo",
-          "note": "New table with RLS. Migrates the existing 37 in as rows owned by Kaycee. Needs her sign-off on the schema."
+          "status": "done",
+          "note": "Applied 9 September. Two tables: charts and chart_edits. The 37 seeded with real birth details and the timezones the provider resolved, all marked seed and private."
         },
         {
           "id": "p1c",
@@ -47,8 +47,8 @@
         {
           "id": "p1f",
           "title": "Paid content held back on the free tier",
-          "status": "todo",
-          "note": "Report prose becomes an unlock prompt. Daily transit read is subscriber-only."
+          "status": "doing",
+          "note": "The synthesis is now withheld by tier, proven on a real chart: free shows 0 of 26 placements and 0 of 9 centres while keeping all 64 gate keynotes. Still to do: the daily transit read becomes subscriber-only."
         },
         {
           "id": "p1g",
