@@ -1868,6 +1868,13 @@ createServer((req, res) => {
 
         const { data: charts } = await db.from("client_charts")
           .select("client_slug, client_name, token, created_at, revoked_at");
+        // Where a chart came from is on the chart itself now, not a guess from
+        // which table it turned up in. Seed is Kaycee's own roster; anything else
+        // was made by somebody through the portal.
+        const { data: records } = await db.from("charts")
+          .select("token, tier, owner_id, for_email");
+        const byToken = new Map((records ?? []).map(
+          (r: { token: string }) => [r.token, r as Record<string, unknown>]));
         const { data: accounts } = await db.from("profiles")
           .select("email, full_name, created_at");
 
@@ -1887,10 +1894,12 @@ createServer((req, res) => {
         const people: Person[] = [];
         for (const c of charts ?? []) {
           const got = reports[c.client_slug] ?? new Set<string>();
+          const rec = byToken.get(c.token);
+          const tier = (rec?.tier as string) ?? "seed";
           people.push({
             name: c.client_name ?? c.client_slug,
-            email: null,
-            source: "roster",
+            email: (rec?.for_email as string) ?? null,
+            source: tier === "seed" ? "roster" : "signup",
             joined: c.created_at ?? null,
             chart: c.token ? `https://charts.delphihd.com/c/${c.token}` : null,
             reports: got.size === 2 ? "both" : got.size === 1 ? [...got][0] : "none",

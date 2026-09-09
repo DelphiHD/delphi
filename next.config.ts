@@ -17,6 +17,13 @@ const nextConfig: NextConfig = {
   typescript: {
     tsconfigPath: "tsconfig.build.json",
   },
+  // The chart builder is now imported by /api/chart, which drags its whole
+  // dependency tree into the server bundle. The rasteriser is a native binary
+  // and cannot live in a bundle at all: the build fails with "asset is not
+  // placeable in ESM chunks". It is only ever used to write Kaycee's PNG, which
+  // the server never does, so it is left outside the bundle and loaded from
+  // node_modules if anything ever asks for it.
+  serverExternalPackages: ["@resvg/resvg-js"],
   env: {
     NEXT_PUBLIC_BUILD_ID:
       process.env.VERCEL_DEPLOYMENT_ID ?? process.env.VERCEL_GIT_COMMIT_SHA ?? "",
