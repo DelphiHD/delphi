@@ -1694,18 +1694,24 @@ createServer((req, res) => {
       };
 
       // Each LaunchAgent writes a dated marker and, on failure, the word FAILED.
+      // When the log was last written, not when a header says it was. Parsing the
+      // "=== date ===" markers read Evening Echoes' own "=== Evening Echoes,
+      // 2026-09-08 ===" banner as a timestamp and called a healthy job dead.
+      // A panel that cries wolf is worse than no panel.
       const logFor = (agent: string) => {
         const p = `${process.env.HOME}/Library/Logs/com.delphihd.${agent}.log`;
         if (!existsSync(p)) return { last: null as string | null, failed: false, tail: "no log yet" };
+        const touched = statSync(p).mtime.toISOString();
         const text = readFileSync(p, "utf8");
-        const blocks = text.split("=== ").filter(Boolean);
-        const last = blocks[blocks.length - 1] ?? "";
-        const stamp = last.split(" ===")[0]?.trim() ?? null;
-        const when = stamp ? new Date(stamp) : null;
+        // only what happened since the last time the agent itself started
+        const starts = [...text.matchAll(/^=== (\w{3} \w{3} .+?) ===$/gm)];
+        const from = starts.length ? (starts[starts.length - 1].index ?? 0) : Math.max(0, text.length - 4000);
+        const lastRun = text.slice(from);
+        const lines = lastRun.split("\n").map((l) => l.trim()).filter(Boolean);
         return {
-          last: when && !isNaN(when.getTime()) ? when.toISOString() : null,
-          failed: /FAILED|Error:/i.test(last),
-          tail: (last.split(" ===")[1] ?? "").trim().split("\n").filter(Boolean).slice(-1)[0] ?? "ran clean",
+          last: touched,
+          failed: /FAILED|Error:/i.test(lastRun),
+          tail: lines[lines.length - 1] ?? "ran clean",
         };
       };
 
