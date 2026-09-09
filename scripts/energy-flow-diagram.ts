@@ -3160,6 +3160,69 @@ body.mod-relation.view-astro #relswap { display:inline-flex; }
   grid-template-columns:74px 1fr auto; gap:6px; font-size:11.5px; line-height:1.85; }
 #astroplanets .line i, #astrohouses .line i, #astroaspects .line i { font-style:normal; opacity:.55; }
 body.view-mandala svg.canvas { display:none !important; }
+
+/* ── On a phone ──────────────────────────────────────────────────────────────
+   The desktop layout stands the panel beside the chart and floats the controls
+   over the drawing's left edge. At 375px those three things land on top of one
+   another: the panel covered the logo, the bodygraph was pushed off screen, and
+   the chart and view buttons were cut off.
+   Nothing above this line changes. Below it the page becomes one column, in the
+   order somebody reads it: what they came for, how to change it, then the
+   detail. Kaycee, 2026-09-09: "people live on their phones so I think it's on
+   us to figure it out." */
+@media (max-width: 760px) {
+  body { overflow-y: auto; }
+  .wrap {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+    gap: 12px;
+    padding: 10px 10px 28px;
+    align-items: stretch;
+  }
+
+  /* The wordmark sat over the panel once the panel moved. It has its own line. */
+  .brandmark.logo { position: static; width: 104px; margin: 2px auto 0; display: block; }
+  .brandmark.know { display: none; }
+
+  /* The stage is a row on desktop, which put the controls beside the drawing and
+     squeezed it into a third of the width. On a phone it is a column: controls,
+     then chart, each with the full width. */
+  .stage { width: 100%; flex-direction: column; align-items: center; gap: 10px; }
+  .stage svg.canvas, .stage .mandala svg, .stage .astro svg {
+    max-width: 100%; height: auto; max-height: 62vh;
+  }
+
+  /* The controls stop floating over the drawing and become a row above it that
+     scrolls sideways, so every button is reachable with a thumb. */
+  .viewdock.docked {
+    position: static; width: auto; order: -1; margin: 0 0 4px;
+    padding: 8px; backdrop-filter: none; background: rgba(255,255,255,.96);
+  }
+  .viewdock.docked .row {
+    flex-direction: row; overflow-x: auto; gap: 6px;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .viewdock.docked .row::-webkit-scrollbar { display: none; }
+  .viewdock.docked button { width: auto; white-space: nowrap; flex: 0 0 auto; padding: 8px 13px; }
+  .viewdock.docked .sec { margin: 6px 0 2px; }
+
+  /* The panel is a full-width section under the chart rather than a column
+     beside it, and it scrolls with the page instead of inside itself. */
+  .panel {
+    flex: 1 1 auto; width: 100%; align-self: auto;
+    overflow-y: visible; max-height: none; border-radius: 14px;
+  }
+
+  /* Anything that hovers has to be reachable and readable at this size. */
+  .tip { max-width: 84vw; font-size: 12.5px; }
+  .card { position: fixed; left: 8px; right: 8px; bottom: 8px; width: auto; max-height: 52vh; overflow-y: auto; }
+}
+
+/* A phone held sideways is mostly screen height, so give the drawing more of it. */
+@media (max-width: 900px) and (orientation: landscape) {
+  .stage svg.canvas, .stage .mandala svg, .stage .astro svg { max-height: 86vh; }
+}
 .mandala { border-radius:18px; overflow:hidden; }
 body.view-mandala .mandala svg { max-height:calc(100vh - 28px); width:auto; height:auto; margin:0 auto; display:block; }
 </style></head>
