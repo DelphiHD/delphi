@@ -1707,13 +1707,38 @@ function favicon(): string {
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 }
 
-// ── brand font (Montserrat), cached locally so reruns are offline ───────────
+// ── brand font (Montserrat) ─────────────────────────────────────────────────
+// Shipped with the code rather than fetched and cached. The cache lived in
+// .cache/fonts, which does not exist on a server and cannot be created there:
+// the first chart anybody made through the website died on
+// "ENOENT: mkdir '.cache/fonts'". Kaycee, from her phone, 2026-09-09.
+// Montserrat is under the Open Font License, so it travels with the repo.
+const FONT_BUNDLED = "assets/fonts";
 const FONT_DIR = ".cache/fonts";
 const FONT_WEIGHTS = [400, 600];
 
+/** Where this weight actually is, bundled first. */
+function fontPath(w: number): string | null {
+  for (const dir of [FONT_BUNDLED, FONT_DIR]) {
+    const p = join(dir, `Montserrat-${w}.ttf`);
+    if (existsSync(p)) return p;
+  }
+  return null;
+}
+
 async function montserrat(): Promise<Map<number, Buffer>> {
   const out = new Map<number, Buffer>();
-  mkdirSync(FONT_DIR, { recursive: true });
+  // Everything present already: the ordinary case, and the only one on a server.
+  if (FONT_WEIGHTS.every((w) => fontPath(w))) {
+    for (const w of FONT_WEIGHTS) out.set(w, readFileSync(fontPath(w)!));
+    return out;
+  }
+  try {
+    mkdirSync(FONT_DIR, { recursive: true });
+  } catch {
+    // Read-only filesystem. Nothing to cache into, and nothing worth failing for.
+    return out;
+  }
   const missing = FONT_WEIGHTS.filter((w) => !existsSync(join(FONT_DIR, `Montserrat-${w}.ttf`)));
   if (missing.length) {
     try {
@@ -1734,8 +1759,8 @@ async function montserrat(): Promise<Map<number, Buffer>> {
     }
   }
   for (const w of FONT_WEIGHTS) {
-    const p = join(FONT_DIR, `Montserrat-${w}.ttf`);
-    if (existsSync(p)) out.set(w, readFileSync(p));
+    const p = fontPath(w);
+    if (p) out.set(w, readFileSync(p));
   }
   return out;
 }

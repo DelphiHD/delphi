@@ -150,7 +150,19 @@ export default function ChartPage() {
           <input id="date" type="date" value={birthDate}
             onChange={(e) => setBirthDate(e.target.value)} />
 
-          <label>Birth time</label>
+          {/* The time comes before the question about it: people know the time
+              or they do not, and asking how sure they are before they have
+              typed anything is backwards. It was also easy to miss underneath
+              four buttons, especially on a phone. */}
+          {needsTime && (
+            <>
+              <label htmlFor="time">Time of birth</label>
+              <input id="time" className="boxed" type="time" value={birthTime}
+                onChange={(e) => setBirthTime(e.target.value)} />
+            </>
+          )}
+
+          <label>{needsTime ? "How sure is that time?" : "Birth time"}</label>
           <div className="chips">
             {(Object.keys(ACCURACY_LABEL) as Accuracy[]).map((a) => (
               <button type="button" key={a}
@@ -158,11 +170,6 @@ export default function ChartPage() {
                 onClick={() => setAccuracy(a)}>{ACCURACY_LABEL[a]}</button>
             ))}
           </div>
-
-          {needsTime && (
-            <input id="time" type="time" value={birthTime}
-              onChange={(e) => setBirthTime(e.target.value)} />
-          )}
 
           {showsPartOfDay && (
             <>
@@ -279,6 +286,15 @@ export default function ChartPage() {
         }
         input::placeholder { color: rgba(255, 255, 255, 0.42); }
         input:focus { outline: none; border-bottom-color: var(--purple-light); }
+        /* A time field is a handful of characters in a wide empty row, which
+           reads as nothing at all on a phone. This one gets an edge. */
+        input.boxed {
+          border: 1px solid rgba(255, 255, 255, 0.34);
+          border-radius: 12px;
+          padding: 12px 14px;
+          background: rgba(255, 255, 255, 0.06);
+        }
+        input.boxed:focus { border-color: var(--purple-light); background: rgba(255, 255, 255, 0.1); }
         /* The date and time pickers draw their own controls; without this they
            come out as dark glyphs on a dark field and look broken. */
         input[type="date"], input[type="time"] { color-scheme: dark; }
