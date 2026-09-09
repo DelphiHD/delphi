@@ -35,7 +35,7 @@
         {
           "id": "p1d",
           "title": "Public birth-details form with account signup",
-          "status": "doing",
+          "status": "done",
           "note": "The form is built at /chart: place chosen from the provider's lookup, birth time asked honestly with a part-of-day fallback, long-form birth certificate guidance and a rectification booking link. Still to add: the account itself, magic link rather than just an email field. Mobile: inputs are 16px so Safari does not zoom on focus, and the app declares a viewport."
         },
         {
@@ -66,8 +66,8 @@
         {
           "id": "p1i",
           "title": "The chart itself has to work on a phone",
-          "status": "doing",
-          "note": "The bodygraph now stacks properly at 375px and reads well. Still to check on a real phone: tap behaviour for the mouseover cards, and the astrology wheel and composite at that width."
+          "status": "done",
+          "note": "Done 9 September, verified by Kaycee on her own phone. All 37 charts republished with it."
         }
       ]
     },
