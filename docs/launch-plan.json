@@ -111,7 +111,7 @@
           "id": "p2a",
           "title": "Inngest wired for long jobs",
           "status": "todo",
-          "note": "Reports run seven minutes to two hours. Nothing on Vercel or Supabase holds a job that long."
+          "note": "Reports run seven minutes to two hours. Nothing on Vercel or Supabase holds a job that long. An event of forty attendees with reports included is the case that decides this: forty long jobs, queued, retried and reported on, then released together."
         },
         {
           "id": "p2b",
@@ -128,7 +128,8 @@
         {
           "id": "p2d",
           "title": "Purchase triggers the report, chart republishes with it",
-          "status": "todo"
+          "status": "todo",
+          "note": "A report becomes visible when it is released, not the moment it is written. A purchase releases it straight away; an event holds every attendee's report until Kaycee publishes the batch. So a report needs a state between written and visible, and the chart republishes on release rather than on completion."
         }
       ]
     },
@@ -175,9 +176,77 @@
           "status": "todo"
         }
       ]
+    },
+    {
+      "id": "p5",
+      "title": "Phase 5 — Events",
+      "target": "2026-10-21",
+      "why": "Kaycee expects to run events regularly. Each one is a different deal, and the machinery should not care which.",
+      "items": [
+        {
+          "id": "p5a",
+          "title": "An event, with its own terms",
+          "status": "todo",
+          "note": "How many people, what they get, when it is live, and what the deal was. Set per event."
+        },
+        {
+          "id": "p5b",
+          "title": "Codes that carry a grant",
+          "status": "todo",
+          "note": "Event access, a discount, or a report included. One list, one place to see what has been used."
+        },
+        {
+          "id": "p5c",
+          "title": "Pre-registration, charts built ahead",
+          "status": "todo",
+          "note": "The night before rather than thirty at once on venue wifi. Turns the riskiest moment into nothing happening."
+        },
+        {
+          "id": "p5d",
+          "title": "Batch reports, released together",
+          "status": "todo",
+          "note": "Written ahead, held, then published as one moment in the room."
+        },
+        {
+          "id": "p5e",
+          "title": "Per-event numbers",
+          "status": "todo",
+          "note": "Charts, emails and bookings per event, so she can tell which are worth doing again."
+        },
+        {
+          "id": "p5f",
+          "title": "Tighten the public limit once events are separate",
+          "status": "todo",
+          "note": "Forty per connection exists only to survive a room sharing one wifi. Drops to about eight."
+        }
+      ]
     }
   ],
   "decided": [
+    {
+      "on": "2026-09-10",
+      "what": "Events get a code, not their own instance. A second deployment would drift from the real one and split her signups; a code is the same form arriving tagged. Kaycee expects to run events regularly."
+    },
+    {
+      "on": "2026-09-10",
+      "what": "An event code RAISES the per-connection limit for its window, never removes it. A leaked code still cannot run away."
+    },
+    {
+      "on": "2026-09-10",
+      "what": "Each event carries its own terms, set per event: how many people, what attendees get, when it is live, and a note on the deal. Kaycee, 2026-09-10: \"Each one will be slightly different and I want to be flexible.\""
+    },
+    {
+      "on": "2026-09-10",
+      "what": "A free report at an event is not a risk to be capped, it is a cost the event fee already covered. The cap on a code is the number of attendees she was paid for, so the code stops when the deal is fulfilled rather than when a safety number is hit."
+    },
+    {
+      "on": "2026-09-10",
+      "what": "Pre-registration publishes the CHART immediately. Reports, when an event includes them, are batched and published together. Kaycee, 2026-09-10: \"I'll probably want to batch them and then publish them all at the same time.\" This means a report needs a state between written and visible, which the current design does not have."
+    },
+    {
+      "on": "2026-09-10",
+      "what": "Event work is after the 16th. The loose per-connection limit covers her first event on its own; once events carry their own terms the public limit can drop from forty to about eight."
+    },
     {
       "on": "2026-09-10",
       "what": "The free chart is protected by a quiet rate limit, not a captcha. Kaycee, 2026-09-10: no visible 'prove you are human' step in front of the hook. Five charts an hour per email address, forty per caller, three hundred site-wide. The caller limit is deliberately loose because a room at an event shares one connection, and a limit tuned to stop a bot would have stopped her whole audience."
