@@ -17,6 +17,7 @@
 
 import { randomBytes } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
+import { callerHash, callerIp, looksLikeEmail, withinLimits } from "@/lib/chart-limits";
 
 // A chart takes about ten seconds. Pro allows five minutes; this asks for two,
 // which is room for a slow provider without holding a request open all day.
@@ -70,17 +71,46 @@ export async function POST(request: Request): Promise<Response> {
   if (!url || !key) return bad("this server cannot reach the database", 500);
   const db = createClient(url, key, { auth: { persistSession: false } });
 
+  // Checked before anything is created and before the provider is called, so a
+  // script in a loop costs a database count rather than a chart.
+  const caller = callerHash(callerIp(request));
+  const askedFor = (body.forEmail ?? "").trim().toLowerCase() || null;
+  const verdict = await withinLimits({ email: askedFor, caller }, async ({ email, caller: c, since }) => {
+    const [e, i, t] = await Promise.all([
+      email
+        ? db.from("charts").select("id", { count: "exact", head: true }).eq("for_email", email).gte("created_at", since)
+        : Promise.resolve({ count: 0 }),
+      c
+        ? db.from("charts").select("id", { count: "exact", head: true }).eq("request_ip_hash", c).gte("created_at", since)
+        : Promise.resolve({ count: 0 }),
+      db.from("charts").select("id", { count: "exact", head: true }).gte("created_at", since),
+    ]);
+    return { byEmail: e.count ?? 0, byCaller: i.count ?? 0, total: t.count ?? 0 };
+  });
+  if (!verdict.ok) {
+    console.warn(`chart refused: ${verdict.reason}`);
+    return Response.json({ ok: false, error: verdict.message }, { status: 429 });
+  }
+
   // The account, made now rather than when they click something in an email.
   // Their address is the hook's whole purpose, and a signup that depends on an
   // email arriving is a signup that half of them never complete. No password:
   // they come back through a magic link when we can send one.
   const emailGiven = (body.forEmail ?? "").trim().toLowerCase();
+  if (emailGiven && !looksLikeEmail(emailGiven)) {
+    return bad("that email address does not look right");
+  }
   let ownerId: string | null = null;
   if (emailGiven) {
     try {
       const made = await db.auth.admin.createUser({
         email: emailGiven,
-        email_confirm: true,
+        // Deliberately NOT confirmed. Anyone can type anyone's address into a
+        // public form; confirming it here would let a stranger create a
+        // standing account on somebody else's email. Unconfirmed, it is only a
+        // place to hang their charts, and it becomes theirs the first time they
+        // ask for a magic link at their own inbox.
+        email_confirm: false,
         user_metadata: { full_name: name, source: "free chart" },
       });
       if (made.data.user) ownerId = made.data.user.id;
@@ -120,6 +150,7 @@ export async function POST(request: Request): Promise<Response> {
     time_accuracy: timeAccuracy,
     tier: "free",
     token,
+    request_ip_hash: caller,
     for_email: body.forEmail?.trim() || null,
   });
   if (chartErr) {
