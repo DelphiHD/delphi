@@ -733,17 +733,27 @@ function transitInner(
   // sky's ink, exactly as a doubled placement is drawn. Kaycee, 2026-09-01:
   // "It should work that way on the transit chart too... It just shows the
   // client color."
+  // data-sky marks the half that belongs to the sky. Without it the runtime
+  // repaint below puts the client's tint back over every leg on this canvas,
+  // which is why a gate carried by both kept reading as the client's alone.
+  //
+  // Every gate the client carries is marked, not just the ones in the sky at
+  // build time. The date picker repaints this chart for any moment, and a mark
+  // baked to one minute is wrong twice over: a gate the chosen day activates
+  // can never darken, and a gate that only today's sky touched stays darkened
+  // on every other day, showing a transit that is not there. Kaycee, 2026-09-10,
+  // looking at 5 June 2027: "I would expect gate 15 to be teal and black here."
+  // The colour is decided at runtime from the date on screen; the mark only says
+  // which half is the sky's to paint.
   for (const g of natal) {
-    if (!transit.has(g)) continue;
-    // data-sky marks the half that belongs to the sky. Without it the runtime
-    // repaint below puts the client's tint back over every leg on this canvas,
-    // which is why a gate carried by both kept reading as the client's alone.
+    const lit = transit.has(g);
+    const fill = lit ? TRANSIT_INK : CLIENT_TINT;
     s = s.replace(
       new RegExp(`(<[a-z]+ [^>]*class="pleg"(?![^>]*data-full)[^>]*data-gate="${g}"[^>]*?)\\sfill="[^"]*"`),
-      (_m, head: string) => `${head} data-sky="1" fill="${TRANSIT_INK}"`);
+      (_m, head: string) => `${head} data-sky="1" fill="${fill}"`);
     s = s.replace(new RegExp(`(<[a-z]+ [^>]*?id="design-${g}"[^>]*?)\\sfill="[^"]*"`),
       (_m, head: string) =>
-        `${head.replace('id="', 'class="pleg" data-gate="' + g + '" data-sky="1" id="')} fill="${TRANSIT_INK}"`);
+        `${head.replace('id="', 'class="pleg" data-gate="' + g + '" data-sky="1" id="')} fill="${fill}"`);
   }
 
   for (const g of paintable) {
@@ -3420,6 +3430,12 @@ ${d.client ? "" : `<div class="readout" id="readout"><b>Hover the bodygraph</b><
 var DATA = ${JSON.stringify(payload)};
 var CLIENT_TINT_JS = ${JSON.stringify(CLIENT_TINT)};
 var TRANSIT_INK_JS = ${JSON.stringify(TRANSIT_INK)};
+// The gates the sky holds at the moment currently on screen. Seeded from the
+// moment the chart was built and replaced every time the date picker moves, so
+// a gate the client also carries darkens on the days it is actually transited
+// and goes back to their own colour on the days it is not.
+var SKY_LIT = {};
+((DATA.sky && DATA.sky.positions) || []).forEach(function (p) { SKY_LIT[p.gate] = 1; });
 // the brand font again, so a saved image carries it too (an SVG drawn into a
 // canvas cannot reach the page's fonts)
 var FONTCSS = ${JSON.stringify(face)};
@@ -4391,6 +4407,15 @@ if (DATA.client) {
       [].forEach.call(document.querySelectorAll('svg.canvas.transit .tleg, svg.canvas.transit .tdisc'),
         function (el) {
           el.setAttribute('fill', lit[el.dataset.gate] ? INK : 'none');
+        });
+      // and the gates the client carries too: the half that belongs to the sky
+      // takes the sky's ink on a day the sky is there, and the client's own
+      // colour on a day it is not. Without this a gate they both carry could
+      // only ever read two-toned for the minute the chart was built.
+      SKY_LIT = lit;
+      [].forEach.call(document.querySelectorAll('svg.canvas.transit .pleg[data-sky]'),
+        function (el) {
+          el.setAttribute('fill', lit[el.dataset.gate] ? INK : CLIENT_TINT_JS);
         });
       // a number is only white while there is a disc under it to sit on
       [].forEach.call(document.querySelectorAll('svg.canvas.transit .pnum[data-gate]'), function (n) {
@@ -5970,7 +5995,9 @@ function relight() {
     var sv = el.closest ? el.closest('svg.canvas') : null;
     // the client is one colour on this overlay, except the half that is the
     // sky's: a gate they both carry reads in both, the way a doubled placement does
-    if (sv && sv.classList.contains('transit')) col = el.dataset.sky ? TRANSIT_INK_JS : CLIENT_TINT_JS;
+    if (sv && sv.classList.contains('transit')) {
+      col = (el.dataset.sky && SKY_LIT[el.dataset.gate]) ? TRANSIT_INK_JS : CLIENT_TINT_JS;
+    }
     // The pair's chart carries its own colours, one per person. This repaint knows
     // only the traditional black and red and would put them straight back over it,
     // which is what made the connection chart look like a single chart after load.
@@ -6425,6 +6452,42 @@ function varHtml(v) {
           { text: v.arrow + ' arrow' }]) +
     prose(v.report);
 }
+// One gate behaviour for every view. Each view had grown its own handler, so a
+// gate said something on the bodygraph, less on the mandala and nothing at all
+// on the astrology ring, and somebody wanting to know about gate 12 had to go
+// back to the bodygraph to find out. Kaycee, 2026-09-10: "The same gate 12 info
+// should appear on the bodygraph, mandala, circuits and astrology. It helps
+// people make the connections."
+//
+// Every view draws a gate under a different name: a halo or a leg or a disc on
+// the bodygraph, a cell or a hexagram on the mandala, a band on the astrology
+// ring, a chip in the definition list. This reads the gate off any of them, so
+// the answer below can be the same one every time.
+function gateFromTarget(t) {
+  if (!t || !t.closest) return 0;
+  var el = t.closest('[data-gatecell],[data-hex],.gateband[data-gate],.halo[data-gate],' +
+    '.pleg[data-gate],.pnum[data-gate],.gdisc[data-gate],.tleg[data-gate],.tdisc[data-gate],' +
+    '.bleg[data-gate],.brg[data-gate],.bridge[data-gate]');
+  if (!el) return 0;
+  var g = +(el.dataset.gatecell || el.dataset.hex || el.dataset.gate);
+  return (g >= 1 && g <= 64) ? g : 0;
+}
+function chanFromTarget(t) {
+  if (!t || !t.closest) return null;
+  var el = t.closest('[data-ch]');
+  return el && chByKey[el.dataset.ch] ? el.dataset.ch : null;
+}
+// The short form, for a hover. The long form is the card, which is gateLibHtml
+// and already knows whether this chart carries the gate.
+function gateTipHtml(g) {
+  var L = (DATA.gateLib || {})[g] || {};
+  var here = (byGate[g] || []);
+  return '<b>Gate ' + g + '</b>' + esc(L.name || '') +
+    '<span style="opacity:.68"><br>' + esc(L.center || '') +
+    (L.circuit ? ' &middot; ' + esc(L.circuit) : '') +
+    (here.length ? '' : ' &middot; not in this chart') + '</span>' +
+    (L.keynote ? '<span class="tipbody">' + esc(L.keynote) + '</span>' : '');
+}
 function gateLibHtml(gate) {
   var L = (DATA.gateLib || {})[gate] || {};
   var here = (byGate[gate] || []);
@@ -6555,6 +6618,15 @@ document.addEventListener('click', function (e) {
     markRows(ct.dataset.center);
     return;
   }
+  // a gate or a channel in a view with no click handler of its own
+  var cg = gateFromTarget(e.target);
+  if (cg) { openCard(e.target, gateLibHtml(cg), null, cg); return; }
+  var ck = chanFromTarget(e.target);
+  if (ck) {
+    var cch = chByKey[ck];
+    openCard(e.target, chanHtml(cch), ck, [cch.srcGate, cch.tgtGate]);
+    return;
+  }
   if (!e.target.closest || !e.target.closest('.panel')) closeCard();
 });
 document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeCard(); });
@@ -6672,6 +6744,23 @@ document.addEventListener('mousemove', function (e) {
     show('<b>' + esc(k.name) + (k.stateLabel ? ' &middot; ' + k.stateLabel : '') +
       '</b><span class="meta">' + k.fns.join(' + ') +
       (k.biology ? '<br>' + esc(k.biology) : '') + '</span>' + prose(k.stateText));
+    return;
+  }
+  // Nothing above claimed it. Before giving up, ask whether this is a gate or a
+  // channel drawn by a view that has no handler of its own: the mandala's ring,
+  // the astrology bands, a bridge chip. They all answer the same as the bodygraph.
+  var ug = gateFromTarget(e.target);
+  if (ug) {
+    hot(null); markRows(null); litGate(ug);
+    showTip(e, gateTipHtml(ug));
+    return;
+  }
+  var uk = chanFromTarget(e.target);
+  if (uk) {
+    var uc = chByKey[uk];
+    hot(uk); litGate([uc.srcGate, uc.tgtGate]);
+    showTip(e, '<b>' + esc(uc.name) + '</b>' + esc(uc.circuitName) +
+      (uc.type ? ' \u00b7 ' + esc(uc.type) : ''));
     return;
   }
   hot(null); litGate(null); markRows(null); tip.hidden = true;
