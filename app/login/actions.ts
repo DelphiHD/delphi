@@ -5,10 +5,10 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
 function safeNext(value: FormDataEntryValue | null): string {
-  if (typeof value !== "string") return "/portal/welcome";
+  if (typeof value !== "string") return "/portal";
   return value.startsWith("/") && !value.startsWith("//")
     ? value
-    : "/portal/welcome";
+    : "/portal";
 }
 
 function siteUrl(): string {
@@ -31,7 +31,7 @@ export async function signInWithPassword(formData: FormData) {
   if (error) {
     const params = new URLSearchParams({
       error: error.message,
-      next: next === "/portal/welcome" ? "" : next,
+      next: next === "/portal" ? "" : next,
     });
     redirect(`/login?${params.toString()}`);
   }

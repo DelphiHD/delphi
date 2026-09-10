@@ -58,3 +58,7 @@ supabase/.branches/
 # Local sync checkpoints (extracted Notion content, not for git)
 .cache/
 .vercel
+
+# never a copy of the secrets either
+.env*.backup-*
+.env.local.backup*

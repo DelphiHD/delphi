@@ -16,7 +16,7 @@ export default async function SignupPage({
     data: { user },
   } = await supabase.auth.getUser();
   if (user) {
-    redirect("/portal/welcome");
+    redirect("/portal");
   }
 
   return (

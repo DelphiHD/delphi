@@ -26,7 +26,7 @@ export function SignupForm() {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: `${siteUrl}/auth/callback?next=/portal/welcome` },
+      options: { emailRedirectTo: `${siteUrl}/auth/callback?next=/portal` },
     });
 
     setStatus(error ? error.message : "Check your email to confirm your account.");

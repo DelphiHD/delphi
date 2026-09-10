@@ -15,7 +15,7 @@ type Mode = "password" | "magic";
 export function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get("next") ?? "/portal/welcome";
+  const next = params.get("next") ?? "/portal";
 
   const [mode, setMode] = useState<Mode>("password");
   const [email, setEmail] = useState("");
