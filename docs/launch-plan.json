@@ -225,6 +225,10 @@
   "decided": [
     {
       "on": "2026-09-10",
+      "what": "An attendee's chart makes Kaycee Delphi admin over it, not their analyst. Running the event is not the same as working with the person; that still takes a booking. So an event fills the funnel without filling her portal with people she has never sat down with."
+    },
+    {
+      "on": "2026-09-10",
       "what": "Events get a code, not their own instance. A second deployment would drift from the real one and split her signups; a code is the same form arriving tagged. Kaycee expects to run events regularly."
     },
     {
