@@ -111,7 +111,7 @@
           "id": "p2a",
           "title": "Inngest wired for long jobs",
           "status": "todo",
-          "note": "Reports run seven minutes to two hours. Nothing on Vercel or Supabase holds a job that long. An event of forty attendees with reports included is the case that decides this: forty long jobs, queued, retried and reported on, then released together."
+          "note": "Reports run seven minutes to two hours, and some fail. Nothing on Vercel or Supabase holds a job that long. Forty attendees with reports included is the case that decides this: forty long jobs, queued with lead time, each retried, each one's failure visible in time to fix it, then the lot released together."
         },
         {
           "id": "p2b",
@@ -129,7 +129,7 @@
           "id": "p2d",
           "title": "Purchase triggers the report, chart republishes with it",
           "status": "todo",
-          "note": "A report becomes visible when it is released, not the moment it is written. A purchase releases it straight away; an event holds every attendee's report until Kaycee publishes the batch. So a report needs a state between written and visible, and the chart republishes on release rather than on completion."
+          "note": "A report becomes visible when it is released, not the moment it is written. A purchase releases it straight away. A batch is held until every report in it is good, because a partial delivery is worse than a late one. So a report needs a state between written and visible, and the chart republishes on release rather than on completion."
         }
       ]
     },
@@ -203,9 +203,9 @@
         },
         {
           "id": "p5d",
-          "title": "Batch reports, released together",
+          "title": "Batch reports, released only when the batch is whole",
           "status": "todo",
-          "note": "Written ahead, held, then published as one moment in the room."
+          "note": "Run a day before or the morning of, not on the hour. The batch shows how many are written and how many failed, so failures can be fixed before anybody sees anything. Release is one deliberate act over the whole batch, never per report as each finishes."
         },
         {
           "id": "p5e",
@@ -249,7 +249,7 @@
     },
     {
       "on": "2026-09-10",
-      "what": "Pre-registration publishes the CHART immediately. Reports, when an event includes them, are batched and published together. Kaycee, 2026-09-10: \"I'll probably want to batch them and then publish them all at the same time.\" This means a report needs a state between written and visible, which the current design does not have."
+      "what": "Pre-registration publishes the CHART immediately. Reports, when an event includes them, are run with lead time (a day before, or the morning of) and released together only once the whole batch is good. The reason is not theatre, it is that reports fail sometimes: Kaycee, 2026-09-10, \"I just don't want to run into a situation where we're running a bunch of reports at the same time and only a handful get theirs because we run into an issue. I would rather resolve the issues and then publish to make it look more seamless.\" So a report needs a state between written and visible, and a batch needs to be visibly whole before it is released."
     },
     {
       "on": "2026-09-10",
