@@ -1,7 +1,7 @@
 {
   "project": "Client Portal",
   "goal": "Free chart is the hook. Account required. Reports, extra charts and a subscription are what sells.",
-  "updated": "2026-09-09",
+  "updated": "2026-09-10",
   "event": {
     "label": "Kaycee's event",
     "date": "2026-09-16",
@@ -41,8 +41,8 @@
         {
           "id": "p1e",
           "title": "Free tier renders the Delphi Basic layer",
-          "status": "todo",
-          "note": "Centres use Delphi Defined/Undefined/Open Basic; channels use Delphi Free Chart. Gates have no Basic field yet, so the keynote stands in. Kaycee is adding a Delphi Free Chart field to the gates database; the wiring waits on that sync."
+          "status": "done",
+          "note": "Done 10 September. Centres use Delphi Defined/Undefined/Open Basic; channels use Delphi Free Chart; gates now use Delphi Basic, which Kaycee wrote into the gates database on 9 September along with Delphi Bridge Text. All 64 gates carry both. A gate card shows her synthesis when the chart has one and her general words when it does not, the same rule a centre already followed, so a free chart says something real about every gate instead of falling back to a keynote."
         },
         {
           "id": "p1f",
@@ -80,6 +80,18 @@
           "title": "Sign in and come back to your charts",
           "status": "todo",
           "note": "The accounts exist already and sit dormant; there is nothing to sign into yet. Magic link rather than a password, and a page listing everything that person owns. Kaycee, 9 September: \"Let's attack that tomorrow.\" Not needed for the free chart, which never asks anyone to log in. Needed before anything is sold."
+        },
+        {
+          "id": "p1l",
+          "title": "One gate answer in every view, and the tables follow the chart",
+          "status": "done",
+          "note": "Done 10 September. Each view had grown its own handler, so a gate said something on the bodygraph, less on the mandala and nothing on the astrology ring. One shared function now answers for all four. Hovering a gate or a channel also lights its own placements in the tables, which only the transit column was doing. Mandala channels highlight (their rule was scoped to a canvas the mandala hub is not). Integration channels report a channel the person actually has, and a highlighted one is no longer buried under an overlapping neighbour."
+        },
+        {
+          "id": "p1m",
+          "title": "A transit reads for the date on screen, not the minute the chart was built",
+          "status": "done",
+          "note": "Done 10 September, verified live on 5 June 2027. The two-tone mark was baked at build time, so a gate the chosen date activates could never darken and four gates that only the build minute touched read as transited on every date. Every carried gate now has a sky half and the date decides its colour. All 37 charts republished."
         }
       ]
     },
