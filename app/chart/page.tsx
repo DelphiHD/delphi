@@ -209,7 +209,7 @@ export default function ChartPage() {
                 than guess.
               </p>
               <p>
-                <a href="https://cal.com/DelphiHumanDesign" target="_blank" rel="noreferrer">
+                <a href="https://cal.com/delphihumandesign/birth-time-rectification" target="_blank" rel="noreferrer">
                   Book A Rectification Session
                 </a>{" "}
                 if you would rather work it out from your life than from paperwork.
