@@ -10,7 +10,7 @@
   "phases": [
     {
       "id": "p1",
-      "title": "Phase 1 \u2014 Free chart, self-serve",
+      "title": "Phase 1 — Free chart, self-serve",
       "target": "2026-09-15",
       "why": "A stranger on the website gets a real chart in ten seconds, in the cloud, and leaves an email behind.",
       "items": [
@@ -36,7 +36,7 @@
           "id": "p1d",
           "title": "Public birth-details form with account signup",
           "status": "done",
-          "note": "The form is built at /chart: place chosen from the provider's lookup, birth time asked honestly with a part-of-day fallback, long-form birth certificate guidance and a rectification booking link. Still to add: the account itself, magic link rather than just an email field. Mobile: inputs are 16px so Safari does not zoom on focus, and the app declares a viewport."
+          "note": "The form is built at /chart: place chosen from the provider's lookup, birth time asked honestly with a part-of-day fallback, long-form birth certificate guidance and a rectification booking link. An account is created silently from the email they give, with no password and nothing for them to confirm, so their charts are already attached the day there is something to sign into. Mobile: inputs are 16px so Safari does not zoom on focus, and the app declares a viewport."
         },
         {
           "id": "p1e",
@@ -68,12 +68,24 @@
           "title": "The chart itself has to work on a phone",
           "status": "done",
           "note": "Done 9 September, verified by Kaycee on her own phone. All 37 charts republished with it."
+        },
+        {
+          "id": "p1j",
+          "title": "The chart arrives by email, not just in the tab that made it",
+          "status": "done",
+          "note": "Done 9 September, proven end to end on production: form to chart to inbox, Resend reporting Delivered rather than merely accepted. Sends from chart@send.delphihd.com so the root domain's SPF, which points at Google Workspace, is never touched. Replies go to hello@delphihd.com. Mail can never cost somebody their chart: it is reported, not thrown."
+        },
+        {
+          "id": "p1k",
+          "title": "Sign in and come back to your charts",
+          "status": "todo",
+          "note": "The accounts exist already and sit dormant; there is nothing to sign into yet. Magic link rather than a password, and a page listing everything that person owns. Kaycee, 9 September: \"Let's attack that tomorrow.\" Not needed for the free chart, which never asks anyone to log in. Needed before anything is sold."
         }
       ]
     },
     {
       "id": "p2",
-      "title": "Phase 2 \u2014 Paid reports",
+      "title": "Phase 2 — Paid reports",
       "target": "2026-09-23",
       "why": "The chart they already own fills in with Kaycee's synthesis. Better than a PDF arriving.",
       "items": [
@@ -104,7 +116,7 @@
     },
     {
       "id": "p3",
-      "title": "Phase 3 \u2014 Charts for friends and family",
+      "title": "Phase 3 — Charts for friends and family",
       "target": "2026-09-30",
       "why": "Highest margin item in the model. No LLM cost at all, just a chart.",
       "items": [
@@ -123,7 +135,7 @@
     },
     {
       "id": "p4",
-      "title": "Phase 4 \u2014 Subscription",
+      "title": "Phase 4 — Subscription",
       "target": "2026-10-07",
       "why": "Unlimited charts plus the daily transit synthesis. Recurring revenue.",
       "items": [
@@ -148,6 +160,18 @@
     }
   ],
   "decided": [
+    {
+      "on": "2026-09-09",
+      "what": "Chart emails send from send.delphihd.com, never the root. One SPF record per domain and hers points at Google Workspace, so a second sender on the apex would have risked hello@delphihd.com."
+    },
+    {
+      "on": "2026-09-09",
+      "what": "The free chart never asks anyone to log in. An account is made quietly from their email; login only ever appears at the paid tiers."
+    },
+    {
+      "on": "2026-09-09",
+      "what": "The chart email stays plain. Kaycee: \"Less to get flagged as spam.\" A new sending domain has no reputation, and image-heavy first sends are what tip filters."
+    },
     {
       "on": "2026-09-09",
       "what": "Inngest for long-running jobs. Kaycee: \"I don't want to run anything.\""
@@ -194,13 +218,13 @@
       "what": "Prices: full synthesis, extra chart, monthly."
     },
     {
-      "what": "Charts table schema, including the birth-time accuracy field. Needs Kaycee's sign-off before the migration runs."
-    },
-    {
       "what": "Whether to add a Delphi Basic field to the gates database in Notion."
     },
     {
       "what": "A rectification session does not exist on Cal.com yet. The form links to the booking page; it should link to that event type once it is created."
+    },
+    {
+      "what": "Whether the test chart made on 9 September to prove the email path (a second copy of Kaycee's own) is deleted or kept as a sample to show people."
     }
   ],
   "brief": "https://claude.ai/code/artifact/3428e24e-262a-4fd7-86a6-93468244cb44"
