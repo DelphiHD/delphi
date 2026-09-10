@@ -2852,6 +2852,13 @@ svg.canvas.plain .chgrp.hot path, svg.canvas.plain .chgrp.hot polygon,
 svg.canvas.plain .chgrp.hot rect { fill:${HL_GOLD} !important; }
 svg.canvas:not(.plain) .ch.hot path, svg.canvas:not(.plain) .ch.hot polygon,
 svg.canvas:not(.plain) .ch.hot rect { fill:${HL_GOLD} !important; }
+/* The bodygraph at the mandala's hub is not an svg.canvas, so both rules above
+   missed it entirely: hot() was marking its channels correctly and nothing was
+   painting them, which is why its gates and centers lit and the channel itself
+   never did. Kaycee, 2026-09-10: "the channels are still not highlighting on
+   the mandala view." */
+.mandala .chgrp.hot path, .mandala .chgrp.hot polygon, .mandala .chgrp.hot rect,
+.mandala .ch.hot path, .mandala .ch.hot polygon, .mandala .ch.hot rect { fill:${HL_GOLD} !important; }
 /* a single gate's leg lights the same way, solid rather than glowing */
 svg.canvas:not(.plain) .leg.lit path, svg.canvas:not(.plain) .leg.lit polygon,
 svg.canvas:not(.plain) .leg.lit rect { fill:${HL_GOLD} !important; }
@@ -2989,6 +2996,13 @@ body.view-transit #placements, body.view-transit #chandrop, body.view-transit #d
 body.show-bridges .bleg { fill:#d24dff !important; opacity:.62; }
 body.show-bridges .pnum.bnum { opacity:0; }
 body.show-bridges .bleg.on { fill:#d24dff !important; opacity:1; }
+/* Pointing at a bridging gate shows the leg it would complete, in bridge pink,
+   whether or not the Bridge gates toggle happens to be on. Without this,
+   hovering a gate in the Bridges list lit its disc and left the leg invisible,
+   so there was nothing to see where the channel would actually close.
+   Kaycee, 2026-09-10: "make sure the bridging gate leg highlights in pink on
+   mouseover." */
+.bleg.lit { fill:#d24dff !important; opacity:1; }
 body.show-bridges .bridge { opacity:1; }
 .bridge.on { opacity:1 !important; }
 .bridge.on circle { stroke:#f1c232; stroke-width:3; }
@@ -2996,10 +3010,6 @@ body.show-bridges .bridge { opacity:1; }
 .isle b { font-weight:600; }
 .isle .brg { cursor:pointer; border-bottom:1px dotted rgba(132,80,149,.6); }
 .isle .brg:hover { color:var(--purple); }
-.brgx { margin:7px 0 0 0; padding:7px 9px; border-radius:8px; background:rgba(132,80,149,.06); }
-.brgx .brg { cursor:pointer; font-weight:700; color:var(--purple);
-  border-bottom:1px dotted rgba(132,80,149,.6); }
-.brgn { font-weight:600; opacity:.85; }
 .basic { margin-top:8px; font-size:12.5px; line-height:1.62; }
 .brgt { margin-top:4px; font-size:12px; line-height:1.55; opacity:.85; }
 .isle .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px;
@@ -3494,22 +3504,17 @@ if (DATA.client) {
         }).join('')
       : '<div class="isle">No defined centers.</div>') +
     (bridges.length
+      // The list stays a list. Each gate carries what it would actually do in
+      // Kaycee's words, but on hover and click rather than printed underneath:
+      // seven bridging gates at four hundred characters each turned the panel
+      // into a wall. Kaycee, 2026-09-10: "I was expecting mouseover/click
+      // through effects."
       ? '<div class="isle" style="margin-top:7px"><b>Bridges</b> ' +
-        '<span style="opacity:.6">' + brGates.length +
-        (brGates.length === 1 ? ' gate would join the split' : ' gates would join the split') +
-        '</span></div>' +
-        // Each bridging gate says what it would actually do, in Kaycee's words,
-        // rather than one generic line covering all of them. The number keeps
-        // the .brg class so hovering it still lights the gate on the bodygraph.
         brGates.map(function (g) {
-          var L = (DATA.gateLib || {})[g] || {};
-          return '<div class="brgx">' +
-            '<span class="brg" data-gate="' + g + '">' + g + '</span> ' +
-            '<span class="brgn">' + esc(L.name || '') + '</span>' +
-            '<div class="brgt">' +
-            (L.bridge ? esc(L.bridge) : 'Would complete a channel across the split.') +
-            '</div></div>';
-        }).join('')
+          return '<span class="brg" data-gate="' + g + '">' + g + '</span>';
+        }).join(', ') + '</div>' +
+        '<div class="isle" style="opacity:.6">Each would complete a channel across the split. ' +
+        'Hover one to see what it would bring.</div>'
       : (isles.length > 1 ? '' : '<div class="isle" style="opacity:.6">One island: nothing to bridge.</div>'));
 
   // every gate of a channel that sits wholly inside an island
@@ -6464,6 +6469,16 @@ function litGate(gates) {
   [].forEach.call(document.querySelectorAll('.trow'), function (r) {
     r.classList.toggle('hi', !!want[+r.dataset.gate]);
   });
+  // and so does the client's own placement table. Only the transit column was
+  // following the highlight, so hovering a gate on a client chart left the
+  // placement rows showing whatever the last center hover had set: the whole
+  // center rather than the gate under the cursor. This also gives a channel its
+  // rows for free, because a channel lights both its gates. Kaycee, 2026-09-10:
+  // "when an active gate is hovered over in the bodygraph its associated
+  // placements on the placement tables will also be highlighted."
+  [].forEach.call(document.querySelectorAll('.prow'), function (r) {
+    r.classList.toggle('hi', sidesOf(r).some(function (p) { return !!want[p.gate]; }));
+  });
   // the wheel and the bodygraph at its hub follow the same highlight
   [].forEach.call(document.querySelectorAll('.hubring'), function (h) {
     h.classList.toggle('on', !!want[h.dataset.gate]);
@@ -6531,6 +6546,10 @@ function varHtml(v) {
 // the bodygraph, a cell or a hexagram on the mandala, a band on the astrology
 // ring, a chip in the definition list. This reads the gate off any of them, so
 // the answer below can be the same one every time.
+/** Whether this gate is one of the ones that would join this chart's split. */
+function isBridge(g) {
+  return ((DATA.client && DATA.client.bridges) || []).some(function (b) { return b.gate === +g; });
+}
 function gateFromTarget(t) {
   if (!t || !t.closest) return 0;
   var el = t.closest('[data-gatecell],[data-hex],.gateband[data-gate],.halo[data-gate],' +
@@ -6577,6 +6596,8 @@ function gateLibHtml(gate) {
     (L.keynote ? '<span class="meta"><i>Keynote:</i> ' + esc(L.keynote) + '</span>' : '') +
     (L.func ? '<span class="meta"><i>Function:</i> ' + esc(L.func) + '</span>' : '') +
     (L.basic ? '<div class="basic">' + esc(L.basic) + '</div>' : '') +
+    (isBridge(gate) && L.bridge
+      ? '<div class="basic"><i>If it bridged your split:</i> ' + esc(L.bridge) + '</div>' : '') +
     '<span class="meta">Not activated in this chart.</span>';
 }
 function propHtml(m) {
