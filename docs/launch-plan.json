@@ -78,8 +78,8 @@
         {
           "id": "p1k",
           "title": "Sign in and come back to your charts",
-          "status": "todo",
-          "note": "The accounts exist already and sit dormant; there is nothing to sign into yet. Magic link rather than a password, and a page listing everything that person owns. Kaycee, 9 September: \"Let's attack that tomorrow.\" Not needed for the free chart, which never asks anyone to log in. Needed before anything is sold."
+          "status": "doing",
+          "note": "The portal at /portal lists a person's charts, branded, live and verified with a real signed-in session on 10 September. Magic links can now return to charts.delphihd.com. Still to do: nothing is attached to any account yet, which waits on the ownership schema."
         },
         {
           "id": "p1l",
@@ -92,6 +92,12 @@
           "title": "A transit reads for the date on screen, not the minute the chart was built",
           "status": "done",
           "note": "Done 10 September, verified live on 5 June 2027. The two-tone mark was baked at build time, so a gate the chosen date activates could never darken and four gates that only the build minute touched read as transited on every date. Every carried gate now has a sky half and the date decides its colour. All 37 charts republished."
+        },
+        {
+          "id": "p1n",
+          "title": "The free chart cannot be run in a loop",
+          "status": "done",
+          "note": "Done 10 September. The endpoint had no rate limit, no captcha and no origin check, and every call created an account, called the provider, published a file and sent mail. Now limited per email, per caller and site-wide, with a hashed caller rather than a stored address. Accounts are created unconfirmed so none can be squatted, and an address that cannot receive mail is refused before anything is made."
         }
       ]
     },
@@ -173,6 +179,34 @@
   ],
   "decided": [
     {
+      "on": "2026-09-10",
+      "what": "The free chart is protected by a quiet rate limit, not a captcha. Kaycee, 2026-09-10: no visible 'prove you are human' step in front of the hook. Five charts an hour per email address, forty per caller, three hundred site-wide. The caller limit is deliberately loose because a room at an event shares one connection, and a limit tuned to stop a bot would have stopped her whole audience."
+    },
+    {
+      "on": "2026-09-10",
+      "what": "No email confirmation step before a chart is sent. You cannot confirm an address without emailing it, so the step would be friction on the hook for no real protection. The account is created UNCONFIRMED instead, so nobody can claim a standing account on somebody else's address, and the rate limit stops volume."
+    },
+    {
+      "on": "2026-09-10",
+      "what": "An address that cannot receive mail is refused before anything is created. Every bounce counts against her sending domain."
+    },
+    {
+      "on": "2026-09-10",
+      "what": "A chart outlives the account that made it. owner_id was set to cascade, so deleting an account silently deleted its charts; it is now set null. Verified by deleting a throwaway account and watching the chart survive."
+    },
+    {
+      "on": "2026-09-10",
+      "what": "charts.delphihd.com added to the Supabase redirect allow list. Magic links could only return to localhost or a Vercel address, so sign-in could never have worked for a real client on her own domain."
+    },
+    {
+      "on": "2026-09-10",
+      "what": "The portal lists a person's charts and nothing else, enforced by the database rather than by the query. Proven live: a query asking for all charts with no owner filter returned only that person's two out of thirty-nine."
+    },
+    {
+      "on": "2026-09-10",
+      "what": "Chart ownership: most seed clients will own their own account. The Hollingsheads sit under Paul, the Goodins under Erlene. Kaycee sees every chart as Delphi admin, but is only somebody's analyst, with their chart in her own portal, once they book. Schema for this not yet written."
+    },
+    {
       "on": "2026-09-09",
       "what": "Chart emails send from send.delphihd.com, never the root. One SPF record per domain and hers points at Google Workspace, so a second sender on the apex would have risked hello@delphihd.com."
     },
@@ -230,9 +264,6 @@
       "what": "Prices: full synthesis, extra chart, monthly."
     },
     {
-      "what": "Whether to add a Delphi Basic field to the gates database in Notion."
-    },
-    {
       "what": "A rectification session does not exist on Cal.com yet. The form links to the booking page; it should link to that event type once it is created."
     },
     {
@@ -240,6 +271,18 @@
     },
     {
       "what": "Planetary returns may want to be drawn like a relationship chart rather than a date on the transit view: the return overlaid on the natal chart, two states at once. Kaycee, 2026-09-10: the cross of the Uranus Opposition factors into a reading, so how the returns are displayed needs reconsidering. Parked by her the same day, not dropped."
+    },
+    {
+      "what": "Captcha on the auth endpoints is off. Supabase's per-IP limits are the only guard on sign-in, and per-IP limits do not stop anything distributed. Worth turning on if abuse ever appears; it needs a Turnstile or hCaptcha key."
+    },
+    {
+      "what": "The site refuses to be embedded in a frame by anyone (frame-ancestors none, X-Frame-Options DENY). Correct as a default, but the Wix embed will be blocked by it until an exception is carved out for the chart form alone."
+    },
+    {
+      "what": "Ownership schema: owner, Delphi admin, and analyst-of are three different things and today owner_id is being asked to mean all three, which is why no chart is attached to anyone. Needs a migration and policies before real people are invited."
+    },
+    {
+      "what": "http://localhost:3000/** is on the production redirect allow list. Dev convenience left in production; low risk, worth removing before launch."
     }
   ],
   "brief": "https://claude.ai/code/artifact/3428e24e-262a-4fd7-86a6-93468244cb44"
