@@ -1214,7 +1214,8 @@ function centerFunctions(chunks: Chunk[]): Record<Center, string[]> {
  *  channel, open means it carries nothing at all. Kaycee writes all three. */
 interface CenterStates { theme: string; defined: string; undefined: string; open: string }
 
-interface GateMeta { name: string; keynote: string; func: string; circuit: string; quarter: string }
+interface GateMeta { name: string; keynote: string; func: string; circuit: string;
+  quarter: string; basic: string; bridge: string }
 /** Per-gate detail from her HD Gates database, for the gate popups. */
 function gateMeta(chunks: Chunk[]): Record<number, GateMeta> {
   const out: Record<number, GateMeta> = {};
@@ -1229,6 +1230,10 @@ function gateMeta(chunks: Chunk[]): Record<number, GateMeta> {
       func: (m["Function - DBHD - The 9 Centers"] ?? "").split("\n")[0].trim(),
       circuit: (m["Human Design Circuits"] ?? "").trim(),
       quarter: (m.Quarter ?? m["HD Quarters"] ?? "").replace(/^\d+:\s*/, "").trim(),
+      // Kaycee's own words for the free tier, and for what this gate would do
+      // if it arrived to bridge a split. Both authored per gate in Notion.
+      basic: (m["Delphi Basic"] ?? "").trim(),
+      bridge: (m["Delphi Bridge Text"] ?? "").trim(),
     };
   }
   return out;
@@ -2574,6 +2579,9 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
           func: d.gateInfo[a.gate]?.func ?? "",
           circuit: d.gateInfo[a.gate]?.circuit ?? "",
           quarter: d.gateInfo[a.gate]?.quarter ?? "",
+          // Her general words for this gate. A chart with no synthesis of its
+          // own still says something real, the way a center already does.
+          basic: d.gateInfo[a.gate]?.basic ?? "",
           center: CENTER_DISPLAY[centerOf(a.gate)], cid: centerOf(a.gate),
           sign: signOf(a.gate, a.line, a.color, a.tone, a.base).sign,
           signDeg: r2(signOf(a.gate, a.line, a.color, a.tone, a.base).degree),
@@ -2599,6 +2607,8 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
         func: d.gateInfo[g]?.func ?? "",
         circuit: d.gateInfo[g]?.circuit ?? "",
         quarter: d.gateInfo[g]?.quarter ?? "",
+        basic: d.gateInfo[g]?.basic ?? "",
+        bridge: d.gateInfo[g]?.bridge ?? "",
         center: CENTER_DISPLAY[centerOf(g)], cid: centerOf(g),
       }]),
     ),
@@ -2957,6 +2967,12 @@ body.show-bridges .bridge { opacity:1; }
 .isle b { font-weight:600; }
 .isle .brg { cursor:pointer; border-bottom:1px dotted rgba(132,80,149,.6); }
 .isle .brg:hover { color:var(--purple); }
+.brgx { margin:7px 0 0 0; padding:7px 9px; border-radius:8px; background:rgba(132,80,149,.06); }
+.brgx .brg { cursor:pointer; font-weight:700; color:var(--purple);
+  border-bottom:1px dotted rgba(132,80,149,.6); }
+.brgn { font-weight:600; opacity:.85; }
+.basic { margin-top:8px; font-size:12.5px; line-height:1.62; }
+.brgt { margin-top:4px; font-size:12px; line-height:1.55; opacity:.85; }
 .isle .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px;
   vertical-align:middle; }
 .tabs { display:flex; gap:6px; margin:-4px 0 12px; }
@@ -3429,6 +3445,9 @@ if (DATA.client) {
   var ISLE_COLORS = ['#1d4ed8', '#0d9488', '#c2410c', '#be123c'];
   var isles = DATA.client.islands || [];
   var bridges = DATA.client.bridges || [];
+  var brGates = bridges.map(function (b) { return b.gate; })
+    .filter(function (g, i, a) { return a.indexOf(g) === i; })
+    .sort(function (a, b) { return a - b; });
   var centerName = {};
   DATA.centers.forEach(function (c) { centerName[c.id] = c.name; });
   document.getElementById('deflist').innerHTML =
@@ -3441,12 +3460,21 @@ if (DATA.client) {
       : '<div class="isle">No defined centers.</div>') +
     (bridges.length
       ? '<div class="isle" style="margin-top:7px"><b>Bridges</b> ' +
-        bridges.map(function (b) { return b.gate; })
-          .filter(function (g, i, a) { return a.indexOf(g) === i; })
-          .sort(function (a, b) { return a - b; })
-          .map(function (g) { return '<span class="brg" data-gate="' + g + '">' + g + '</span>'; })
-          .join(', ') + '</div>' +
-        '<div class="isle" style="opacity:.6">Each would complete a channel across the split.</div>'
+        '<span style="opacity:.6">' + brGates.length +
+        (brGates.length === 1 ? ' gate would join the split' : ' gates would join the split') +
+        '</span></div>' +
+        // Each bridging gate says what it would actually do, in Kaycee's words,
+        // rather than one generic line covering all of them. The number keeps
+        // the .brg class so hovering it still lights the gate on the bodygraph.
+        brGates.map(function (g) {
+          var L = (DATA.gateLib || {})[g] || {};
+          return '<div class="brgx">' +
+            '<span class="brg" data-gate="' + g + '">' + g + '</span> ' +
+            '<span class="brgn">' + esc(L.name || '') + '</span>' +
+            '<div class="brgt">' +
+            (L.bridge ? esc(L.bridge) : 'Would complete a channel across the split.') +
+            '</div></div>';
+        }).join('')
       : (isles.length > 1 ? '' : '<div class="isle" style="opacity:.6">One island: nothing to bridge.</div>'));
 
   // every gate of a channel that sits wholly inside an island
@@ -3518,7 +3546,8 @@ if (DATA.client) {
     litGate(+el.dataset.gate);
     var L = (DATA.gateLib || {})[el.dataset.gate] || {};
     showTip(e, '<b>Gate ' + el.dataset.gate + '</b>' + esc(L.name || '') + '<br>' +
-      '<span style="opacity:.7">would complete a channel across the split</span>');
+      '<span style="opacity:.7">' +
+      (L.bridge ? esc(L.bridge) : 'would complete a channel across the split') + '</span>');
   });
   document.getElementById('deflist').addEventListener('click', function (e) {
     var el = e.target.closest ? e.target.closest('.brg') : null;
@@ -6408,6 +6437,7 @@ function gateLibHtml(gate) {
           L.center ? { text: L.center } : null]) +
     (L.keynote ? '<span class="meta"><i>Keynote:</i> ' + esc(L.keynote) + '</span>' : '') +
     (L.func ? '<span class="meta"><i>Function:</i> ' + esc(L.func) + '</span>' : '') +
+    (L.basic ? '<div class="basic">' + esc(L.basic) + '</div>' : '') +
     '<span class="meta">Not activated in this chart.</span>';
 }
 function propHtml(m) {
@@ -6445,7 +6475,8 @@ function gateHtml(p) {
           { text: p.center }]) +
     (p.keynote ? '<span class="meta"><i>Keynote:</i> ' + esc(p.keynote) + '</span>' : '') +
     (p.func ? '<span class="meta"><i>Function:</i> ' + esc(p.func) + '</span>' : '') +
-    prose(p.report);
+    (p.report ? prose(p.report)
+              : (p.basic ? '<div class="basic">' + esc(p.basic) + '</div>' : ''));
 }
 
 function openCard(el, html, key, gate) {
