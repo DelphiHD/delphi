@@ -482,3 +482,21 @@ both sections were correct: "Yes to the definition thing... They are correct."
 This rule was not new and was not caused by that day's work: it has fired seven times
 since the Phase 4 build, in May, June twice, July, and twice on 2026-08-30, when three
 reports were generated in one day.
+
+## Chart emails send from a subdomain, not the root (2026-09-09)
+
+A chart made through the website used to exist only as a link in whichever tab made
+it. Close the tab at an event and a stranger has lost the thing they just handed
+their birth details over for. Chart emails now go out through Resend.
+
+They send from `chart@send.delphihd.com`, not `delphihd.com`. A domain gets one SPF
+record and Kaycee's already points at Google Workspace, so a second sender on the
+root would have put `hello@delphihd.com` at risk. Records on `send.delphihd.com`
+cannot touch her actual mail. All three (DKIM TXT, two SES CNAMEs) were added in the
+Wix DNS panel and verified the same afternoon; the apex was never touched.
+
+Replies go to `hello@delphihd.com`. The sending subdomain only sends, so without
+that, anyone answering their chart email would have been talking to nobody.
+
+Mail is never fatal: `sendChartEmail` returns whether it went and does not throw. A
+chart that exists must not be undone by a mail server having a bad afternoon.
