@@ -211,15 +211,30 @@ const DESIGN_RED = "#e06666";
 const HL_GOLD = "#f1c232";
 
 // Kaycee's booking page. Client charts link straight to the individual sessions
-// so anyone holding a chart can book without going back through her. Drop-In is
-// hidden from the public page on purpose and stays reachable by direct link:
-// whoever is holding a chart is already a client, which is who it is for.
+// so anyone holding a chart can book without going back through her.
 const BOOKING_URL = "https://cal.com/DelphiHumanDesign";
 const BOOKING_SESSIONS = [
   { slug: "foundation-session", name: "Foundation Session", meta: "2 hr &middot; $200" },
   { slug: "relationship-session", name: "Relationship Session", meta: "2 hr &middot; $300" },
-  { slug: "drop-in", name: "Drop-In", meta: "30 min &middot; $50" },
+  { slug: "birth-time-rectification", name: "Birth Time Rectification", meta: "2 hr &middot; $250" },
 ];
+
+// Drop-In is not for everybody holding a chart. It is hidden from the public
+// booking page on purpose, and it is for people who have already sat down with
+// her. That reasoning held while only her own roster had charts; the moment a
+// stranger could make one from the website it started offering a returning
+// client's session to somebody she has never met. Kaycee, 2026-09-10: "I only
+// want that to appear for clients of mine who have had a foundation or
+// rectification session. Not for basic charts or on the wider booking page."
+const DROP_IN = { slug: "drop-in", name: "Drop-In", meta: "30 min &middot; $50" };
+
+/** Whether this chart belongs to somebody who has actually sat down with her. */
+function isEstablishedClient(brief: ClientBrief): boolean {
+  const tier = (brief as { tier?: string }).tier;
+  return !tier || tier === "seed";        // her own roster, built from the CLI
+}
+
+
 
 const TABLE_W = 132, TABLE_GAP = 22;
 const TUBE = 8.7;                       // channel width in the delphi design
@@ -832,6 +847,9 @@ interface ClientCtx {
     color: number; tone: number; base: number }[];
   subtitle: { personality: string[]; design: string[] };
   outDir: string;
+  /** Whether this is somebody Kaycee has actually sat down with. Decides
+   *  whether the returning-client session is offered. */
+  established: boolean;
 }
 
 /** "2 / 4" -> "2 / 4 Hermit Opportunist", the way Kaycee names it. */
@@ -927,6 +945,7 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
     // are found on disk by the person's name, so a portal chart for somebody who
     // happens to share a name with a client would have picked theirs up. What
     // decides it is the tier on the chart, not what is lying in a folder.
+    established: isEstablishedClient(brief),
     report: entitledToReports(brief)
       ? loadReports(brief.slug, brief.name, clientOutputDir(brief), {
           signature: chart.signature.value, notSelf: chart.notSelfTheme.value,
@@ -3419,7 +3438,7 @@ ${d.client ? "" : viewControls}
     </details>
 
     </div>
-${d.client ? `<div class="booknote"><div class="booklab">Book a session</div>${BOOKING_SESSIONS.map(
+${d.client ? `<div class="booknote"><div class="booklab">Book a session</div>${(d.client.established ? [...BOOKING_SESSIONS, DROP_IN] : BOOKING_SESSIONS).map(
       (s) => `<a href="${BOOKING_URL}/${s.slug}" target="_blank" rel="noopener"><span>${s.name}</span><em>${s.meta}</em></a>`,
     ).join("")}</div>` : ""}
 ${d.client ? "" : `<div class="readout" id="readout"><b>Hover the bodygraph</b><span class="meta">Click to pin a description over the chart.</span></div>
@@ -6031,11 +6050,60 @@ if (DATA.client && DATA.client.variables) {
 
 function esc(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
 function show(html) { if (readout) readout.innerHTML = html; }
+// Where each channel group sat before anything was hovered. SVG has no
+// z-index, so the only way to raise a shape is to move it later in the
+// document, and the only way to put it back is to remember where it was.
+var chHome = null;
+function rememberChannelOrder() {
+  if (chHome) return;
+  chHome = [];
+  [].forEach.call(document.querySelectorAll('.ch, .chgrp'), function (g) {
+    chHome.push({ el: g, parent: g.parentNode, next: g.nextSibling });
+  });
+}
 function hot(key) {
+  rememberChannelOrder();
   // .chgrp holds the drawn legs in the plain view, .ch in the circuit view
   [].forEach.call(document.querySelectorAll('.ch, .chgrp'), function (g) {
     g.classList.toggle('hot', !!key && g.dataset.ch === key);
   });
+  // Put every group back where the design drew it, then raise only the hot one.
+  //
+  // The integration channels overlap: 10-34, 20-34 and 34-57 each carry their
+  // own copy of the stretch between the Sacral and the junction, drawn one on
+  // top of another. Highlighting 10-34 really did colour its legs gold, and a
+  // neighbouring channel's black copy was painted over the top, so the middle
+  // of the channel looked dead. Kaycee, 2026-09-10: "the leg in the middle
+  // isn't highlighting because it's assigned to gate 20."
+  for (var i = 0; i < chHome.length; i++) {
+    var h = chHome[i];
+    if (h.el.classList.contains('hot')) continue;
+    if (h.el.nextSibling !== h.next) h.parent.insertBefore(h.el, h.next);
+  }
+  if (key) {
+    var lift = document.querySelectorAll('.ch.hot, .chgrp.hot');
+    [].forEach.call(lift, function (g) { if (g.parentNode) g.parentNode.appendChild(g); });
+  }
+}
+
+/** Which channel a hover over overlapping legs actually means.
+ *
+ *  Several integration channels lie on the same pixels, and the one that
+ *  happens to be topmost is not necessarily the one this person carries.
+ *  Reporting a channel they do not have is worse than saying nothing.
+ *  Kaycee, 2026-09-10: "when I hover over the gate 10 leg it only shows the
+ *  10-57 which isn't active in my chart." */
+function chanUnder(e, el) {
+  var mine = (DATA.client && DATA.client.defined) || [];
+  var here = el && el.dataset ? el.dataset.ch : null;
+  if (!here || mine.indexOf(here) >= 0) return here;
+  if (!document.elementsFromPoint) return here;
+  var stack = document.elementsFromPoint(e.clientX, e.clientY);
+  for (var i = 0; i < stack.length; i++) {
+    var g = stack[i].closest ? stack[i].closest('[data-ch]') : null;
+    if (g && mine.indexOf(g.dataset.ch) >= 0) return g.dataset.ch;
+  }
+  return here;
 }
 function markCenter(cid) {
   // a center outlines even when it holds no activated gate
@@ -6482,10 +6550,18 @@ function chanFromTarget(t) {
 function gateTipHtml(g) {
   var L = (DATA.gateLib || {})[g] || {};
   var here = (byGate[g] || []);
+  // What this chart does with the gate comes first when it has one, because
+  // that is the thing the person is actually looking at. The library's own
+  // words carry the rest, and stand alone for a gate they do not carry.
+  var who = here.map(function (p) {
+    return (p.side === 'design' ? 'Design ' : 'Personality ') + esc(p.planet) +
+      ' ' + p.gate + '.' + p.line;
+  }).join(' &middot; ');
   return '<b>Gate ' + g + '</b>' + esc(L.name || '') +
     '<span style="opacity:.68"><br>' + esc(L.center || '') +
     (L.circuit ? ' &middot; ' + esc(L.circuit) : '') +
     (here.length ? '' : ' &middot; not in this chart') + '</span>' +
+    (who ? '<span style="opacity:.85"><br>' + who + '</span>' : '') +
     (L.keynote ? '<span class="tipbody">' + esc(L.keynote) + '</span>' : '');
 }
 function gateLibHtml(gate) {
@@ -6681,15 +6757,14 @@ document.addEventListener('mousemove', function (e) {
     var L = (DATA.gateLib || {})[cg];
     if (L) {
       hot(null); markRows(null); litGate(+cg);
-      showTip(e, '<b>Gate ' + cg + '</b>' + esc(L.name) + (L.keynote ? '<br>' + esc(L.keynote) : ''));
+      showTip(e, gateTipHtml(+cg));
       return;
     }
   }
   var hg = e.target.closest ? e.target.closest('.mandala .pleg, .mandala .pnum, .mandala .gdisc') : null;
   if (hg && hg.dataset.gate) {
-    var HL = (DATA.gateLib || {})[hg.dataset.gate];
     hot(null); markRows(null); litGate(+hg.dataset.gate);
-    if (HL) showTip(e, '<b>Gate ' + hg.dataset.gate + '</b>' + esc(HL.name));
+    showTip(e, gateTipHtml(+hg.dataset.gate));
     return;
   }
   var trow = e.target.closest ? e.target.closest('.trow') : null;
@@ -6723,11 +6798,15 @@ document.addEventListener('mousemove', function (e) {
     return;
   }
   var halo = e.target.closest ? e.target.closest('.halo') : null;
-  if (halo) { litGate(halo.dataset.gate); return; }
-  var ch = e.target.closest ? e.target.closest('.ch') : null;
-  if (ch) {
-    var c = chByKey[ch.dataset.ch];
-    hot(ch.dataset.ch); litGate([c.srcGate, c.tgtGate]);
+  if (halo) {
+    litGate(halo.dataset.gate);
+    showTip(e, gateTipHtml(+halo.dataset.gate));
+    return;
+  }
+  var ch = e.target.closest ? e.target.closest('[data-ch]') : null;
+  if (ch && chByKey[chanUnder(e, ch)]) {
+    var c = chByKey[chanUnder(e, ch)];
+    hot(c.key); litGate([c.srcGate, c.tgtGate]);
     showTip(e, '<b>' + esc(c.name) + '</b>' + esc(c.circuitName) + (c.type ? ' · ' + esc(c.type) : ''));
     show('<b>' + esc(c.name) + '</b><span class="meta">' + esc(c.circuitName) +
       (c.type ? ' · ' + esc(c.type) : '') +
