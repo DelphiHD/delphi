@@ -296,13 +296,17 @@ export default function ChartPage() {
            great, this looks funny."
            min-height 100vh so the card fills whatever height the section is
            given, instead of leaving a strip of page underneath it. */
-        body.compact { background: #0b0913; }
-        body.compact .wrap { padding: 0; max-width: none; }
+        /* A slim white frame, even on all four sides, so the card lifts off the
+           starfield behind it the way the widget it replaces did. Not a field of
+           white: the card fills everything inside the frame, whatever height the
+           section is given, so there is never a dead strip underneath.
+           Kaycee, 2026-09-10: "there was a slight white border around the
+           bodygraph widget so it stood out from the hero image, but it wasn't
+           half a page of white space." */
+        body.compact .wrap { padding: 14px; max-width: none; }
         body.compact .card {
-          border-radius: 0;
-          box-shadow: none;
-          min-height: 100vh;
-          padding: 26px 28px 28px;
+          min-height: calc(100vh - 28px);
+          padding: 24px 26px 26px;
           display: flex;
           flex-direction: column;
           justify-content: center;
