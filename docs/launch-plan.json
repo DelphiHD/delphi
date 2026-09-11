@@ -53,8 +53,8 @@
         {
           "id": "p1g",
           "title": "Replace the chart tool on the Wix site with an embed",
-          "status": "todo",
-          "note": "Points at charts.delphihd.com. The apex never moves."
+          "status": "done",
+          "note": "Done 10 September. Her own form replaced the bodygraph.com widget on the home page hero, desktop and mobile, live at delphihd.com. The old widget collected an email address that went to bodygraph.com; every signup now lands in her own database. The embed only works because /chart carries an exception to the site's no-framing rule, naming her domains AND the Wix sandbox the embed renders inside. Left over: the time of birth field clips slightly on mobile. Kaycee, 2026-09-10: \"we can fix that tomorrow.\""
         },
         {
           "id": "p1h",
@@ -223,6 +223,10 @@
     }
   ],
   "decided": [
+    {
+      "on": "2026-09-10",
+      "what": "Wix wraps every HTML embed in its own sandbox frame served from filesusr.com, so frame-ancestors has to name the sandbox as well as her site. Naming delphihd.com alone leaves the embed blank with no error, which cost an hour. Worth remembering for any future embed."
+    },
     {
       "on": "2026-09-10",
       "what": "Owner, Delphi admin and analyst are three separate things in the database now, applied and verified. Kaycee is an admin, so all 37 appear in her portal without an account being created for anybody. No chart was attached to a person: that means creating an account for them, which they should hear about from her rather than discover."
