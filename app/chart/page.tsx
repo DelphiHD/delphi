@@ -331,7 +331,7 @@ export default function ChartPage() {
         }
         label {
           display: block;
-          color: rgba(255, 255, 255, 0.62);
+          color: rgba(255, 255, 255, 0.86);
           font-size: 10.5px;
           font-weight: 600;
           letter-spacing: 0.13em;
@@ -348,17 +348,17 @@ export default function ChartPage() {
           font-size: 16px;
           padding: 11px 2px;
           border: 0;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.28);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.42);
           border-radius: 0;
           background: transparent;
           color: #fff;
         }
-        input::placeholder { color: rgba(255, 255, 255, 0.42); }
+        input::placeholder { color: rgba(255, 255, 255, 0.58); }
         input:focus { outline: none; border-bottom-color: var(--purple-light); }
         /* A time field is a handful of characters in a wide empty row, which
            reads as nothing at all on a phone. This one gets an edge. */
         input.boxed {
-          border: 1px solid rgba(255, 255, 255, 0.34);
+          border: 1px solid rgba(255, 255, 255, 0.46);
           border-radius: 12px;
           padding: 12px 14px;
           background: rgba(255, 255, 255, 0.06);
@@ -367,7 +367,7 @@ export default function ChartPage() {
         /* The date and time pickers draw their own controls; without this they
            come out as dark glyphs on a dark field and look broken. */
         input[type="date"], input[type="time"] { color-scheme: dark; }
-        .fine { color: rgba(255, 255, 255, 0.6); font-size: 12px; margin: 7px 0 0; line-height: 1.55; }
+        .fine { color: rgba(255, 255, 255, 0.76); font-size: 12px; margin: 7px 0 0; line-height: 1.55; }
         .fine.ok { color: var(--purple-light); font-weight: 500; }
         .error {
           background: rgba(224, 102, 102, 0.16); color: #ffd9d5; border-radius: 12px;
@@ -397,8 +397,8 @@ export default function ChartPage() {
         .chips { display: flex; flex-wrap: wrap; gap: 7px; }
         .chip {
           font: inherit; font-size: 12.5px; padding: 8px 15px; border-radius: 999px;
-          border: 1px solid rgba(255, 255, 255, 0.3); background: transparent;
-          color: rgba(255, 255, 255, 0.8); cursor: pointer;
+          border: 1px solid rgba(255, 255, 255, 0.42); background: transparent;
+          color: rgba(255, 255, 255, 0.92); cursor: pointer;
         }
         .chip:hover { border-color: #fff; color: #fff; }
         .chip.on { background: #fff; border-color: #fff; color: var(--ink); font-weight: 600; }
