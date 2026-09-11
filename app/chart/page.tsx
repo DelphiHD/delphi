@@ -154,9 +154,12 @@ export default function ChartPage() {
               <label htmlFor="email">Email</label>
               <input id="email" type="email" value={email} autoComplete="email"
                 onChange={(e) => setEmail(e.target.value)} />
+              {/* Under the email, not under the name. Side by side it was
+                  sitting beneath the wrong field and reading as a note about
+                  what her name would be used for. */}
+              <p className="fine">So we can send you the link. Nothing else.</p>
             </div>
           </div>
-          <p className="fine">So we can send you the link. Nothing else.</p>
 
           <label htmlFor="place">Place of birth</label>
           <input id="place" value={placeText} autoComplete="off"
@@ -367,6 +370,9 @@ export default function ChartPage() {
         /* Inside a pair the first label must not push its row down, or the two
            columns start at different heights. */
         .pair label { margin-top: 16px; }
+        /* The note lives inside a column now, so it must not crowd the label of
+           the row beneath it. */
+        .pair .fine { margin-bottom: 0; }
         .chips { display: flex; flex-wrap: wrap; gap: 7px; }
         .chip {
           font: inherit; font-size: 12.5px; padding: 8px 15px; border-radius: 999px;
