@@ -35,6 +35,22 @@ const PART_OF_DAY: { key: string; label: string; time: string }[] = [
 ];
 
 export default function ChartPage() {
+  // Embedded in her home page this form has to live inside a hero, next to a
+  // heading, on a laptop screen. On its own page it can breathe. Same form,
+  // two amounts of room. Detected rather than configured, so the Wix embed
+  // needs no special URL and cannot be pasted in wrong.
+  const [, setCompact] = useState(false);
+  useEffect(() => {
+    let inFrame = false;
+    try {
+      inFrame = window.self !== window.top || new URLSearchParams(location.search).has("embed");
+    } catch {
+      inFrame = true;     // blocked from reading the parent means we are in one
+    }
+    setCompact(inFrame);
+    document.body.classList.toggle("compact", inFrame);
+  }, []);
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [birthDate, setBirthDate] = useState("");
@@ -123,13 +139,23 @@ export default function ChartPage() {
         </section>
       ) : (
         <section className="card">
-          <label htmlFor="name">Your name</label>
-          <input id="name" value={name} onChange={(e) => setName(e.target.value)}
-            autoComplete="name" />
-
-          <label htmlFor="email">Email</label>
-          <input id="email" type="email" value={email} autoComplete="email"
-            onChange={(e) => setEmail(e.target.value)} />
+          {/* Side by side rather than stacked. Embedded in a hero there is
+              width going spare and no height at all, and every stacked field
+              is another seventy pixels the section has to find.
+              Kaycee, 2026-09-10: "It feels like there is plenty of room to be
+              wider, but not taller." */}
+          <div className="pair">
+            <div>
+              <label htmlFor="name">Your name</label>
+              <input id="name" value={name} onChange={(e) => setName(e.target.value)}
+                autoComplete="name" />
+            </div>
+            <div>
+              <label htmlFor="email">Email</label>
+              <input id="email" type="email" value={email} autoComplete="email"
+                onChange={(e) => setEmail(e.target.value)} />
+            </div>
+          </div>
           <p className="fine">So we can send you the link. Nothing else.</p>
 
           <label htmlFor="place">Place of birth</label>
@@ -149,21 +175,25 @@ export default function ChartPage() {
           )}
           {place && <p className="fine ok">Using {place.value} · {place.timezone}</p>}
 
-          <label htmlFor="date">Date of birth</label>
-          <input id="date" type="date" value={birthDate}
-            onChange={(e) => setBirthDate(e.target.value)} />
+          <div className="pair">
+            <div>
+              <label htmlFor="date">Date of birth</label>
+              <input id="date" type="date" value={birthDate}
+                onChange={(e) => setBirthDate(e.target.value)} />
+            </div>
 
           {/* The time comes before the question about it: people know the time
               or they do not, and asking how sure they are before they have
               typed anything is backwards. It was also easy to miss underneath
               four buttons, especially on a phone. */}
-          {needsTime && (
-            <>
-              <label htmlFor="time">Time of birth</label>
-              <input id="time" className="boxed" type="time" value={birthTime}
-                onChange={(e) => setBirthTime(e.target.value)} />
-            </>
-          )}
+            {needsTime && (
+              <div>
+                <label htmlFor="time">Time of birth</label>
+                <input id="time" className="boxed" type="time" value={birthTime}
+                  onChange={(e) => setBirthTime(e.target.value)} />
+              </div>
+            )}
+          </div>
 
           <label>{needsTime ? "How sure is that time?" : "Birth time"}</label>
           <div className="chips">
@@ -251,6 +281,12 @@ export default function ChartPage() {
            Kaycee, 2026-09-10: "it would be nice if the white border was the same
            all the way around and it fit on one page... just enough to make it pop." */
         .wrap { width: 100%; max-width: 900px; margin: 0 auto; padding: 22px; }
+        /* Inside her page the hero says "Know Thyself." right above this, so
+           the page's own title is said twice and costs height that the section
+           does not have. */
+        body.compact h1 { display: none; }
+        body.compact .wrap { padding: 18px; }
+        body.compact .card { padding: 22px 22px 24px; }
         h1 {
           font-weight: 400;
           font-size: clamp(21px, 4vw, 27px);
@@ -323,6 +359,14 @@ export default function ChartPage() {
           cursor: pointer; color: #fff;
         }
         .places button:hover { background: rgba(255, 255, 255, 0.12); }
+        /* Two fields to a row wherever there is room for two, one where there
+           is not. A phone falls back to stacked on its own. */
+        .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
+        .pair > div:only-child { grid-column: 1 / -1; }
+        @media (max-width: 520px) { .pair { grid-template-columns: 1fr; gap: 0; } }
+        /* Inside a pair the first label must not push its row down, or the two
+           columns start at different heights. */
+        .pair label { margin-top: 16px; }
         .chips { display: flex; flex-wrap: wrap; gap: 7px; }
         .chip {
           font: inherit; font-size: 12.5px; padding: 8px 15px; border-radius: 999px;
