@@ -387,7 +387,12 @@ export default function ChartPage() {
            is not. A phone falls back to stacked on its own. */
         .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
         .pair > div:only-child { grid-column: 1 / -1; }
-        @media (max-width: 520px) { .pair { grid-template-columns: 1fr; gap: 0; } }
+        @media (max-width: 520px) {
+          .pair { grid-template-columns: 1fr; gap: 0; }
+          /* Stacked, the email note is directly above the next label instead
+             of beside it, so it needs its spacing back. */
+          .pair .fine { margin-bottom: 10px; }
+        }
         /* Inside a pair the first label must not push its row down, or the two
            columns start at different heights. */
         .pair label { margin-top: 16px; }
