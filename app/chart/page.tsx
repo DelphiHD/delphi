@@ -128,7 +128,15 @@ export default function ChartPage() {
             This link is yours. It works on any device and it stays live, so
             save it somewhere you will find it again.
           </p>
-          <a className="go" href={result.url}>Open My Chart</a>
+          {/* A new tab, always. Embedded in her home page this link was
+              trying to load the chart INSIDE Wix's frame, and a chart refuses
+              to be framed by anyone, so the form appeared to fail at the last
+              step even though the chart had been made and the email had gone.
+              Kaycee, 2026-09-10: "The links in the email work, but actually
+              loading a chart from the widget fails in both cases."
+              It is also the right behaviour on its own page: a chart is a big
+              document, and it should not replace the form that made it. */}
+          <a className="go" href={result.url} target="_blank" rel="noreferrer">Open My Chart</a>
           <p className="fine">
             {result.emailed
               ? `Sent to ${email} as well, so you have it twice.`
