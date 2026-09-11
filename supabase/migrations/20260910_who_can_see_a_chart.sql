@@ -1,4 +1,6 @@
--- PROPOSED. Nothing here has been run. Read it, change it, then say the word.
+-- Applied 2026-09-10, approved by Kaycee. Verified by signing two people in on
+-- production: an admin saw all 37 charts, an ordinary chart account saw its own
+-- one out of 38. Same page, same query, different answers.
 --
 -- Who can see a chart, when it is not their own.
 --

@@ -79,7 +79,7 @@
           "id": "p1k",
           "title": "Sign in and come back to your charts",
           "status": "doing",
-          "note": "The portal at /portal lists a person's charts, branded, live and verified with a real signed-in session on 10 September. Magic links can now return to charts.delphihd.com. Still to do: nothing is attached to any account yet, which waits on the ownership schema."
+          "note": "The portal at /portal lists a person's charts, branded, live. Ownership applied 10 September: an admin sees everything, a chart account sees only their own, an analyst sees their clients'. Proven on production with two signed-in people. Still to do: inviting the 37, which is a deliberate act, and the family groupings decided then."
         },
         {
           "id": "p1l",
@@ -223,6 +223,10 @@
     }
   ],
   "decided": [
+    {
+      "on": "2026-09-10",
+      "what": "Owner, Delphi admin and analyst are three separate things in the database now, applied and verified. Kaycee is an admin, so all 37 appear in her portal without an account being created for anybody. No chart was attached to a person: that means creating an account for them, which they should hear about from her rather than discover."
+    },
     {
       "on": "2026-09-10",
       "what": "Most people are chart accounts: an account, their charts, no working relationship. Booking a session is what changes it, because that is where it becomes ongoing coaching, and only then is Kaycee their analyst. Her words: \"unless they book a session, at that point it really turns into an ongoing coaching kind of situation and changes the relationship, but in general most attendees will just be chart accounts.\""
