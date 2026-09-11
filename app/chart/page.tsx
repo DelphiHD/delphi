@@ -244,14 +244,20 @@ export default function ChartPage() {
           color: var(--ink);
           -webkit-font-smoothing: antialiased;
         }
-        .wrap { max-width: 560px; margin: 0 auto; padding: 40px 20px 56px; }
+        /* The card fills its box with an even white margin all round, rather than
+           sitting narrow in a wide white field. Embedded in her home page the box
+           is about 800 wide, so the white reads as a thin frame that makes the
+           card pop instead of a broad border down two sides only.
+           Kaycee, 2026-09-10: "it would be nice if the white border was the same
+           all the way around and it fit on one page... just enough to make it pop." */
+        .wrap { width: 100%; max-width: 900px; margin: 0 auto; padding: 22px; }
         h1 {
           font-weight: 400;
           font-size: clamp(21px, 4vw, 27px);
           letter-spacing: 0.02em;
           color: var(--ink);
           text-align: center;
-          margin: 0 0 22px;
+          margin: 0 0 14px;
           text-wrap: balance;
         }
         .card {
