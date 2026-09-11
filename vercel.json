@@ -26,7 +26,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://us-assets.i.posthog.com https://us.i.posthog.com https://*.vercel.live; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://us.i.posthog.com https://us-assets.i.posthog.com https://api.stripe.com https://*.vercel.live; frame-src 'self' https://js.stripe.com https://hooks.stripe.com; frame-ancestors 'self' https://delphihd.com https://www.delphihd.com https://*.wixsite.com https://*.wix.com https://*.editor.wix.com; base-uri 'self'; form-action 'self'; object-src 'none'"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://us-assets.i.posthog.com https://us.i.posthog.com https://*.vercel.live; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://us.i.posthog.com https://us-assets.i.posthog.com https://api.stripe.com https://*.vercel.live; frame-src 'self' https://js.stripe.com https://hooks.stripe.com; frame-ancestors 'self' https://delphihd.com https://www.delphihd.com https://*.wixsite.com https://*.wix.com https://*.editor.wix.com https://*.filesusr.com https://*.wixstatic.com; base-uri 'self'; form-action 'self'; object-src 'none'"
         }
       ]
     },
