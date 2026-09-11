@@ -288,8 +288,25 @@ export default function ChartPage() {
            the page's own title is said twice and costs height that the section
            does not have. */
         body.compact h1 { display: none; }
-        body.compact .wrap { padding: 18px; }
-        body.compact .card { padding: 22px 22px 24px; }
+        /* Embedded, the card IS the box. The white was this page's own
+           background showing around a card that sat inside it, which is why it
+           read as a border of its own rather than part of her page. The widget
+           it replaces had no white at all: the form filled its frame.
+           Kaycee, 2026-09-10: "The dimensions of the bodygraph widget were
+           great, this looks funny."
+           min-height 100vh so the card fills whatever height the section is
+           given, instead of leaving a strip of page underneath it. */
+        body.compact { background: #0b0913; }
+        body.compact .wrap { padding: 0; max-width: none; }
+        body.compact .card {
+          border-radius: 0;
+          box-shadow: none;
+          min-height: 100vh;
+          padding: 26px 28px 28px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+        }
         h1 {
           font-weight: 400;
           font-size: clamp(21px, 4vw, 27px);
