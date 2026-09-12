@@ -14,12 +14,6 @@
 
 "use client";
 
-// Never cached. This page changes as Kaycee changes it, and a pre-rendered copy
-// sitting at the edge means she makes an edit, checks her phone, and is shown
-// the old one. There is nothing to gain from caching a form.
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
 import { useEffect, useRef, useState } from "react";
 
 type Accuracy = "document" | "told" | "approximate" | "unknown";
