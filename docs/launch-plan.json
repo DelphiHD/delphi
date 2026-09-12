@@ -396,6 +396,22 @@
   {
    "on": "2026-09-12",
    "what": "What that means for the product: a general disclaimer is not adequate and a small indicator is not adequate either. For roughly four people in ten with a vague birth time, the thing at the top of their chart is not settled, and a person new to Human Design will read that top line as who they are. The scan runs per person, so nobody needs a generic warning: each chart can say exactly which of its own fields are not settled and what the alternatives are. This is also the honest and non-salesy case for finding a birth certificate or booking a rectification, because for those people it is not a refinement, it is a different chart."
+  },
+  {
+   "on": "2026-09-12",
+   "what": "Fields the scan watches move are not given a value. They read 'Exact Birth Time Required' and open, on a click, to what they could be with the hours each answer covers. Kaycee's wording and her instruction. The four variables are withheld whenever the time is not exact, whether or not the scan caught them moving, because they turn over on colour and tone and catching nothing across a sample is luck rather than evidence."
+  },
+  {
+   "on": "2026-09-12",
+   "what": "The bodygraph draws solid only what holds across the whole window; anything that comes and goes is drawn open in the colour it would have had. Kaycee, 2026-09-12, choosing between draw-it-anyway, draw-only-what-holds, and withhold-the-picture: '2 seems most inline with our educational purpose.' The effect is that nothing on the drawing is ever wrong, and a beginner can see at a glance which parts of themselves the missing hour is costing them."
+  },
+  {
+   "on": "2026-09-12",
+   "what": "An unsettled centre no longer wears the state label of the hour it happened to be cast at, and no longer carries the reading that goes with it. Found by looking at the built chart: a Sacral that is defined for half the window was labelled Undefined and given the whole undefined-Sacral description. Being read the wrong description is worse than being read none."
+  },
+  {
+   "on": "2026-09-12",
+   "what": "'I Was Told The Time' runs as exact. Kaycee, 2026-09-12: 'for I was told the time maybe a popup telling them that exact birth time matters, but run the chart as if it were exact.' Only 'I Know Roughly' and 'I Don't Know It' are scanned, so a told or documented time costs no extra calls at all."
   }
  ],
  "open": [
@@ -428,6 +444,15 @@
   },
   {
    "what": "bodygraph.com refuses a burst of calls that follows a busy stretch (429). The scan handles it itself by pacing and retrying. Whether that pacing and retry belongs in lib/mybodygraph, where it would protect every other caller too, is a change to a spine module and needs Kaycee's decision."
+  },
+  {
+   "what": "The note on the chart form says 'Without a time, your Type and Authority are usually still reliable, but your Profile, your Ascendant and all four of your variables may not be.' The 24-date measurement puts Type changing in 3 of 24 and Authority in 2 of 24, so 'usually' is true but somebody whose Type IS unsettled reads that sentence on the form and then meets 'Exact Birth Time Required' on their own Type minutes later. Kaycee's approved copy, so not touched: needs her decision on rewording."
+  },
+  {
+   "what": "The 'told the time' popup Kaycee asked for is not built yet: the chart runs as exact, but nothing yet tells that person the exact time matters."
+  },
+  {
+   "what": "Caching the scan. It costs about 40 calls and 4 seconds and currently re-runs on every build of an approximate-time chart. Storing it on the chart row would fix that and is what the dashboard reliability indicator needs, but it is a schema change and needs Kaycee's decision. Only approximate and unknown charts would ever carry it."
   }
  ],
  "brief": "https://claude.ai/code/artifact/3428e24e-262a-4fd7-86a6-93468244cb44"
