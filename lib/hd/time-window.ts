@@ -201,7 +201,7 @@ export async function scanWindow(
   opts: ScanOptions = {},
 ): Promise<WindowReport> {
   const precision = opts.precisionMinutes ?? 10;
-  const maxCasts = opts.maxCasts ?? 14;
+  const maxCasts = opts.maxCasts ?? 48;
   let casts = 0;
 
   const cast = async (hhmm: string): Promise<Chart> => {
@@ -231,15 +231,17 @@ export async function scanWindow(
   // If the Moon crossed N lines across the window, N+1 samples bracket them all.
   const steps = Math.min(
     Math.max(2, Math.ceil(movedLines) + 1),
-    Math.max(2, Math.floor((maxCasts - casts) / 2)),
+    Math.max(2, Math.floor((maxCasts - casts) * 0.6)),
   );
-  const samples: { mins: number; chart: Chart }[] = [{ mins: start, chart: a }];
-  for (let i = 1; i < steps; i++) {
-    if (casts >= maxCasts) break;
-    const t = start + (spanMins * i) / steps;
-    samples.push({ mins: t, chart: await cast(toClock(t)) });
-  }
-  samples.push({ mins: end, chart: b });
+  // All at once. The grid does not depend on itself, so waiting for each cast in
+  // turn was spending seconds of somebody's attention for nothing. Only the
+  // narrowing below has to be sequential, because each step decides the next.
+  const gridTimes: number[] = [];
+  for (let i = 1; i < steps; i++) gridTimes.push(start + (spanMins * i) / steps);
+  const grid = await Promise.all(gridTimes.map(async (t) => ({ mins: t, chart: await cast(toClock(t)) })));
+  const samples: { mins: number; chart: Chart }[] = [
+    { mins: start, chart: a }, ...grid, { mins: end, chart: b },
+  ];
 
   // Narrow each gap that changed, so the report can say when rather than that.
   const found = new Map<string, Change>();

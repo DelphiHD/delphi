@@ -1,400 +1,407 @@
 {
-  "project": "Client Portal",
-  "goal": "Free chart is the hook. Account required. Reports, extra charts and a subscription are what sells.",
-  "updated": "2026-09-12",
-  "event": {
-    "label": "Kaycee's event",
-    "date": "2026-09-16",
-    "target": "Phase 1 live: self-serve free chart with account signup"
+ "project": "Client Portal",
+ "goal": "Free chart is the hook. Account required. Reports, extra charts and a subscription are what sells.",
+ "updated": "2026-09-12",
+ "event": {
+  "label": "Kaycee's event",
+  "date": "2026-09-16",
+  "target": "Phase 1 live: self-serve free chart with account signup"
+ },
+ "phases": [
+  {
+   "id": "p1",
+   "title": "Phase 1 — Free chart, self-serve",
+   "target": "2026-09-15",
+   "why": "A stranger on the website gets a real chart in ten seconds, in the cloud, and leaves an email behind.",
+   "items": [
+    {
+     "id": "p1a",
+     "title": "Chart builder reads the library from Supabase, not the local cache",
+     "status": "done",
+     "note": "Done 9 September. Proved by building a chart with the local library moved away entirely. Notion multi-selects and relations are normalised so the database and the file produce byte-identical charts."
+    },
+    {
+     "id": "p1b",
+     "title": "Charts become database rows, not a hardcoded roster",
+     "status": "done",
+     "note": "Applied 9 September. Two tables: charts and chart_edits. The 37 seeded with real birth details and the timezones the provider resolved, all marked seed and private."
+    },
+    {
+     "id": "p1c",
+     "title": "Chart builds run as a Vercel function",
+     "status": "done",
+     "note": "Done 9 September. POST birth details to /api/chart, get a published link in about 11 seconds. Proven end to end against a production build: place lookup, chart cast, published, served from charts.delphihd.com, synthesis withheld because the tier says free."
+    },
+    {
+     "id": "p1d",
+     "title": "Public birth-details form with account signup",
+     "status": "done",
+     "note": "The form is built at /chart: place chosen from the provider's lookup, birth time asked honestly with a part-of-day fallback, long-form birth certificate guidance and a rectification booking link. An account is created silently from the email they give, with no password and nothing for them to confirm, so their charts are already attached the day there is something to sign into. Mobile: inputs are 16px so Safari does not zoom on focus, and the app declares a viewport."
+    },
+    {
+     "id": "p1e",
+     "title": "Free tier renders the Delphi Basic layer",
+     "status": "done",
+     "note": "Done 10 September. Centres use Delphi Defined/Undefined/Open Basic; channels use Delphi Free Chart; gates now use Delphi Basic, which Kaycee wrote into the gates database on 9 September along with Delphi Bridge Text. All 64 gates carry both. A gate card shows her synthesis when the chart has one and her general words when it does not, the same rule a centre already followed, so a free chart says something real about every gate instead of falling back to a keynote."
+    },
+    {
+     "id": "p1f",
+     "title": "Paid content held back on the free tier",
+     "status": "doing",
+     "note": "The synthesis is now withheld by tier, proven on a real chart: free shows 0 of 26 placements and 0 of 9 centres while keeping all 64 gate keynotes. Still to do: the daily transit read becomes subscriber-only."
+    },
+    {
+     "id": "p1g",
+     "title": "Replace the chart tool on the Wix site with an embed",
+     "status": "done",
+     "note": "Done 10 September. Her own form replaced the bodygraph.com widget on the home page hero, desktop and mobile, live at delphihd.com. The old widget collected an email address that went to bodygraph.com; every signup now lands in her own database. The embed only works because /chart carries an exception to the site's no-framing rule, naming her domains AND the Wix sandbox the embed renders inside. Left over: the time of birth field clips slightly on mobile. Kaycee, 2026-09-10: \"we can fix that tomorrow.\""
+    },
+    {
+     "id": "p1h",
+     "title": "Reach the dashboard from anywhere, not just this Mac",
+     "status": "todo",
+     "priority": "low",
+     "note": "It runs on the laptop today, so it is only visible while that laptop is on. Lower priority than the launch itself: Kaycee, 9 September."
+    },
+    {
+     "id": "p1i",
+     "title": "The chart itself has to work on a phone",
+     "status": "done",
+     "note": "Done 9 September, verified by Kaycee on her own phone. All 37 charts republished with it."
+    },
+    {
+     "id": "p1j",
+     "title": "The chart arrives by email, not just in the tab that made it",
+     "status": "done",
+     "note": "Done 9 September, proven end to end on production: form to chart to inbox, Resend reporting Delivered rather than merely accepted. Sends from chart@send.delphihd.com so the root domain's SPF, which points at Google Workspace, is never touched. Replies go to hello@delphihd.com. Mail can never cost somebody their chart: it is reported, not thrown."
+    },
+    {
+     "id": "p1k",
+     "title": "Sign in and come back to your charts",
+     "status": "doing",
+     "note": "The portal at /portal lists a person's charts, branded, live. Ownership applied 10 September: an admin sees everything, a chart account sees only their own, an analyst sees their clients'. Proven on production with two signed-in people. Still to do: inviting the 37, which is a deliberate act, and the family groupings decided then."
+    },
+    {
+     "id": "p1l",
+     "title": "One gate answer in every view, and the tables follow the chart",
+     "status": "done",
+     "note": "Done 10 September. Each view had grown its own handler, so a gate said something on the bodygraph, less on the mandala and nothing on the astrology ring. One shared function now answers for all four. Hovering a gate or a channel also lights its own placements in the tables, which only the transit column was doing. Mandala channels highlight (their rule was scoped to a canvas the mandala hub is not). Integration channels report a channel the person actually has, and a highlighted one is no longer buried under an overlapping neighbour."
+    },
+    {
+     "id": "p1m",
+     "title": "A transit reads for the date on screen, not the minute the chart was built",
+     "status": "done",
+     "note": "Done 10 September, verified live on 5 June 2027. The two-tone mark was baked at build time, so a gate the chosen date activates could never darken and four gates that only the build minute touched read as transited on every date. Every carried gate now has a sky half and the date decides its colour. All 37 charts republished."
+    },
+    {
+     "id": "p1n",
+     "title": "The free chart cannot be run in a loop",
+     "status": "done",
+     "note": "Done 10 September. The endpoint had no rate limit, no captcha and no origin check, and every call created an account, called the provider, published a file and sent mail. Now limited per email, per caller and site-wide, with a hashed caller rather than a stored address. Accounts are created unconfirmed so none can be squatted, and an address that cannot receive mail is refused before anything is made."
+    }
+   ]
   },
-  "phases": [
+  {
+   "id": "p2",
+   "title": "Phase 2 — Paid reports",
+   "target": "2026-09-23",
+   "why": "The chart they already own fills in with Kaycee's synthesis. Better than a PDF arriving.",
+   "items": [
     {
-      "id": "p1",
-      "title": "Phase 1 — Free chart, self-serve",
-      "target": "2026-09-15",
-      "why": "A stranger on the website gets a real chart in ten seconds, in the cloud, and leaves an email behind.",
-      "items": [
-        {
-          "id": "p1a",
-          "title": "Chart builder reads the library from Supabase, not the local cache",
-          "status": "done",
-          "note": "Done 9 September. Proved by building a chart with the local library moved away entirely. Notion multi-selects and relations are normalised so the database and the file produce byte-identical charts."
-        },
-        {
-          "id": "p1b",
-          "title": "Charts become database rows, not a hardcoded roster",
-          "status": "done",
-          "note": "Applied 9 September. Two tables: charts and chart_edits. The 37 seeded with real birth details and the timezones the provider resolved, all marked seed and private."
-        },
-        {
-          "id": "p1c",
-          "title": "Chart builds run as a Vercel function",
-          "status": "done",
-          "note": "Done 9 September. POST birth details to /api/chart, get a published link in about 11 seconds. Proven end to end against a production build: place lookup, chart cast, published, served from charts.delphihd.com, synthesis withheld because the tier says free."
-        },
-        {
-          "id": "p1d",
-          "title": "Public birth-details form with account signup",
-          "status": "done",
-          "note": "The form is built at /chart: place chosen from the provider's lookup, birth time asked honestly with a part-of-day fallback, long-form birth certificate guidance and a rectification booking link. An account is created silently from the email they give, with no password and nothing for them to confirm, so their charts are already attached the day there is something to sign into. Mobile: inputs are 16px so Safari does not zoom on focus, and the app declares a viewport."
-        },
-        {
-          "id": "p1e",
-          "title": "Free tier renders the Delphi Basic layer",
-          "status": "done",
-          "note": "Done 10 September. Centres use Delphi Defined/Undefined/Open Basic; channels use Delphi Free Chart; gates now use Delphi Basic, which Kaycee wrote into the gates database on 9 September along with Delphi Bridge Text. All 64 gates carry both. A gate card shows her synthesis when the chart has one and her general words when it does not, the same rule a centre already followed, so a free chart says something real about every gate instead of falling back to a keynote."
-        },
-        {
-          "id": "p1f",
-          "title": "Paid content held back on the free tier",
-          "status": "doing",
-          "note": "The synthesis is now withheld by tier, proven on a real chart: free shows 0 of 26 placements and 0 of 9 centres while keeping all 64 gate keynotes. Still to do: the daily transit read becomes subscriber-only."
-        },
-        {
-          "id": "p1g",
-          "title": "Replace the chart tool on the Wix site with an embed",
-          "status": "done",
-          "note": "Done 10 September. Her own form replaced the bodygraph.com widget on the home page hero, desktop and mobile, live at delphihd.com. The old widget collected an email address that went to bodygraph.com; every signup now lands in her own database. The embed only works because /chart carries an exception to the site's no-framing rule, naming her domains AND the Wix sandbox the embed renders inside. Left over: the time of birth field clips slightly on mobile. Kaycee, 2026-09-10: \"we can fix that tomorrow.\""
-        },
-        {
-          "id": "p1h",
-          "title": "Reach the dashboard from anywhere, not just this Mac",
-          "status": "todo",
-          "priority": "low",
-          "note": "It runs on the laptop today, so it is only visible while that laptop is on. Lower priority than the launch itself: Kaycee, 9 September."
-        },
-        {
-          "id": "p1i",
-          "title": "The chart itself has to work on a phone",
-          "status": "done",
-          "note": "Done 9 September, verified by Kaycee on her own phone. All 37 charts republished with it."
-        },
-        {
-          "id": "p1j",
-          "title": "The chart arrives by email, not just in the tab that made it",
-          "status": "done",
-          "note": "Done 9 September, proven end to end on production: form to chart to inbox, Resend reporting Delivered rather than merely accepted. Sends from chart@send.delphihd.com so the root domain's SPF, which points at Google Workspace, is never touched. Replies go to hello@delphihd.com. Mail can never cost somebody their chart: it is reported, not thrown."
-        },
-        {
-          "id": "p1k",
-          "title": "Sign in and come back to your charts",
-          "status": "doing",
-          "note": "The portal at /portal lists a person's charts, branded, live. Ownership applied 10 September: an admin sees everything, a chart account sees only their own, an analyst sees their clients'. Proven on production with two signed-in people. Still to do: inviting the 37, which is a deliberate act, and the family groupings decided then."
-        },
-        {
-          "id": "p1l",
-          "title": "One gate answer in every view, and the tables follow the chart",
-          "status": "done",
-          "note": "Done 10 September. Each view had grown its own handler, so a gate said something on the bodygraph, less on the mandala and nothing on the astrology ring. One shared function now answers for all four. Hovering a gate or a channel also lights its own placements in the tables, which only the transit column was doing. Mandala channels highlight (their rule was scoped to a canvas the mandala hub is not). Integration channels report a channel the person actually has, and a highlighted one is no longer buried under an overlapping neighbour."
-        },
-        {
-          "id": "p1m",
-          "title": "A transit reads for the date on screen, not the minute the chart was built",
-          "status": "done",
-          "note": "Done 10 September, verified live on 5 June 2027. The two-tone mark was baked at build time, so a gate the chosen date activates could never darken and four gates that only the build minute touched read as transited on every date. Every carried gate now has a sky half and the date decides its colour. All 37 charts republished."
-        },
-        {
-          "id": "p1n",
-          "title": "The free chart cannot be run in a loop",
-          "status": "done",
-          "note": "Done 10 September. The endpoint had no rate limit, no captcha and no origin check, and every call created an account, called the provider, published a file and sent mail. Now limited per email, per caller and site-wide, with a hashed caller rather than a stored address. Accounts are created unconfirmed so none can be squatted, and an address that cannot receive mail is refused before anything is made."
-        }
-      ]
+     "id": "p2a",
+     "title": "Inngest wired for long jobs",
+     "status": "todo",
+     "note": "Reports run seven minutes to two hours, and some fail. Nothing on Vercel or Supabase holds a job that long. Forty attendees with reports included is the case that decides this: forty long jobs, queued with lead time, each retried, each one's failure visible in time to fix it, then the lot released together."
     },
     {
-      "id": "p2",
-      "title": "Phase 2 — Paid reports",
-      "target": "2026-09-23",
-      "why": "The chart they already own fills in with Kaycee's synthesis. Better than a PDF arriving.",
-      "items": [
-        {
-          "id": "p2a",
-          "title": "Inngest wired for long jobs",
-          "status": "todo",
-          "note": "Reports run seven minutes to two hours, and some fail. Nothing on Vercel or Supabase holds a job that long. Forty attendees with reports included is the case that decides this: forty long jobs, queued with lead time, each retried, each one's failure visible in time to fix it, then the lot released together."
-        },
-        {
-          "id": "p2b",
-          "title": "Stripe checkout in the app",
-          "status": "todo",
-          "note": "Account and prices already exist on the Cal.com side. This is wiring, not setup."
-        },
-        {
-          "id": "p2c",
-          "title": "Webhook as the source of truth for what someone owns",
-          "status": "todo",
-          "note": "Signature verified before any write. On its own branch, per the git policy."
-        },
-        {
-          "id": "p2d",
-          "title": "Purchase triggers the report, chart republishes with it",
-          "status": "todo",
-          "note": "A report becomes visible when it is released, not the moment it is written. A purchase releases it straight away. A batch is held until every report in it is good, because a partial delivery is worse than a late one. So a report needs a state between written and visible, and the chart republishes on release rather than on completion."
-        }
-      ]
+     "id": "p2b",
+     "title": "Stripe checkout in the app",
+     "status": "todo",
+     "note": "Account and prices already exist on the Cal.com side. This is wiring, not setup."
     },
     {
-      "id": "p3",
-      "title": "Phase 3 — Charts for friends and family",
-      "target": "2026-09-30",
-      "why": "Highest margin item in the model. No LLM cost at all, just a chart.",
-      "items": [
-        {
-          "id": "p3a",
-          "title": "Buy a chart for someone else from inside the portal",
-          "status": "todo"
-        },
-        {
-          "id": "p3b",
-          "title": "Ownership and sharing rules",
-          "status": "todo",
-          "note": "Who can see a chart bought for them, and what happens if they make their own account."
-        }
-      ]
+     "id": "p2c",
+     "title": "Webhook as the source of truth for what someone owns",
+     "status": "todo",
+     "note": "Signature verified before any write. On its own branch, per the git policy."
     },
     {
-      "id": "p4",
-      "title": "Phase 4 — Subscription",
-      "target": "2026-10-07",
-      "why": "Unlimited charts plus the daily transit synthesis. Recurring revenue.",
-      "items": [
-        {
-          "id": "p4a",
-          "title": "Daily transit run moves to Vercel Cron",
-          "status": "todo",
-          "note": "Retires the LaunchAgents on the Mac."
-        },
-        {
-          "id": "p4b",
-          "title": "Transit reads become subscriber-driven, not roster-driven",
-          "status": "todo",
-          "note": "Biggest downstream change in the plan. The existing 37 keep working throughout."
-        },
-        {
-          "id": "p4c",
-          "title": "Subscription checkout and lifecycle",
-          "status": "todo"
-        }
-      ]
-    },
-    {
-      "id": "p5",
-      "title": "Phase 5 — Events",
-      "target": "2026-10-21",
-      "why": "Kaycee expects to run events regularly. Each one is a different deal, and the machinery should not care which.",
-      "items": [
-        {
-          "id": "p5g",
-          "title": "A chart says what its birth time cannot settle",
-          "status": "doing",
-          "note": "Scan engine working 12 September, proven on Kaycee's own chart: in a single hour around her birth time, Motivation, Sense, Design Sense and two Moon lines all move. Still to do: carry the accuracy through to the builder, mark the fields that move, say which time a day-segment used, and a reliability indicator on the dashboard so a booking arrives with its certainty attached."
-        },
-        {
-          "id": "p5a",
-          "title": "An event, with its own terms",
-          "status": "todo",
-          "note": "How many people, what they get, when it is live, and what the deal was. Set per event."
-        },
-        {
-          "id": "p5b",
-          "title": "Codes that carry a grant",
-          "status": "todo",
-          "note": "Event access, a discount, or a report included. One list, one place to see what has been used."
-        },
-        {
-          "id": "p5c",
-          "title": "Pre-registration, charts built ahead",
-          "status": "todo",
-          "note": "The night before rather than thirty at once on venue wifi. Turns the riskiest moment into nothing happening."
-        },
-        {
-          "id": "p5d",
-          "title": "Batch reports, released only when the batch is whole",
-          "status": "todo",
-          "note": "Run a day before or the morning of, not on the hour. The batch shows how many are written and how many failed, so failures can be fixed before anybody sees anything. Release is one deliberate act over the whole batch, never per report as each finishes."
-        },
-        {
-          "id": "p5e",
-          "title": "Per-event numbers",
-          "status": "todo",
-          "note": "Charts, emails and bookings per event, so she can tell which are worth doing again."
-        },
-        {
-          "id": "p5f",
-          "title": "Tighten the public limit once events are separate",
-          "status": "todo",
-          "note": "Forty per connection exists only to survive a room sharing one wifi. Drops to about eight."
-        }
-      ]
+     "id": "p2d",
+     "title": "Purchase triggers the report, chart republishes with it",
+     "status": "todo",
+     "note": "A report becomes visible when it is released, not the moment it is written. A purchase releases it straight away. A batch is held until every report in it is good, because a partial delivery is worse than a late one. So a report needs a state between written and visible, and the chart republishes on release rather than on completion."
     }
-  ],
-  "decided": [
+   ]
+  },
+  {
+   "id": "p3",
+   "title": "Phase 3 — Charts for friends and family",
+   "target": "2026-09-30",
+   "why": "Highest margin item in the model. No LLM cost at all, just a chart.",
+   "items": [
     {
-      "on": "2026-09-12",
-      "what": "A chart scans to the LINE and no finer. Colour, tone and base are declared unreliable without an exact birth time rather than searched for, because the Moon crosses a colour every ~17 minutes, a tone every ~3, and a base about every 30 seconds. No scan can bracket that honestly. Kaycee, 2026-09-12: \"I like your instinct, let's do that.\" Consequence: all four variables and both senses are unreliable on any chart without a to-the-minute time, and the chart says so."
+     "id": "p3a",
+     "title": "Buy a chart for someone else from inside the portal",
+     "status": "todo"
     },
     {
-      "on": "2026-09-12",
-      "what": "How often to sample across a birth-time window is set by the Moon, not a fixed step. Kaycee, 2026-09-12: \"Can the scan timing logic be based on the speed of the moon since it's the one that changes most frequently?\" The Moon runs between about 11.8 and 15.4 degrees a day depending where it is in its orbit, which is why some days carry far more change than others. Its speed is measured from the two endpoint casts rather than assumed, so it costs nothing extra."
-    },
-    {
-      "on": "2026-09-12",
-      "what": "An uncertain chart reports what actually moves on that person's date, not a blanket warning. A blanket warning is noise on a quiet day and nowhere near enough on a busy one. Where nothing moves the chart says so, which is the reassuring and true answer. Fields that move get a mark; clicking it says what it changes to and when. Chart and dashboard stay uncluttered: Kaycee's design."
-    },
-    {
-      "on": "2026-09-12",
-      "what": "Everything is compared, not a headline set: the eight properties, all fifteen planets on both sides to gate and line, all nine centres, every channel, all four variables and both senses. A chart is structured data, so comparing two casts is a field-by-field comparison."
-    },
-    {
-      "on": "2026-09-12",
-      "what": "Wheel position comes from lib/hd/gate-longitude, the same mapping the mandala is drawn from. Gate numbers are not in wheel order, so subtracting gate numbers says nothing about distance travelled; a second, wrong mapping was written and replaced before it shipped."
-    },
-    {
-      "on": "2026-09-10",
-      "what": "Wix wraps every HTML embed in its own sandbox frame served from filesusr.com, so frame-ancestors has to name the sandbox as well as her site. Naming delphihd.com alone leaves the embed blank with no error, which cost an hour. Worth remembering for any future embed."
-    },
-    {
-      "on": "2026-09-10",
-      "what": "Owner, Delphi admin and analyst are three separate things in the database now, applied and verified. Kaycee is an admin, so all 37 appear in her portal without an account being created for anybody. No chart was attached to a person: that means creating an account for them, which they should hear about from her rather than discover."
-    },
-    {
-      "on": "2026-09-10",
-      "what": "Most people are chart accounts: an account, their charts, no working relationship. Booking a session is what changes it, because that is where it becomes ongoing coaching, and only then is Kaycee their analyst. Her words: \"unless they book a session, at that point it really turns into an ongoing coaching kind of situation and changes the relationship, but in general most attendees will just be chart accounts.\""
-    },
-    {
-      "on": "2026-09-10",
-      "what": "An attendee's chart makes Kaycee Delphi admin over it, not their analyst. Running the event is not the same as working with the person; that still takes a booking. So an event fills the funnel without filling her portal with people she has never sat down with."
-    },
-    {
-      "on": "2026-09-10",
-      "what": "Events get a code, not their own instance. A second deployment would drift from the real one and split her signups; a code is the same form arriving tagged. Kaycee expects to run events regularly."
-    },
-    {
-      "on": "2026-09-10",
-      "what": "An event code RAISES the per-connection limit for its window, never removes it. A leaked code still cannot run away."
-    },
-    {
-      "on": "2026-09-10",
-      "what": "Each event carries its own terms, set per event: how many people, what attendees get, when it is live, and a note on the deal. Kaycee, 2026-09-10: \"Each one will be slightly different and I want to be flexible.\""
-    },
-    {
-      "on": "2026-09-10",
-      "what": "A free report at an event is not a risk to be capped, it is a cost the event fee already covered. The cap on a code is the number of attendees she was paid for, so the code stops when the deal is fulfilled rather than when a safety number is hit."
-    },
-    {
-      "on": "2026-09-10",
-      "what": "Pre-registration publishes the CHART immediately. Reports, when an event includes them, are run with lead time (a day before, or the morning of) and released together only once the whole batch is good. The reason is not theatre, it is that reports fail sometimes: Kaycee, 2026-09-10, \"I just don't want to run into a situation where we're running a bunch of reports at the same time and only a handful get theirs because we run into an issue. I would rather resolve the issues and then publish to make it look more seamless.\" So a report needs a state between written and visible, and a batch needs to be visibly whole before it is released."
-    },
-    {
-      "on": "2026-09-10",
-      "what": "Event work is after the 16th. The loose per-connection limit covers her first event on its own; once events carry their own terms the public limit can drop from forty to about eight."
-    },
-    {
-      "on": "2026-09-10",
-      "what": "The free chart is protected by a quiet rate limit, not a captcha. Kaycee, 2026-09-10: no visible 'prove you are human' step in front of the hook. Five charts an hour per email address, forty per caller, three hundred site-wide. The caller limit is deliberately loose because a room at an event shares one connection, and a limit tuned to stop a bot would have stopped her whole audience."
-    },
-    {
-      "on": "2026-09-10",
-      "what": "No email confirmation step before a chart is sent. You cannot confirm an address without emailing it, so the step would be friction on the hook for no real protection. The account is created UNCONFIRMED instead, so nobody can claim a standing account on somebody else's address, and the rate limit stops volume."
-    },
-    {
-      "on": "2026-09-10",
-      "what": "An address that cannot receive mail is refused before anything is created. Every bounce counts against her sending domain."
-    },
-    {
-      "on": "2026-09-10",
-      "what": "A chart outlives the account that made it. owner_id was set to cascade, so deleting an account silently deleted its charts; it is now set null. Verified by deleting a throwaway account and watching the chart survive."
-    },
-    {
-      "on": "2026-09-10",
-      "what": "charts.delphihd.com added to the Supabase redirect allow list. Magic links could only return to localhost or a Vercel address, so sign-in could never have worked for a real client on her own domain."
-    },
-    {
-      "on": "2026-09-10",
-      "what": "The portal lists a person's charts and nothing else, enforced by the database rather than by the query. Proven live: a query asking for all charts with no owner filter returned only that person's two out of thirty-nine."
-    },
-    {
-      "on": "2026-09-10",
-      "what": "Chart ownership: most seed clients will own their own account. The Hollingsheads sit under Paul, the Goodins under Erlene. Kaycee sees every chart as Delphi admin, but is only somebody's analyst, with their chart in her own portal, once they book. Schema for this not yet written."
-    },
-    {
-      "on": "2026-09-09",
-      "what": "Chart emails send from send.delphihd.com, never the root. One SPF record per domain and hers points at Google Workspace, so a second sender on the apex would have risked hello@delphihd.com."
-    },
-    {
-      "on": "2026-09-09",
-      "what": "The free chart never asks anyone to log in. An account is made quietly from their email; login only ever appears at the paid tiers."
-    },
-    {
-      "on": "2026-09-09",
-      "what": "The chart email stays plain. Kaycee: \"Less to get flagged as spam.\" A new sending domain has no reputation, and image-heavy first sends are what tip filters."
-    },
-    {
-      "on": "2026-09-09",
-      "what": "Inngest for long-running jobs. Kaycee: \"I don't want to run anything.\""
-    },
-    {
-      "on": "2026-09-09",
-      "what": "Account required for a free chart, for email capture."
-    },
-    {
-      "on": "2026-09-09",
-      "what": "Free basic chart is the hook, not a product. Supersedes the old INTENT line about not being a free chart calculator."
-    },
-    {
-      "on": "2026-09-09",
-      "what": "Chart publishes first; the report is added to it on purchase."
-    },
-    {
-      "on": "2026-09-09",
-      "what": "Money at the event goes through the existing booking page. No new payment code in launch week."
-    },
-    {
-      "on": "2026-09-09",
-      "what": "The dashboard is the one door. Everything else is linked from it, so nothing has to be hunted for."
-    },
-    {
-      "on": "2026-09-09",
-      "what": "Signups and emails live in the database, shown on the dashboard. Not Notion: Notion is the source library, not a customer list."
-    },
-    {
-      "on": "2026-09-09",
-      "what": "The cloud library was six weeks stale (853 rows, last written 24 July) and four gates had unresolved Quarters. A full sync fixed both: 860 rows, all resolving. Found by comparing a database build against a file build."
-    },
-    {
-      "on": "2026-09-09",
-      "what": "The sync runs weekly in GitHub, plus a Sync now button on the dashboard. Kaycee edits the library every few weeks, so nightly was sixty half-hour runs between edits: all risk, no benefit."
-    },
-    {
-      "on": "2026-09-09",
-      "what": "The local 3:30am sync LaunchAgent is retired (moved to ~/Library/LaunchAgents/retired, not deleted). One sync, in the cloud."
+     "id": "p3b",
+     "title": "Ownership and sharing rules",
+     "status": "todo",
+     "note": "Who can see a chart bought for them, and what happens if they make their own account."
     }
-  ],
-  "open": [
+   ]
+  },
+  {
+   "id": "p4",
+   "title": "Phase 4 — Subscription",
+   "target": "2026-10-07",
+   "why": "Unlimited charts plus the daily transit synthesis. Recurring revenue.",
+   "items": [
     {
-      "what": "Prices: full synthesis, extra chart, monthly."
+     "id": "p4a",
+     "title": "Daily transit run moves to Vercel Cron",
+     "status": "todo",
+     "note": "Retires the LaunchAgents on the Mac."
     },
     {
-      "what": "A rectification session does not exist on Cal.com yet. The form links to the booking page; it should link to that event type once it is created."
+     "id": "p4b",
+     "title": "Transit reads become subscriber-driven, not roster-driven",
+     "status": "todo",
+     "note": "Biggest downstream change in the plan. The existing 37 keep working throughout."
     },
     {
-      "what": "Whether the test chart made on 9 September to prove the email path (a second copy of Kaycee's own) is deleted or kept as a sample to show people."
-    },
-    {
-      "what": "Planetary returns may want to be drawn like a relationship chart rather than a date on the transit view: the return overlaid on the natal chart, two states at once. Kaycee, 2026-09-10: the cross of the Uranus Opposition factors into a reading, so how the returns are displayed needs reconsidering. Parked by her the same day, not dropped."
-    },
-    {
-      "what": "Captcha on the auth endpoints is off. Supabase's per-IP limits are the only guard on sign-in, and per-IP limits do not stop anything distributed. Worth turning on if abuse ever appears; it needs a Turnstile or hCaptcha key."
-    },
-    {
-      "what": "The site refuses to be embedded in a frame by anyone (frame-ancestors none, X-Frame-Options DENY). Correct as a default, but the Wix embed will be blocked by it until an exception is carved out for the chart form alone."
-    },
-    {
-      "what": "Ownership schema: owner, Delphi admin, and analyst-of are three different things and today owner_id is being asked to mean all three, which is why no chart is attached to anyone. Needs a migration and policies before real people are invited."
-    },
-    {
-      "what": "http://localhost:3000/** is on the production redirect allow list. Dev convenience left in production; low risk, worth removing before launch."
+     "id": "p4c",
+     "title": "Subscription checkout and lifecycle",
+     "status": "todo"
     }
-  ],
-  "brief": "https://claude.ai/code/artifact/3428e24e-262a-4fd7-86a6-93468244cb44"
+   ]
+  },
+  {
+   "id": "p5",
+   "title": "Phase 5 — Events",
+   "target": "2026-10-21",
+   "why": "Kaycee expects to run events regularly. Each one is a different deal, and the machinery should not care which.",
+   "items": [
+    {
+     "id": "p5g",
+     "title": "A chart says what its birth time cannot settle",
+     "status": "doing",
+     "note": "Scan engine working 12 September, proven on Kaycee's own chart: in a single hour around her birth time, Motivation, Sense, Design Sense and two Moon lines all move. Still to do: carry the accuracy through to the builder, mark the fields that move, say which time a day-segment used, and a reliability indicator on the dashboard so a booking arrives with its certainty attached."
+    },
+    {
+     "id": "p5a",
+     "title": "An event, with its own terms",
+     "status": "todo",
+     "note": "How many people, what they get, when it is live, and what the deal was. Set per event."
+    },
+    {
+     "id": "p5b",
+     "title": "Codes that carry a grant",
+     "status": "todo",
+     "note": "Event access, a discount, or a report included. One list, one place to see what has been used."
+    },
+    {
+     "id": "p5c",
+     "title": "Pre-registration, charts built ahead",
+     "status": "todo",
+     "note": "The night before rather than thirty at once on venue wifi. Turns the riskiest moment into nothing happening."
+    },
+    {
+     "id": "p5d",
+     "title": "Batch reports, released only when the batch is whole",
+     "status": "todo",
+     "note": "Run a day before or the morning of, not on the hour. The batch shows how many are written and how many failed, so failures can be fixed before anybody sees anything. Release is one deliberate act over the whole batch, never per report as each finishes."
+    },
+    {
+     "id": "p5e",
+     "title": "Per-event numbers",
+     "status": "todo",
+     "note": "Charts, emails and bookings per event, so she can tell which are worth doing again."
+    },
+    {
+     "id": "p5f",
+     "title": "Tighten the public limit once events are separate",
+     "status": "todo",
+     "note": "Forty per connection exists only to survive a room sharing one wifi. Drops to about eight."
+    }
+   ]
+  }
+ ],
+ "decided": [
+  {
+   "on": "2026-09-12",
+   "what": "A chart scans to the LINE and no finer. Colour, tone and base are declared unreliable without an exact birth time rather than searched for, because the Moon crosses a colour every ~17 minutes, a tone every ~3, and a base about every 30 seconds. No scan can bracket that honestly. Kaycee, 2026-09-12: \"I like your instinct, let's do that.\" Consequence: all four variables and both senses are unreliable on any chart without a to-the-minute time, and the chart says so."
+  },
+  {
+   "on": "2026-09-12",
+   "what": "How often to sample across a birth-time window is set by the Moon, not a fixed step. Kaycee, 2026-09-12: \"Can the scan timing logic be based on the speed of the moon since it's the one that changes most frequently?\" The Moon runs between about 11.8 and 15.4 degrees a day depending where it is in its orbit, which is why some days carry far more change than others. Its speed is measured from the two endpoint casts rather than assumed, so it costs nothing extra."
+  },
+  {
+   "on": "2026-09-12",
+   "what": "An uncertain chart reports what actually moves on that person's date, not a blanket warning. A blanket warning is noise on a quiet day and nowhere near enough on a busy one. Where nothing moves the chart says so, which is the reassuring and true answer. Fields that move get a mark; clicking it says what it changes to and when. Chart and dashboard stay uncluttered: Kaycee's design."
+  },
+  {
+   "on": "2026-09-12",
+   "what": "Everything is compared, not a headline set: the eight properties, all fifteen planets on both sides to gate and line, all nine centres, every channel, all four variables and both senses. A chart is structured data, so comparing two casts is a field-by-field comparison."
+  },
+  {
+   "on": "2026-09-12",
+   "what": "Wheel position comes from lib/hd/gate-longitude, the same mapping the mandala is drawn from. Gate numbers are not in wheel order, so subtracting gate numbers says nothing about distance travelled; a second, wrong mapping was written and replaced before it shipped."
+  },
+  {
+   "on": "2026-09-10",
+   "what": "Wix wraps every HTML embed in its own sandbox frame served from filesusr.com, so frame-ancestors has to name the sandbox as well as her site. Naming delphihd.com alone leaves the embed blank with no error, which cost an hour. Worth remembering for any future embed."
+  },
+  {
+   "on": "2026-09-10",
+   "what": "Owner, Delphi admin and analyst are three separate things in the database now, applied and verified. Kaycee is an admin, so all 37 appear in her portal without an account being created for anybody. No chart was attached to a person: that means creating an account for them, which they should hear about from her rather than discover."
+  },
+  {
+   "on": "2026-09-10",
+   "what": "Most people are chart accounts: an account, their charts, no working relationship. Booking a session is what changes it, because that is where it becomes ongoing coaching, and only then is Kaycee their analyst. Her words: \"unless they book a session, at that point it really turns into an ongoing coaching kind of situation and changes the relationship, but in general most attendees will just be chart accounts.\""
+  },
+  {
+   "on": "2026-09-10",
+   "what": "An attendee's chart makes Kaycee Delphi admin over it, not their analyst. Running the event is not the same as working with the person; that still takes a booking. So an event fills the funnel without filling her portal with people she has never sat down with."
+  },
+  {
+   "on": "2026-09-10",
+   "what": "Events get a code, not their own instance. A second deployment would drift from the real one and split her signups; a code is the same form arriving tagged. Kaycee expects to run events regularly."
+  },
+  {
+   "on": "2026-09-10",
+   "what": "An event code RAISES the per-connection limit for its window, never removes it. A leaked code still cannot run away."
+  },
+  {
+   "on": "2026-09-10",
+   "what": "Each event carries its own terms, set per event: how many people, what attendees get, when it is live, and a note on the deal. Kaycee, 2026-09-10: \"Each one will be slightly different and I want to be flexible.\""
+  },
+  {
+   "on": "2026-09-10",
+   "what": "A free report at an event is not a risk to be capped, it is a cost the event fee already covered. The cap on a code is the number of attendees she was paid for, so the code stops when the deal is fulfilled rather than when a safety number is hit."
+  },
+  {
+   "on": "2026-09-10",
+   "what": "Pre-registration publishes the CHART immediately. Reports, when an event includes them, are run with lead time (a day before, or the morning of) and released together only once the whole batch is good. The reason is not theatre, it is that reports fail sometimes: Kaycee, 2026-09-10, \"I just don't want to run into a situation where we're running a bunch of reports at the same time and only a handful get theirs because we run into an issue. I would rather resolve the issues and then publish to make it look more seamless.\" So a report needs a state between written and visible, and a batch needs to be visibly whole before it is released."
+  },
+  {
+   "on": "2026-09-10",
+   "what": "Event work is after the 16th. The loose per-connection limit covers her first event on its own; once events carry their own terms the public limit can drop from forty to about eight."
+  },
+  {
+   "on": "2026-09-10",
+   "what": "The free chart is protected by a quiet rate limit, not a captcha. Kaycee, 2026-09-10: no visible 'prove you are human' step in front of the hook. Five charts an hour per email address, forty per caller, three hundred site-wide. The caller limit is deliberately loose because a room at an event shares one connection, and a limit tuned to stop a bot would have stopped her whole audience."
+  },
+  {
+   "on": "2026-09-10",
+   "what": "No email confirmation step before a chart is sent. You cannot confirm an address without emailing it, so the step would be friction on the hook for no real protection. The account is created UNCONFIRMED instead, so nobody can claim a standing account on somebody else's address, and the rate limit stops volume."
+  },
+  {
+   "on": "2026-09-10",
+   "what": "An address that cannot receive mail is refused before anything is created. Every bounce counts against her sending domain."
+  },
+  {
+   "on": "2026-09-10",
+   "what": "A chart outlives the account that made it. owner_id was set to cascade, so deleting an account silently deleted its charts; it is now set null. Verified by deleting a throwaway account and watching the chart survive."
+  },
+  {
+   "on": "2026-09-10",
+   "what": "charts.delphihd.com added to the Supabase redirect allow list. Magic links could only return to localhost or a Vercel address, so sign-in could never have worked for a real client on her own domain."
+  },
+  {
+   "on": "2026-09-10",
+   "what": "The portal lists a person's charts and nothing else, enforced by the database rather than by the query. Proven live: a query asking for all charts with no owner filter returned only that person's two out of thirty-nine."
+  },
+  {
+   "on": "2026-09-10",
+   "what": "Chart ownership: most seed clients will own their own account. The Hollingsheads sit under Paul, the Goodins under Erlene. Kaycee sees every chart as Delphi admin, but is only somebody's analyst, with their chart in her own portal, once they book. Schema for this not yet written."
+  },
+  {
+   "on": "2026-09-09",
+   "what": "Chart emails send from send.delphihd.com, never the root. One SPF record per domain and hers points at Google Workspace, so a second sender on the apex would have risked hello@delphihd.com."
+  },
+  {
+   "on": "2026-09-09",
+   "what": "The free chart never asks anyone to log in. An account is made quietly from their email; login only ever appears at the paid tiers."
+  },
+  {
+   "on": "2026-09-09",
+   "what": "The chart email stays plain. Kaycee: \"Less to get flagged as spam.\" A new sending domain has no reputation, and image-heavy first sends are what tip filters."
+  },
+  {
+   "on": "2026-09-09",
+   "what": "Inngest for long-running jobs. Kaycee: \"I don't want to run anything.\""
+  },
+  {
+   "on": "2026-09-09",
+   "what": "Account required for a free chart, for email capture."
+  },
+  {
+   "on": "2026-09-09",
+   "what": "Free basic chart is the hook, not a product. Supersedes the old INTENT line about not being a free chart calculator."
+  },
+  {
+   "on": "2026-09-09",
+   "what": "Chart publishes first; the report is added to it on purchase."
+  },
+  {
+   "on": "2026-09-09",
+   "what": "Money at the event goes through the existing booking page. No new payment code in launch week."
+  },
+  {
+   "on": "2026-09-09",
+   "what": "The dashboard is the one door. Everything else is linked from it, so nothing has to be hunted for."
+  },
+  {
+   "on": "2026-09-09",
+   "what": "Signups and emails live in the database, shown on the dashboard. Not Notion: Notion is the source library, not a customer list."
+  },
+  {
+   "on": "2026-09-09",
+   "what": "The cloud library was six weeks stale (853 rows, last written 24 July) and four gates had unresolved Quarters. A full sync fixed both: 860 rows, all resolving. Found by comparing a database build against a file build."
+  },
+  {
+   "on": "2026-09-09",
+   "what": "The sync runs weekly in GitHub, plus a Sync now button on the dashboard. Kaycee edits the library every few weeks, so nightly was sixty half-hour runs between edits: all risk, no benefit."
+  },
+  {
+   "on": "2026-09-09",
+   "what": "The local 3:30am sync LaunchAgent is retired (moved to ~/Library/LaunchAgents/retired, not deleted). One sync, in the cloud."
+  },
+  {
+   "on": "2026-09-12",
+   "what": "The birth-time scan casts its sampling grid all at once instead of one after another, and the ceiling went from 14 casts to 48. Kaycee, 2026-09-12: 'Even a stranger on my site deserves good service.' A cast takes about a third of a second, and the grid does not depend on itself, so the old serial version was charging somebody seconds of waiting for nothing. Measured after: a whole-day window is 48 casts in 9.2 seconds, an afternoon 21 casts in 5.5. Charts are unlimited on the Business plan, so the ceiling costs no money, only patience."
+  }
+ ],
+ "open": [
+  {
+   "what": "Prices: full synthesis, extra chart, monthly."
+  },
+  {
+   "what": "A rectification session does not exist on Cal.com yet. The form links to the booking page; it should link to that event type once it is created."
+  },
+  {
+   "what": "Whether the test chart made on 9 September to prove the email path (a second copy of Kaycee's own) is deleted or kept as a sample to show people."
+  },
+  {
+   "what": "Planetary returns may want to be drawn like a relationship chart rather than a date on the transit view: the return overlaid on the natal chart, two states at once. Kaycee, 2026-09-10: the cross of the Uranus Opposition factors into a reading, so how the returns are displayed needs reconsidering. Parked by her the same day, not dropped."
+  },
+  {
+   "what": "Captcha on the auth endpoints is off. Supabase's per-IP limits are the only guard on sign-in, and per-IP limits do not stop anything distributed. Worth turning on if abuse ever appears; it needs a Turnstile or hCaptcha key."
+  },
+  {
+   "what": "The site refuses to be embedded in a frame by anyone (frame-ancestors none, X-Frame-Options DENY). Correct as a default, but the Wix embed will be blocked by it until an exception is carved out for the chart form alone."
+  },
+  {
+   "what": "Ownership schema: owner, Delphi admin, and analyst-of are three different things and today owner_id is being asked to mean all three, which is why no chart is attached to anyone. Needs a migration and policies before real people are invited."
+  },
+  {
+   "what": "http://localhost:3000/** is on the production redirect allow list. Dev convenience left in production; low risk, worth removing before launch."
+  },
+  {
+   "what": "Whether to add a local ephemeris (planet positions computed on the machine, offline, in microseconds) alongside the chart provider. The provider stays the authority on Human Design; a local ephemeris would only answer 'where was the Moon at 14:37', which is astronomy, not HD. It would make the birth-time scan exact rather than sampled, remove the cast ceiling entirely, and is the only way the teaching deck can work at an event with no signal. Kaycee, 2026-09-12: 'if we need to start looking at better APIs we should figure that out.' Structural: needs her decision before anything is built."
+  }
+ ],
+ "brief": "https://claude.ai/code/artifact/3428e24e-262a-4fd7-86a6-93468244cb44"
 }
