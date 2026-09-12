@@ -1,7 +1,7 @@
 # The relationship module
 
 What the chart provider gives us for a pair, confirmed against the live API on
-2026-08-30 with Tennyson Taggart and Tiff Polamateer. Written down so the build
+2026-08-30 with Tennyson Taggart and Tiff Polmateer. Written down so the build
 does not start by rediscovering it.
 
 ## The call

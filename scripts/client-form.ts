@@ -546,6 +546,13 @@ const PAGE = /* html */ `<!doctype html>
   table.ptable thead th { border-top:0; background:rgba(132,80,149,.06); cursor:pointer; user-select:none;
     font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--purple); font-weight:600; }
   table.ptable thead th:hover { background:rgba(132,80,149,.12); }
+  /* What an account is for, said at a glance: her own login and a leftover test
+     should never look like a client. */
+  .acct { display:inline-block; padding:2px 9px; border-radius:999px; font-size:11px;
+    font-weight:600; letter-spacing:.04em; }
+  .acct.admin  { background:rgba(132,80,149,.14); color:#845095; }
+  .acct.client { background:rgba(13,148,136,.14); color:#0b7a70; }
+  .acct.test   { background:rgba(241,194,50,.22); color:#7a5c07; }
   table.ptable thead th.on { color:var(--ink); }
   table.ptable tbody tr:hover { background:rgba(132,80,149,.04); }
   table.ptable tr.off td { opacity:.45; text-decoration:line-through; }
@@ -967,6 +974,7 @@ const PAGE = /* html */ `<!doctype html>
     { key: 'name',    label: 'Name' },
     { key: 'chart',   label: 'Chart' },
     { key: 'source',  label: 'How they got here' },
+    { key: 'account', label: 'Account' },
     { key: 'joined',  label: 'Since' },
     { key: 'reports', label: 'Reports' },
     { key: 'email',   label: 'Email' }
@@ -976,6 +984,9 @@ const PAGE = /* html */ `<!doctype html>
   // surname, and she is looking somebody up, not reading a sentence. A single
   // word stays as it is; everything before the last word is the given name, so
   // middle names travel with it rather than being mistaken for a surname.
+  // What an account is for. Says it plainly so a test or her own admin login is
+  // never mistaken for a client. Kaycee, 2026-09-12.
+  var ACCOUNT_LABEL = { admin: 'Admin', client: 'Client', test: 'Test' };
   function fileAs(n) {
     var t = String(n || '').trim().split(/\s+/);
     if (t.length < 2) return String(n || '');
@@ -1016,6 +1027,9 @@ const PAGE = /* html */ `<!doctype html>
           '<td>' + esc(fileAs(p.name)) + '</td>' +
           '<td>' + (p.chart ? '<a href="' + esc(p.chart) + '" target="_blank" rel="noreferrer">open</a>' : '<span class="sub">—</span>') + '</td>' +
           '<td>' + esc(p.source === 'signup' ? 'Signed up' : p.source === 'roster' ? 'Roster' : p.source) + '</td>' +
+          '<td>' + (p.account === 'none'
+            ? '<span class="sub">no account</span>'
+            : '<span class="acct ' + esc(p.account) + '">' + esc(ACCOUNT_LABEL[p.account] || p.account) + '</span>') + '</td>' +
           '<td class="tnum">' + (p.joined ? esc(String(p.joined).slice(0, 10)) : '—') + '</td>' +
           '<td>' + (p.reports === 'both' ? 'Both' : p.reports === 'none' ? '<span class="sub">none</span>' : esc(p.reports)) + '</td>' +
           '<td>' + (p.email ? '<a href="mailto:' + esc(p.email) + '">' + esc(p.email) + '</a>' : '<span class="sub">—</span>') + '</td>' +
@@ -1895,7 +1909,7 @@ createServer((req, res) => {
         const byToken = new Map((records ?? []).map(
           (r: { token: string }) => [r.token, r as Record<string, unknown>]));
         const { data: accounts } = await db.from("profiles")
-          .select("email, full_name, created_at");
+          .select("email, full_name, created_at, account_type");
 
         // which reports each person actually has
         const reports: Record<string, Set<string>> = {};
@@ -1909,6 +1923,8 @@ createServer((req, res) => {
         type Person = {
           name: string; email: string | null; source: string; joined: string | null;
           chart: string | null; reports: string; revoked: boolean;
+          /** admin, client, test, or none when they have no account at all. */
+          account: string;
         };
         const people: Person[] = [];
         for (const c of charts ?? []) {
@@ -1927,6 +1943,7 @@ createServer((req, res) => {
             chart: c.token ? `https://charts.delphihd.com/c/${c.token}` : null,
             reports: got.size === 2 ? "both" : got.size === 1 ? [...got][0] : "none",
             revoked: !!c.revoked_at,
+            account: "none",
           });
         }
         const named = new Set(people.map((p) => p.name.toLowerCase()));
@@ -1942,10 +1959,15 @@ createServer((req, res) => {
             (p.email && p.email.toLowerCase() === mail) ||
             loose(p.name) === loose(String(nm)) ||
             (mail && loose(p.name) === loose(mail.split("@")[0])));
-          if (hit) { hit.email = hit.email ?? a.email ?? null; continue; }
+          if (hit) {
+            hit.email = hit.email ?? a.email ?? null;
+            hit.account = (a.account_type as string) ?? "client";
+            continue;
+          }
           people.push({
             name: nm, email: a.email ?? null, source: "signup",
             joined: a.created_at ?? null, chart: null, reports: "none", revoked: false,
+            account: (a.account_type as string) ?? "client",
           });
           named.add(String(nm).toLowerCase());
         }
