@@ -68,6 +68,10 @@ async function codeSvg(url: string, dark: string): Promise<{ inner: string; size
 }
 
 async function main() {
+  // The chatty line under the code is gone. The address stays or goes with a
+  // flag, because a printed code that nobody can scan is useless without one,
+  // and some organisers want the artwork bare. Kaycee, 2026-09-12.
+  const showUrl = !process.argv.includes("--no-url");
   const slug = (process.argv[2] ?? "").toLowerCase();
   const ev = EVENTS[slug];
   if (!ev) {
@@ -116,18 +120,16 @@ async function main() {
   <text x="${W / 2}" y="${qy + qSize + 156}" text-anchor="middle" fill="${GOLD}"
         font-family="Helvetica Neue, Arial, sans-serif" font-size="26" font-weight="600" letter-spacing="3">${esc(ev.when.toUpperCase())} &#183; ${esc(ev.where.toUpperCase())}</text>
 
-  <text x="${W / 2}" y="${qy + qSize + 216}" text-anchor="middle" fill="${DIM}"
-        font-family="Helvetica Neue, Arial, sans-serif" font-size="24">${esc(ev.line)}</text>
-
-  <text x="${W / 2}" y="${H - 54}" text-anchor="middle" fill="${DIM}"
-        font-family="Helvetica Neue, Arial, sans-serif" font-size="25" letter-spacing="1">${esc(url.replace("https://", ""))}</text>
+  ${showUrl ? `<text x="${W / 2}" y="${H - 54}" text-anchor="middle" fill="${DIM}"
+        font-family="Helvetica Neue, Arial, sans-serif" font-size="25" letter-spacing="1">${esc(url.replace("https://", ""))}</text>` : ""}
 </svg>`;
 
   // ── the bare code, for their own layout ────────────────────────────────
   const p = await codeSvg(url, INK);
   const plain = `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 ${p.size} ${p.size}">${p.inner}</svg>`;
 
-  writeFileSync(join(out, `${ev.slug}-registration-card.svg`), card);
+  const cardName = showUrl ? `${ev.slug}-registration-card.svg` : `${ev.slug}-registration-card-no-url.svg`;
+  writeFileSync(join(out, cardName), card);
   writeFileSync(join(out, `${ev.slug}-qr-plain.svg`), plain);
   await QRCode.toFile(join(out, `${ev.slug}-qr-plain.png`), url, {
     errorCorrectionLevel: "H", margin: 2, width: 1400,
@@ -137,7 +139,7 @@ async function main() {
   console.log(`${ev.name}`);
   console.log(`  points at: ${url}`);
   console.log(`  folder:    ${out}`);
-  console.log(`  card:      ${ev.slug}-registration-card.svg`);
+  console.log(`  card:      ${cardName}`);
   console.log(`  plain:     ${ev.slug}-qr-plain.svg and .png`);
 }
 

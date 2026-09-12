@@ -169,10 +169,6 @@ export default function ChartPage() {
             <div className="ev">
               <span className="evlab">Pre-registration</span>
               <span className="evname">{event.name}</span>
-              <span className="evfine">
-                Your chart is built before the workshop, so it is ready whether
-                or not there is signal when we get there.
-              </span>
             </div>
           )}
           {/* Side by side rather than stacked. Embedded in a hero there is
@@ -412,8 +408,7 @@ export default function ChartPage() {
           text-transform: uppercase; color: var(--gold); font-weight: 700; }
         .evname { display: block; margin-top: 4px; font-size: 17px; font-weight: 600;
           color: #fff; letter-spacing: 0.01em; }
-        .evfine { display: block; margin-top: 6px; font-size: 12px; line-height: 1.55;
-          color: rgba(255, 255, 255, 0.76); }
+
         .fine.ok { color: var(--purple-light); font-weight: 500; }
         .error {
           background: rgba(224, 102, 102, 0.16); color: #ffd9d5; border-radius: 12px;

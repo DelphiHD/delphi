@@ -630,13 +630,6 @@ const PAGE = /* html */ `<!doctype html>
   .pip.kept { background:#eef0f4; border-color:#b9bfcc; opacity:1; }
   .pip.rejected { background:#fdeaea; border-color:#e0a0a0; opacity:1; font-weight:600; }
   .pip.failed { background:#fdeaea; border-color:#c46a6a; opacity:1; font-weight:600; }
-  #rosterPick { display:grid; grid-template-columns:repeat(auto-fill,minmax(232px,1fr)); gap:2px 14px;
-    background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:4px;
-    max-height:320px; overflow:auto; }
-  #rosterPick label { display:flex; align-items:center; gap:8px; font-size:12.5px; padding:3px 0; cursor:pointer; }
-  #rosterPick input { width:auto; }
-  #rosterPick .rid { font-size:10px; opacity:.45; font-weight:600; letter-spacing:.05em; }
-  #rosterPick .miss { color:#b3261e; font-size:10.5px; }
   .cid { font-size:10px; font-weight:600; letter-spacing:.06em; opacity:.5; margin-left:6px; }
   .who a { font-size:11.5px; color:var(--purple); word-break:break-all; }
   table.rep { width:100%; border-collapse:collapse; font-size:12px; }
@@ -686,17 +679,6 @@ const PAGE = /* html */ `<!doctype html>
 
 <div id="out"><pre id="log"></pre><div class="links" id="links" style="display:none"></div></div>
 
-<h2 style="margin-top:34px">Rerun someone already on the roster</h2>
-<p class="sub">Their birth details are already on file, so nothing is retyped. Both reports are written again from scratch.</p>
-<div class="row" style="margin-top:0">
-  <button type="button" class="ghost" id="pickNone">Clear</button>
-  <button type="button" class="ghost" id="pickMissing">Select everyone missing a report</button>
-</div>
-<div id="rosterPick"></div>
-<div class="row">
-  <button type="button" class="go" id="rerunGo" disabled>Rerun selected</button>
-  <span class="sub" id="rerunNote" style="margin:0"></span>
-</div>
 </div>
 
 <div class="dash" id="dash" hidden>
@@ -988,9 +970,12 @@ const PAGE = /* html */ `<!doctype html>
   // never mistaken for a client. Kaycee, 2026-09-12.
   var ACCOUNT_LABEL = { admin: 'Admin', client: 'Client', test: 'Test' };
   function fileAs(n) {
-    var t = String(n || '').trim().split(/\s+/);
-    if (t.length < 2) return String(n || '');
-    return t[t.length - 1] + ', ' + t.slice(0, -1).join(' ');
+    // No regex here. This whole script lives inside a template literal, which
+    // eats the backslash, so /\s+/ became /s+/ and every name was split on the
+    // letter s: "Russell Goodin" came out as "ell Goodin, Ru".
+    var parts = String(n || '').trim().split(' ').filter(function (w) { return w.length > 0; });
+    if (parts.length < 2) return String(n || '');
+    return parts[parts.length - 1] + ', ' + parts.slice(0, -1).join(' ');
   }
   async function loadPeople() {
     var box = document.getElementById('peopleTable');
@@ -1302,7 +1287,6 @@ const PAGE = /* html */ `<!doctype html>
       : '<div class="tile"><span>No history available.</span></div>';
     sortable('systemTable');
 
-    paintPicker(d.roster);
     document.getElementById('mRoster').innerHTML =
       '<table class="rep"><thead><tr><th>id</th><th>client</th><th>foundation</th>' +
       '<th>planetary</th><th>spent</th></tr></thead><tbody>' +
@@ -1400,31 +1384,6 @@ const PAGE = /* html */ `<!doctype html>
     sortable('mRules');
     sortable('mRoster');
   }
-  // the roster picker, filled from the same data the dashboard uses
-  function paintPicker(roster) {
-    var box = document.getElementById('rosterPick');
-    if (!box || box.dataset.filled === String(roster.length)) return;
-    box.dataset.filled = String(roster.length);
-    box.innerHTML = roster.map(function (r) {
-      var missing = [];
-      if (!r.foundation) missing.push('no foundation');
-      if (!r.planetary) missing.push('no planetary');
-      return '<label><input type="checkbox" value="' + esc(r.slug) + '">' +
-        '<span class="rid">' + esc(r.id) + '</span>' + esc(r.name) +
-        (missing.length ? ' <span class="miss">' + missing.join(', ') + '</span>' : '') + '</label>';
-    }).join('');
-    box.addEventListener('change', updateRerun);
-  }
-  function selected() {
-    return [].slice.call(document.querySelectorAll('#rosterPick input:checked')).map(function (i) { return i.value; });
-  }
-  function updateRerun() {
-    var n = selected().length;
-    document.getElementById('rerunGo').disabled = n === 0;
-    document.getElementById('rerunNote').textContent = n
-      ? n + ' selected \u00b7 about ' + Math.round(n * 34) + ' minutes and $' + (n * 2.7).toFixed(2)
-      : '';
-  }
   document.getElementById('clearRuns').onclick = function () {
     var b = document.getElementById('clearRuns');
     b.disabled = true;
@@ -1439,38 +1398,6 @@ const PAGE = /* html */ `<!doctype html>
       .catch(function () { b.disabled = false; });
   };
 
-  document.getElementById('pickNone').onclick = function () {
-    [].slice.call(document.querySelectorAll('#rosterPick input')).forEach(function (i) { i.checked = false; });
-    updateRerun();
-  };
-  document.getElementById('pickMissing').onclick = function () {
-    [].slice.call(document.querySelectorAll('#rosterPick label')).forEach(function (l) {
-      l.querySelector('input').checked = !!l.querySelector('.miss');
-    });
-    updateRerun();
-  };
-  document.getElementById('rerunGo').onclick = async function () {
-    var slugs = selected();
-    if (!slugs.length) return;
-    var btn = document.getElementById('rerunGo');
-    btn.disabled = true; btn.textContent = 'Working\u2026';
-    show('status');
-    out.className = 'on'; log.textContent = ''; links.style.display = 'none'; links.innerHTML = '';
-    var res = await fetch('/rerun', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slugs: slugs }),
-    });
-    var reader = res.body.getReader(), dec = new TextDecoder(), buf = '';
-    while (true) {
-      var r = await reader.read();
-      if (r.done) break;
-      buf += dec.decode(r.value, { stream: true });
-      log.textContent = buf;
-      log.scrollTop = log.scrollHeight;
-    }
-    btn.disabled = false; btn.textContent = 'Rerun selected';
-    refresh();
-  };
 
   refresh();
   setInterval(refresh, 5000);
