@@ -1113,6 +1113,11 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
     meta: [
       { label: "Profile", value: profileWithLines(chart.profile.value), field: "Profile" },
       { label: "Type", value: chart.type.value, field: "Type" },
+      // The signature and the not-self theme are what a type feels like when it
+      // is working and when it is not, so they belong against it rather than
+      // four rows away. Kaycee, 2026-09-12: "can we actually move frequencies
+      // just below type, it kind of belongs there."
+      { label: "Frequencies", value: `${chart.signature.value} / ${chart.notSelfTheme.value}`, field: "Signature" },
       { label: "Strategy", value: chart.strategy.value, field: "Strategy" },
       { label: "Authority", value: chart.authority.value, field: "Authority" },
       // The four arrows as the notation Kaycee's library indexes them by, which
@@ -1122,7 +1127,6 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
       // header info under Authority?"
       { label: "Variables", value: phsNotation(chart), field: "Variables" },
       { label: "Definition", value: chart.definition.value, field: "Definition" },
-      { label: "Frequencies", value: `${chart.signature.value} / ${chart.notSelfTheme.value}`, field: "Signature" },
       { label: "Incarnation Cross", value: chart.incarnationCross.value, field: "Incarnation Cross" },
     ].map((m) => {
       // The notation is the four arrows in one line, so it is withheld exactly

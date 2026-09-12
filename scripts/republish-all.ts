@@ -1,0 +1,78 @@
+/**
+ * Rebuild and republish every chart, so none is left on an older version.
+ *
+ * A chart is a baked file. Changing the builder changes nothing that is already
+ * published, and refreshing cannot help: the file behind the link is whatever
+ * it was when it was made. That is fine for a handful of charts and quietly
+ * wrong for a roster, because the person holding the oldest link is the one
+ * least likely to mention it.
+ *
+ * Built on 2026-09-12 after a day of chart changes left forty-six charts on
+ * five different versions of the page.
+ *
+ * Sequential on purpose. Every build casts real charts, and forty-six at once
+ * would be a stampede at bodygraph.com for no gain: nobody is waiting on this.
+ *
+ * Run:
+ *   npx tsx scripts/republish-all.ts            # everything
+ *   npx tsx scripts/republish-all.ts --dry-run  # list what would be rebuilt
+ */
+
+import { config } from "dotenv";
+config({ path: ".env.local", override: true });
+
+import { createClient } from "@supabase/supabase-js";
+
+function db() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error("Supabase credentials are not set");
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+async function main() {
+  const dry = process.argv.includes("--dry-run");
+  const { data, error } = await db()
+    .from("charts")
+    .select("person_name, token, created_at")
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(`could not list the charts: ${error.message}`);
+
+  const charts = data ?? [];
+  console.log(`${charts.length} chart(s)${dry ? " would be rebuilt" : " to rebuild"}\n`);
+  if (dry) {
+    for (const c of charts) console.log(`  ${String(c.person_name).padEnd(28)} ${c.token}`);
+    return;
+  }
+
+  const { runBuilder } = await import("@/scripts/energy-flow-diagram");
+  const failed: { name: string; token: string; why: string }[] = [];
+  const started = Date.now();
+
+  for (let i = 0; i < charts.length; i++) {
+    const c = charts[i];
+    const label = `[${String(i + 1).padStart(2)}/${charts.length}] ${String(c.person_name).slice(0, 30).padEnd(30)}`;
+    const t0 = Date.now();
+    try {
+      await runBuilder(["--token", c.token, "--publish", "--no-png"]);
+      console.log(`${label} ok    ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+    } catch (e) {
+      const why = e instanceof Error ? e.message : String(e);
+      failed.push({ name: String(c.person_name), token: c.token, why });
+      console.log(`${label} FAILED  ${why.slice(0, 90)}`);
+    }
+  }
+
+  const mins = ((Date.now() - started) / 60000).toFixed(1);
+  console.log(`\n${charts.length - failed.length} of ${charts.length} republished in ${mins} minutes`);
+  if (failed.length) {
+    console.log(`\n${failed.length} still on an older version:`);
+    for (const f of failed) console.log(`  ${f.name.padEnd(28)} ${f.token}  ${f.why.slice(0, 80)}`);
+    process.exitCode = 1;
+  }
+}
+
+main().catch((e) => {
+  console.error(e instanceof Error ? e.message : e);
+  process.exit(1);
+});
