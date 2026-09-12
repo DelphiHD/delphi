@@ -207,6 +207,19 @@ const CENTER_KEY: Record<string, string> = {
 };
 
 /**
+ * The scan's name for a centre, from the key the bodygraph is painted with.
+ *
+ * The two vocabularies differ: the chart calls them "Ego / Heart" and
+ * "G / Identity", the scan calls them "Heart centre" and "G / Identity centre".
+ * Building one from the other by hand is how the Heart centre's card came up
+ * empty, so the mapping is asked for rather than guessed.
+ */
+export function centreField(key: string): string | null {
+  for (const [field, k] of Object.entries(CENTER_KEY)) if (k === key) return field;
+  return null;
+}
+
+/**
  * Channels that are there for some of the window and not the rest.
  *
  * Kaycee, 2026-09-12, choosing how the bodygraph handles this: "2 seems most

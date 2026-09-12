@@ -44,7 +44,7 @@ import { cacheDir, cacheRoot, tryMkdir } from "@/lib/cache-dir";
 import { chartByToken, briefFromRecord, reliabilityForChart } from "@/lib/hd/chart-record";
 import {
   reliabilityOf, settled, unsettledChannels, unsettledCenters, unsettledGates,
-  NEEDS_EXACT, VARIABLE_FIELDS, type Reliability,
+  centreField, NEEDS_EXACT, VARIABLE_FIELDS, type Reliability,
 } from "@/lib/hd/time-accuracy";
 import { longitudeOf, GATE_RANGES, GATE_ARC_DEGREES, LINE_ARC_DEGREES } from "@/lib/hd/gate-longitude";
 import type { CenterName } from "@/lib/chart/types";
@@ -2540,8 +2540,7 @@ function buildCanvas(
           (d.client.reliability.window
             ? `<text class="castline" x="${r2(OX + LY.coreW / 2)}" y="79" text-anchor="middle" ` +
               `font-size="12" letter-spacing=".08em" fill="#845095">` +
-              `${esc(capitalise(d.client.reliability.window.label))} &#183; cast for ` +
-              `${esc(twelveHour(d.client.reliability.window.castFor))} &#183; dashed is not settled</text>`
+              `Chart Cast at ${esc(twelveHour(d.client.reliability.window.castFor))}</text>`
             : ""))
     : `<text x="${OX + 52}" y="60" font-size="25" font-weight="600" letter-spacing=".02em" ` +
       `fill="${skin.ink}">The Nine Centers and the Flow to the Throat</text>` +
@@ -2744,12 +2743,18 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
       return {
         id: c, name: CENTER_DISPLAY[c], fns: d.fn[c], biology: d.biology[c],
         defined, state, pending,
+        // The scan's own name for this centre, carried rather than rebuilt from
+        // the display name: the two vocabularies do not match on Heart or G.
+        pendField: centreField(c),
         stateLabel: state ? state.charAt(0).toUpperCase() + state.slice(1) : "",
         stateText: state ? d.states[c][state] : "",
         // the tooltip is 250px wide, so the hover gets the opening sentences and
         // the card gets the rest
         stateShort: state ? firstSentences(d.states[c][state], 2) : "",
         report: d.client?.report.centers[c] ?? "",
+        // All three readings, so an unsettled centre can show what each of its
+        // possible states would mean rather than only the one it was cast in.
+        stateTexts: { defined: d.states[c].defined, undefined: d.states[c].undefined, open: d.states[c].open },
         notSelf: d.states[c].theme,
       };
     }),
@@ -3028,14 +3033,15 @@ svg.canvas.plain .pleg.lit { fill:${HL_GOLD} !important; }
    missing hour is costing them. Open, not faded: a faded centre reads as a
    weaker version of defined, which is the wrong idea entirely. */
 .cshape.pending { fill:#ffffff !important;
-  stroke:var(--pend,#845095) !important; stroke-width:2.2 !important;
+  stroke:#845095 !important; stroke-width:2.2 !important;
   stroke-dasharray:7 5; stroke-linecap:round; }
 .chgrp.pending path, .chgrp.pending polygon, .chgrp.pending rect,
 .pleg.pending {
   fill:none !important; stroke:var(--pend,#2b2b33) !important;
   stroke-width:1.6 !important; stroke-dasharray:6 4; }
-.gdisc.pending { fill:none !important; stroke:#2b2b33 !important;
-  stroke-width:1.2 !important; stroke-dasharray:3 3; }
+.gdisc.pending { fill:#f3ecf6 !important; stroke:#845095 !important;
+  stroke-width:1.3 !important; stroke-dasharray:3 2.5; }
+.pnum.pending { fill:#2b2b33 !important; opacity:1 !important; }
 .castat { margin:0 0 4px; font-size:12px; letter-spacing:.02em; opacity:.75; }
 .possible { margin:8px 0 2px; font-size:11px; font-weight:700; letter-spacing:.08em;
   text-transform:uppercase; color:#845095; }
@@ -3811,7 +3817,6 @@ if (DATA.client) {
     [].forEach.call(document.querySelectorAll('.cshape'), function (el) {
       if (!ctrs[el.dataset.center]) return;
       el.classList.add('pending');
-      if (el.dataset.on) el.style.setProperty('--pend', el.dataset.on);
     });
     // .chgrp is the bodygraph's own legs, .ch is the circuit view's redraw of
     // the same channel. Kaycee, 2026-09-12: "let's make sure all of this
@@ -3820,6 +3825,11 @@ if (DATA.client) {
       if (chs[g.dataset.ch]) g.classList.add('pending');
     });
     [].forEach.call(document.querySelectorAll('.pleg, .gdisc'), function (el) {
+      if (gts[el.dataset.gate]) el.classList.add('pending');
+    });
+    // The number sits on top of the disc in white. A disc drawn open needs its
+    // number in ink or it disappears with the fill.
+    [].forEach.call(document.querySelectorAll('.pnum[data-gate]'), function (el) {
       if (gts[el.dataset.gate]) el.classList.add('pending');
     });
     // the mandala's gate cells and the astrology ring's gate bands
@@ -6884,19 +6894,37 @@ function libKeyFor(kind, value) {
 }
 
 function basicFor(field, value) {
+  // A centre's possible answers are states, not library entries, and Kaycee has
+  // written all three. Kaycee, 2026-09-12: "I would expect to see mouseovers
+  // for the different center definition possibilities."
+  if (field.slice(-7) === ' centre') {
+    var c = (DATA.centers || []).filter(function (x) { return x.pendField === field; })[0];
+    if (!c || !c.stateTexts) return '';
+    var key = value.slice(0, 7) === 'defined' ? 'defined' : value === 'open' ? 'open' : 'undefined';
+    return c.stateTexts[key] || '';
+  }
   var lib = DATA.basicLib || {};
   var kind = libKindFor(field);
   var table = lib[kind] || {};
   return table[libKeyFor(kind, value)] || '';
 }
 
+// "defined (design)" reads as "defined". Which side defines it is operator
+// detail, and the centre is either theirs at that hour or it is not.
+// Kaycee, 2026-09-12: "You can remove the (design) designation on that bullet."
+function plainValue(v) {
+  var i = String(v).indexOf(' (');
+  return i < 0 ? String(v) : String(v).slice(0, i);
+}
+
 // One answer in the list. Carries its own text when there is one, so hovering
 // it says what the difference actually means rather than just naming it.
 function optTag(field, value) {
+  var shown = plainValue(value);
   var basic = basicFor(field, value);
-  if (!basic) return esc(value);
+  if (!basic) return esc(shown);
   return '<span class="opt" data-basic="' + esc(basic).split('"').join('&quot;') + '">' +
-    esc(value) + '</span>';
+    esc(shown) + '</span>';
 }
 
 // What an unsettled field says. Kaycee, 2026-09-12, giving the whole spec:
@@ -7032,7 +7060,7 @@ function ctrHtml(k) {
   // their own reading first when this chart has one, Kaycee's general text for
   // the state otherwise, so a center always says something
   return '<b>' + esc(k.name) + '</b>' + tags(t) +
-    (k.pending ? pendingNote(k.name + ' centre') : '') +
+    (k.pending ? pendingNote(k.pendField) : '') +
     (k.biology ? '<span class="meta">' + esc(k.biology) + '</span>' : '') + extra +
     prose(k.pending ? k.report : (k.report || k.stateText));
 }
