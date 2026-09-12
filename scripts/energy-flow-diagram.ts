@@ -43,6 +43,7 @@ import { loadLibraryChunks } from "@/lib/hd/chunks-source";
 import { cacheDir, cacheRoot, tryMkdir } from "@/lib/cache-dir";
 import { chartByToken, briefFromRecord, reliabilityForChart } from "@/lib/hd/chart-record";
 import { computeCycles, type Cycles } from "@/lib/chart/cycles";
+import { cyclesFor } from "@/lib/hd/cycles-node";
 import {
   reliabilityOf, settled, unsettledChannels, unsettledCenters, unsettledGates,
   centreField, NEEDS_EXACT, VARIABLE_FIELDS, type Reliability,
@@ -925,11 +926,45 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
   // Never fatal. It shells out to Python, which is there on her machine and may
   // not be inside the function that builds a chart for somebody on the website.
   // A chart with no cycle dates is worth far more than no chart.
+  //
+  // Two ways to get them. Swiss Ephemeris through Python is the reference and
+  // returns all four including Kiron; it runs on Kaycee's machine and not
+  // inside a Vercel function. The local ephemeris returns Saturn, Uranus and
+  // the second Saturn, checked against the reference across five births and
+  // fifteen cycles on 2026-09-12: every date identical to the day, and every
+  // retrograde pass count identical. Kiron is not in that ephemeris and cannot
+  // be had cheaply, so a website chart gets three of the four rather than a
+  // fourth that is a year out. scripts/check-cycles.ts is the comparison.
   let cycles: Cycles | null = null;
   try {
     cycles = await computeCycles(chart.birth.utcDate);
-  } catch (e) {
-    console.warn(`  cycle dates unavailable: ${e instanceof Error ? e.message : e}`);
+  } catch {
+    try {
+      const nat = (p: string) => {
+        const a = chart.activations.personality.find((x) => x.planet === p);
+        return a ? longitudeOf(a.gate, a.line, a.color, a.tone, a.base) : null;
+      };
+      const sat = nat("Saturn"), ura = nat("Uranus");
+      if (sat === null || ura === null) throw new Error("no Saturn or Uranus in the chart");
+      const local = await cyclesFor({ birthUtc: chart.birth.utcDate, natal: { Saturn: sat, Uranus: ura } });
+      const find = (label: string) => local.find((c) => c.label === label);
+      const blank = { firstPass: "", firstPassDatetime: "", allPasses: [], status: "unknown" as const, windowEnd: null };
+      const shape = (label: string) => {
+        const c = find(label);
+        return c
+          ? { firstPass: c.firstPass, firstPassDatetime: "", allPasses: c.allPasses, status: c.status, windowEnd: c.allPasses[c.allPasses.length - 1] ?? null }
+          : blank;
+      };
+      cycles = {
+        saturnReturn: shape("Saturn Return"),
+        uranusOpposition: shape("Uranus Opposition"),
+        chironReturn: blank,
+        secondSaturnReturn: shape("Second Saturn Return"),
+      };
+      console.warn("  Kiron return omitted: Swiss Ephemeris is not available here");
+    } catch (e2) {
+      console.warn(`  cycle dates unavailable: ${e2 instanceof Error ? e2.message : e2}`);
+    }
   }
 
   // How well the birth time is known, and therefore what this chart may claim.
