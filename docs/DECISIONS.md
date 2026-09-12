@@ -108,7 +108,14 @@ Both functions return SVG strings. The same data contract feeds the current `.do
 
 **How to apply.** Phase 1 runs `supabase link --project-ref biufjcapnuzbdowoksnb` to associate the local repo with this project. Migrations land in `supabase/migrations/` and apply via `supabase db push`. Anon key + service-role key come from the dashboard; service-role key never goes in a `NEXT_PUBLIC_*` env.
 
-**Open.** Database password is stored in Tennyson's 1Password vault — share it with Kaycee before she needs to run a migration herself. Upgrade to Pro plan before Phase 5 (customer data + 7-day backup retention). Configure auth redirect URLs in the dashboard once Vercel domain is known.
+**Applying a migration without Tennyson.** Corrected 2026-09-12. The old note here said the database password lives in Tennyson's 1Password vault and had to be shared with Kaycee before she could run a migration. That is wrong twice over, and it sent a session hunting for a password nobody needs. Tennyson was a contractor during Phase 1 and Kaycee has none of his credentials.
+
+Nothing is locked. The database password is only for connecting from outside the dashboard, it is not needed to run a migration, and it can be reset from Settings → Database at any time without knowing the old one. Two routes, neither of which involves him:
+
+1. **Preferred.** A Supabase personal access token from Kaycee's own account (Account → Access Tokens), stored as `SUPABASE_ACCESS_TOKEN` in `.env.local`. `scripts/apply-migration.ts` then applies any migration file with no dashboard visit and no password. This is the route that takes it off her plate permanently.
+2. **Fallback.** Paste the migration's SQL into the SQL editor at `https://supabase.com/dashboard/project/biufjcapnuzbdowoksnb/sql/new`. Needs only her dashboard login.
+
+**Open.** Upgrade to Pro plan before Phase 5 (customer data + 7-day backup retention). Configure auth redirect URLs in the dashboard once Vercel domain is known.
 
 ---
 
