@@ -42,6 +42,7 @@ import { CENTER_GATES, centerOf, type Center } from "@/lib/hd/gate-center";
 import { loadLibraryChunks } from "@/lib/hd/chunks-source";
 import { cacheDir, cacheRoot, tryMkdir } from "@/lib/cache-dir";
 import { chartByToken, briefFromRecord, reliabilityForChart } from "@/lib/hd/chart-record";
+import { computeCycles, type Cycles } from "@/lib/chart/cycles";
 import {
   reliabilityOf, settled, unsettledChannels, unsettledCenters, unsettledGates,
   centreField, NEEDS_EXACT, VARIABLE_FIELDS, type Reliability,
@@ -857,6 +858,8 @@ interface ClientCtx {
   established: boolean;
   /** What this chart is allowed to claim, given how well the time is known. */
   reliability: Reliability;
+  /** Saturn, Uranus and Kiron, computed rather than read out of a report. */
+  cycles: Cycles | null;
   /** Drawn, but visibly not settled: true at some hours of the window and not
    *  others. Kept apart from the sets above so the solid parts of the drawing
    *  are true whatever hour the person was actually born. */
@@ -910,6 +913,23 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
   const svg = chart.bodygraphSvg ?? chart.chartImageSvg;
   if (!svg || !svg.includes("<svg")) {
     throw new Error(`mybodygraph returned no branded SVG for ${brief.name}.`);
+  }
+
+  // The life cycle dates, for every chart rather than only one with a written
+  // report. lib/chart/cycles is the existing path, validated against Maia
+  // Mechanics to the minute on twelve of twelve sample points, so it is used
+  // rather than a second implementation. Kaycee, 2026-09-12: "the cycle dates
+  // should be returned with the api data for all charts... We've figured it out
+  // before."
+  //
+  // Never fatal. It shells out to Python, which is there on her machine and may
+  // not be inside the function that builds a chart for somebody on the website.
+  // A chart with no cycle dates is worth far more than no chart.
+  let cycles: Cycles | null = null;
+  try {
+    cycles = await computeCycles(chart.birth.utcDate);
+  } catch (e) {
+    console.warn(`  cycle dates unavailable: ${e instanceof Error ? e.message : e}`);
   }
 
   // How well the birth time is known, and therefore what this chart may claim.
@@ -997,6 +1017,7 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
     centers: settledCenters,
     gates,
     reliability,
+    cycles,
     pending: pendingParts,
     // Kaycee's written synthesis, and only for a chart entitled to it. Reports
     // are found on disk by the person's name, so a portal chart for somebody who
@@ -2608,6 +2629,47 @@ function mandalaView(d: SceneData): string {
   return `<div class="mandala">${svg.replace(/<\/svg>\s*$/, `<g class="hubrings">${rings}</g></svg>`)}</div>`;
 }
 
+/**
+ * The cycles a chart shows: computed dates for everybody, with Kaycee's own
+ * written passage where a Foundation report has one.
+ *
+ * Before this, a chart without that report showed nothing at all where the
+ * dates belong, which is the wrong way round: the dates are arithmetic and
+ * belong to every chart, while the writing is the thing that is bought.
+ */
+function mergedCycles(d: SceneData): { label: string; date: string; status: string; text: string; passes?: string[] }[] {
+  const written = new Map((d.client?.report.cycles ?? []).map((c) => [c.label.toLowerCase(), c]));
+  const c = d.client?.cycles;
+  if (!c) return d.client?.report.cycles ?? [];
+
+  // Dates only, unless a Foundation report has written words for this person.
+  // Her lifecycle library entries are written for the operator, not the client:
+  // "Do NOT use roof-language in non-6-line reports", "Saturn Return is a
+  // light-reading, not a darkness-reading". True and useful, and none of it is
+  // a client's to read. What a client should be told about a Saturn Return is
+  // Kaycee's to write, not this file's to improvise.
+  const rows: { label: string; date: string; status: string; text: string; passes?: string[] }[] = [];
+  const put = (label: string, cy: { firstPass: string; allPasses: string[]; status: string }) => {
+    if (!cy.firstPass) return;
+    const mine = written.get(label.toLowerCase());
+    const span = cy.allPasses.length > 1
+      ? `${cy.allPasses[0]} to ${cy.allPasses[cy.allPasses.length - 1]}`
+      : cy.firstPass;
+    rows.push({
+      label,
+      date: mine?.date || span,
+      status: mine?.status || cy.status,
+      text: mine?.text ?? "",
+      passes: cy.allPasses,
+    });
+  };
+  put("Saturn Return", c.saturnReturn);
+  put("Uranus Opposition", c.uranusOpposition);
+  put("Kiron Return", c.chironReturn);
+  put("Second Saturn Return", c.secondSaturnReturn);
+  return rows;
+}
+
 // ── interactive page ────────────────────────────────────────────────────────
 function buildHtml(d: SceneData, canvases: string, mandala: string, astro: string,
   fonts: Map<number, Buffer>): string {
@@ -2673,7 +2735,7 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
     centerRows: (Object.keys(CENTER_GATES) as Center[]).map((k) => ({ key: k, label: CENTER_LABEL[k] })),
     astro: d.astro ? { ...d.astro, design: d.astroDesign ?? null } : null,
     read: d.read ?? null,
-    cycles: d.client?.report.cycles ?? [],
+    cycles: d.client ? mergedCycles(d) : [],
     client: d.client
       ? { name: d.client.name,
           dates: {
@@ -2681,7 +2743,7 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
             place: d.client.subtitle.personality[1] ?? "",
             design: d.client.subtitle.design[0] ?? "",
           },
-          cycles: d.client.report.cycles,
+          cycles: mergedCycles(d),
           islands: definitionMap(d).islands,
           bridges: definitionMap(d).bridges,
           channelList: d.channels
@@ -3238,11 +3300,16 @@ body.show-bridges .bridge { opacity:1; }
 .chan-item .sw { width:14px; height:4px; border-radius:2px; flex:0 0 14px; }
 #tab-dates h4, #tab-stats h4, #relhome h4 { font-size:9.5px; letter-spacing:.18em; font-weight:600; opacity:.6; margin:16px 0 7px;
   text-transform:uppercase; }
-#tab-dates .line, .pane .line, 
-#tab-dates .line span, .pane .line span { opacity:.6; }
-.cyc { font-size:11.5px; line-height:1.5; padding:6px 7px; margin:0 -7px 2px; border-radius:7px; cursor:pointer; }
+/* The dates tab had no size of its own, so the birth and design lines fell
+   back to the page size and towered over everything around them. Kaycee,
+   2026-09-12: "can we fix the text sizes on the dates tab to match the rest of
+   the control panel? It's all over the place right now." These are the Home
+   panel's numbers, so the two tabs read as one panel. */
+#tab-dates .line, .pane .line { font-size:11px; line-height:1.45; opacity:.6; }
+#tab-dates .line span, .pane .line span { font-size:11px; opacity:1; }
+.cyc { font-size:11px; line-height:1.45; padding:6px 7px; margin:0 -7px 2px; border-radius:7px; cursor:pointer; }
 .cyc:hover { background:rgba(132,80,149,.14); }
-.cyc b { display:block; font-weight:600; }
+.cyc b { display:block; font-weight:600; font-size:11px; }
 .cyc span { opacity:.62; }
 .bar { display:grid; grid-template-columns:78px 1fr 26px; align-items:center; gap:7px; font-size:11.5px;
   margin-bottom:3px; }
@@ -4075,13 +4142,21 @@ if (DATA.client) {
         '<span>' + esc(c.date) + ' &middot; ' + esc(c.status) + '</span></div>';
     }).join('');
   } else {
-    datesHtml += '<h4>Cycles</h4><div class="line"><span>No timeline chapter in this Foundation report.</span></div>';
+    datesHtml += '';
   }
   document.getElementById('tab-dates').innerHTML = datesHtml;
   document.getElementById('tab-dates').addEventListener('click', function (e) {
     var el = e.target.closest ? e.target.closest('.cyc') : null;
     if (!el) return;
     var c = cyc[+el.dataset.cyc];
+    if (!c.text) {
+      var when = (c.passes && c.passes.length > 1)
+        ? '<ul class="couldbe"><li>' + c.passes.map(esc).join('</li><li>') + '</li></ul>'
+        : '';
+      openCard(el, '<b>' + esc(c.label) + '</b><span class="kn">' + esc(c.status) + '</span>' +
+        '<div class="body"><p class="castat">' + esc(c.date) + '</p>' + when + '</div>');
+      return;
+    }
     openCard(el, '<b>' + esc(c.label) + '</b><span class="kn">' + esc(c.date) + '</span>' +
       tags([{ text: c.status }]) + prose(c.text));
   });
