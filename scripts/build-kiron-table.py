@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate the Kiron ephemeris table, once, so no chart ever has to ask for it.
+Generate the slow-body ephemeris table, once, so no chart ever has to ask.
 
 Kiron is the one body the runtime ephemeris does not know, and its return is
 the marker that matters most for 6-line beings. Asking bodygraph.com where it
@@ -29,9 +29,15 @@ _EPH = os.environ.get("SWE_EPH_PATH") or os.path.expanduser("~/.cache/swisseph")
 if os.path.isdir(_EPH):
     swe.set_ephe_path(_EPH)
 
+BODIES = {
+    "Chiron": swe.CHIRON,
+    "Saturn": swe.SATURN,
+    "Uranus": swe.URANUS,
+}
+
 START = datetime(1900, 1, 1, tzinfo=timezone.utc)
 END = datetime(2130, 1, 1, tzinfo=timezone.utc)
-STEP_DAYS = 5
+STEP_DAYS = 1
 SCALE = 100000  # longitude to five decimal places, as an integer
 
 def julian(dt):
@@ -39,34 +45,34 @@ def julian(dt):
                       dt.hour + dt.minute / 60 + dt.second / 3600)
 
 def main():
-    values = []
-    t = START
-    while t < END:
-        lon = swe.calc_ut(julian(t), swe.CHIRON, swe.FLG_SWIEPH)[0][0]
-        values.append(round(lon * SCALE))
-        t += timedelta(days=STEP_DAYS)
-
-    # Stored as differences, which are small and regular, so the file gzips to
-    # a fraction of what the raw longitudes would.
-    deltas = [values[0]]
-    for i in range(1, len(values)):
-        deltas.append(values[i] - values[i - 1])
-
     out = {
-        "what": "Kiron's ecliptic longitude, from Swiss Ephemeris, every 5 days.",
-        "why": "So a chart can find the Kiron return without asking anyone. See lib/hd/kiron.ts.",
+        "what": "Ecliptic longitude from Swiss Ephemeris, every 5 days, for the bodies whose returns a chart reports.",
+        "why": "So a return date and its exact moment can be found without asking anyone. See lib/hd/slow-table.ts.",
         "generatedBy": "scripts/build-kiron-table.py",
         "start": START.isoformat().replace("+00:00", "Z"),
         "stepDays": STEP_DAYS,
         "scale": SCALE,
-        "count": len(values),
-        "deltas": deltas,
+        "bodies": {},
     }
-    path = "lib/hd/kiron-table.json"
+
+    for name, code in BODIES.items():
+        values = []
+        t = START
+        while t < END:
+            lon = swe.calc_ut(julian(t), code, swe.FLG_SWIEPH)[0][0]
+            values.append(round(lon * SCALE))
+            t += timedelta(days=STEP_DAYS)
+        deltas = [values[0]]
+        for i in range(1, len(values)):
+            deltas.append(values[i] - values[i - 1])
+        out["bodies"][name] = deltas
+        out["count"] = len(values)
+        print(f"  {name}: {len(values)} samples")
+
+    path = "lib/hd/slow-table.json"
     with open(path, "w") as f:
         json.dump(out, f, separators=(",", ":"))
-    size = os.path.getsize(path)
-    print(f"{len(values)} samples, {START.date()} to {END.date()}, {size/1024:.0f} KB at {path}")
+    print(f"{START.date()} to {END.date()}, {os.path.getsize(path)/1024:.0f} KB at {path}")
 
 if __name__ == "__main__":
     main()

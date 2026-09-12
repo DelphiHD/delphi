@@ -35,6 +35,7 @@ const daysApart = (a: string, b: string) =>
 
 async function main() {
   let worst = 0;
+  let worstMins = 0;
   let rows = 0;
 
   for (const b of BIRTHS) {
@@ -42,16 +43,9 @@ async function main() {
       birthDate: b.date, birthTime: b.time, timezone: b.tz, locationQuery: b.place,
     });
     const reference = await computeCycles(chart.birth.utcDate);
-    const mine = await cyclesFor({
-      birthUtc: chart.birth.utcDate,
-      natal: {
-        Saturn: lonOf(chart, "Saturn")!,
-        Uranus: lonOf(chart, "Uranus")!,
-        Chiron: lonOf(chart, "Chiron"),
-      },
-    });
+    const mine = await cyclesFor({ birthUtc: chart.birth.utcDate });
 
-    const pairs: [string, { firstPass: string; allPasses: string[] }][] = [
+    const pairs: [string, { firstPass: string; firstPassDatetime: string; allPasses: string[] }][] = [
       ["Saturn Return", reference.saturnReturn],
       ["Uranus Opposition", reference.uranusOpposition],
       ["Kiron Return", reference.chironReturn],
@@ -67,11 +61,20 @@ async function main() {
       const passes = `${got.allPasses.length} vs ${ref.allPasses.length} passes`;
       if (got.allPasses.length !== ref.allPasses.length) worst = 999;
       worst = Math.max(worst, off); rows++;
-      console.log(`  ${label.padEnd(21)} ref ${ref.firstPass}  node ${got.firstPass}  ${String(off).padStart(3)} day(s)  ${passes}`);
+      // The instant matters, not just the day: a return chart is cast for when
+      // the return happens. Compared in minutes.
+      const mins = ref.firstPassDatetime
+        ? Math.round(Math.abs(new Date(ref.firstPassDatetime).getTime() - new Date(got.firstPassUtc).getTime()) / 60_000)
+        : -1;
+      worstMins = Math.max(worstMins, mins);
+      console.log(`  ${label.padEnd(21)} ref ${ref.firstPassDatetime || ref.firstPass}  node ${got.firstPassUtc}  ${String(mins).padStart(4)} min  ${passes}`);
     }
   }
-  console.log(`\n${rows} cycles compared, worst disagreement ${worst} day(s)`);
-  if (worst > 1) { console.error("Too far apart to trust. Not shipping this."); process.exit(1); }
+  console.log(`\n${rows} cycles compared, worst disagreement ${worst} day(s) / ${worstMins} minute(s)`);
+  if (worst > 1 || worstMins > 5) {
+    console.error("Too far apart to trust. Not shipping this.");
+    process.exit(1);
+  }
 
 }
 

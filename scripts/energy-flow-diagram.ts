@@ -940,16 +940,7 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
   // lib/chart/cycles.ts is still the reference it runs against.
   let cycles: Cycles | null = null;
   try {
-    const nat = (planet: string) => {
-      const a = chart.activations.personality.find((x) => x.planet === planet);
-      return a ? longitudeOf(a.gate, a.line, a.color, a.tone, a.base) : null;
-    };
-    const sat = nat("Saturn"), ura = nat("Uranus");
-    if (sat === null || ura === null) throw new Error("the chart has no Saturn or Uranus");
-    const local = await cyclesFor({
-      birthUtc: chart.birth.utcDate,
-      natal: { Saturn: sat, Uranus: ura, Chiron: nat("Chiron") },
-    });
+    const local = await cyclesFor({ birthUtc: chart.birth.utcDate });
     const blank = { firstPass: "", firstPassDatetime: "", allPasses: [], status: "unknown" as const, windowEnd: null };
     const shape = (label: string) => {
       const c = local.find((x) => x.label === label);

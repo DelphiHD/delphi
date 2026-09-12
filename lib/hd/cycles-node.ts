@@ -37,8 +37,14 @@ export interface Cycle {
   label: string;
   /** The first crossing, YYYY-MM-DD. */
   firstPass: string;
-  /** Every crossing. One entry for Kiron, usually three for the rest. */
+  /** The same moment to the second. The return chart work needs the instant,
+   *  not the day: a chart cast for a return is cast for when it happens.
+   *  Kaycee, 2026-09-12: "when we do the return chart work it will be important
+   *  to have the exact times." */
+  firstPassUtc: string;
+  /** Every crossing. Usually three, when the planet retrogrades over the point. */
   allPasses: string[];
+  allPassesUtc: string[];
   status: "Passed" | "Current" | "Upcoming";
 }
 
@@ -48,6 +54,7 @@ const YEAR = 365.2422;
 /** Shortest signed angle from a to b. */
 const delta = (a: number, b: number) => ((b - a + 540) % 360) - 180;
 const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
+const stamp = (t: number) => new Date(Math.round(t / 1000) * 1000).toISOString().replace(".000", "");
 
 /**
  * Every moment in a window where a body crosses a longitude.
@@ -70,7 +77,9 @@ function crossings(planet: string, target: number, from: number, to: number): nu
     // +180 to -180, which is the far side of the wheel and not a return.
     if (Math.sign(d) !== Math.sign(prevD) && Math.abs(d - prevD) < 180) {
       let lo = prevT, hi = t, dlo = prevD;
-      for (let i = 0; i < 6; i++) {
+      // Twenty two halvings takes a one day bracket down to about twenty
+      // milliseconds, so the instant is as exact as the ephemeris under it.
+      for (let i = 0; i < 22; i++) {
         const mid = (lo + hi) / 2;
         const l = longitudeAt(planet, new Date(mid));
         if (l === null) break;
@@ -109,11 +118,23 @@ const statusOf = (passes: number[], now: number): Cycle["status"] =>
 
 export async function cyclesFor(args: {
   birthUtc: string;
-  /** Birth longitudes, which the caller already has from the chart it cast. */
-  natal: { Saturn: number; Uranus: number; Chiron?: number | null };
   now?: Date;
 }): Promise<Cycle[]> {
   const birth = new Date(args.birthUtc).getTime();
+  // Read from the ephemeris rather than taken from the chart.
+  //
+  // The chart carries a planet as gate, line, colour, tone and base, and the
+  // finest of those is a base: about four thousandths of a degree, which for
+  // Saturn is three hours of travel. Decoding a longitude back out of it and
+  // hunting the return from there put the moment of the return up to three and
+  // a half hours out, while the date stayed right. The birth instant and this
+  // ephemeris give the position outright.
+  const natal = {
+    Saturn: longitudeAt("Saturn", new Date(birth)),
+    Uranus: longitudeAt("Uranus", new Date(birth)),
+    Chiron: longitudeAt("Chiron", new Date(birth)),
+  };
+  if (natal.Saturn === null || natal.Uranus === null) return [];
   const now = (args.now ?? new Date()).getTime();
   const at = (years: number) => birth + years * YEAR * DAY;
   const out: Cycle[] = [];
@@ -123,17 +144,18 @@ export async function cyclesFor(args: {
     out.push({
       label,
       firstPass: iso(passes[0]),
+      firstPassUtc: stamp(passes[0]),
       allPasses: passes.map(iso),
+      allPassesUtc: passes.map(stamp),
       status: statusOf(passes, now),
     });
   };
 
-  add("Saturn Return", crossings("Saturn", args.natal.Saturn, at(26), at(33)));
-  add("Uranus Opposition",
-    crossings("Uranus", (args.natal.Uranus + 180) % 360, at(36), at(48)));
-  add("Second Saturn Return", crossings("Saturn", args.natal.Saturn, at(55), at(62)));
-  if (args.natal.Chiron != null) {
-    add("Kiron Return", crossings("Chiron", args.natal.Chiron, at(45), at(56)));
+  add("Saturn Return", crossings("Saturn", natal.Saturn, at(26), at(33)));
+  add("Uranus Opposition", crossings("Uranus", (natal.Uranus + 180) % 360, at(36), at(48)));
+  add("Second Saturn Return", crossings("Saturn", natal.Saturn, at(55), at(62)));
+  if (natal.Chiron !== null) {
+    add("Kiron Return", crossings("Chiron", natal.Chiron, at(45), at(56)));
   }
   return out.sort((a, b) => a.firstPass.localeCompare(b.firstPass));
 }
