@@ -3443,8 +3443,12 @@ body.view-transit .todaysec, body.view-transit .datesec { display:block; }
 .cycpill.on { background:var(--purple); border-color:var(--purple); color:#fff; font-weight:600; }
 .datesec.loading .datepick, .datesec.loading .cycrow { opacity:.45; pointer-events:none; }
 .noread { font-size:11.5px; opacity:.62; line-height:1.5; margin-top:6px; }
-/* in the transit view the panel is about today, not about their design */
-body.view-transit #placements, body.view-transit #chandrop, body.view-transit #defdrop { display:none; }
+/* in the transit view the panel is about today, not about their design.
+   Show is not part of that: it used to be the placements drawer on the right
+   and is now the dock's filters, which apply to every view. Kaycee,
+   2026-09-12: "we lost the Show toggle on the transit, relationship and
+   astrology views." */
+body.view-transit #chandrop, body.view-transit #defdrop { display:none; }
 .todaylab { font-size:9.5px; letter-spacing:.18em; font-weight:600; opacity:.62;
   text-transform:uppercase; margin-bottom:6px; }
 .todayread { font-size:11.5px; line-height:1.62; }
@@ -3740,10 +3744,10 @@ body.mod-relation #relhome { display:block; }
 #relPlaceList div:hover, #relPlaceList div.on { background:rgba(132,80,149,.22); }
 #relPlace.unset { border-color:rgba(224,102,102,.6); }
 
-body.mod-relation #pmeta, body.mod-relation #placements, body.mod-relation #chandrop,
+body.mod-relation #pmeta, body.mod-relation #chandrop,
 body.mod-relation #defdrop, body.mod-relation #circdrop { display:none !important; }
 body.mod-relation #datesec, body.mod-relation #todaysec { display:none !important; }
-body.view-astro #pmeta, body.view-astro #circdrop, body.view-astro #placements,
+body.view-astro #pmeta, body.view-astro #circdrop,
 body.view-astro #datesec, body.view-astro #todaysec, body.view-astro #chandrop,
 body.view-astro #defdrop { display:none !important; }
 /* The astrology view is an astrology panel. The pair's HD drawers belong to the
