@@ -41,7 +41,7 @@ import { CHANNELS } from "@/lib/hd/channels";
 import { CENTER_GATES, centerOf, type Center } from "@/lib/hd/gate-center";
 import { loadLibraryChunks } from "@/lib/hd/chunks-source";
 import { cacheDir, cacheRoot, tryMkdir } from "@/lib/cache-dir";
-import { chartByToken, briefFromRecord } from "@/lib/hd/chart-record";
+import { chartByToken, briefFromRecord, reliabilityForChart } from "@/lib/hd/chart-record";
 import {
   reliabilityOf, settled, unsettledChannels, unsettledCenters, unsettledGates,
   NEEDS_EXACT, VARIABLE_FIELDS, type Reliability,
@@ -918,12 +918,13 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
   // chart is cast normally and the person is told separately that the exact
   // time matters. Only "roughly" and "I don't know" are scanned.
   const accuracy = brief.timeAccuracy ?? "document";
-  const reliability = (accuracy === "approximate" || accuracy === "unknown")
-    ? await reliabilityOf({
-        accuracy, birthDate: brief.birthDate, birthTime: brief.birthTime,
-        timezone: tz, locationQuery: placeForLookup(brief),
-      })
-    : settled(accuracy);
+  const reliability = brief.reliability
+    ?? ((accuracy === "approximate" || accuracy === "unknown")
+      ? await reliabilityOf({
+          accuracy, birthDate: brief.birthDate, birthTime: brief.birthTime,
+          timezone: tz, locationQuery: placeForLookup(brief),
+        })
+      : settled(accuracy));
 
   // Option 2, Kaycee's choice: solid means true at every hour of the window.
   // Anything that comes and goes moves out of the solid sets and into `pending`
@@ -1334,6 +1335,49 @@ function gateMeta(chunks: Chunk[]): Record<number, GateMeta> {
       basic: (m["Delphi Basic"] ?? "").trim(),
       bridge: (m["Delphi Bridge Text"] ?? "").trim(),
     };
+  }
+  return out;
+}
+
+/**
+ * Kaycee's own short text for a value, whatever kind of value it is.
+ *
+ * Built so a withheld field can show what the difference between its possible
+ * answers actually means: somebody told their Type is either Generator or
+ * Projector learns nothing from the two words alone. Kaycee, 2026-09-12: "it
+ * would help people see the difference and why it matters."
+ *
+ * Keyed by kind and by the value as it is written on a chart, so the lookup
+ * works from the answer rather than from a database id. Only entries that
+ * actually carry Delphi Basic text are included: a kind she has not written yet
+ * simply has no hover, and starts having one the moment the column is filled
+ * and the sync runs. Kaycee, 2026-09-12: "I know I still need to add Delphi
+ * Basic columns to some of the databases... I'd like the function to be there."
+ *
+ * Today that means gates and profiles. Type, Authority, Definition and the
+ * variables are wired and waiting.
+ */
+function basicByValue(chunks: Chunk[]): Record<string, Record<string, string>> {
+  const out: Record<string, Record<string, string>> = {
+    type: {}, authority: {}, profile: {}, definition: {}, gate: {}, variable: {}, channel: {},
+  };
+  // "Triple Split Definition" and "Triple Split" have to land on the same key,
+  // and so do "1 / 3" and "1/3: The Investigator Martyr".
+  const norm = (v: string) =>
+    v.toLowerCase().split(":")[0].replace(/\bdefinition\b/g, "").replace(/[^a-z0-9/]/g, "");
+
+  for (const c of chunks) {
+    const basic = ((c.metadata ?? {})["Delphi Basic"] ?? "").toString().trim();
+    if (!basic) continue;
+    const kind = c.source_kind ?? "";
+    if (kind === "gate") {
+      const n = Number((c.metadata ?? {})["Gate #"] ?? (c.title ?? "").match(/\d+/)?.[0]);
+      if (n) out.gate[String(n)] = basic;
+      continue;
+    }
+    if (!(kind in out)) continue;
+    const key = norm(c.title ?? "");
+    if (key) out[kind][key] = basic;
   }
   return out;
 }
@@ -1935,6 +1979,9 @@ interface SceneData {
   biology: Record<Center, string>;
   tagInfo: Record<string, string>;
   gateInfo: Record<number, GateMeta>;
+  /** Kaycee's short text per value, by kind. Empty for a kind she has not
+   *  written a Delphi Basic column for yet. */
+  basicLib?: Record<string, Record<string, string>>;
   states: Record<Center, CenterStates>;
   lineName: (g: number, l: number) => string;
   anchors: Record<number, { x: number; y: number }>;
@@ -2615,6 +2662,9 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
       }
       return o;
     })(),
+    // Kaycee's short text per value, so a withheld field can show what the
+    // difference between its possible answers means rather than just naming them.
+    basicLib: d.basicLib ?? {},
     planetGlyphs: PLANET_GLYPHS,
     planetOrder: PLANET_ROWS,
     tableGeom: { w: TABLE_W + 18, rowH: 30, leftX: 4, rightX: OX + LY.coreW + TABLE_GAP - 10, y: 96 },
@@ -2986,6 +3036,19 @@ svg.canvas.plain .pleg.lit { fill:${HL_GOLD} !important; }
   stroke-width:1.6 !important; stroke-dasharray:6 4; }
 .gdisc.pending { fill:none !important; stroke:#2b2b33 !important;
   stroke-width:1.2 !important; stroke-dasharray:3 3; }
+/* one of the answers a withheld field could have had, with its own text */
+.opt { border-bottom:1px dotted #845095; cursor:help; }
+.opt:hover { background:#f3ecf6; }
+/* the same open treatment wherever a view redraws the thing */
+.ch.pending path, .ch.pending polygon, .ch.pending rect {
+  fill:none !important; stroke:var(--pend,#2b2b33) !important;
+  stroke-width:1.6 !important; stroke-dasharray:6 4; }
+.mandala [data-gatecell].pending path, .mandala [data-hex].pending {
+  stroke:#845095 !important; stroke-width:1.6 !important; stroke-dasharray:3 3; }
+.gateband.pending { stroke:#845095 !important; stroke-dasharray:3 3; }
+/* a placement whose planet lands on a different gate at a different hour */
+.prow.pending text { font-style:italic; }
+.prow.pending rect:first-child { stroke:#845095; stroke-width:1; stroke-dasharray:3 3; }
 /* A withheld field in the header. The value sits in its own span so it can be
    styled, which means it lands on the rule that shrinks and capitalises the
    label beside it: every property below is undoing that, deliberately. */
@@ -3749,11 +3812,38 @@ if (DATA.client) {
       el.classList.add('pending');
       if (el.dataset.on) el.style.setProperty('--pend', el.dataset.on);
     });
-    [].forEach.call(document.querySelectorAll('.chgrp'), function (g) {
+    // .chgrp is the bodygraph's own legs, .ch is the circuit view's redraw of
+    // the same channel. Kaycee, 2026-09-12: "let's make sure all of this
+    // carries through to the other views."
+    [].forEach.call(document.querySelectorAll('.chgrp, .ch'), function (g) {
       if (chs[g.dataset.ch]) g.classList.add('pending');
     });
     [].forEach.call(document.querySelectorAll('.pleg, .gdisc'), function (el) {
       if (gts[el.dataset.gate]) el.classList.add('pending');
+    });
+    // the mandala's gate cells and the astrology ring's gate bands
+    [].forEach.call(document.querySelectorAll('[data-gatecell], [data-hex], .gateband[data-gate]'), function (el) {
+      var g = el.dataset.gatecell || el.dataset.hex || el.dataset.gate;
+      if (gts[g]) el.classList.add('pending');
+    });
+    // and the placement rows, so a planet that lands on two different gates
+    // across the window is not read as one answer
+    var movers = {};
+    ((DATA.client.time && DATA.client.time.unsettled) || []).forEach(function (u) {
+      if (u.kind !== 'activation') return;
+      // "Design North Node" -> "design|north-node", the same shape the rows
+      // carry. Split and join rather than a pattern: this script is written
+      // inside a template literal and a backslash does not survive it.
+      var bits = u.field.split(' ');
+      var pid = bits.slice(1).join(' ').toLowerCase().split(' ').join('-');
+      movers[bits[0].toLowerCase() + '|' + pid] = 1;
+    });
+    [].forEach.call(document.querySelectorAll('.prow[data-planet]'), function (el) {
+      var side = el.dataset.side, pid = el.dataset.planet;
+      var hit = side === 'merged' || !side
+        ? (movers['personality|' + pid] || movers['design|' + pid])
+        : movers[side + '|' + pid];
+      if (hit) el.classList.add('pending');
     });
   })();
 
@@ -3768,7 +3858,7 @@ if (DATA.client) {
       openCard(el,
         '<b>Your birth window</b><span class="kn">' + esc(capFirst(T.window.label)) + '</span>' +
         '<div class="body"><p>This chart was cast for ' + esc(clock12(T.window.castFor)) +
-        ', the middle of ' + esc(T.window.label) + '. Anything drawn with a dashed line is true for part of ' +
+        '. Anything drawn with a dashed line is true for part of ' +
         esc(T.window.label) + ' and not the rest, so it is shown open rather than filled in.</p>' +
         '<p>Everything drawn solid is yours whatever hour you were born.</p></div>' +
         '<div class="body"><p><b>Not settled without an exact time</b></p><ul class="couldbe"><li>' +
@@ -6239,6 +6329,15 @@ function relight() {
 // hover shows a light tip, click pins the full description over the bodygraph
 var readout = document.getElementById('readout');
 var card = document.getElementById('card');
+// Hovering one of the possible answers says what it would mean, in Kaycee's own
+// words. A popup on a popup, which she asked for and which is the only place
+// the difference between Generator and Projector can actually be shown.
+card.addEventListener('mousemove', function (e) {
+  var o = e.target.closest ? e.target.closest('.opt') : null;
+  if (!o) return;
+  showTip(e, '<b>' + esc(o.textContent) + '</b>' + esc(o.dataset.basic));
+});
+card.addEventListener('mouseleave', function () { tip.hidden = true; });
 var tip = document.getElementById('tip');
 var stage = document.querySelector('.stage');
 var chByKey = {}; DATA.channels.forEach(function (c) { chByKey[c.key] = c; });
@@ -6737,9 +6836,7 @@ function couldBeHtml(label, field, couldBe) {
   var out = '<b>' + esc(label) + '</b>' +
     '<span class="kn">Exact Birth Time Required</span>';
   if (w) {
-    out += '<div class="body"><p>This chart was cast for ' + esc(clock12(w.castFor)) +
-      ', the middle of ' + esc(w.label) + '. Across ' + esc(w.label) +
-      ' this is not one answer.</p></div>';
+    out += '<div class="body"><p>This chart was cast for ' + esc(clock12(w.castFor)) + '.</p></div>';
   }
   if (couldBe && couldBe.length) {
     out += '<div class="body"><p><b>What it could be</b></p><ul class="couldbe">';
@@ -6753,7 +6850,8 @@ function couldBeHtml(label, field, couldBe) {
           }
         }
       }
-      out += '<li>' + esc(couldBe[i]) + (when ? '<span class="whn">' + esc(when) + '</span>' : '') + '</li>';
+      out += '<li>' + optTag(field, couldBe[i]) +
+        (when ? '<span class="whn">' + esc(when) + '</span>' : '') + '</li>';
     }
     out += '</ul></div>';
   } else {
@@ -6768,6 +6866,54 @@ function couldBeHtml(label, field, couldBe) {
   return out;
 }
 
+// Which of Kaycee's databases holds the short text for a field's answers.
+// A field that is not here, or a kind whose Delphi Basic column is not filled
+// in yet, simply gets no hover. Nothing breaks and nothing needs changing when
+// she writes one: the text appears on the next sync.
+function libKindFor(field) {
+  if (field === 'Type') return 'type';
+  if (field === 'Authority') return 'authority';
+  if (field === 'Profile') return 'profile';
+  if (field === 'Definition') return 'definition';
+  if (field.indexOf('Personality ') === 0 || field.indexOf('Design ') === 0) return 'gate';
+  if (field.indexOf('Channel ') === 0) return 'channel';
+  return 'variable';
+}
+
+// "Triple Split Definition" and "Triple Split" have to reach the same entry,
+// and so do "1 / 3" and "1/3". Built by hand rather than with a pattern,
+// because this script lives inside a template literal and a backslash does not
+// survive it.
+function libKeyFor(kind, value) {
+  var v = String(value == null ? '' : value);
+  if (kind === 'gate') return v.split('.')[0];
+  if (kind === 'channel') return v;
+  var low = v.toLowerCase().split(':')[0];
+  if (kind === 'definition') low = low.split('definition').join('');
+  var out = '';
+  for (var i = 0; i < low.length; i++) {
+    var ch = low.charAt(i);
+    if ((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch === '/') out += ch;
+  }
+  return out;
+}
+
+function basicFor(field, value) {
+  var lib = DATA.basicLib || {};
+  var kind = libKindFor(field);
+  var table = lib[kind] || {};
+  return table[libKeyFor(kind, value)] || '';
+}
+
+// One answer in the list. Carries its own text when there is one, so hovering
+// it says what the difference actually means rather than just naming it.
+function optTag(field, value) {
+  var basic = basicFor(field, value);
+  if (!basic) return esc(value);
+  return '<span class="opt" data-basic="' + esc(basic).split('"').join('&quot;') + '">' +
+    esc(value) + '</span>';
+}
+
 // Why a thing on the drawing is dashed, with the hours each state covers.
 // Short on purpose: it sits inside a card that already has its own content.
 function pendingNote(field) {
@@ -6777,13 +6923,12 @@ function pendingNote(field) {
   var when = '';
   if (u && u.spans && u.spans.length) {
     when = '<ul class="couldbe"><li>' + u.spans.map(function (s) {
-      return esc(s.value) + '<span class="whn">' + clock12(s.from) + ' to ' + clock12(s.to) + '</span>';
+      return optTag(field, s.value) + '<span class="whn">' + clock12(s.from) + ' to ' + clock12(s.to) + '</span>';
     }).join('</li><li>') + '</li></ul>';
   }
   return '<span class="kn">Not settled without an exact birth time</span>' +
     '<div class="body"><p>Drawn open because this depends on the hour. ' +
-    'The chart was cast for ' + esc(clock12(T.window.castFor)) + ', the middle of ' +
-    esc(T.window.label) + '.</p>' + when + '</div>';
+    'The chart was cast for ' + esc(clock12(T.window.castFor)) + '.</p>' + when + '</div>';
 }
 
 function capFirst(t) { return String(t || '').charAt(0).toUpperCase() + String(t || '').slice(1); }
@@ -6905,8 +7050,12 @@ function ctrHtml(k) {
 }
 function gateHtml(p) {
   var sideName = p.side === 'design' ? 'Design' : 'Personality';
+  // A planet that lands on a different gate at a different hour says so here,
+  // where somebody meets the placement, rather than only in the header.
+  var moves = pendingNote(sideName + ' ' + p.planet);
   return '<b>Gate ' + p.gate + '.' + p.line + (p.fix ? ' ' + p.fix : '') + '</b>' +
-    '<span class="kn">' + esc(p.gateName) + (p.lineName ? ' · ' + esc(p.lineName) : '') + '</span>' +
+    (moves ? moves : '<span class="kn">' + esc(p.gateName) + (p.lineName ? ' · ' + esc(p.lineName) : '') + '</span>') +
+    (moves ? '<span class="kn">' + esc(p.gateName) + (p.lineName ? ' · ' + esc(p.lineName) : '') + '</span>' : '') +
     tags([{ text: sideName + ' ' + p.planet, bg: p.side === 'design' ? '#e06666' : '#c9b6e4' },
           p.circuit ? { text: p.circuit } : null,
           p.quarter ? { text: 'Quarter of ' + p.quarter } : null,
@@ -7489,6 +7638,9 @@ export async function runBuilder(argv: string[] = process.argv.slice(2)): Promis
     const record = await chartByToken(tokenArg);
     if (!record) throw new Error(`no chart in the database with token ${tokenArg}`);
     brief = briefFromRecord(record) as ClientBrief;
+    // Scanned once and kept on the row, so rebuilding a chart does not spend
+    // forty calls working out the same answer again.
+    brief.reliability = await reliabilityForChart(record);
     fromDb = true;
   } else if (slug) {
     brief = clientFromSlug(slug);
@@ -7521,6 +7673,7 @@ export async function runBuilder(argv: string[] = process.argv.slice(2)): Promis
 
   const libNames = loadLibraryNames();
   const gateInfo = gateMeta(chunks);
+  const basicLib = basicByValue(chunks);
   const tags = tagInfo(chunks);
   const states = centerStates(chunks);
   const anchors = gateAnchors(raw);
@@ -7566,7 +7719,7 @@ export async function runBuilder(argv: string[] = process.argv.slice(2)): Promis
     client, inner, plain: client ? plainInner(raw, definitionMap({ client, channels } as SceneData).bridges.map((b) => b.gate)) : undefined,
     transit: transitInnerSvg, sky, read: dayRead,
     channels, slots, centerBox, fn, biology, anchors,
-    gateInfo, states, tagInfo: tags, lineName: (g, l) => libNames.line(g, l),
+    gateInfo, basicLib, states, tagInfo: tags, lineName: (g, l) => libNames.line(g, l),
   };
   const fonts = await montserrat();
 

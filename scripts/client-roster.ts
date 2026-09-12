@@ -30,6 +30,9 @@ export interface ClientBrief {
    *  came from Kaycee and is treated as exact. Set on a chart made through the
    *  website, where a stranger may only know the part of the day. */
   timeAccuracy?: "document" | "told" | "approximate" | "unknown";
+  /** Worked out and stored when the chart came from the database, so a rough
+   *  birth time is only ever scanned once. */
+  reliability?: import("@/lib/hd/time-accuracy").Reliability;
 }
 
 /** The place to ASK the chart provider about, which is not always the place

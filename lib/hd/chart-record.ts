@@ -12,6 +12,10 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
+import {
+  birthFingerprint, fromStored, reliabilityOf, settled, toStored,
+  type Reliability, type StoredScan,
+} from "@/lib/hd/time-accuracy";
 
 export interface ChartRecord {
   id: string;
@@ -25,6 +29,10 @@ export interface ChartRecord {
   tier: "seed" | "free" | "purchased" | "gift";
   visibility: "private" | "shared" | "public";
   ownerId: string | null;
+  /** The stored birth time scan, and the birth details it was run against.
+   *  Null on an exact time, which is never scanned. */
+  timeScan: StoredScan | null;
+  timeScanFor: string | null;
 }
 
 function db() {
@@ -46,7 +54,44 @@ const shape = (r: Record<string, unknown>): ChartRecord => ({
   tier: r.tier as ChartRecord["tier"],
   visibility: r.visibility as ChartRecord["visibility"],
   ownerId: (r.owner_id as string | null) ?? null,
+  timeScan: (r.time_scan as StoredScan | null) ?? null,
+  timeScanFor: (r.time_scan_for as string | null) ?? null,
 });
+
+/**
+ * What this chart may claim, worked out once and kept.
+ *
+ * Scanning a window costs about forty calls to bodygraph.com and four seconds.
+ * The answer only changes when the birth details change, so it is stored with
+ * the details it was run against and thrown away when they stop matching.
+ * Kaycee approved keeping it on 2026-09-12.
+ *
+ * An exact time is never scanned at all, so most rows never touch any of this.
+ */
+export async function reliabilityForChart(r: ChartRecord): Promise<Reliability> {
+  if (r.timeAccuracy === "document" || r.timeAccuracy === "told") {
+    return settled(r.timeAccuracy);
+  }
+  const want = birthFingerprint({
+    accuracy: r.timeAccuracy, birthDate: r.birthDate, birthTime: r.birthTime,
+    timezone: r.birthTimezone, locationQuery: r.birthPlace,
+  });
+  if (r.timeScan && r.timeScanFor === want) return fromStored(r.timeScan);
+
+  const fresh = await reliabilityOf({
+    accuracy: r.timeAccuracy, birthDate: r.birthDate, birthTime: r.birthTime,
+    timezone: r.birthTimezone, locationQuery: r.birthPlace,
+  });
+  // Failing to write the cache must never fail the chart: the chart is the
+  // thing somebody is waiting for, and the worst case here is scanning again.
+  const { error } = await db().from("charts").update({
+    time_scan: toStored(fresh),
+    time_scan_for: want,
+    time_scan_at: new Date().toISOString(),
+  }).eq("id", r.id);
+  if (error) console.warn(`could not store the birth time scan for ${r.id}: ${error.message}`);
+  return fresh;
+}
 
 /** One chart by its link token. Null when there is no such chart. */
 export async function chartByToken(token: string): Promise<ChartRecord | null> {

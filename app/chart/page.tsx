@@ -264,15 +264,32 @@ export default function ChartPage() {
                 birth.
               </p>
               <p>
-                Without a time, your Type and Authority are usually still
-                reliable, but your Profile, your Ascendant and all four of your
-                variables may not be. Your chart will say which is which rather
+                Without a time, all four of your variables are out of reach, and
+                your Profile, your Ascendant and sometimes even your Type can
+                change across a window that wide. Your chart will say exactly
+                which of your own details are settled and which are not, rather
                 than guess.
               </p>
               <p>
                 <a href="https://cal.com/delphihumandesign/birth-time-rectification" target="_blank" rel="noreferrer">
                   Book A Rectification Session
                 </a>
+              </p>
+            </div>
+          )}
+
+          {/* A remembered time is cast as given, on Kaycee's instruction, so this
+              says its piece here rather than interrupting with a popup.
+              Kaycee, 2026-09-12: "maybe not a popup, but the added text
+              underneath the birth time pills like the unknown time." */}
+          {accuracy === "told" && (
+            <div className="note">
+              <p>
+                <strong>Worth checking when you get the chance.</strong> A
+                remembered time is cast exactly as you give it. A few minutes
+                either way will move all four of your variables, and more than
+                that can reach your Profile, so the long form of your birth
+                certificate is worth finding.
               </p>
             </div>
           )}

@@ -244,3 +244,51 @@ export function unsettledGates(r: Reliability): Set<number> {
   }
   return out;
 }
+
+// ── keeping the answer ──────────────────────────────────────────────────────
+
+/**
+ * What the scan was run against.
+ *
+ * A stored scan is only true for the birth details it was cast from. Kaycee
+ * corrects birth details often, and a correction that left a confident old
+ * answer in place would be worse than having no answer at all, so the details
+ * travel with the scan and it is thrown away the moment they stop matching.
+ */
+export function birthFingerprint(args: {
+  accuracy: Accuracy; birthDate: string; birthTime: string | null;
+  timezone: string; locationQuery?: string;
+}): string {
+  return [
+    args.accuracy, args.birthDate, args.birthTime ?? "",
+    args.timezone, args.locationQuery ?? "",
+  ].join("|");
+}
+
+/** The shape that goes into the database. A Map does not survive JSON. */
+export interface StoredScan {
+  accuracy: Accuracy;
+  window: TimeWindow | null;
+  identityUnsettled: boolean;
+  resolution?: WindowReport["resolution"];
+  casts: number;
+  unsettled: Unsettled[];
+}
+
+export function toStored(r: Reliability): StoredScan {
+  return {
+    accuracy: r.accuracy, window: r.window,
+    identityUnsettled: r.identityUnsettled,
+    resolution: r.resolution, casts: r.casts,
+    unsettled: [...r.unsettled.values()],
+  };
+}
+
+export function fromStored(s: StoredScan): Reliability {
+  return {
+    accuracy: s.accuracy, exact: false, window: s.window,
+    unsettled: new Map(s.unsettled.map((u) => [u.field, u])),
+    identityUnsettled: s.identityUnsettled,
+    resolution: s.resolution, casts: s.casts,
+  };
+}
