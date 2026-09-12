@@ -155,7 +155,15 @@ export async function POST(request: Request): Promise<Response> {
     owner_id: ownerId,
     person_name: name,
     birth_date: birthDate,
-    birth_time: timeAccuracy === "unknown" ? null : birthTime,
+    // Somebody who does not know their birth time but does know it was the
+    // afternoon has told us something, and it was being thrown away: the time
+    // was stored as null, so the scan swept all twenty-four hours instead of
+    // their six and the chart withheld far more than it needed to. Kaycee found
+    // it on the live site, 2026-09-12. Kept when they gave one, null when they
+    // genuinely could not say.
+    birth_time: timeAccuracy === "unknown" && !/^\d{2}:\d{2}$/.test(birthTime)
+      ? null
+      : birthTime,
     birth_place: place,
     birth_timezone: timezone,
     time_accuracy: timeAccuracy,

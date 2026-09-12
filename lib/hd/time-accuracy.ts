@@ -75,6 +75,15 @@ const SEGMENTS: { at: string; from: string; to: string; label: string }[] = [
   { at: "21:00", from: "18:00", to: "23:59", label: "the Evening" },
 ];
 
+/**
+ * The part of the day a stored time stands for, or null when it is a real time.
+ * Shared so the portal and the scan cannot disagree about what a row means.
+ */
+export function segmentLabel(birthTime: string | null): string | null {
+  const seg = SEGMENTS.find((x) => x.at === (birthTime ?? "").slice(0, 5));
+  return seg ? seg.label : null;
+}
+
 export function windowFor(accuracy: Accuracy, birthTime: string | null): TimeWindow | null {
   if (accuracy === "document" || accuracy === "told") return null;
   const at = (birthTime ?? "").slice(0, 5);

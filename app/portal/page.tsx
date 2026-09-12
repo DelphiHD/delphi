@@ -14,6 +14,7 @@
 
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { segmentLabel } from "@/lib/hd/time-accuracy";
 
 export const metadata = { title: "Your charts — Delphi Human Design" };
 
@@ -32,6 +33,13 @@ function readableDate(iso: string): string {
 function readableTime(t: string | null, accuracy: string): string {
   if (!t) return "time unknown";
   const hhmm = t.slice(0, 5);
+  // A stored time on a chart whose owner does not know their birth time is the
+  // middle of the part of the day they picked, not a time they gave. Printing
+  // it as a clock time would read as an answer they never offered.
+  if (accuracy === "unknown") {
+    const seg = segmentLabel(hhmm);
+    return seg ? `time unknown, ${seg}` : "time unknown";
+  }
   return accuracy === "approximate" ? `about ${hhmm}` : hhmm;
 }
 
