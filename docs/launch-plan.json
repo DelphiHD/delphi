@@ -428,6 +428,14 @@
   {
    "on": "2026-09-12",
    "what": "The badge on a withheld field reads '2 Possible' rather than 'could be 2'. Kaycee, 2026-09-12."
+  },
+  {
+   "on": "2026-09-12",
+   "what": "20260912_birth_time_scan.sql is APPLIED. Run through the SQL editor in Kaycee's own browser rather than handed to her as instructions. Verified after: a rough-time chart scans in 3.8 seconds and 43 calls the first time, returns instantly and identically the second, and rescans correctly when the birth time is edited (Afternoon window became the Morning window, cast for 9:00 AM)."
+  },
+  {
+   "on": "2026-09-12",
+   "what": "MEASURED, needs a decision before the event. The whole chart is built inside the web request, which has a 120 second ceiling. Six people with no birth time submitting at the same moment: every chart succeeded, and every one took 29 seconds. The scan is about 42 of the calls in each. Extrapolating the same shape, roughly 25 people at the same instant is where the ceiling is. Caching does not help this, because it only saves the rebuild and every one of these is a first build. BFKI is pre-registration spread over days rather than a room submitting at once, which is the main thing making this survivable, but a group hitting signal together after a day with none is exactly Kaycee's stated situation."
   }
  ],
  "open": [
@@ -462,10 +470,10 @@
    "what": "bodygraph.com refuses a burst of calls that follows a busy stretch (429). The scan handles it itself by pacing and retrying. Whether that pacing and retry belongs in lib/mybodygraph, where it would protect every other caller too, is a change to a spine module and needs Kaycee's decision."
   },
   {
-   "what": "supabase/migrations/20260912_birth_time_scan.sql is written but NOT applied. It cannot be applied from the repo: supabase db push needs the project link, which needs the database password in Tennyson's 1Password. Until it is applied the code works exactly as it does now, scanning every build and logging one warning per chart. Apply by pasting the file into the SQL editor at https://supabase.com/dashboard/project/biufjcapnuzbdowoksnb/sql/new, or by running supabase link then supabase db push once the password is to hand."
+   "what": "The dashboard birth time reliability indicator is not built yet. Everything it needs now exists on the chart row once the migration is applied: time_accuracy, and time_scan carrying whether the identity fields are among the casualties."
   },
   {
-   "what": "The dashboard birth time reliability indicator is not built yet. Everything it needs now exists on the chart row once the migration is applied: time_accuracy, and time_scan carrying whether the identity fields are among the casualties."
+   "what": "Whether to deliver the chart first and scan after, rebuilding in the background, so nobody waits on the scan. It would take each person's wait back to roughly what an exact time costs and remove the event ceiling risk entirely. It changes how a chart is made, so it is Kaycee's decision, not a side effect."
   }
  ],
  "brief": "https://claude.ai/code/artifact/3428e24e-262a-4fd7-86a6-93468244cb44"
