@@ -7,38 +7,52 @@
  * reports what moves between them, so the chart can mark the parts that are not
  * settled and leave alone the parts that are.
  *
- * HOW OFTEN TO LOOK
+ * WHERE TO LOOK
  *
  * Kaycee, 2026-09-12: "Can the scan timing logic be based on the speed of the
- * moon since it's the one that changes most frequently?" That is the right
- * anchor, and it fixes a real hole: searching between two endpoints finds one
- * crossing, so if two happen inside the same gap the second is missed. The step
- * has to be smaller than the time the Moon takes to cross one line.
+ * moon since it's the one that changes most frequently?" That was the right
+ * anchor, and the first version of this walked the window at the Moon's own
+ * pace and bisected every gap that moved. It worked, but it was sampling:
+ * forty-eight casts across a day, each one a round trip, and a crossing was
+ * only ever known to the nearest ten minutes.
  *
- * The Moon moves roughly 13.2 degrees a day, but between about 11.8 and 15.4
- * depending where it is in its orbit, which is Kaycee's point that some days
- * carry more change than others. So the speed is measured rather than assumed:
- * the two endpoint casts already say where the Moon was, and the difference
- * gives its speed on that date for free.
+ * It does not sample any more. lib/hd/ephemeris computes the planets here, on
+ * the machine, for nothing, so the exact minute each body steps over a
+ * boundary is known before a single call is made. The provider is then asked
+ * only about those minutes. Fewer calls, and the answer is the real minute
+ * rather than a bracket.
  *
- *   a gate   5.625째  ~10 hours
- *   a line   0.9375째 ~1 hour 42
- *   a colour 0.156째  ~17 minutes
- *   a tone   0.026째  ~3 minutes
- *   a base   0.0043째 ~30 seconds
+ * The provider remains the only authority on what a chart says. Nothing in
+ * here decides a gate, a profile or a variable; it decides which moments are
+ * worth asking about. Kaycee, 2026-09-12: "Just to be clear, this impacts the
+ * scans only and not the charts, correct?" Correct. Delete this whole file and
+ * every chart on the site is byte-identical.
  *
- * This scans to the LINE. Colour, tone and base move far too fast for any scan
- * to bracket honestly, so they are reported as unreliable rather than searched:
- * a base changes about every thirty seconds, which no approximate time can
- * survive. That is a statement about the sky, not a limitation of the code.
+ * HOW FINE IT GOES
+ *
+ * A line is guaranteed: every body's line crossings are always asked about.
+ * Below that it takes what it can afford and says which rung it reached, so
+ * the chart can be honest about what is settled.
+ *
+ *   a gate   5.625 deg   Moon ~10 hours
+ *   a line   0.9375      ~1 hour 42
+ *   a colour 0.156       ~17 minutes
+ *   a tone   0.026       ~3 minutes
+ *   a base   0.0043      ~30 seconds
+ *
+ * Colour and tone are affordable for the slow bodies, which is where the
+ * variables live: the Sun changes tone about every forty minutes, so a six
+ * hour window is nine calls, not a hundred. They are not affordable for the
+ * Moon, and a base moves every thirty seconds for everything, so those are
+ * reported as unsettled rather than searched. That is a statement about the
+ * sky, not a limitation of the code.
  */
 
 import { getChart } from "@/lib/mybodygraph";
 import { longitudeOf } from "@/lib/hd/gate-longitude";
+import { crossingsIn, type Rung } from "@/lib/hd/ephemeris";
 import type { Chart, PlanetActivation } from "@/lib/chart/types";
 
-/** 360 degrees over 64 gates, six lines each. */
-const DEGREES_PER_LINE = 360 / 64 / 6;
 
 export interface Birth {
   birthDate: string;
@@ -48,15 +62,35 @@ export interface Birth {
   longitude?: number;
 }
 
-/** One thing that is not the same at both ends of the window. */
+/** One value a field holds, and the stretch of the window it holds it for. */
+export interface Span {
+  value: string;
+  /** Local HH:MM this value starts and stops being true. */
+  from: string;
+  to: string;
+}
+
+/**
+ * One thing that is not the same across the whole window.
+ *
+ * `spans` is the useful part and the reason this is not just a from/to pair.
+ * Somebody who says "some time in the afternoon" does not want to be told
+ * their Design Sense changed at half past twelve, because they do not know
+ * what time they were born. They want to know it is one of Taste, Outer Vision
+ * or Inner Vision, and which is likeliest given what they do remember. So the
+ * whole run of values is kept, in order, with the stretch each one covers.
+ */
 export interface Change {
   /** "Profile", "Authority", "Personality Sun", "Throat centre", "10-20"… */
   field: string;
   /** Where it belongs on the page, so the mark can be put in the right place. */
   kind: "property" | "activation" | "center" | "channel" | "variable";
+  /** Every value the field takes across the window, earliest first. */
+  spans: Span[];
+  /** First and last, kept because most callers only want the headline. */
   from: string;
   to: string;
-  /** Local HH:MM the change happens at, once it has been narrowed down. */
+  /** Local HH:MM of the first change. Absent when it could not be pinned. */
   at?: string;
 }
 
@@ -70,6 +104,13 @@ export interface WindowReport {
   changes: Change[];
   /** True when nothing at all moves, which is the reassuring answer. */
   steady: boolean;
+  /**
+   * The finest rung every body was fully checked at. A line is always
+   * guaranteed; colour and tone are reached when the sky that day allows it
+   * inside the cast budget. Below this rung the chart should say "not settled"
+   * rather than imply it looked.
+   */
+  resolution: Rung;
 }
 
 // ── reading a chart as flat, comparable values ──────────────────────────────
@@ -141,7 +182,7 @@ export function diff(a: Chart, b: Chart): Change[] {
     const x = fa.get(field), y = fb.get(field);
     const from = x?.value ?? "—", to = y?.value ?? "—";
     if (from === to) continue;
-    changes.push({ field, kind: (x ?? y)!.kind, from, to });
+    changes.push({ field, kind: (x ?? y)!.kind, from, to, spans: [] });
   }
   const order: Change["kind"][] = ["property", "variable", "activation", "center", "channel"];
   return changes.sort((p, q) =>
@@ -179,6 +220,41 @@ function arcBetween(a: number, b: number): number {
   return d;
 }
 
+/**
+ * Ask for many casts without tripping the provider's quota.
+ *
+ * Found by measurement on 2026-09-12: sixteen at once is fine, but a run of
+ * scans back to back earns a 429 and the provider refuses the rest. Firing
+ * every cast the instant we know we want it is therefore a way to hand
+ * somebody a broken chart on a busy afternoon.
+ *
+ * So: a few in flight at a time, and a refusal waits and asks again rather
+ * than failing. Kept here rather than in lib/mybodygraph, because changing how
+ * every caller in the system talks to the provider is Kaycee's decision, not a
+ * side effect of the scan wanting to be polite.
+ */
+const AT_ONCE = 6;
+
+async function pooled<T>(jobs: (() => Promise<T>)[]): Promise<T[]> {
+  const out = new Array<T>(jobs.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < jobs.length) {
+      const i = next++;
+      for (let attempt = 0; ; attempt++) {
+        try { out[i] = await jobs[i](); break; }
+        catch (e) {
+          const busy = e instanceof Error && e.message.includes("429");
+          if (!busy || attempt >= 4) throw e;
+          await new Promise((r) => setTimeout(r, 400 * 2 ** attempt));
+        }
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(AT_ONCE, jobs.length) }, worker));
+  return out;
+}
+
 // ── the scan ────────────────────────────────────────────────────────────────
 
 export interface ScanOptions {
@@ -191,8 +267,8 @@ export interface ScanOptions {
 /**
  * Cast the same birth across a window and report what moves.
  *
- * Two casts on a quiet day. On a busy one it steps at the Moon's own pace and
- * then bisects each gap that changed, which is a handful more.
+ * Two casts on a quiet day. On a busy one, one cast per moment the sky
+ * actually turns over, which is a handful more and never a guess.
  */
 export async function scanWindow(
   birth: Birth,
@@ -210,64 +286,136 @@ export async function scanWindow(
   };
 
   const start = toMinutes(fromTime), end = toMinutes(toTime);
-  const [a, b] = await Promise.all([cast(fromTime), cast(toTime)]);
+  const [a, b] = await pooled([() => cast(fromTime), () => cast(toTime)]);
 
+  // Kept because it is the honest headline for how eventful a day was, and
+  // Kaycee's own framing: "some days have more changes than others, it really
+  // just depends on what the planets are doing."
   const ma = moonLongitude(a), mb = moonLongitude(b);
   const movedDegrees = ma !== null && mb !== null ? arcBetween(ma, mb) : 0;
-  // the step is measured in line-widths: one sample per line the Moon crosses
-  const movedLines = movedDegrees / DEGREES_PER_LINE;
-  const spanMins = Math.max(1, end - start);
 
   const ends = diff(a, b);
   if (!ends.length) {
     return {
       from: fromTime, to: toTime, casts,
       moonDegrees: movedDegrees,
-      changes: [], steady: true,
+      changes: [], steady: true, resolution: "tone",
     };
   }
 
-  // Step small enough that no single line crossing can hide inside one gap.
-  // If the Moon crossed N lines across the window, N+1 samples bracket them all.
-  const steps = Math.min(
-    Math.max(2, Math.ceil(movedLines) + 1),
-    Math.max(2, Math.floor((maxCasts - casts) * 0.6)),
+  // Where the sky actually turns over, worked out here rather than hunted for.
+  // The design side moves with the birth time, so both sides are watched; the
+  // offset between them comes from the chart the provider just handed back.
+  const designOffsetMins = Math.round(
+    (new Date(a.birth.designUtcDate).getTime() - new Date(a.birth.utcDate).getTime()) / 60_000,
   );
-  // All at once. The grid does not depend on itself, so waiting for each cast in
-  // turn was spending seconds of somebody's attention for nothing. Only the
-  // narrowing below has to be sequential, because each step decides the next.
-  const gridTimes: number[] = [];
-  for (let i = 1; i < steps; i++) gridTimes.push(start + (spanMins * i) / steps);
-  const grid = await Promise.all(gridTimes.map(async (t) => ({ mins: t, chart: await cast(toClock(t)) })));
-  const samples: { mins: number; chart: Chart }[] = [
-    { mins: start, chart: a }, ...grid, { mins: end, chart: b },
-  ];
+  const crossings = crossingsIn({
+    startUtc: new Date(a.birth.utcDate),
+    startMins: start,
+    endMins: end,
+    designOffsetMins,
+  });
 
-  // Narrow each gap that changed, so the report can say when rather than that.
-  const found = new Map<string, Change>();
-  for (let i = 0; i < samples.length - 1; i++) {
-    let lo = samples[i], hi = samples[i + 1];
-    const gap = diff(lo.chart, hi.chart);
-    if (!gap.length) continue;
-    while (hi.mins - lo.mins > precision && casts < maxCasts) {
-      const midMins = (lo.mins + hi.mins) / 2;
-      const mid = { mins: midMins, chart: await cast(toClock(midMins)) };
-      if (diff(lo.chart, mid.chart).length) hi = mid; else lo = mid;
-    }
-    for (const ch of gap) {
-      // first crossing wins: it is the earliest time the reader stops being safe
-      if (!found.has(ch.field)) found.set(ch.field, { ...ch, at: toClock(hi.mins) });
+  // Spend the budget a whole body at a time. Half of a body's crossings is
+  // worse than none of them: it would report the changes it happened to catch
+  // and stay silent about the ones it skipped, which reads as certainty.
+  const groups = new Map<string, { rung: Rung; mins: Set<number> }>();
+  for (const c of crossings) {
+    const key = `${c.planet}|${c.rung}`;
+    const g = groups.get(key) ?? { rung: c.rung, mins: new Set<number>() };
+    g.mins.add(c.mins);
+    groups.set(key, g);
+  }
+  const RUNG_ORDER: Rung[] = ["gate", "line", "color", "tone"];
+  const ranked = [...groups.values()].sort((x, y) =>
+    RUNG_ORDER.indexOf(x.rung) - RUNG_ORDER.indexOf(y.rung) || x.mins.size - y.mins.size);
+
+  const want = new Set<number>();
+  const covered = new Set<Rung>(["gate"]);
+  const skipped = new Set<Rung>();
+  for (const g of ranked) {
+    const added = [...g.mins].filter((m) => !want.has(m) && m > start && m < end);
+    // A line is the promise, so it is taken whether or not the budget likes it.
+    if (g.rung === "line" || casts + want.size + added.length <= maxCasts) {
+      for (const m of added) want.add(m);
+      if (!skipped.has(g.rung)) covered.add(g.rung);
+    } else {
+      skipped.add(g.rung);
+      covered.delete(g.rung);
     }
   }
+  const resolution = RUNG_ORDER.filter((r) => covered.has(r)).pop() ?? "gate";
 
-  // Anything the endpoints disagree on but the walk never isolated still counts;
-  // it is a real difference, we just could not say when within the cast budget.
-  for (const ch of ends) if (!found.has(ch.field)) found.set(ch.field, ch);
+  // All of them together, a few in flight at a time. They do not depend on
+  // each other, so waiting for each in turn would spend somebody's afternoon
+  // on round trips.
+  const times = [...want].sort((x, y) => x - y);
+  const charts = await pooled(times.map((mins) => () => cast(toClock(mins))));
+  const middles = times.map((mins, i) => ({ mins, chart: charts[i] }));
+  const samples = [
+    { mins: start, chart: a }, ...middles, { mins: end, chart: b },
+  ];
+
+  // Consecutive casts now sit either side of a real boundary, so the time a
+  // thing changes is the time of the later cast. No bisecting, no ten-minute
+  // bracket: the minute is the answer.
+  //
+  // Read down each field rather than across each gap, so a field that moves
+  // three times reports all three values and not just the first one somebody
+  // happened to catch.
+  const flat = samples.map((s) => ({ mins: s.mins, map: flatten(s.chart) }));
+  const fields = new Map<string, Change["kind"]>();
+  for (const f of flat) for (const [k, v] of f.map) fields.set(k, v.kind);
+
+  const found = new Map<string, Change>();
+  for (const [field, kind] of fields) {
+    const spans: Span[] = [];
+    for (const f of flat) {
+      const value = f.map.get(field)?.value ?? "—";
+      const last = spans[spans.length - 1];
+      if (last && last.value === value) last.to = toClock(f.mins);
+      else spans.push({ value, from: toClock(f.mins), to: toClock(f.mins) });
+    }
+    if (spans.length < 2) continue;
+    // A value holds right up until the next one starts. Ending a span at the
+    // last cast that saw it would leave visible gaps in the timeline, and a
+    // gap reads as "we don't know", which is not what it means.
+    for (let i = 0; i < spans.length - 1; i++) spans[i].to = spans[i + 1].from;
+    spans[spans.length - 1].to = toTime;
+    found.set(field, {
+      field, kind, spans,
+      from: spans[0].value, to: spans[spans.length - 1].value,
+      at: spans[1].from,
+    });
+  }
+
+  // The safety net. Nodes, Chiron and Lilith cannot be computed here, and none
+  // of them can change a line inside a birth window, but Lilith can shift a
+  // tone across a long one. So anything the two ends disagree about that the
+  // walk above never accounted for is still hunted the old way, by halving.
+  for (const ch of ends) {
+    if (found.has(ch.field)) continue;
+    let lo = samples[0], hi = samples[samples.length - 1];
+    while (hi.mins - lo.mins > precision && casts < maxCasts) {
+      const midMins = Math.round((lo.mins + hi.mins) / 2);
+      const mid = { mins: midMins, chart: await cast(toClock(midMins)) };
+      if (diff(lo.chart, mid.chart).some((d) => d.field === ch.field)) hi = mid; else lo = mid;
+    }
+    const at = hi.mins > start ? toClock(hi.mins) : undefined;
+    found.set(ch.field, {
+      ...ch, at,
+      spans: [
+        { value: ch.from, from: fromTime, to: at ?? toTime },
+        { value: ch.to, from: at ?? fromTime, to: toTime },
+      ],
+    });
+  }
 
   return {
     from: fromTime, to: toTime, casts,
     moonDegrees: movedDegrees,
     changes: [...found.values()],
     steady: false,
+    resolution,
   };
 }
