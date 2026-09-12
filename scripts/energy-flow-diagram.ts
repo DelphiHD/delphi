@@ -49,7 +49,7 @@ import {
   centreField, NEEDS_EXACT, VARIABLE_FIELDS, type Reliability,
 } from "@/lib/hd/time-accuracy";
 import { longitudeOf, GATE_RANGES, GATE_ARC_DEGREES, LINE_ARC_DEGREES } from "@/lib/hd/gate-longitude";
-import type { CenterName } from "@/lib/chart/types";
+import type { CenterName, Chart } from "@/lib/chart/types";
 import { gateName } from "@/lib/hd/gate-names";
 import { loadLibraryNames } from "@/lib/hd/library-names";
 import { renderFullMandala } from "@/lib/render/mandala";
@@ -195,10 +195,22 @@ const PLANET_ROWS = [
   "Sun", "Earth", "Moon", "North Node", "South Node", "Mercury", "Venus",
   "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto",
 ] as const;
+/**
+ * Shown, but never part of the mechanics.
+ *
+ * Kaycee, 2026-09-12: "I know I've yelled at you about never showing chiron and
+ * Lilith, but they do need to be added here." So they appear in the placement
+ * columns and among the planets that can be switched off, and nowhere else:
+ * they do not light a gate, hang a leg, define a centre, complete a channel or
+ * count toward a connection. Every one of those reads from the thirteen.
+ */
+const PLANET_EXTRAS = ["Chiron", "Lilith"] as const;
+const ALL_PLANET_ROWS = [...PLANET_ROWS, ...PLANET_EXTRAS] as const;
 const PLANET_GLYPHS: Record<string, string> = {
   Sun: "\u2609", Earth: "\u2295", Moon: "\u263D", "North Node": "\u260A", "South Node": "\u260B",
   Mercury: "\u263F", Venus: "\u2640", Mars: "\u2642", Jupiter: "\u2643", Saturn: "\u2644",
   Uranus: "", Neptune: "\u2646", Pluto: "\u2647",
+  Chiron: "\u26B7", Lilith: "\u26B8",
 };
 const PROFILE_LINES: Record<number, string> = {
   1: "Investigator", 2: "Hermit", 3: "Martyr", 4: "Opportunist", 5: "Heretic", 6: "Role Model",
@@ -850,8 +862,8 @@ interface ClientCtx {
   report: ReportText;
   variables: { key: string; label: string; arrow: "left" | "right"; theme: string;
     side: "design" | "personality"; unsettled?: boolean; couldBe?: string[] }[];
-  acts: { side: "personality" | "design"; planet: string; gate: number; line: number; fix: string;
-    color: number; tone: number; base: number }[];
+  acts: { side: "personality" | "design"; core: boolean; planet: string; gate: number; line: number;
+    fix: string; color: number; tone: number; base: number }[];
   subtitle: { personality: string[]; design: string[] };
   outDir: string;
   /** Whether this is somebody Kaycee has actually sat down with. Decides
@@ -877,6 +889,23 @@ function twelveHour(hhmm: string): string {
 }
 
 const capitalise = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+
+/**
+ * "PRL DLR": the four arrows in one line.
+ *
+ * P is the personality side, top arrow then bottom: Motivation, then
+ * Perspective. D is the design side the same way: Determination, then
+ * Environment. That is the order they sit in on the chart and the order her own
+ * variable library is titled in.
+ */
+function phsNotation(chart: Chart): string {
+  const v = chart.variables;
+  if (!v) return "";
+  const a = (x?: { arrow?: string }) => (x?.arrow === "left" ? "L" : x?.arrow === "right" ? "R" : "");
+  const p = a(v.motivation) + a(v.perspective);
+  const d = a(v.determination) + a(v.environment);
+  return p.length === 2 && d.length === 2 ? `P${p} D${d}` : "";
+}
 
 /** "2 / 4" -> "2 / 4 Hermit Opportunist", the way Kaycee names it. */
 function profileWithLines(value: string): string {
@@ -1007,11 +1036,13 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
     if (withPlace && brief.birthPlace) lines.push(brief.birthPlace);
     return lines;
   };
-  // Chiron and Lilith come back from the API but are not part of the placement
-  // columns Kaycee uses, so they never reach the tables or the bodygraph marks
+  // Chiron and Lilith ride along for the placement columns and the planet
+  // switches, and are flagged so nothing mechanical counts them. `core` is what
+  // every gate, leg, centre and channel reads from.
   const acts = (["personality", "design"] as const).flatMap((side) =>
-    chart.activations[side].filter((a) => (PLANET_ROWS as readonly string[]).includes(a.planet)).map((a) => ({
+    chart.activations[side].filter((a) => (ALL_PLANET_ROWS as readonly string[]).includes(a.planet)).map((a) => ({
       side,
+      core: (PLANET_ROWS as readonly string[]).includes(a.planet),
       planet: a.planet as string,
       gate: a.gate,
       line: a.line,
@@ -1023,7 +1054,7 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
     })),
   );
 
-  const gates = new Set<number>(acts.map((a) => a.gate));
+  const gates = new Set<number>(acts.filter((a) => a.core).map((a) => a.gate));
   // A planet that only shifts a line stays on the same gate and the drawing is
   // unaffected; one that crosses into a different gate takes its leg with it,
   // so both gates are pending and neither is drawn as settled.
@@ -1084,10 +1115,23 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
       { label: "Type", value: chart.type.value, field: "Type" },
       { label: "Strategy", value: chart.strategy.value, field: "Strategy" },
       { label: "Authority", value: chart.authority.value, field: "Authority" },
+      // The four arrows as the notation Kaycee's library indexes them by, which
+      // is how a practitioner reads them at a glance. Personality first, top
+      // then bottom, then Design the same way, matching where they sit on the
+      // chart. Kaycee, 2026-09-12: "can we ad the PXX DXX designation to the
+      // header info under Authority?"
+      { label: "Variables", value: phsNotation(chart), field: "Variables" },
       { label: "Definition", value: chart.definition.value, field: "Definition" },
       { label: "Frequencies", value: `${chart.signature.value} / ${chart.notSelfTheme.value}`, field: "Signature" },
       { label: "Incarnation Cross", value: chart.incarnationCross.value, field: "Incarnation Cross" },
     ].map((m) => {
+      // The notation is the four arrows in one line, so it is withheld exactly
+      // when they are: on any chart whose birth time is not exact. Without this
+      // the header would print a confident PLR DLL above four arrows that each
+      // say they cannot be known.
+      if (m.field === "Variables" && !reliability.exact) {
+        return { ...m, value: NEEDS_EXACT, couldBe: [] as string[] };
+      }
       const u = reliability.unsettled.get(m.field);
       return u ? { ...m, value: NEEDS_EXACT, couldBe: u.couldBe } : m;
     }),
@@ -2161,7 +2205,7 @@ function placementTable(
   const headY = 24 + subs.length * 13;
   s += `<line x1="6" y1="${headY}" x2="${TABLE_W - 6}" y2="${headY}" stroke="${headCol}" stroke-width="1.2"></line>`;
 
-  PLANET_ROWS.forEach((planet, i) => {
+  ALL_PLANET_ROWS.forEach((planet, i) => {
     const a = byPlanet.get(planet);
     if (!a) return;
     const ry = headY + 28 + i * rowH;
@@ -2209,7 +2253,7 @@ function pairTable(
     `letter-spacing=".12em" fill="${dark}">PERS</text>`;
   s += `<text x="${W * 0.78}" y="${headY + 15}" text-anchor="middle" font-size="9" ` +
     `letter-spacing=".12em" fill="${light}">DESIGN</text>`;
-  PLANET_ROWS.forEach((planet, i) => {
+  ALL_PLANET_ROWS.forEach((planet, i) => {
     const p = byP.get(planet), d = byD.get(planet);
     if (!p && !d) return;
     const ry = headY + 40 + i * rowH;
@@ -2244,7 +2288,7 @@ function mergedClientTable(client: ClientCtx, skin: Skin, x: number, y: number):
     `letter-spacing=".16em" fill="${CLIENT_TINT}">${esc(client.name.toUpperCase())}</text>`;
   const headY = 18;
   s += `<line x1="6" y1="${headY}" x2="${W - 6}" y2="${headY}" stroke="${CLIENT_TINT}" stroke-width="1.6"></line>`;
-  PLANET_ROWS.forEach((planet, i) => {
+  ALL_PLANET_ROWS.forEach((planet, i) => {
     const d = byD.get(planet), pp = byP.get(planet);
     if (!d && !pp) return;
     const ry = headY + 28 + i * rowH;
@@ -2289,7 +2333,7 @@ function transitTable(sky: NonNullable<SceneData["sky"]>, skin: Skin, x: number,
     `font-weight="600" fill="${TRANSIT_INK}" opacity=".72">${esc(sky.time)} UTC</text>`;
   const headY = 36;
   s += `<line x1="6" y1="${headY}" x2="${W - 6}" y2="${headY}" stroke="${TRANSIT_INK}" stroke-width="1.6"></line>`;
-  PLANET_ROWS.forEach((planet, i) => {
+  ALL_PLANET_ROWS.forEach((planet, i) => {
     const a = byPlanet.get(planet);
     if (!a) return;
     const ry = headY + 28 + i * rowH;
@@ -2397,7 +2441,7 @@ function definitionMap(d: SceneData): {
 
 function gateHalos(d: SceneData, skin: Skin): string {
   if (!d.client) return "";
-  const gates = [...new Set(d.client.acts.map((a) => a.gate))];
+  const gates = [...new Set(d.client.acts.filter((a) => a.core).map((a) => a.gate))];
   const bridges = definitionMap(d).bridges;
   const bridgeRings = [...new Set(bridges.map((b) => b.gate))].map((g) => {
     const a = d.anchors[g];
@@ -2706,7 +2750,7 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
   // On a client chart these dock into the empty corner of the stage instead of
   // the panel, which is where the panel's height was coming from. The teaching
   // diagram has room, so there they stay in the panel.
-  const viewControls = `<div class="sec" id="modsec" hidden>CHART</div>
+  const viewControls = `<div class="sec" id="modsec" hidden>CHART TYPE</div>
     <div class="row" id="modrow" hidden>
       <button id="mSelf" class="on" data-help="This person's own chart, from their birth moment. Everything below reads their design alone." data-help-label="Individual">Individual</button>
       <button id="mTransit" data-help="Today's sky laid over this chart: what the planets are activating right now and which channels they complete. Circuits are unavailable here, because a transit carries none of its own." data-help-label="Transit">Transit</button>
@@ -2719,14 +2763,22 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
       <button id="vMandala" data-help="The wheel the chart is calculated from. All 64 gates in their zodiac order, with your planets placed where they actually fall." data-help-label="Mandala">Mandala</button>
       <button id="vAstro" data-help="Your natal chart in the astrological wheel: signs, houses, planets and the aspects between them." data-help-label="Astrology">Astrology</button>
     </div>
-    <div class="row" id="siderow" hidden>
-      <button id="sideP" class="on" data-help="The conscious side, calculated from the moment of birth. What you know about yourself and can talk about. Shown in black." data-help-label="Personality">Personality</button>
-      <button id="sideD" class="on" data-help="The unconscious side, calculated about 88 days before birth. The body you were given rather than the self you know. Shown in red." data-help-label="Design">Design</button>
-    </div>
-    <div class="row" id="hangrow" hidden>
-      <button id="defined" class="on" data-help="The channels you carry completely, both gates. These are fixed and always on." data-help-label="Defined Channels">Defined Channels</button>
-      <button id="hang" class="on" data-help="Gates where you hold one end of a channel but not the other. They look for the missing gate in the people around you." data-help-label="Hanging Gates">Hanging Gates</button>
-    </div>
+    <details class="drop showdrop" id="placements" hidden>
+      <summary>Show<span class="offcount" id="offcount" hidden></span></summary>
+      <div class="row" id="siderow">
+        <button id="sideP" class="on" data-help="The conscious side, calculated from the moment of birth. What you know about yourself and can talk about. Shown in black." data-help-label="Personality">Personality</button>
+        <button id="sideD" class="on" data-help="The unconscious side, calculated about 88 days before birth. The body you were given rather than the self you know. Shown in red." data-help-label="Design">Design</button>
+      </div>
+      <div class="row" id="hangrow">
+        <button id="defined" class="on" data-help="The channels you carry completely, both gates. These are fixed and always on." data-help-label="Defined Channels">Defined Channels</button>
+        <button id="hang" class="on" data-help="Gates where you hold one end of a channel but not the other. They look for the missing gate in the people around you." data-help-label="Hanging Gates">Hanging Gates</button>
+        <button id="tables" class="on" data-help="Shows and hides the two columns of placements either side of the chart." data-help-label="Columns">Placement Columns</button>
+      </div>
+      <div class="pgrouplab">Planets</div>
+      <div class="row" id="pgroups"></div>
+      <div class="pgrid" id="planets"></div>
+      <div class="row pallnone"><button id="pAll">All</button><button id="pNone">None</button></div>
+    </details>
     <div class="row" id="actrow" hidden>
       <button id="reset" class="gold" data-help="Clears every highlight and selection and returns the chart to how it opened." data-help-label="Reset">Reset</button>
       <button id="snap" data-help="Downloads the chart exactly as it appears now, including whatever you have highlighted." data-help-label="Save Image">Save Image</button>
@@ -2754,7 +2806,7 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
     // difference between its possible answers means rather than just naming them.
     basicLib: d.basicLib ?? {},
     planetGlyphs: PLANET_GLYPHS,
-    planetOrder: PLANET_ROWS,
+    planetOrder: ALL_PLANET_ROWS,
     tableGeom: { w: TABLE_W + 18, rowH: 30, leftX: 4, rightX: OX + LY.coreW + TABLE_GAP - 10, y: 96 },
     // Which gates sit in which center, so the panel can tell an undefined center
     // (no channel, but gates activated) from an open one (nothing activated).
@@ -2893,7 +2945,7 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
     sky: d.sky ? { date: d.sky.date, time: d.sky.time, positions: d.sky.positions.map((p) => ({
       planet: p.planet, gate: p.gate, line: p.line, fixingState: p.fixingState,
     })) } : null,
-    natalGates: d.client ? [...new Set(d.client.acts.map((a) => a.gate))].sort((a, b) => a - b) : [],
+    natalGates: d.client ? [...new Set(d.client.acts.filter((a) => a.core).map((a) => a.gate))].sort((a, b) => a - b) : [],
     zodiac: ZODIAC.map((z) => ({ name: z, glyph: ZODIAC_GLYPH[z] })),
     conjunctionText: d.client?.report.conjunctions ?? {},
     houses: HOUSES,
@@ -2906,7 +2958,14 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
       Ic: ["Imum Coeli", "The lowest point, opposite the Midheaven. Home, family roots, parents or primary caregivers, and private foundation."],
     },
     signsByGate: SIGNS_BY_GATE,
-    planets: PLANET_ROWS.map((p) => ({ id: planetId(p), name: p })),
+    // `extra` is Chiron and Lilith: shown, switchable, and off until somebody
+    // asks. Kaycee, 2026-09-12: "They are relevant for the astrology section and
+    // some advanced HD practitioners like to see them. By default they should be
+    // off though."
+    planets: ALL_PLANET_ROWS.map((p) => ({
+      id: planetId(p), name: p,
+      extra: (PLANET_EXTRAS as readonly string[]).includes(p),
+    })),
     functions: FUNCTION_ORDER.map((f) => ({ name: f, color: FUNCTIONS[f] })),
   };
 
@@ -3124,10 +3183,25 @@ svg.canvas.plain .pleg.lit { fill:${HL_GOLD} !important; }
 .cshape.pending { fill:#ffffff !important;
   stroke:#845095 !important; stroke-width:2.2 !important;
   stroke-dasharray:7 5; stroke-linecap:round; }
+/* A channel that depends on the hour takes its own colour rather than an
+   outline.
+   
+   A channel is two legs meeting in the middle, so outlining each one drew both
+   of their inner ends and left a line across the join. Kaycee, 2026-09-12: "Is
+   it possible to remove the horizontal line between the gates... It's on all of
+   the speculative/dotted channels." The highlight code hit the same seam years
+   ago and solved it by outlining the pair as one shape, which cannot be done
+   here: the legs are separate elements sharing an edge.
+   
+   So they are not outlined at all. A leg is about nine units wide, too narrow
+   to carry a dash or a hatch without reading as noise, and a filled leg has no
+   inner edge to draw. Purple rather than a faded black, because the chart
+   already says not-settled in purple everywhere else, and a faded channel would
+   read as a weaker version of a real one rather than an open question. */
 .chgrp.pending path, .chgrp.pending polygon, .chgrp.pending rect,
+.ch.pending path, .ch.pending polygon, .ch.pending rect,
 .pleg.pending {
-  fill:none !important; stroke:var(--pend,#2b2b33) !important;
-  stroke-width:1.6 !important; stroke-dasharray:6 4; }
+  fill:#c9b0d6 !important; stroke:none !important; }
 .gdisc.pending { fill:#f3ecf6 !important; stroke:#845095 !important;
   stroke-width:1.3 !important; stroke-dasharray:3 2.5; }
 .pnum.pending { fill:#2b2b33 !important; opacity:1 !important; }
@@ -3140,9 +3214,6 @@ svg.canvas.plain .pleg.lit { fill:${HL_GOLD} !important; }
 .opt { border-bottom:1px dotted #845095; cursor:help; }
 .opt:hover { background:#f3ecf6; }
 /* the same open treatment wherever a view redraws the thing */
-.ch.pending path, .ch.pending polygon, .ch.pending rect {
-  fill:none !important; stroke:var(--pend,#2b2b33) !important;
-  stroke-width:1.6 !important; stroke-dasharray:6 4; }
 .mandala [data-gatecell].pending path, .mandala [data-hex].pending {
   stroke:#845095 !important; stroke-width:1.6 !important; stroke-dasharray:3 3; }
 .gateband.pending { stroke:#845095 !important; stroke-dasharray:3 3; }
@@ -3177,10 +3248,16 @@ ${CIRCUITS.map((c) => `body.off-${c.id} .ch[data-circuit="${c.id}"]:not(.hang) {
 body.nodefined .ch:not(.hang) { display:none; }
 /* a deselected planet or side leaves the placement columns alone, dropping out
    of the mandala; its table row just dims */
-${PLANET_ROWS.map((p) => {
+${ALL_PLANET_ROWS.map((p) => {
   const id = planetId(p);
+  // A switched-off planet dims in the columns, because it is still one of the
+  // thirteen and the row belongs there. Chiron and Lilith are not: off means
+  // gone, since they are off by default and a permanently greyed pair at the
+  // foot of every column reads as something missing rather than something
+  // optional. Kaycee, 2026-09-12: "By default they should be off."
+  const extra = (PLANET_EXTRAS as readonly string[]).includes(p);
   return `body.off-p-${id} .mandala [data-planet="${id}"] { display:none; }\n` +
-    `body.off-p-${id} .prow[data-planet="${id}"] { opacity:.3; }`;
+    `body.off-p-${id} .prow[data-planet="${id}"] { ${extra ? "display:none" : "opacity:.3"}; }`;
 }).join("\n")}
 body.off-s-personality .mandala [data-side="personality"] { display:none; }
 body.off-s-design .mandala [data-side="design"] { display:none; }
@@ -3205,7 +3282,14 @@ button.disabled:hover, button:disabled:hover { background:var(--paper); color:in
 .viewdock.docked { position:absolute; left:0; bottom:2px; z-index:5; width:154px;
   padding:8px 10px 10px; border-radius:12px; background:rgba(255,255,255,.93);
   border:1px solid rgba(132,80,149,.18); backdrop-filter:blur(3px);
-  box-shadow:0 6px 18px rgba(60,40,80,.08); }
+  box-shadow:0 6px 18px rgba(60,40,80,.08);
+  /* Open, Show is taller than the chart beside it, and the dock is pinned to
+     the bottom: the top of it went off the edge and could not be reached.
+     Kaycee, 2026-09-12: "is it possible to still be able to scroll to the top
+     of the panel with the Show toggle open?" */
+  max-height:calc(100% - 6px); overflow-y:auto; overscroll-behavior:contain; }
+.viewdock.docked::-webkit-scrollbar { width:6px; }
+.viewdock.docked::-webkit-scrollbar-thumb { background:rgba(132,80,149,.28); border-radius:3px; }
 .viewdock.docked .sec { margin:0 0 7px; }
 .viewdock.docked .row { flex-direction:column; align-items:stretch; margin-top:6px; gap:6px; }
 .viewdock.docked button { width:100%; text-align:center; }
@@ -3214,11 +3298,115 @@ button.disabled:hover, button:disabled:hover { background:var(--paper); color:in
    purple pills below them are independent filters. Selected also takes full
    white and more weight, because black against charcoal alone is too small a
    step to tell at a glance. */
+/* CHART is a mode switch too, one at a time, so it takes the same segmented
+   shape as the views below it. Kaycee, 2026-09-12: "let's see it." It keeps the
+   purple family rather than the charcoal one, because two identical stacks one
+   above the other would be worse than two loose rows: you could not tell at a
+   glance which switch you were reaching for. */
+.viewdock.docked #modrow { gap:0; }
+.viewdock.docked #modrow button { border-radius:0; border:1px solid rgba(132,80,149,.32);
+  background:rgba(132,80,149,.07); color:#2b2b33; font-weight:600; }
+.viewdock.docked #modrow button + button { border-top:0; }
+.viewdock.docked #modrow button:first-child { border-radius:10px 10px 0 0; }
+.viewdock.docked #modrow button:last-child { border-radius:0 0 10px 10px; }
+.viewdock.docked #modrow button.on { background:var(--purple); border-color:var(--purple); color:#fff; }
 .viewdock.docked #viewrow { gap:0; }
 .viewdock.docked #viewrow button { border-radius:0; }
 .viewdock.docked #viewrow button:first-child { border-radius:10px 10px 0 0; }
 .viewdock.docked #viewrow button:last-child { border-radius:0 0 10px 10px; }
 .viewdock.docked #viewrow button + button { border-top-color:rgba(255,255,255,.18); }
+/* SHOW, in the dock
+   The dock asked three different questions and looked like one list of six
+   rows. Kaycee, 2026-09-12: "Just trying to make that side a little neater in
+   general and intuitive/user friendly."
+   
+   So it reads as three now. Which chart. Which view. What is drawn on it. The
+   third is one closed line holding every filter there is: the two sides, the
+   two kinds of channel, the placement columns and the thirteen planets. The
+   two mode switches above it never move, because those are navigation and
+   hiding them would cost a click every time.
+   
+   Not called Definition, which Kaycee suggested: the panel opposite already has
+   a DEFINITION section and that is the Human Design term, so two of them would
+   read as the same thing to exactly the beginner this is built for.
+   
+   The filters stay <button> elements rather than becoming real checkboxes,
+   because every handler in the page toggles their .on class; the tick is drawn
+   by CSS from that same class, so it looks like a checkbox and stays wired. */
+.viewdock.docked .showdrop { margin-top:10px; padding-top:8px;
+  border-top:1px solid rgba(132,80,149,.18); }
+.viewdock.docked .showdrop > summary { margin:0; padding:0;
+  display:flex; align-items:center; justify-content:space-between; }
+
+/* ONE SCALE, ONE COLOUR
+   Kaycee, 2026-09-12: "Just be consistent with text colors, fonts and sizes
+   basically." Everything that can be ticked inside Show is the same size, the
+   same weight and the same two colours: the ink when off, the purple when on.
+   Section labels are the small uppercase the rest of the panel already uses. */
+.viewdock.docked .showdrop { --tick:11px; --tickgap:18px; --lbl:11px; }
+.viewdock.docked .showdrop #siderow,
+.viewdock.docked .showdrop #hangrow { gap:0; margin-top:8px; }
+.viewdock.docked .showdrop #hangrow { margin-top:9px; }
+.viewdock.docked .showdrop #siderow button,
+.viewdock.docked .showdrop #hangrow button,
+.viewdock.docked .showdrop .pgrid label {
+  font-size:var(--lbl); font-weight:500; letter-spacing:0; line-height:1.5;
+  text-align:left; }
+/* The label is always the same ink, ticked or not. Kaycee, 2026-09-12: "can you
+   make all of the options black text though". The box carries the state; the
+   word is just the word, and a list where half the labels change colour reads
+   as two kinds of thing when it is one. */
+.viewdock.docked .showdrop #siderow button,
+.viewdock.docked .showdrop #hangrow button {
+  background:transparent; border:0; color:#2b2b33; opacity:.86;
+  padding:3px 0 3px var(--tickgap); position:relative; width:100%; }
+.viewdock.docked .showdrop #siderow button::before,
+.viewdock.docked .showdrop #hangrow button::before {
+  content:""; position:absolute; left:0; top:50%; transform:translateY(-50%);
+  width:var(--tick); height:var(--tick); border-radius:3px; box-sizing:border-box;
+  border:1.4px solid rgba(43,43,51,.4); background:transparent; }
+.viewdock.docked .showdrop #siderow button.on::before,
+.viewdock.docked .showdrop #hangrow button.on::before {
+  background:var(--purple); border-color:var(--purple); }
+/* the tick itself, kept small: it reads as a mark, not a fill */
+.viewdock.docked .showdrop #siderow button.on::after,
+.viewdock.docked .showdrop #hangrow button.on::after {
+  content:""; position:absolute; left:3.6px; top:calc(50% - 3.2px);
+  width:2.6px; height:5.4px; border:solid #fff; border-width:0 1.5px 1.5px 0;
+  transform:rotate(42deg); }
+
+/* the planets use real checkboxes, so they are sized to match the drawn ones */
+.viewdock.docked .showdrop .pgrid { grid-template-columns:1fr 1fr; gap:0 8px; margin-top:5px; }
+.viewdock.docked .showdrop .pgrid label {
+  display:flex; align-items:center; gap:6px; padding:3px 0; color:#2b2b33;
+  opacity:.86; cursor:pointer; }
+.viewdock.docked .showdrop .pgrid input { width:var(--tick); height:var(--tick);
+  margin:0; accent-color:var(--purple); flex:0 0 var(--tick); }
+
+.varrow-item { font-size:11px; line-height:1.45; padding:4px 6px; margin:0 -6px;
+  border-radius:7px; cursor:pointer; display:flex; flex-direction:column; gap:1px; }
+.varrow-item:hover { background:rgba(132,80,149,.14); }
+.varrow-item > span { font-size:9px; letter-spacing:.1em; text-transform:uppercase;
+  opacity:.5; }
+.offcount { font-size:9px; font-weight:600; letter-spacing:.06em; color:var(--purple);
+  background:rgba(132,80,149,.12); border-radius:8px; padding:1px 6px; margin-left:auto;
+  margin-right:6px; text-transform:none; }
+/* room above the second switch, so the two are not one block of buttons.
+   Kaycee, 2026-09-12: "can you add a space or a line below the word view" and
+   then "above the word view I mean". */
+.viewdock.docked #viewsec { margin-top:13px; }
+.pgrouplab { font-size:9px; letter-spacing:.16em; font-weight:600; opacity:.45;
+  text-transform:uppercase; margin:12px 0 0; color:#2b2b33; }
+.viewdock.docked .showdrop #pgroups { flex-direction:row; flex-wrap:wrap; gap:4px; margin-top:6px; }
+.viewdock.docked .showdrop #pgroups button,
+.viewdock.docked .showdrop .pallnone button {
+  width:auto; flex:1 1 auto; font-size:10px; font-weight:600; letter-spacing:.02em;
+  padding:4px 6px; }
+.viewdock.docked .showdrop .pallnone { flex-direction:row; gap:5px; margin-top:9px; }
+.viewdock.docked .showdrop .pallnone button { flex:1; }
+/* the actions are not filters, and should not look like the list above them */
+.viewdock.docked #actrow { margin-top:10px; padding-top:9px;
+  border-top:1px solid rgba(132,80,149,.18); }
 #viewrow button { background:#4d4d55; color:rgba(255,255,255,.82); }
 #viewrow button:hover { background:#3d3d45; color:#fff; }
 #viewrow button.on, #viewrow button.on:hover { background:#111111; color:#fff; font-weight:600; }
@@ -3706,14 +3894,6 @@ ${d.client ? "" : viewControls}
       <details class="drop"><summary>Aspects</summary><div id="astroaspects"></div></details>
     </div>
 
-    <details class="drop" id="placements" hidden>
-      <summary>Placements</summary>
-      <div class="row"><button id="tables" class="on">Columns</button></div>
-      <div class="row" id="pgroups"></div>
-      <div class="pgrid" id="planets"></div>
-      <div class="row"><button id="pAll">All</button><button id="pNone">None</button></div>
-    </details>
-
     <div class="datesec" id="datesec">
       <div class="todaylab">Date</div>
       <div class="datepick">
@@ -3739,6 +3919,10 @@ ${d.client ? "" : viewControls}
         <div class="qsend"><button class="qgo" id="qgo">Send</button><span class="qmsg" id="qmsg"></span></div>
         <div class="qdone" id="qdone">Thank you. That has been sent.</div>
       </div>
+    </details>
+    <details class="drop" id="vardrop" hidden>
+      <summary>Variables</summary>
+      <div id="varlist"></div>
     </details>
     <details class="drop" id="chandrop" hidden>
       <summary>Channels</summary>
@@ -3802,6 +3986,27 @@ if (DATA.client) {
     if (m) openCard(b, couldBeHtml(m.label, m.field, m.couldBe));
   });
   metaBy = {}; DATA.client.meta.forEach(function (m) { metaBy[m.key] = m; });
+  // The four arrows are on the chart, but only as arrows: you had to know to
+  // hover one. They are listed here too, where Placements used to sit. Kaycee,
+  // 2026-09-12: "we need to add the Variables toggle to the right side control
+  // panel where placements was."
+  (function varList() {
+    var vs = DATA.client.variables || [];
+    if (!vs.length) return;
+    document.getElementById('vardrop').hidden = false;
+    document.getElementById('varlist').innerHTML = vs.map(function (v, i) {
+      var val = v.unsettled
+        ? '<span class="needtime">Exact Birth Time Required</span>'
+        : esc(v.arrow === 'left' ? 'Left' : 'Right') + ' &middot; ' + esc(v.theme);
+      return '<div class="varrow-item" data-var="' + i + '">' +
+        '<span>' + esc(v.label) + '</span>' + val + '</div>';
+    }).join('');
+    document.getElementById('varlist').addEventListener('click', function (e) {
+      var el = e.target.closest ? e.target.closest('.varrow-item') : null;
+      if (el) openCard(el, varHtml(vs[+el.dataset.var]));
+    });
+  })();
+
   document.getElementById('hangrow').hidden = false;
   document.getElementById('placements').hidden = false;
   document.getElementById('chandrop').hidden = false;
@@ -4118,7 +4323,10 @@ if (DATA.client) {
 
   // one click back to the whole chart
   document.getElementById('reset').onclick = function () {
-    [].forEach.call(document.querySelectorAll('.cbx, .pbx'), function (b) { b.checked = true; });
+    // Reset means how the chart opened, and it opened without Chiron and Lilith.
+    [].forEach.call(document.querySelectorAll('.cbx, .pbx'), function (b) {
+      b.checked = !b.classList.contains('pextra');
+    });
     sync();
     document.getElementById('planets').dispatchEvent(new Event('change', { bubbles: true }));
     ['off-s-personality', 'off-s-design', 'nodefined', 'nohang', 'notables', 'show-bridges']
@@ -4963,7 +5171,9 @@ if (DATA.client) {
 
   // planet checkboxes drive the tables, the marks on the chart and the mandala
   document.getElementById('planets').innerHTML = DATA.planets.map(function (p) {
-    return '<label class="cc"><input type="checkbox" class="pbx" data-id="' + p.id + '" checked>' + p.name + '</label>';
+    return '<label class="cc' + (p.extra ? ' extra' : '') + '">' +
+      '<input type="checkbox" class="pbx' + (p.extra ? ' pextra' : '') + '" data-id="' + p.id + '"' +
+      (p.extra ? '' : ' checked') + '>' + p.name + '</label>';
   }).join('');
   document.getElementById('planets').addEventListener('change', function () {
     [].forEach.call(document.querySelectorAll('.pbx'), function (b) {
@@ -4971,9 +5181,31 @@ if (DATA.client) {
     });
     relight();
   });
+  document.getElementById('planets').dispatchEvent(new Event('change', { bubbles: true }));
+  // A collapsed section can hide the fact that something is switched off, so the
+  // line itself says how many. Chiron and Lilith never count: they start off,
+  // and a badge permanently reading "2 off" would tell nobody anything.
+  var offCount = function () {
+    var n = 0;
+    ['sideP', 'sideD', 'defined', 'hang', 'tables'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el && !el.classList.contains('on')) n++;
+    });
+    [].forEach.call(document.querySelectorAll('.pbx'), function (b) {
+      if (!b.checked && !b.classList.contains('pextra')) n++;
+    });
+    var badge = document.getElementById('offcount');
+    if (!badge) return;
+    badge.textContent = n ? n + ' off' : '';
+    badge.hidden = !n;
+  };
+  document.addEventListener('click', function () { setTimeout(offCount, 0); });
+  document.getElementById('planets').addEventListener('change', offCount);
+  offCount();
+
   var toggleBtn = function (id, cls) {
     var b = document.getElementById(id);
-    b.onclick = function () { b.classList.toggle('on', !body.classList.toggle(cls)); relight(); };
+    b.onclick = function () { b.classList.toggle('on', !body.classList.toggle(cls)); relight(); offCount(); };
   };
   toggleBtn('defined', 'nodefined');
   toggleBtn('hang', 'nohang');
@@ -7025,9 +7257,21 @@ function basicFor(field, value) {
 // "defined (design)" reads as "defined". Which side defines it is operator
 // detail, and the centre is either theirs at that hour or it is not.
 // Kaycee, 2026-09-12: "You can remove the (design) designation on that bullet."
+//
+// And a field that simply is not there reads as "Not Defined" rather than a
+// dash. Only a channel can be absent, so there is no other case to worry about,
+// and an em dash beside a time range looks like a value we failed to work out.
+// Kaycee, 2026-09-12: "instead of a dash for that bullet could it say Not
+// Defined?"
 function plainValue(v) {
-  var i = String(v).indexOf(' (');
-  return i < 0 ? String(v) : String(v).slice(0, i);
+  var t = String(v);
+  if (t === '\u2014' || t === '-') return 'Not Defined';
+  var i = t.indexOf(' (');
+  if (i >= 0) t = t.slice(0, i);
+  // "defined via (10-34)" and "open" are how the scan writes them; a bullet is
+  // a label and reads as one. Kaycee, 2026-09-12: "the Defined bullet should
+  // also be capitalized."
+  return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
 // One answer in the list. Carries its own text when there is one, so hovering
@@ -7039,7 +7283,7 @@ function optTag(field, value) {
   // The word keeps the centre reading; each channel carries its own.
   if (field.slice(-7) === ' centre' && String(value).indexOf('defined via ') === 0) {
     var ids = String(value).slice(12).split(' ');
-    var head = wrapOpt('defined', basicFor(field, 'defined'));
+    var head = wrapOpt('Defined', basicFor(field, 'defined'));
     var parts = [];
     for (var i = 0; i < ids.length; i++) parts.push(wrapOpt('(' + ids[i] + ')', channelText(ids[i])));
     return head + ' via ' + parts.join(' ');
@@ -7941,8 +8185,8 @@ export async function runBuilder(argv: string[] = process.argv.slice(2)): Promis
   // chart alone. Nobody is paired with anybody until the reader picks them: a
   // partner baked in by default would show a stranger on somebody's own page.
   if (client && !partnerSlug) {
-    const own = client.acts.filter((a) => a.side === "personality").map((a) => a.gate);
-    const ownD = client.acts.filter((a) => a.side === "design").map((a) => a.gate);
+    const own = client.acts.filter((a) => a.core && a.side === "personality").map((a) => a.gate);
+    const ownD = client.acts.filter((a) => a.core && a.side === "design").map((a) => a.gate);
     scene.composite = compositeInner(
       raw,
       { personality: [...new Set(own)], design: [...new Set(ownD)] },
