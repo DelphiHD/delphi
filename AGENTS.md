@@ -115,6 +115,7 @@ failures come from, and the wrapper is what gets blamed on the machinery.
 - Branching policy: short-lived branches for anything that touches `invoke-llm`, webhooks, or migrations. Per-branch Vercel previews are the review surface. See the Phase 1 branching DECISION entry.
 - Migrations are date-prefixed: `supabase/migrations/YYYYMMDD_description.sql`.
 - No em dashes anywhere in user-facing copy or AI-generated prose. A linter must catch this; prompt-only enforcement leaks.
+- **No operational text on client artifacts.** A chart, report, email, QR card or the public form carries only content that is useful to the client and approved for client use. Never our decision-making, never instructions on how to use the thing, never the artifact explaining its own display conventions back at the reader. This is not about trimming: approved client guidance stays, and removing any of it needs Kaycee's say-so first. `scripts/copy-check.ts` extracts every sentence a client can read and fails the push on anything not in `docs/CLIENT_COPY.json`; run it with `--approve` only after she has seen the words. Same reasoning as the em dash rule above: prompt-only enforcement leaks, and on 2026-09-12 it leaked four times in one morning.
 
 ## Workflow
 

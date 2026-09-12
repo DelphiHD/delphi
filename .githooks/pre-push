@@ -53,4 +53,16 @@ if (( ${#missing[@]} + ${#untracked[@]} > 0 )); then
   exit 1
 fi
 
+# No sentence reaches a client that Kaycee has not seen. On 2026-09-12 four of
+# mine did, in one morning, and each one cost her a screenshot and a message
+# telling me where it was. She asked the right question: "how are we going to
+# stop it from happening?" Not by me remembering.
+if command -v npx >/dev/null 2>&1; then
+  if ! npx tsx scripts/copy-check.ts; then
+    echo
+    echo "pre-push: client copy check failed. Show her the sentences above."
+    exit 1
+  fi
+fi
+
 exit 0
