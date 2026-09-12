@@ -6920,11 +6920,36 @@ function plainValue(v) {
 // One answer in the list. Carries its own text when there is one, so hovering
 // it says what the difference actually means rather than just naming it.
 function optTag(field, value) {
+  // A centre defined by one channel early and another later reads as "defined"
+  // twice, which looks like nothing changed. Kaycee, 2026-09-12: "Would it be
+  // possible to show the channel that would be defining it for both options?"
+  // The word keeps the centre reading; each channel carries its own.
+  if (field.slice(-7) === ' centre' && String(value).indexOf('defined via ') === 0) {
+    var ids = String(value).slice(12).split(' ');
+    var head = wrapOpt('defined', basicFor(field, 'defined'));
+    var parts = [];
+    for (var i = 0; i < ids.length; i++) parts.push(wrapOpt('(' + ids[i] + ')', channelText(ids[i])));
+    return head + ' via ' + parts.join(' ');
+  }
   var shown = plainValue(value);
-  var basic = basicFor(field, value);
+  return wrapOpt(shown, basicFor(field, value));
+}
+
+function wrapOpt(shown, basic) {
   if (!basic) return esc(shown);
   return '<span class="opt" data-basic="' + esc(basic).split('"').join('&quot;') + '">' +
     esc(shown) + '</span>';
+}
+
+// A channel's own words. Kaycee's Delphi Basic column for channels is not
+// written yet and starts appearing here the moment it is; until then the
+// channel's name is still worth more than its two gate numbers alone.
+function channelText(id) {
+  var basic = ((DATA.basicLib || {}).channel || {})[id] || '';
+  var c = (DATA.channels || []).filter(function (x) { return x.key === id; })[0];
+  var name = c ? c.name : '';
+  if (basic) return name ? name + ' — ' + basic : basic;
+  return name;
 }
 
 // What an unsettled field says. Kaycee, 2026-09-12, giving the whole spec:

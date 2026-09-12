@@ -270,18 +270,33 @@ export function unsettledGates(r: Reliability): Set<number> {
 // ── keeping the answer ──────────────────────────────────────────────────────
 
 /**
+ * What the scan compares, as a number to bump when that changes.
+ *
+ * A stored scan is only true for the birth details AND for the version of the
+ * scan that produced it. On 2026-09-12 centres started saying which channel
+ * defines them, every stored scan still held the old shape, and the rebuilt
+ * charts quietly showed the old answer because the birth details had not
+ * moved. Bump this whenever flatten() changes what it records.
+ *
+ *   1  gates, lines, centres, channels, variables
+ *   2  centres say which channels define them; empty spans dropped
+ */
+export const SCAN_VERSION = 2;
+
+/**
  * What the scan was run against.
  *
- * A stored scan is only true for the birth details it was cast from. Kaycee
- * corrects birth details often, and a correction that left a confident old
- * answer in place would be worse than having no answer at all, so the details
- * travel with the scan and it is thrown away the moment they stop matching.
+ * Kaycee corrects birth details often, and a correction that left a confident
+ * old answer in place would be worse than having no answer at all, so the
+ * details travel with the scan and it is thrown away the moment they stop
+ * matching.
  */
 export function birthFingerprint(args: {
   accuracy: Accuracy; birthDate: string; birthTime: string | null;
   timezone: string; locationQuery?: string;
 }): string {
   return [
+    `v${SCAN_VERSION}`,
     args.accuracy, args.birthDate, args.birthTime ?? "",
     args.timezone, args.locationQuery ?? "",
   ].join("|");

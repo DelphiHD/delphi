@@ -50,6 +50,7 @@
 
 import { getChart } from "@/lib/mybodygraph";
 import { longitudeOf } from "@/lib/hd/gate-longitude";
+import { centerOf } from "@/lib/hd/gate-center";
 import { crossingsIn, type Rung } from "@/lib/hd/ephemeris";
 import type { Chart, PlanetActivation } from "@/lib/chart/types";
 
@@ -148,9 +149,21 @@ export function flatten(c: Chart): Map<string, { kind: Change["kind"]; value: st
   side(c.activations?.personality, "Personality");
   side(c.activations?.design, "Design");
 
+  // A centre says what is defining it, not just that something is.
+  //
+  // Kaycee, 2026-09-12: "listing Defined twice makes it appear that there
+  // aren't actually differences. Would it be possible to show the channel that
+  // would be defining it for both options?" Her Head centre was defined at
+  // every hour of the window, but by a different channel early and late, and
+  // the report showed "defined" twice with no way to tell them apart.
   for (const ctr of c.centers ?? []) {
+    const key = ctr.name.split(" ").join("-");
+    const via = (c.channels ?? [])
+      .filter((ch) => centerOf(ch.gates[0]) === key || centerOf(ch.gates[1]) === key)
+      .map((ch) => ch.id)
+      .sort();
     put(`${CENTER_LABEL[ctr.name] ?? ctr.name} centre`, "center",
-      ctr.defined ? `defined (${ctr.consciousness})` : "open");
+      ctr.defined && via.length ? `defined via ${via.join(" ")}` : ctr.defined ? "defined" : "open");
   }
 
   // A channel that exists in one cast and not the other shows up as a change of
@@ -346,6 +359,12 @@ export async function scanWindow(
     // gap reads as "we don't know", which is not what it means.
     for (let i = 0; i < spans.length - 1; i++) spans[i].to = spans[i + 1].from;
     spans[spans.length - 1].to = toTime;
+    // A span that starts and ends at the same minute covers no time; it is the
+    // window's own edge showing through, and reads as a second answer.
+    const real = spans.filter((x) => x.from !== x.to);
+    if (real.length < 2) continue;
+    spans.length = 0;
+    spans.push(...real);
     found.set(field, {
       field, kind, spans,
       from: spans[0].value, to: spans[spans.length - 1].value,
