@@ -14,6 +14,12 @@
 
 "use client";
 
+// Never cached. This page changes as Kaycee changes it, and a pre-rendered copy
+// sitting at the edge means she makes an edit, checks her phone, and is shown
+// the old one. There is nothing to gain from caching a form.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { useEffect, useRef, useState } from "react";
 
 type Accuracy = "document" | "told" | "approximate" | "unknown";
@@ -141,11 +147,7 @@ export default function ChartPage() {
       {result ? (
         <section className="card done">
           <h2>{event ? "You are registered." : "Your chart is ready."}</h2>
-          <p>
-            {event
-              ? `See you at ${event.name}. Your chart is below, and I will have it with me in the workshop.`
-              : "This link is yours. It works on any device and it stays live, so save it somewhere you will find it again."}
-          </p>
+          {event && <p className="evname2">{event.name}</p>}
           {/* A new tab, always. Embedded in her home page this link was
               trying to load the chart INSIDE Wix's frame, and a chart refuses
               to be framed by anyone, so the form appeared to fail at the last
@@ -157,10 +159,10 @@ export default function ChartPage() {
           <a className="go" href={result.url} target="_blank" rel="noreferrer">Open My Chart</a>
           <p className="fine">
             {result.emailed
-              ? `Sent to ${email} as well, so you have it twice.`
+              ? `Sent to ${email}.`
               : result.account
-                ? `Saved to ${email}, so you can find it again later.`
-                : "Save the link: it is the only way back to this chart."}
+                ? `Saved to ${email}.`
+                : "Save this link."}
           </p>
         </section>
       ) : (
@@ -242,9 +244,7 @@ export default function ChartPage() {
           {showsPartOfDay && (
             <>
               <p className="fine">
-                {accuracy === "unknown"
-                  ? "If you know roughly when, say so. A six hour window tells us far more than a whole day."
-                  : "Which part of the day?"}
+                Which part of the day?
               </p>
               <div className="chips">
                 {PART_OF_DAY.map((p) => (
@@ -259,25 +259,9 @@ export default function ChartPage() {
           {(accuracy === "unknown" || accuracy === "approximate") && (
             <div className="note">
               <p>
-                <strong>Your birth time is probably findable.</strong> The short
-                birth certificate most people keep does not carry it, but the
-                long form does, and nearly anyone can request one from the
-                office of vital records in the state or country they were born
-                in. Ask for the <em>long form</em>, sometimes called the vault
-                copy or the certified copy of the original certificate of live
-                birth.
-              </p>
-              <p>
-                Without a time, your Type and Authority are usually still
-                reliable, but your Profile, your Ascendant and all four of your
-                variables may not be. Your chart will say which is which rather
-                than guess.
-              </p>
-              <p>
                 <a href="https://cal.com/delphihumandesign/birth-time-rectification" target="_blank" rel="noreferrer">
                   Book A Rectification Session
-                </a>{" "}
-                if you would rather work it out from your life than from paperwork.
+                </a>
               </p>
             </div>
           )}
@@ -408,6 +392,7 @@ export default function ChartPage() {
           text-transform: uppercase; color: var(--gold); font-weight: 700; }
         .evname { display: block; margin-top: 4px; font-size: 17px; font-weight: 600;
           color: #fff; letter-spacing: 0.01em; }
+        .evname2 { margin: 4px 0 18px; font-size: 16px; font-weight: 600; color: #fff; }
 
         .fine.ok { color: var(--purple-light); font-weight: 500; }
         .error {
