@@ -330,10 +330,17 @@ export default function ChartPage() {
            Kaycee, 2026-09-10: "there was a slight white border around the
            bodygraph widget so it stood out from the hero image, but it wasn't
            half a page of white space." */
-        body.compact .wrap { padding: 14px; max-width: none; }
+        body.compact { background: transparent; }
+        body.compact .wrap {
+          padding: 14px;
+          max-width: none;
+          background: #fff;
+          border-radius: 34px;
+        }
         body.compact .card {
           min-height: calc(100vh - 28px);
           padding: 24px 26px 26px;
+          box-shadow: none;
           display: flex;
           flex-direction: column;
           justify-content: center;
