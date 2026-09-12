@@ -3042,6 +3042,8 @@ svg.canvas.plain .pleg.lit { fill:${HL_GOLD} !important; }
 .gdisc.pending { fill:#f3ecf6 !important; stroke:#845095 !important;
   stroke-width:1.3 !important; stroke-dasharray:3 2.5; }
 .pnum.pending { fill:#2b2b33 !important; opacity:1 !important; }
+.castonly { margin:2px 0 10px; font-size:11px; font-weight:600; letter-spacing:.06em;
+  color:#845095; }
 .castat { margin:0 0 4px; font-size:12px; letter-spacing:.02em; opacity:.75; }
 .possible { margin:8px 0 2px; font-size:11px; font-weight:700; letter-spacing:.08em;
   text-transform:uppercase; color:#845095; }
@@ -4246,7 +4248,16 @@ if (DATA.client) {
         }).join('')
       : '<div class="line"><span>No two planets share a gate on the same side.</span></div>') + '</details>';
 
-    document.getElementById('tab-stats').innerHTML =
+    // Every count on this tab comes from the cast, so on a chart whose birth
+    // time is a guess they are true of that hour and no other. Kaycee,
+    // 2026-09-12: "do you think we should add a line to the effect of
+    // Applicable for (ChartCastTime) Only?"
+    var castOnly = '';
+    var TW = DATA.client && DATA.client.time;
+    if (TW && TW.window) {
+      castOnly = '<p class="castonly">Applicable for ' + esc(clock12(TW.window.castFor)) + ' Only</p>';
+    }
+    document.getElementById('tab-stats').innerHTML = castOnly +
       table('Activations by Line', lineRows, 'line') +
       table('Activations by Circuit', groupRows, 'group') +
       table('Activations by Center', centerRows, 'center') +

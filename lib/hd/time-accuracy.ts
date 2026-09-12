@@ -35,6 +35,7 @@
  */
 
 import { scanWindow, type WindowReport } from "@/lib/hd/time-window";
+import { longitudeAt } from "@/lib/hd/ephemeris";
 
 export type Accuracy = "document" | "told" | "approximate" | "unknown";
 
@@ -107,6 +108,37 @@ export interface Unsettled {
   spans?: { value: string; from: string; to: string }[];
 }
 
+/**
+ * What the birth time governs on the astrological wheel.
+ *
+ * Measured on 2026-09-12 for a Palermo birth, across a single day: the
+ * Ascendant ran Virgo, Libra, Sagittarius, Aquarius, Taurus, Cancer and back to
+ * Virgo. All the way around. The Midheaven with it, and because the houses hang
+ * off the Ascendant, every planet's house placement too.
+ *
+ * The planets themselves do not move like that. Their signs hold all day and
+ * the aspects between them are planet to planet, so they hold whatever the
+ * hour. The Moon is the exception and can cross a sign, which is why it is
+ * measured rather than assumed.
+ *
+ * Kaycee, 2026-09-12, choosing this over greying the whole wheel: "1- yes,
+ * 2-let's handle it the same."
+ */
+export interface AstroReliability {
+  /** The four angles and the twelve houses. Never settled without an exact
+   *  time: even an hour of slack moves the Ascendant fifteen degrees and takes
+   *  every house cusp with it. */
+  anglesUnsettled: boolean;
+  /** The signs the Moon passes through, when it crosses one. Empty when it
+   *  stays put, which is the usual answer for a six hour window. */
+  moonSigns: { value: string; from: string; to: string }[];
+}
+
+const SIGNS = [
+  "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+  "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
+];
+
 export interface Reliability {
   accuracy: Accuracy;
   /** True when the chart can be trusted as cast. */
@@ -119,7 +151,35 @@ export interface Reliability {
   /** How finely the sky was actually checked. */
   resolution?: WindowReport["resolution"];
   casts: number;
+  /** What the wheel can and cannot claim. */
+  astro?: AstroReliability;
 }
+
+/**
+ * Which signs the Moon is in across the window, read locally.
+ *
+ * Free, because the positions are computed here rather than asked for, so this
+ * samples every minute and the crossing is the minute it happens.
+ */
+function moonSignsAcross(startUtc: string, startMins: number, endMins: number) {
+  const out: { value: string; from: string; to: string }[] = [];
+  const t0 = new Date(startUtc).getTime();
+  for (let m = 0; m <= Math.max(1, endMins - startMins); m++) {
+    const lon = longitudeAt("Moon", new Date(t0 + m * 60_000));
+    if (lon === null) break;
+    const name = SIGNS[Math.floor((((lon % 360) + 360) % 360) / 30)];
+    const clock = toClockLocal(startMins + m);
+    const last = out[out.length - 1];
+    if (last && last.value === name) last.to = clock;
+    else out.push({ value: name, from: clock, to: clock });
+  }
+  return out.length > 1 ? out : [];
+}
+
+const toClockLocal = (mins: number) => {
+  const m = ((Math.round(mins) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+};
 
 /** The fields a newcomer reads as "who I am". */
 const IDENTITY = new Set([
@@ -175,6 +235,16 @@ export async function reliabilityOf(args: {
     unsettled.set(field, { field, kind: "variable", couldBe: [] });
   }
 
+  const toMins = (hhmm: string) => {
+    const [h, m] = hhmm.split(":").map(Number);
+    return h * 60 + m;
+  };
+  const moonSigns = moonSignsAcross(report.startUtc, toMins(window.from), toMins(window.to));
+  // Contiguous, the same way the field timelines are: a gap reads as "we do not
+  // know", which is not what it means.
+  for (let i = 0; i < moonSigns.length - 1; i++) moonSigns[i].to = moonSigns[i + 1].from;
+  if (moonSigns.length) moonSigns[moonSigns.length - 1].to = window.to;
+
   return {
     accuracy: args.accuracy,
     exact: false,
@@ -183,6 +253,7 @@ export async function reliabilityOf(args: {
     identityUnsettled: [...unsettled.keys()].some((f) => IDENTITY.has(f)),
     resolution: report.resolution,
     casts: report.casts,
+    astro: { anglesUnsettled: true, moonSigns },
   };
 }
 
@@ -280,8 +351,10 @@ export function unsettledGates(r: Reliability): Set<number> {
  *
  *   1  gates, lines, centres, channels, variables
  *   2  centres say which channels define them; empty spans dropped
+ *   3  the astrology layer: angles, houses and the Moon's sign
+ *   4  spans that cover no time borrow a minute instead of being shown
  */
-export const SCAN_VERSION = 2;
+export const SCAN_VERSION = 4;
 
 /**
  * What the scan was run against.
@@ -310,6 +383,7 @@ export interface StoredScan {
   resolution?: WindowReport["resolution"];
   casts: number;
   unsettled: Unsettled[];
+  astro?: AstroReliability;
 }
 
 export function toStored(r: Reliability): StoredScan {
@@ -318,6 +392,7 @@ export function toStored(r: Reliability): StoredScan {
     identityUnsettled: r.identityUnsettled,
     resolution: r.resolution, casts: r.casts,
     unsettled: [...r.unsettled.values()],
+    astro: r.astro,
   };
 }
 
@@ -327,5 +402,6 @@ export function fromStored(s: StoredScan): Reliability {
     unsettled: new Map(s.unsettled.map((u) => [u.field, u])),
     identityUnsettled: s.identityUnsettled,
     resolution: s.resolution, casts: s.casts,
+    astro: s.astro,
   };
 }

@@ -105,6 +105,9 @@ export interface WindowReport {
   changes: Change[];
   /** True when nothing at all moves, which is the reassuring answer. */
   steady: boolean;
+  /** The UTC instant the window starts at, so the astrology layer can be read
+   *  across the same hours without casting the chart again. */
+  startUtc: string;
   /**
    * The finest rung every body was fully checked at. A line is always
    * guaranteed; colour and tone are reached when the sky that day allows it
@@ -233,6 +236,31 @@ function arcBetween(a: number, b: number): number {
   return d;
 }
 
+/**
+ * Make a run of spans contiguous, and give every one of them real time.
+ *
+ * A value holds right up until the next one starts, so ending a span at the
+ * last cast that saw it would leave gaps, and a gap reads as "we do not know".
+ *
+ * The second half matters at the edges. A crossing found at the final minute of
+ * the window produced a span from 23:59 to 23:59: no time at all, shown as a
+ * second answer. Kaycee, 2026-09-12, looking at exactly that: "listing Defined
+ * twice makes it appear that there aren't actually differences." Such a span
+ * borrows a minute from the one before it, which is honest to a scan that
+ * reports to the minute.
+ */
+function tidy(spans: Span[], endTime: string): void {
+  for (let i = 0; i < spans.length - 1; i++) spans[i].to = spans[i + 1].from;
+  spans[spans.length - 1].to = endTime;
+  for (let i = spans.length - 1; i > 0; i--) {
+    if (spans[i].from !== spans[i].to) continue;
+    const borrowed = toClock(toMinutes(spans[i].to) - 1);
+    if (toMinutes(borrowed) <= toMinutes(spans[i - 1].from)) continue;
+    spans[i].from = borrowed;
+    spans[i - 1].to = borrowed;
+  }
+}
+
 // ── the scan ────────────────────────────────────────────────────────────────
 
 export interface ScanOptions {
@@ -278,6 +306,7 @@ export async function scanWindow(
       from: fromTime, to: toTime, casts,
       moonDegrees: movedDegrees,
       changes: [], steady: true, resolution: "tone",
+      startUtc: a.birth.utcDate,
     };
   }
 
@@ -354,17 +383,7 @@ export async function scanWindow(
       else spans.push({ value, from: toClock(f.mins), to: toClock(f.mins) });
     }
     if (spans.length < 2) continue;
-    // A value holds right up until the next one starts. Ending a span at the
-    // last cast that saw it would leave visible gaps in the timeline, and a
-    // gap reads as "we don't know", which is not what it means.
-    for (let i = 0; i < spans.length - 1; i++) spans[i].to = spans[i + 1].from;
-    spans[spans.length - 1].to = toTime;
-    // A span that starts and ends at the same minute covers no time; it is the
-    // window's own edge showing through, and reads as a second answer.
-    const real = spans.filter((x) => x.from !== x.to);
-    if (real.length < 2) continue;
-    spans.length = 0;
-    spans.push(...real);
+    tidy(spans, toTime);
     found.set(field, {
       field, kind, spans,
       from: spans[0].value, to: spans[spans.length - 1].value,
@@ -385,13 +404,15 @@ export async function scanWindow(
       if (diff(lo.chart, mid.chart).some((d) => d.field === ch.field)) hi = mid; else lo = mid;
     }
     const at = hi.mins > start ? toClock(hi.mins) : undefined;
-    found.set(ch.field, {
-      ...ch, at,
-      spans: [
-        { value: ch.from, from: fromTime, to: at ?? toTime },
-        { value: ch.to, from: at ?? fromTime, to: toTime },
-      ],
-    });
+    const spans: Span[] = [
+      { value: ch.from, from: fromTime, to: at ?? toTime },
+      { value: ch.to, from: at ?? fromTime, to: toTime },
+    ];
+    // The same tidying as above. Without it a change caught at the very last
+    // minute of the window produced a second bullet covering no time at all,
+    // which reads as two answers where there is one crossing.
+    tidy(spans, toTime);
+    found.set(ch.field, { ...ch, at: spans[1]?.from ?? at, spans });
   }
 
   return {
@@ -400,5 +421,6 @@ export async function scanWindow(
     changes: [...found.values()],
     steady: false,
     resolution,
+    startUtc: a.birth.utcDate,
   };
 }
