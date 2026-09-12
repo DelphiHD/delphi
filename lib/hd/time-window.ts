@@ -220,41 +220,6 @@ function arcBetween(a: number, b: number): number {
   return d;
 }
 
-/**
- * Ask for many casts without tripping the provider's quota.
- *
- * Found by measurement on 2026-09-12: sixteen at once is fine, but a run of
- * scans back to back earns a 429 and the provider refuses the rest. Firing
- * every cast the instant we know we want it is therefore a way to hand
- * somebody a broken chart on a busy afternoon.
- *
- * So: a few in flight at a time, and a refusal waits and asks again rather
- * than failing. Kept here rather than in lib/mybodygraph, because changing how
- * every caller in the system talks to the provider is Kaycee's decision, not a
- * side effect of the scan wanting to be polite.
- */
-const AT_ONCE = 6;
-
-async function pooled<T>(jobs: (() => Promise<T>)[]): Promise<T[]> {
-  const out = new Array<T>(jobs.length);
-  let next = 0;
-  const worker = async () => {
-    while (next < jobs.length) {
-      const i = next++;
-      for (let attempt = 0; ; attempt++) {
-        try { out[i] = await jobs[i](); break; }
-        catch (e) {
-          const busy = e instanceof Error && e.message.includes("429");
-          if (!busy || attempt >= 4) throw e;
-          await new Promise((r) => setTimeout(r, 400 * 2 ** attempt));
-        }
-      }
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(AT_ONCE, jobs.length) }, worker));
-  return out;
-}
-
 // ── the scan ────────────────────────────────────────────────────────────────
 
 export interface ScanOptions {
@@ -286,7 +251,7 @@ export async function scanWindow(
   };
 
   const start = toMinutes(fromTime), end = toMinutes(toTime);
-  const [a, b] = await pooled([() => cast(fromTime), () => cast(toTime)]);
+  const [a, b] = await Promise.all([cast(fromTime), cast(toTime)]);
 
   // Kept because it is the honest headline for how eventful a day was, and
   // Kaycee's own framing: "some days have more changes than others, it really
@@ -346,11 +311,10 @@ export async function scanWindow(
   }
   const resolution = RUNG_ORDER.filter((r) => covered.has(r)).pop() ?? "gate";
 
-  // All of them together, a few in flight at a time. They do not depend on
-  // each other, so waiting for each in turn would spend somebody's afternoon
-  // on round trips.
+  // All of them together. They do not depend on each other, and lib/mybodygraph
+  // now paces everything it sends, so asking for thirty at once is safe.
   const times = [...want].sort((x, y) => x - y);
-  const charts = await pooled(times.map((mins) => () => cast(toClock(mins))));
+  const charts = await Promise.all(times.map((mins) => cast(toClock(mins))));
   const middles = times.map((mins, i) => ({ mins, chart: charts[i] }));
   const samples = [
     { mins: start, chart: a }, ...middles, { mins: end, chart: b },

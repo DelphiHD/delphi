@@ -57,11 +57,96 @@ for (const [name, gates] of Object.entries(QUARTERS)) {
   for (const g of gates) QUARTER_BY_GATE[g] = name;
 }
 
+/**
+ * Ask bodygraph.com for something, without asking faster than they will answer.
+ *
+ * Measured on 2026-09-12, with cooldowns between each so the readings are not
+ * each other's fault:
+ *
+ *     20 calls at once   all answered, never once asked to wait
+ *     30                 all answered, asked to wait 8 times
+ *     50                 all answered, asked to wait 54 times
+ *     60                 all answered, asked to wait 86 times
+ *     80                 15 lost outright
+ *
+ * So there are two separate jobs here, and doing only the second is what the
+ * first version of this got wrong.
+ *
+ * PACE. Nothing leaves until fewer than twenty calls are outstanding. Below
+ * that line they never push back at all, so the healthy case involves no
+ * waiting, no retrying and no lost charts. This is a ceiling on the whole
+ * process, not per caller: a report run and somebody filling in the form on
+ * the website are the same twenty as far as bodygraph.com is concerned.
+ *
+ * RECOVER. They can still say "not now" for reasons that are theirs and not
+ * ours, and a 5xx means something on their side is briefly unwell. Neither
+ * means the request was wrong; both mean ask again in a moment. Before this,
+ * every one of those reached the caller as a hard failure, which on the free
+ * chart form means a stranger sees an error instead of their chart.
+ *
+ * It gives up. A retry that never stops would hang the site instead of failing
+ * it, which is worse: four attempts over about six seconds, then the same
+ * error the caller would have had anyway, so anything that handled a failure
+ * before still handles it now.
+ *
+ * Kaycee, 2026-09-12, on this living in the shared layer rather than in the
+ * birth-time scan where it started: "ok yes".
+ */
+const RETRY_ON = new Set([429, 500, 502, 503, 504]);
+const ATTEMPTS = 4;
+const AT_ONCE = 20;
+
+/**
+ * How often bodygraph.com has asked us to wait, this process. Worth watching:
+ * if it climbs during an ordinary day, either their limit has moved or ours
+ * has, and the free chart form is the thing that finds out first.
+ */
+export const providerWaits = { asked: 0, recovered: 0, gaveUp: 0 };
+
+let inFlight = 0;
+const queue: (() => void)[] = [];
+
+async function gate<T>(job: () => Promise<T>): Promise<T> {
+  if (inFlight >= AT_ONCE) await new Promise<void>((r) => queue.push(r));
+  inFlight++;
+  try {
+    return await job();
+  } finally {
+    inFlight--;
+    queue.shift()?.();
+  }
+}
+
+async function ask(url: URL, what: string): Promise<Response> {
+  let last: Response | null = null;
+  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+    if (attempt > 0) {
+      // Jittered, so a wave that was refused together does not come back together.
+      const wait = 500 * 2 ** (attempt - 1);
+      await new Promise((r) => setTimeout(r, wait + Math.random() * wait));
+    }
+    const res = await gate(() => fetch(url, { method: "GET" }));
+    if (res.ok) {
+      if (attempt > 0) providerWaits.recovered++;
+      return res;
+    }
+    if (!RETRY_ON.has(res.status)) return res;
+    providerWaits.asked++;
+    last = res;
+  }
+  providerWaits.gaveUp++;
+  // One line per lost call would bury a log; the counter above has the total.
+  if (providerWaits.gaveUp === 1 || providerWaits.gaveUp % 25 === 0) {
+    console.warn(`mybodygraph ${what}: ${providerWaits.gaveUp} call(s) lost to ${last?.status} after ${ATTEMPTS} attempts`);
+  }
+  return last!;
+}
+
 export async function getTimezoneForLocation(query: string): Promise<string> {
   const url = new URL(API_BASE + LOCATIONS_PATH);
   url.searchParams.set("api_key", apiKey());
   url.searchParams.set("query", query);
-  const res = await fetch(url, { method: "GET" });
+  const res = await ask(url, "locations");
   if (!res.ok) {
     throw new Error(`mybodygraph locations failed: ${res.status} ${res.statusText}`);
   }
@@ -106,7 +191,7 @@ export async function getChart(args: GetChartArgs): Promise<Chart> {
   const wantSvg = args.includeChartImage || args.brandedSvg;
   if (wantSvg) url.searchParams.set("design", "delphi");
 
-  const res = await fetch(url, { method: "GET" });
+  const res = await ask(url, "hd-data");
   if (!res.ok) {
     throw new Error(`mybodygraph hd-data failed: ${res.status} ${res.statusText}`);
   }
