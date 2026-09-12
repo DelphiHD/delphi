@@ -63,10 +63,14 @@ export async function chartByToken(token: string): Promise<ChartRecord | null> {
 export function briefFromRecord(r: ChartRecord): {
   id: string; slug: string; name: string;
   birthDate: string; birthTime: string; birthPlace: string; birthTimezone: string;
-  tier: string;
+  tier: string; timeAccuracy: ChartRecord["timeAccuracy"];
 } {
   return {
     tier: r.tier,
+    // Carried, not dropped. Without this the builder cannot tell a birth
+    // certificate from "some time in the afternoon", and draws both with the
+    // same confidence.
+    timeAccuracy: r.timeAccuracy,
     id: r.id,
     slug: r.token,
     name: r.personName,

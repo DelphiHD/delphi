@@ -42,6 +42,10 @@ import { CENTER_GATES, centerOf, type Center } from "@/lib/hd/gate-center";
 import { loadLibraryChunks } from "@/lib/hd/chunks-source";
 import { cacheDir, cacheRoot, tryMkdir } from "@/lib/cache-dir";
 import { chartByToken, briefFromRecord } from "@/lib/hd/chart-record";
+import {
+  reliabilityOf, settled, unsettledChannels, unsettledCenters, unsettledGates,
+  NEEDS_EXACT, VARIABLE_FIELDS, type Reliability,
+} from "@/lib/hd/time-accuracy";
 import { longitudeOf, GATE_RANGES, GATE_ARC_DEGREES, LINE_ARC_DEGREES } from "@/lib/hd/gate-longitude";
 import type { CenterName } from "@/lib/chart/types";
 import { gateName } from "@/lib/hd/gate-names";
@@ -840,9 +844,10 @@ interface ClientCtx {
   channels: Set<string>;        // defined channels, "low-high"
   centers: Set<Center>;         // defined centers
   gates: Set<number>;           // every activated gate, for hanging legs
-  meta: { label: string; value: string }[];
+  meta: { label: string; value: string; field?: string; couldBe?: string[] }[];
   report: ReportText;
-  variables: { key: string; label: string; arrow: "left" | "right"; theme: string; side: "design" | "personality" }[];
+  variables: { key: string; label: string; arrow: "left" | "right"; theme: string;
+    side: "design" | "personality"; unsettled?: boolean; couldBe?: string[] }[];
   acts: { side: "personality" | "design"; planet: string; gate: number; line: number; fix: string;
     color: number; tone: number; base: number }[];
   subtitle: { personality: string[]; design: string[] };
@@ -850,7 +855,24 @@ interface ClientCtx {
   /** Whether this is somebody Kaycee has actually sat down with. Decides
    *  whether the returning-client session is offered. */
   established: boolean;
+  /** What this chart is allowed to claim, given how well the time is known. */
+  reliability: Reliability;
+  /** Drawn, but visibly not settled: true at some hours of the window and not
+   *  others. Kept apart from the sets above so the solid parts of the drawing
+   *  are true whatever hour the person was actually born. */
+  pending: { channels: Set<string>; centers: Set<Center>; gates: Set<number> };
 }
+
+/** "15:00" -> "3:00 PM". The chart speaks the way a person does. */
+function twelveHour(hhmm: string): string {
+  const [h, m] = hhmm.split(":");
+  const hour = Number(h);
+  const suffix = hour < 12 ? "AM" : "PM";
+  const twelve = hour % 12 === 0 ? 12 : hour % 12;
+  return `${twelve}:${m} ${suffix}`;
+}
+
+const capitalise = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 /** "2 / 4" -> "2 / 4 Hermit Opportunist", the way Kaycee names it. */
 function profileWithLines(value: string): string {
@@ -889,6 +911,36 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
   if (!svg || !svg.includes("<svg")) {
     throw new Error(`mybodygraph returned no branded SVG for ${brief.name}.`);
   }
+
+  // How well the birth time is known, and therefore what this chart may claim.
+  // A roster chart has no accuracy on it because every one of those times came
+  // from Kaycee. "I was told the time" runs as exact, on her instruction: the
+  // chart is cast normally and the person is told separately that the exact
+  // time matters. Only "roughly" and "I don't know" are scanned.
+  const accuracy = brief.timeAccuracy ?? "document";
+  const reliability = (accuracy === "approximate" || accuracy === "unknown")
+    ? await reliabilityOf({
+        accuracy, birthDate: brief.birthDate, birthTime: brief.birthTime,
+        timezone: tz, locationQuery: placeForLookup(brief),
+      })
+    : settled(accuracy);
+
+  // Option 2, Kaycee's choice: solid means true at every hour of the window.
+  // Anything that comes and goes moves out of the solid sets and into `pending`
+  // so it can be drawn as visibly unfinished rather than quietly wrong. A
+  // channel that is absent at the hour we cast for but present at others also
+  // belongs there, which is why this adds as well as removes.
+  const pendingParts = {
+    channels: unsettledChannels(reliability),
+    centers: new Set([...unsettledCenters(reliability)] as Center[]),
+    gates: unsettledGates(reliability),
+  };
+  const settledChannels = new Set(chart.channels.map((c) => pairKey(c.gates[0], c.gates[1])));
+  for (const id of pendingParts.channels) settledChannels.delete(id);
+  const settledCenters = new Set(
+    chart.centers.filter((c) => c.defined).map((c) => CENTER_FROM_API[c.name]),
+  );
+  for (const key of pendingParts.centers) settledCenters.delete(key);
   // built from the 13-planet set below, not the raw response: Chiron and Lilith
   // are not part of the placements Kaycee works from, so they must not light a
   // gate or hang a leg
@@ -924,6 +976,10 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
   );
 
   const gates = new Set<number>(acts.map((a) => a.gate));
+  // A planet that only shifts a line stays on the same gate and the drawing is
+  // unaffected; one that crosses into a different gate takes its leg with it,
+  // so both gates are pending and neither is drawn as settled.
+  for (const g of pendingParts.gates) gates.delete(g);
 
   return {
     slug: brief.slug,
@@ -936,11 +992,11 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
     },
       /** the raw design instant, for reading the design side's astrology */
       designUtc: chart.birth.designUtcDate,
-    channels: new Set(chart.channels.map((c) => pairKey(c.gates[0], c.gates[1]))),
-    centers: new Set(
-      chart.centers.filter((c) => c.defined).map((c) => CENTER_FROM_API[c.name]),
-    ),
+    channels: settledChannels,
+    centers: settledCenters,
     gates,
+    reliability,
+    pending: pendingParts,
     // Kaycee's written synthesis, and only for a chart entitled to it. Reports
     // are found on disk by the person's name, so a portal chart for somebody who
     // happens to share a name with a client would have picked theirs up. What
@@ -953,25 +1009,39 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
       : emptyReports(),
     // the four PHS arrows, in the clusters the report cover uses: Design red on
     // the left, Personality black on the right
+    // The four arrows turn over on colour and tone, which move every seventeen
+    // minutes and every three. Kaycee, 2026-09-12: "I think we should do that
+    // for the variables in all cases of unknown birth times." So these go
+    // whether or not the scan happened to catch them moving: catching nothing
+    // across a sample is luck, not evidence.
     variables: [
-      { key: "determination", label: "Determination", side: "design",
+      { key: "determination", label: "Determination", side: "design" as const,
         arrow: chart.variables.determination.arrow, theme: chart.variables.determination.theme },
-      { key: "environment", label: "Environment", side: "design",
+      { key: "environment", label: "Environment", side: "design" as const,
         arrow: chart.variables.environment.arrow, theme: chart.variables.environment.theme },
-      { key: "motivation", label: "Motivation", side: "personality",
+      { key: "motivation", label: "Motivation", side: "personality" as const,
         arrow: chart.variables.motivation.arrow, theme: chart.variables.motivation.theme },
-      { key: "perspective", label: "Perspective", side: "personality",
+      { key: "perspective", label: "Perspective", side: "personality" as const,
         arrow: chart.variables.perspective.arrow, theme: chart.variables.perspective.theme },
-    ],
+    ].map((v) => reliability.exact
+      ? v
+      : { ...v, unsettled: true, couldBe: reliability.unsettled.get(v.label)?.couldBe ?? [] }),
+    // A field the scan watched move is not given a value. Kaycee, 2026-09-12:
+    // "Is it possible to return some kind of message like Exact Birth Time
+    // Required... in those fields if it changes?" What it could instead be is
+    // on the field itself, a click away, so the chart stays uncluttered.
     meta: [
-      { label: "Profile", value: profileWithLines(chart.profile.value) },
-      { label: "Type", value: chart.type.value },
-      { label: "Strategy", value: chart.strategy.value },
-      { label: "Authority", value: chart.authority.value },
-      { label: "Definition", value: chart.definition.value },
-      { label: "Frequencies", value: `${chart.signature.value} / ${chart.notSelfTheme.value}` },
-      { label: "Incarnation Cross", value: chart.incarnationCross.value },
-    ],
+      { label: "Profile", value: profileWithLines(chart.profile.value), field: "Profile" },
+      { label: "Type", value: chart.type.value, field: "Type" },
+      { label: "Strategy", value: chart.strategy.value, field: "Strategy" },
+      { label: "Authority", value: chart.authority.value, field: "Authority" },
+      { label: "Definition", value: chart.definition.value, field: "Definition" },
+      { label: "Frequencies", value: `${chart.signature.value} / ${chart.notSelfTheme.value}`, field: "Signature" },
+      { label: "Incarnation Cross", value: chart.incarnationCross.value, field: "Incarnation Cross" },
+    ].map((m) => {
+      const u = reliability.unsettled.get(m.field);
+      return u ? { ...m, value: NEEDS_EXACT, couldBe: u.couldBe } : m;
+    }),
     outDir: clientOutputDir(brief),
   };
 }
@@ -2160,8 +2230,14 @@ function variableArrows(d: SceneData): string {
     const pts = v.arrow === "left"
       ? `${x + size},${y - size} ${x + size},${y + size} ${x - size},${y}`
       : `${x - size},${y - size} ${x - size},${y + size} ${x + size},${y}`;
-    return `<polygon class="varrow" data-var="${v.key}" data-label="${esc(v.label)}" ` +
-      `data-theme="${esc(v.theme)}" data-arrow="${v.arrow}" points="${pts}" fill="${color}"></polygon>`;
+    // An arrow that cannot be claimed is drawn as an outline. It still points
+    // the way the cast says, because leaving it out would look like an answer
+    // too, and an empty space says nothing about why it is empty.
+    return `<polygon class="varrow${v.unsettled ? " pendarrow" : ""}" data-var="${v.key}" data-label="${esc(v.label)}" ` +
+      `data-theme="${esc(v.theme)}" data-arrow="${v.arrow}" points="${pts}" ` +
+      (v.unsettled
+        ? `fill="none" stroke="${color}" stroke-width="1.6" stroke-dasharray="4 3"`
+        : `fill="${color}"`) + `></polygon>`;
   }).join("") + `</g>`;
 }
 
@@ -2410,7 +2486,16 @@ function buildCanvas(
           `<tspan fill="${personInk(PERSON_B, "personality")}">${esc(d.connection.b.name)}</tspan>` +
           `</text>`
         : `<text x="${r2(OX + LY.coreW / 2)}" y="58" text-anchor="middle" font-size="27" font-weight="600" ` +
-          `letter-spacing=".02em" fill="${skin.ink}">${esc(d.client.name)}</text>`)
+          `letter-spacing=".02em" fill="${skin.ink}">${esc(d.client.name)}</text>` +
+          // Kaycee, 2026-09-12: "We should also make it clear what time we are
+          // using for the estimate for each day segment." One line, clickable
+          // for the rest, so the chart says it without explaining itself.
+          (d.client.reliability.window
+            ? `<text class="castline" x="${r2(OX + LY.coreW / 2)}" y="79" text-anchor="middle" ` +
+              `font-size="12" letter-spacing=".08em" fill="#845095">` +
+              `${esc(capitalise(d.client.reliability.window.label))} &#183; cast for ` +
+              `${esc(twelveHour(d.client.reliability.window.castFor))} &#183; dashed is not settled</text>`
+            : ""))
     : `<text x="${OX + 52}" y="60" font-size="25" font-weight="600" letter-spacing=".02em" ` +
       `fill="${skin.ink}">The Nine Centers and the Flow to the Throat</text>` +
       `<text x="${OX + 52}" y="86" font-size="13" fill="${skin.muted}">` +
@@ -2567,7 +2652,25 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
             report: d.client!.report.props[m.label.toLowerCase().replace(/^incarnation cross$/, "cross")] ?? "",
             wide: /cross|frequencies/i.test(m.label),
           })),
-          defined: [...d.client.channels], centers: [...d.client.centers] }
+          defined: [...d.client.channels], centers: [...d.client.centers],
+          // Option 2: solid means true at every hour of the window. These are
+          // the parts that come and go, drawn as visibly unfinished so nothing
+          // on the picture is ever wrong, only visibly pending.
+          pending: {
+            channels: [...d.client.pending.channels],
+            centers: [...d.client.pending.centers],
+            gates: [...d.client.pending.gates],
+          },
+          time: {
+            exact: d.client.reliability.exact,
+            accuracy: d.client.reliability.accuracy,
+            window: d.client.reliability.window,
+            identityUnsettled: d.client.reliability.identityUnsettled,
+            unsettled: [...d.client.reliability.unsettled.values()].map((u) => ({
+              field: u.field, kind: u.kind, couldBe: u.couldBe,
+              spans: u.spans ?? [],
+            })),
+          } }
       : null,
     channels: d.channels.map((c) => ({
       key: c.key, name: c.name, circuit: c.circuit,
@@ -2576,6 +2679,7 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
       cFrom: c.source, cTo: c.target,
       srcGate: c.srcGate, tgtGate: c.tgtGate, keynote: c.keynote, type: c.type,
       live: !d.client || d.client.channels.has(c.key),
+      pending: !!d.client && d.client.pending.channels.has(c.key),
       report: d.client?.report.channels[c.key] ?? "",
     })),
     centers: (Object.keys(CENTER_SVG_ID) as Center[]).map((c) => {
@@ -2586,9 +2690,10 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
       const defined = d.client ? d.client.centers.has(c) : null;
       const carries = d.client ? [...d.client.gates].some((g) => centerOf(g) === c) : false;
       const state = defined === null ? null : defined ? "defined" : carries ? "undefined" : "open";
+      const pending = !!d.client && d.client.pending.centers.has(c);
       return {
         id: c, name: CENTER_DISPLAY[c], fns: d.fn[c], biology: d.biology[c],
-        defined, state,
+        defined, state, pending,
         stateLabel: state ? state.charAt(0).toUpperCase() + state.slice(1) : "",
         stateText: state ? d.states[c][state] : "",
         // the tooltip is 250px wide, so the hover gets the opening sentences and
@@ -2865,6 +2970,42 @@ svg.canvas:not(.plain) .leg.lit rect { fill:${HL_GOLD} !important; }
 svg.canvas.plain .pleg.lit { fill:${HL_GOLD} !important; }
 .cshape.lit { stroke:#ffcc00 !important; stroke-width:3.4 !important;
   filter: drop-shadow(0 0 3px rgba(255,204,0,.85)); }
+/* NOT SETTLED
+   Kaycee, 2026-09-12: "2 seems most inline with our educational purpose."
+   Solid means true at every hour of this person's birth window. Anything that
+   comes and goes is drawn open, in the colour it would have had, so the picture
+   is never wrong and a beginner can see exactly which parts of themselves the
+   missing hour is costing them. Open, not faded: a faded centre reads as a
+   weaker version of defined, which is the wrong idea entirely. */
+.cshape.pending { fill:#ffffff !important;
+  stroke:var(--pend,#845095) !important; stroke-width:2.2 !important;
+  stroke-dasharray:7 5; stroke-linecap:round; }
+.chgrp.pending path, .chgrp.pending polygon, .chgrp.pending rect,
+.pleg.pending {
+  fill:none !important; stroke:var(--pend,#2b2b33) !important;
+  stroke-width:1.6 !important; stroke-dasharray:6 4; }
+.gdisc.pending { fill:none !important; stroke:#2b2b33 !important;
+  stroke-width:1.2 !important; stroke-dasharray:3 3; }
+/* A withheld field in the header. The value sits in its own span so it can be
+   styled, which means it lands on the rule that shrinks and capitalises the
+   label beside it: every property below is undoing that, deliberately. */
+.prop .needtime { display:inline; text-transform:none !important; letter-spacing:0 !important;
+  font-size:12px !important; font-weight:500 !important; font-style:italic;
+  color:#845095 !important; opacity:1 !important; }
+.prop .pendmark { display:inline-block !important; text-transform:none !important;
+  font-size:10px !important; letter-spacing:.2px !important; }
+.couldbe { margin:6px 0 0; padding:0 0 0 16px; }
+.couldbe li { margin:3px 0; }
+.couldbe .whn { display:block; font-size:11px; opacity:.6; letter-spacing:.02em; }
+.castline { cursor:pointer; }
+.castline:hover { fill:#5d3569 !important; }
+.pendarrow { cursor:pointer; }
+/* the legend badge and the fields that had to withhold a value */
+.pendmark { display:inline-block; margin-left:6px; padding:1px 6px; border-radius:9px;
+  border:1px dashed #845095; color:#845095; font-size:10px; font-weight:700;
+  letter-spacing:.4px; cursor:pointer; vertical-align:middle; }
+.pendmark:hover { background:#845095; color:#fff; }
+.needtime { color:#845095; font-style:italic; }
 /* and the wheel echoes it */
 .mhi { animation:hlpulse 1.2s ease-in-out infinite; }
 .mandala [data-gatecell].lit path { stroke:#9c7415 !important; stroke-width:2.6 !important; }
@@ -3474,9 +3615,26 @@ var metaBy = {};
 // client header
 if (DATA.client) {
   document.getElementById('pmeta').innerHTML = DATA.client.meta.map(function (m) {
+    // A field the scan watched move carries no value, and says so in a way that
+    // cannot be mistaken for one. What it could be is a click away rather than
+    // on the page: Kaycee, 2026-09-12, "the dashboard and chart page stay
+    // uncluttered."
+    var body = m.couldBe
+      ? '<span class="needtime">' + esc(m.value) + '</span>' +
+        (m.couldBe.length ? '<span class="pendmark" data-couldbe="' + m.key + '">could be ' + m.couldBe.length + '</span>' : '')
+      : m.value;
     return '<div class="prop' + (m.report ? ' has' : '') + (m.wide ? ' wide' : '') +
-      '" data-key="' + m.key + '"><span>' + m.label + '</span> ' + m.value + '</div>';
+      (m.couldBe ? ' unsettled' : '') +
+      '" data-key="' + m.key + '"><span>' + m.label + '</span> ' + body + '</div>';
   }).join('');
+  // what a withheld field could have been, and when each one applies
+  document.getElementById('pmeta').addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('.pendmark') : null;
+    if (!b) return;
+    e.stopPropagation();
+    var m = metaBy[b.dataset.couldbe];
+    if (m) openCard(b, couldBeHtml(m.label, m.field, m.couldBe));
+  });
   metaBy = {}; DATA.client.meta.forEach(function (m) { metaBy[m.key] = m; });
   document.getElementById('hangrow').hidden = false;
   document.getElementById('placements').hidden = false;
@@ -3576,6 +3734,48 @@ if (DATA.client) {
       el.classList.toggle('in-isle', !!col);
     });
   };
+  // Draw the parts that depend on the hour as open rather than filled. Runs
+  // once, off the scan that was done when the chart was built: nothing here
+  // decides what is settled, it only draws the answer.
+  (function markPending() {
+    var P = (DATA.client && DATA.client.pending) || null;
+    if (!P) return;
+    var chs = {}, ctrs = {}, gts = {};
+    P.channels.forEach(function (k) { chs[k] = 1; });
+    P.centers.forEach(function (k) { ctrs[k] = 1; });
+    P.gates.forEach(function (g) { gts[g] = 1; });
+    [].forEach.call(document.querySelectorAll('.cshape'), function (el) {
+      if (!ctrs[el.dataset.center]) return;
+      el.classList.add('pending');
+      if (el.dataset.on) el.style.setProperty('--pend', el.dataset.on);
+    });
+    [].forEach.call(document.querySelectorAll('.chgrp'), function (g) {
+      if (chs[g.dataset.ch]) g.classList.add('pending');
+    });
+    [].forEach.call(document.querySelectorAll('.pleg, .gdisc'), function (el) {
+      if (gts[el.dataset.gate]) el.classList.add('pending');
+    });
+  })();
+
+  // the line under the name explains the dashes, once, on request
+  [].forEach.call(document.querySelectorAll('.castline'), function (el) {
+    el.addEventListener('click', function (e) {
+      // The page closes any open card on a document click, so without this the
+      // card opens and shuts inside the same gesture and looks like nothing.
+      e.stopPropagation();
+      var T = DATA.client && DATA.client.time; if (!T || !T.window) return;
+      var names = T.unsettled.map(function (u) { return u.field; });
+      openCard(el,
+        '<b>Your birth window</b><span class="kn">' + esc(capFirst(T.window.label)) + '</span>' +
+        '<div class="body"><p>This chart was cast for ' + esc(clock12(T.window.castFor)) +
+        ', the middle of ' + esc(T.window.label) + '. Anything drawn with a dashed line is true for part of ' +
+        esc(T.window.label) + ' and not the rest, so it is shown open rather than filled in.</p>' +
+        '<p>Everything drawn solid is yours whatever hour you were born.</p></div>' +
+        '<div class="body"><p><b>Not settled without an exact time</b></p><ul class="couldbe"><li>' +
+        names.map(esc).join('</li><li>') + '</li></ul></div>');
+    });
+  });
+
   var bIsl = document.getElementById('tIslands');
   bIsl.onclick = function () { bIsl.classList.toggle('on'); paintIslands(bIsl.classList.contains('on')); };
   var bBr = document.getElementById('tBridges');
@@ -6527,7 +6727,78 @@ function prose(text) {
       : '<p>' + esc(p) + '</p>';
   }).join('') + '</div>';
 }
+// What a field could have been, and when. One card, used by the header, the
+// arrows and the bodygraph, so a withheld field says the same thing wherever
+// somebody meets it.
+function couldBeHtml(label, field, couldBe) {
+  var T = (DATA.client && DATA.client.time) || null;
+  var w = T && T.window;
+  var u = T && T.unsettled.filter(function (x) { return x.field === field; })[0];
+  var out = '<b>' + esc(label) + '</b>' +
+    '<span class="kn">Exact Birth Time Required</span>';
+  if (w) {
+    out += '<div class="body"><p>This chart was cast for ' + esc(clock12(w.castFor)) +
+      ', the middle of ' + esc(w.label) + '. Across ' + esc(w.label) +
+      ' this is not one answer.</p></div>';
+  }
+  if (couldBe && couldBe.length) {
+    out += '<div class="body"><p><b>What it could be</b></p><ul class="couldbe">';
+    for (var i = 0; i < couldBe.length; i++) {
+      var when = '';
+      if (u && u.spans) {
+        for (var j = 0; j < u.spans.length; j++) {
+          if (u.spans[j].value === couldBe[i]) {
+            when = clock12(u.spans[j].from) + ' to ' + clock12(u.spans[j].to);
+            break;
+          }
+        }
+      }
+      out += '<li>' + esc(couldBe[i]) + (when ? '<span class="whn">' + esc(when) + '</span>' : '') + '</li>';
+    }
+    out += '</ul></div>';
+  } else {
+    out += '<div class="body"><p>This one turns over faster than any birth window can pin down, so there is no short list to choose from.</p></div>';
+  }
+  // Kaycee's own approved wording, the same as on the form that made this
+  // chart: the short certificate most people keep does not carry the time, the
+  // long form does. Written here rather than invented, so somebody does not
+  // meet two different explanations on the same journey.
+  out += '<div class="body"><p>The short birth certificate most people keep does not carry the time, but the long form does, and nearly anyone can request one from the office of vital records where they were born. Ask for the <em>long form</em>, sometimes called the vault copy.</p>' +
+    '<p><a href="https://cal.com/delphihumandesign/birth-time-rectification" target="_blank" rel="noreferrer">Book A Rectification Session</a></p></div>';
+  return out;
+}
+
+// Why a thing on the drawing is dashed, with the hours each state covers.
+// Short on purpose: it sits inside a card that already has its own content.
+function pendingNote(field) {
+  var T = (DATA.client && DATA.client.time) || null;
+  if (!T || !T.window) return '';
+  var u = T.unsettled.filter(function (x) { return x.field === field; })[0];
+  var when = '';
+  if (u && u.spans && u.spans.length) {
+    when = '<ul class="couldbe"><li>' + u.spans.map(function (s) {
+      return esc(s.value) + '<span class="whn">' + clock12(s.from) + ' to ' + clock12(s.to) + '</span>';
+    }).join('</li><li>') + '</li></ul>';
+  }
+  return '<span class="kn">Not settled without an exact birth time</span>' +
+    '<div class="body"><p>Drawn open because this depends on the hour. ' +
+    'The chart was cast for ' + esc(clock12(T.window.castFor)) + ', the middle of ' +
+    esc(T.window.label) + '.</p>' + when + '</div>';
+}
+
+function capFirst(t) { return String(t || '').charAt(0).toUpperCase() + String(t || '').slice(1); }
+
+// "15:00" -> "3:00 PM", so the chart speaks the way a person does.
+function clock12(hhmm) {
+  var bits = String(hhmm || '').split(':');
+  var h = Number(bits[0]), m = bits[1] || '00';
+  var ap = h < 12 ? 'AM' : 'PM';
+  var h12 = h % 12; if (h12 === 0) h12 = 12;
+  return h12 + ':' + m + ' ' + ap;
+}
+
 function varHtml(v) {
+  if (v.unsettled) return couldBeHtml(v.label, v.label, v.couldBe || []);
   return '<b>' + esc(v.label) + '</b>' +
     '<span class="kn">' + esc(v.theme) + '</span>' +
     tags([{ text: v.side === 'design' ? 'Design' : 'Personality',
@@ -6606,7 +6877,8 @@ function propHtml(m) {
 
 function chanHtml(c) {
   return '<b>' + esc(c.name) + '</b>' +
-    (DATA.client && !c.live ? '<span class="meta">Not defined in this chart.</span>' : '') +
+    (c.pending ? pendingNote('Channel ' + c.key) : '') +
+    (DATA.client && !c.live && !c.pending ? '<span class="meta">Not defined in this chart.</span>' : '') +
     (c.keynote ? '<span class="kn">' + esc(c.keynote) + '</span>' : '') +
     tags([{ text: c.circuitName, bg: circColor[c.circuit] }, c.type ? { text: c.type } : null]) +
     '<span class="meta">Gate ' + c.srcGate + ' in the ' + esc(c.from) + ' feeds gate ' + c.tgtGate +
@@ -6614,16 +6886,22 @@ function chanHtml(c) {
 }
 function ctrHtml(k) {
   var t = k.fns.map(function (f) { return { text: f, bg: fnColor[f] }; });
-  if (k.stateLabel) t.push({ text: k.stateLabel });
+  // An unsettled centre must not wear the label of the hour it happened to be
+  // cast at, and must not be read the description that goes with it. Somebody
+  // whose Sacral is defined for half their window would otherwise be handed the
+  // undefined Sacral reading in full, which is a worse answer than no answer.
+  if (k.pending) t.push({ text: 'Not settled', bg: '#845095' });
+  else if (k.stateLabel) t.push({ text: k.stateLabel });
   var extra = '';
-  if (k.state && k.state !== 'defined' && k.notSelf) {
+  if (!k.pending && k.state && k.state !== 'defined' && k.notSelf) {
     extra += '<span class="meta"><i>Not-self theme:</i> ' + esc(k.notSelf) + '</span>';
   }
   // their own reading first when this chart has one, Kaycee's general text for
   // the state otherwise, so a center always says something
   return '<b>' + esc(k.name) + '</b>' + tags(t) +
+    (k.pending ? pendingNote(k.name + ' centre') : '') +
     (k.biology ? '<span class="meta">' + esc(k.biology) + '</span>' : '') + extra +
-    prose(k.report || k.stateText);
+    prose(k.pending ? k.report : (k.report || k.stateText));
 }
 function gateHtml(p) {
   var sideName = p.side === 'design' ? 'Design' : 'Personality';
@@ -6759,7 +7037,9 @@ document.addEventListener('mousemove', function (e) {
   if (va && varBy[va.dataset.var]) {
     var v = varBy[va.dataset.var];
     hot(null); litGate(null); markRows(null);
-    showTip(e, '<b>' + esc(v.label) + '</b>' + esc(v.theme) + ' &middot; ' + esc(v.arrow) + ' arrow');
+    showTip(e, '<b>' + esc(v.label) + '</b>' + (v.unsettled
+      ? '<span style="color:#845095">Exact Birth Time Required</span>'
+      : esc(v.theme) + ' &middot; ' + esc(v.arrow) + ' arrow'));
     return;
   }
   var mp = e.target.closest ? e.target.closest('.mandala [data-planet]') : null;
@@ -6838,10 +7118,10 @@ document.addEventListener('mousemove', function (e) {
   if (ct && ctrByID[ct.dataset.center]) {
     var k = ctrByID[ct.dataset.center];
     hot(null); litGate(gatesInCenter(ct.dataset.center)); markCenter(ct.dataset.center); markRows(ct.dataset.center);
-    showTip(e, '<b>' + esc(k.name) + (k.stateLabel ? ' &middot; ' + k.stateLabel : '') + '</b>' +
+    showTip(e, '<b>' + esc(k.name) + (k.pending ? ' &middot; Not settled' : k.stateLabel ? ' &middot; ' + k.stateLabel : '') + '</b>' +
       '<span style="opacity:.68">' + k.fns.join(' + ') + '</span>' +
       (k.stateShort ? '<span class="tipbody">' + esc(k.stateShort) + '</span>' : ''));
-    show('<b>' + esc(k.name) + (k.stateLabel ? ' &middot; ' + k.stateLabel : '') +
+    show('<b>' + esc(k.name) + (k.pending ? ' &middot; Not settled' : k.stateLabel ? ' &middot; ' + k.stateLabel : '') +
       '</b><span class="meta">' + k.fns.join(' + ') +
       (k.biology ? '<br>' + esc(k.biology) : '') + '</span>' + prose(k.stateText));
     return;

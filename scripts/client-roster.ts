@@ -26,6 +26,10 @@ export interface ClientBrief {
    *  exists so a small town still prints on the client's own chart instead of
    *  being quietly replaced by the nearest city. */
   lookupPlace?: string;
+  /** How well the birth time is known. Absent on the roster, where every time
+   *  came from Kaycee and is treated as exact. Set on a chart made through the
+   *  website, where a stranger may only know the part of the day. */
+  timeAccuracy?: "document" | "told" | "approximate" | "unknown";
 }
 
 /** The place to ASK the chart provider about, which is not always the place
