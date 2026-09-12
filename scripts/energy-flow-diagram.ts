@@ -2864,6 +2864,10 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
               field: u.field, kind: u.kind, couldBe: u.couldBe,
               spans: u.spans ?? [],
             })),
+            // What the wheel may claim: the angles and the house ring are never
+            // settled without an exact time, and the Moon is the one planet
+            // that can cross a sign inside a birth window.
+            astro: d.client.reliability.astro ?? null,
           } }
       : null,
     channels: d.channels.map((c) => ({
@@ -3221,6 +3225,14 @@ svg.canvas.plain .pleg.lit { fill:${HL_GOLD} !important; }
 .mandala [data-gatecell].pending path, .mandala [data-hex].pending {
   stroke:#845095 !important; stroke-width:1.6 !important; stroke-dasharray:3 3; }
 .gateband.pending { stroke:#845095 !important; stroke-dasharray:3 3; }
+/* the wheel's angles and houses, drawn open for the same reason the bodygraph's
+   centres are: they depend entirely on the hour */
+.astro .angle.pending { fill:#845095 !important; opacity:.45; }
+.astro .hnum.pending { fill:#845095 !important; opacity:.42; }
+.astro .cusp.pending { stroke:#845095 !important; stroke-dasharray:4 4; opacity:.5 !important; }
+.astro .housesector.pending { opacity:.35 !important; }
+.astro .angle.pending, .astro .hnum.pending, .astro [data-aplanet].pending { cursor:pointer; }
+.astro [data-aplanet].pending { fill:#845095 !important; }
 /* a placement whose planet lands on a different gate at a different hour */
 .prow.pending text { font-style:italic; }
 .prow.pending rect:first-child { stroke:#845095; stroke-width:1; stroke-dasharray:3 3; }
@@ -4146,6 +4158,28 @@ if (DATA.client) {
       var g = el.dataset.gatecell || el.dataset.hex || el.dataset.gate;
       if (gts[g]) el.classList.add('pending');
     });
+    // THE WHEEL
+    //
+    // Measured on 2026-09-12: across a single day the Ascendant runs the whole
+    // way round the zodiac, and the Midheaven with it. Every house cusp hangs
+    // off the Ascendant, so every planet's house goes too. The planets
+    // themselves hold: their signs are the same all day and the aspects between
+    // them are planet to planet. Kaycee, 2026-09-12: "1- yes, 2-let's handle it
+    // the same." So the angles and the house ring are drawn open and everything
+    // else on the wheel stays as it is.
+    var A = (DATA.client.time && DATA.client.time.astro) || null;
+    if (A && A.anglesUnsettled) {
+      [].forEach.call(document.querySelectorAll(
+        '.astro .angle[data-angle], .astro .hnum[data-house], .astro .cusp[data-cusp], .astro .housesector[data-hsector]'
+      ), function (el) { el.classList.add('pending'); });
+    }
+    // the Moon is the one planet that can change sign inside a window
+    if (A && A.moonSigns && A.moonSigns.length > 1) {
+      [].forEach.call(document.querySelectorAll('.astro [data-aplanet="Moon"]'), function (el) {
+        el.classList.add('pending');
+      });
+    }
+
     // and the placement rows, so a planet that lands on two different gates
     // across the window is not read as one answer
     var movers = {};
@@ -6451,6 +6485,9 @@ if (DATA.client) {
           if (!hh) { tip.hidden = true; return; }
           showTip(e, '<b>' + esc(hh.name) + '</b>' +
             '<span class="pill house">' + esc(hh.group) + '</span>' +
+            (t.classList.contains('pending')
+              ? '<span style="color:#845095">Exact Birth Time Required</span>'
+              : '') +
             '<br><span style="opacity:.78">' + esc(hh.blurb) + '</span>');
           return;
         }
@@ -6459,7 +6496,11 @@ if (DATA.client) {
           e.stopPropagation();
           var aa = (DATA.angles || {})[an];
           if (!aa) { tip.hidden = true; return; }
-          showTip(e, '<b>' + esc(aa[0]) + '</b><span style="opacity:.78">' + esc(aa[1]) + '</span>');
+          showTip(e, '<b>' + esc(aa[0]) + '</b>' +
+            (t.classList.contains('pending')
+              ? '<span style="color:#845095">Exact Birth Time Required</span>'
+              : '') +
+            '<span style="opacity:.78">' + esc(aa[1]) + '</span>');
           return;
         }
         // the mandala's own planet handler sits further up and would answer for
@@ -6483,10 +6524,23 @@ if (DATA.client) {
             t.getAttribute('data-person'));
           if (!pl) { tip.hidden = true; return; }
           var sideNm = t.getAttribute('data-side') === 'design' ? 'Design ' : '';
+          // The house a planet sits in is the Ascendant's answer, so on a chart
+          // whose hour is a guess it is not the planet's to give. The sign and
+          // the degree are, except for the Moon, which can cross a sign inside
+          // a birth window and says which ones it could be.
+          var TW = DATA.client && DATA.client.time;
+          var AST = TW && TW.astro;
+          var housePill = (AST && AST.anglesUnsettled)
+            ? '<span class="pill house">House needs an exact time</span>'
+            : (HOUSE_N[pl.house] ? '<span class="pill house">House ' + HOUSE_N[pl.house] + '</span>' : '');
+          var moonNote = '';
+          if (pl.name === 'Moon' && AST && AST.moonSigns && AST.moonSigns.length > 1) {
+            moonNote = '<span style="color:#845095">Could be ' +
+              AST.moonSigns.map(function (m) { return esc(m.value); }).join(' or ') + '</span>';
+          }
           html = '<b>' + esc(sideNm + (pl.label || pretty(pl.name))) + ' in ' + esc(pl.sign) +
-            ' ' + dg(pl.position) + '</b>' +
-            pill(pl.quality) + pill(pl.element) +
-            (HOUSE_N[pl.house] ? '<span class="pill house">House ' + HOUSE_N[pl.house] + '</span>' : '') +
+            ' ' + dg(pl.position) + '</b>' + moonNote +
+            pill(pl.quality) + pill(pl.element) + housePill +
             (pl.blurb ? '<br><span style="opacity:.72">' + esc(pl.blurb) + '</span>' : '');
         }
         showTip(e, html);

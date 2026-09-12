@@ -553,6 +553,15 @@ const PAGE = /* html */ `<!doctype html>
   .acct.admin  { background:rgba(132,80,149,.14); color:#845095; }
   .acct.client { background:rgba(13,148,136,.14); color:#0b7a70; }
   .acct.test   { background:rgba(241,194,50,.22); color:#7a5c07; }
+  /* the birth time, at a glance. Exact is quiet on purpose: it is the answer
+     she wants most of the time and should not shout. Shaky is the one that
+     changes how a session opens, so it is the one that reads first. */
+  .tm { display:inline-block; padding:2px 9px; border-radius:999px; font-size:11px;
+    font-weight:600; letter-spacing:.04em; white-space:nowrap; }
+  .tm-exact { background:rgba(13,148,136,.12); color:#0b7a70; }
+  .tm-told  { background:rgba(120,120,130,.14); color:#4a4a55; }
+  .tm-rough { background:rgba(241,194,50,.22); color:#7a5c07; }
+  .tm-shaky { background:rgba(210,77,255,.16); color:#8b2fae; }
   table.ptable thead th.on { color:var(--ink); }
   table.ptable tbody tr:hover { background:rgba(132,80,149,.04); }
   table.ptable tr.off td { opacity:.45; text-decoration:line-through; }
@@ -957,6 +966,7 @@ const PAGE = /* html */ `<!doctype html>
     { key: 'chart',   label: 'Chart' },
     { key: 'source',  label: 'How they got here' },
     { key: 'account', label: 'Account' },
+    { key: 'timing',  label: 'Birth Time' },
     { key: 'joined',  label: 'Since' },
     { key: 'reports', label: 'Reports' },
     { key: 'email',   label: 'Email' }
@@ -969,6 +979,16 @@ const PAGE = /* html */ `<!doctype html>
   // What an account is for. Says it plainly so a test or her own admin login is
   // never mistaken for a client. Kaycee, 2026-09-12.
   var ACCOUNT_LABEL = { admin: 'Admin', client: 'Client', test: 'Test' };
+  // How far a birth time can be trusted, at a glance, for the moment somebody
+  // books. "Shaky" is the one worth seeing: the scan found the type, profile or
+  // authority moving inside their window, so the top of their chart is not
+  // settled and the session opens differently. Kaycee, 2026-09-12.
+  var TIMING = {
+    exact: { label: 'Exact', cls: 'tm-exact' },
+    told:  { label: 'Told', cls: 'tm-told' },
+    rough: { label: 'Rough', cls: 'tm-rough' },
+    shaky: { label: 'Rough · type moves', cls: 'tm-shaky' }
+  };
   function fileAs(n) {
     // No regex here. This whole script lives inside a template literal, which
     // eats the backslash, so /\s+/ became /s+/ and every name was split on the
@@ -1015,6 +1035,10 @@ const PAGE = /* html */ `<!doctype html>
           '<td>' + (p.account === 'none'
             ? '<span class="sub">no account</span>'
             : '<span class="acct ' + esc(p.account) + '">' + esc(ACCOUNT_LABEL[p.account] || p.account) + '</span>') + '</td>' +
+          '<td>' + (function () {
+            var t = TIMING[p.timing] || TIMING.exact;
+            return '<span class="tm ' + t.cls + '">' + esc(t.label) + '</span>';
+          })() + '</td>' +
           '<td class="tnum">' + (p.joined ? esc(String(p.joined).slice(0, 10)) : '—') + '</td>' +
           '<td>' + (p.reports === 'both' ? 'Both' : p.reports === 'none' ? '<span class="sub">none</span>' : esc(p.reports)) + '</td>' +
           '<td>' + (p.email ? '<a href="mailto:' + esc(p.email) + '">' + esc(p.email) + '</a>' : '<span class="sub">—</span>') + '</td>' +
@@ -1832,7 +1856,7 @@ createServer((req, res) => {
         // which table it turned up in. Seed is Kaycee's own roster; anything else
         // was made by somebody through the portal.
         const { data: records } = await db.from("charts")
-          .select("token, tier, owner_id, for_email, source");
+          .select("token, tier, owner_id, for_email, source, time_accuracy, time_scan");
         const byToken = new Map((records ?? []).map(
           (r: { token: string }) => [r.token, r as Record<string, unknown>]));
         const { data: accounts } = await db.from("profiles")
@@ -1852,7 +1876,32 @@ createServer((req, res) => {
           chart: string | null; reports: string; revoked: boolean;
           /** admin, client, test, or none when they have no account at all. */
           account: string;
+          /**
+           * How far this chart's birth time can be trusted, for the moment
+           * somebody books a session. Kaycee, 2026-09-12: "i also want some kind
+           * of birth time reliability indicator on the dashboard in case they
+           * book a session so I know if it's exact or not."
+           *
+           * Four answers, and the fourth is the one worth seeing: a rough time
+           * whose scan found the type, profile or authority moving is a chart
+           * whose top line is not settled, and that changes how a session opens.
+           */
+          timing: "exact" | "told" | "rough" | "shaky";
         };
+        /**
+         * Birth certificate, remembered, roughly known, or roughly known and
+         * already shown to move something that matters. The last one reads off
+         * the stored scan, which knows whether the identity fields are among
+         * the casualties; without a stored scan it is simply rough.
+         */
+        const timingOf = (rec?: Record<string, unknown>): Person["timing"] => {
+          const acc = (rec?.time_accuracy as string) ?? "document";
+          if (acc === "document") return "exact";
+          if (acc === "told") return "told";
+          const scan = rec?.time_scan as { identityUnsettled?: boolean } | null;
+          return scan?.identityUnsettled ? "shaky" : "rough";
+        };
+
         const people: Person[] = [];
         for (const c of charts ?? []) {
           const got = reports[c.client_slug] ?? new Set<string>();
@@ -1871,6 +1920,7 @@ createServer((req, res) => {
             reports: got.size === 2 ? "both" : got.size === 1 ? [...got][0] : "none",
             revoked: !!c.revoked_at,
             account: "none",
+            timing: timingOf(rec),
           });
         }
         const named = new Set(people.map((p) => p.name.toLowerCase()));
@@ -1895,6 +1945,8 @@ createServer((req, res) => {
             name: nm, email: a.email ?? null, source: "signup",
             joined: a.created_at ?? null, chart: null, reports: "none", revoked: false,
             account: (a.account_type as string) ?? "client",
+            // an account with no chart has no birth time to judge
+            timing: "exact",
           });
           named.add(String(nm).toLowerCase());
         }
