@@ -412,6 +412,22 @@
   {
    "on": "2026-09-12",
    "what": "'I Was Told The Time' runs as exact. Kaycee, 2026-09-12: 'for I was told the time maybe a popup telling them that exact birth time matters, but run the chart as if it were exact.' Only 'I Know Roughly' and 'I Don't Know It' are scanned, so a told or documented time costs no extra calls at all."
+  },
+  {
+   "on": "2026-09-12",
+   "what": "Every possible answer a withheld field could take carries Kaycee's own short text on hover, so the difference between Generator and Projector can be seen rather than just named. Kaycee, 2026-09-12: 'it would help people see the difference and why it matters... I know I still need to add Delphi Basic columns to some of the databases, it's a top priority of mine, but I'd like the function to be there.' Built to read whatever exists: Gates (all 64) and Profiles (all 12) work today; Type, Authority, Definition, Channels and the variables are wired and start working on the first sync after she writes those columns. Nothing needs changing in the code when she does."
+  },
+  {
+   "on": "2026-09-12",
+   "what": "A remembered time says its piece in a note under the birth time pills rather than in a popup, matching the existing note for a rough time. Kaycee, 2026-09-12: 'maybe not a popup, but the added text underneath the birth time pills like the unknown time.'"
+  },
+  {
+   "on": "2026-09-12",
+   "what": "The note under a rough birth time no longer says Type and Authority are usually reliable. The 24-date measurement had Type changing on three of them, and somebody in that three would have read the reassurance on the form and then met 'Exact Birth Time Required' on their own Type a minute later. New wording: the variables are out of reach, Profile, Ascendant and sometimes Type can change, and the chart says which of their own details are settled."
+  },
+  {
+   "on": "2026-09-12",
+   "what": "The badge on a withheld field reads '2 Possible' rather than 'could be 2'. Kaycee, 2026-09-12."
   }
  ],
  "open": [
@@ -446,13 +462,10 @@
    "what": "bodygraph.com refuses a burst of calls that follows a busy stretch (429). The scan handles it itself by pacing and retrying. Whether that pacing and retry belongs in lib/mybodygraph, where it would protect every other caller too, is a change to a spine module and needs Kaycee's decision."
   },
   {
-   "what": "The note on the chart form says 'Without a time, your Type and Authority are usually still reliable, but your Profile, your Ascendant and all four of your variables may not be.' The 24-date measurement puts Type changing in 3 of 24 and Authority in 2 of 24, so 'usually' is true but somebody whose Type IS unsettled reads that sentence on the form and then meets 'Exact Birth Time Required' on their own Type minutes later. Kaycee's approved copy, so not touched: needs her decision on rewording."
+   "what": "supabase/migrations/20260912_birth_time_scan.sql is written but NOT applied. It cannot be applied from the repo: supabase db push needs the project link, which needs the database password in Tennyson's 1Password. Until it is applied the code works exactly as it does now, scanning every build and logging one warning per chart. Apply by pasting the file into the SQL editor at https://supabase.com/dashboard/project/biufjcapnuzbdowoksnb/sql/new, or by running supabase link then supabase db push once the password is to hand."
   },
   {
-   "what": "The 'told the time' popup Kaycee asked for is not built yet: the chart runs as exact, but nothing yet tells that person the exact time matters."
-  },
-  {
-   "what": "Caching the scan. It costs about 40 calls and 4 seconds and currently re-runs on every build of an approximate-time chart. Storing it on the chart row would fix that and is what the dashboard reliability indicator needs, but it is a schema change and needs Kaycee's decision. Only approximate and unknown charts would ever carry it."
+   "what": "The dashboard birth time reliability indicator is not built yet. Everything it needs now exists on the chart row once the migration is applied: time_accuracy, and time_scan carrying whether the identity fields are among the casualties."
   }
  ],
  "brief": "https://claude.ai/code/artifact/3428e24e-262a-4fd7-86a6-93468244cb44"
