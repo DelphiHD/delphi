@@ -339,6 +339,11 @@ export default function ChartPage() {
         }
         body.compact .card {
           min-height: calc(100vh - 28px);
+        }
+        @media (max-width: 520px) {
+          body.compact .card { min-height: 0; }
+        }
+        body.compact .card {
           padding: 24px 26px 26px;
           box-shadow: none;
           display: flex;
@@ -435,7 +440,6 @@ export default function ChartPage() {
           .pair { grid-template-columns: 1fr; gap: 0; }
           /* Stacked, the email note is directly above the next label instead
              of beside it, so it needs its spacing back. */
-          .pair .fine { margin-bottom: 10px; }
         }
         /* Inside a pair the first label must not push its row down, or the two
            columns start at different heights. */
@@ -443,6 +447,12 @@ export default function ChartPage() {
         /* The note lives inside a column now, so it must not crowd the label of
            the row beneath it. */
         .pair .fine { margin-bottom: 0; }
+        /* Stacked, the email note sits directly above the next label instead of
+           beside it, so it needs its own space. This has to come after the rule
+           above or that one wins. */
+        @media (max-width: 520px) {
+          .pair .fine { margin-bottom: 16px; }
+        }
         .chips { display: flex; flex-wrap: wrap; gap: 7px; }
         .chip {
           font: inherit; font-size: 12.5px; padding: 8px 15px; border-radius: 999px;
