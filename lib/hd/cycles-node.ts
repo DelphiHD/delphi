@@ -89,31 +89,28 @@ const statusOf = (passes: number[], now: number): Cycle["status"] =>
     : now > passes[passes.length - 1] ? "Passed" : "Current";
 
 /**
- * KIRON IS NOT COMPUTED HERE, AND THAT IS DELIBERATE.
+ * KIRON, AND THE TWO WRONG WAYS TO GET IT
  *
- * Two attempts are recorded in the history of this file, both wrong. The first
+ * Kiron is not in astronomy-engine, and two attempts to find its return by
+ * asking bodygraph.com are recorded here so nobody repeats them. The first
  * stepped toward the answer from two guesses and missed by up to thirteen
  * years. The second bracketed with yearly samples and was consistently three
- * hundred days late, and the measurement showed exactly why: Kiron crosses its
- * birth longitude three times across roughly ten months, and two samples a year
- * apart can sit on the same side of all three. The scan saw no crossing at all
- * until after the last one.
+ * hundred days late, which turned out to be exactly the span from the first
+ * pass to the last: Kiron crosses its birth longitude three times across about
+ * ten months, and two samples a year apart can sit on the same side of all
+ * three. Kaycee, 2026-09-12: "with retrogrades it's not something that can be
+ * computed by hand unfortunately." Quite.
  *
- * Catching the first pass honestly means asking bodygraph.com where Kiron is
- * every ten days across a couple of years, which is about sixty five calls for
- * one date. Saturn and Uranus cost nothing because the ephemeris here knows
- * them; Kiron is not in it.
- *
- * So this returns Saturn, Uranus and the second Saturn, exactly. Where Python
- * and Swiss Ephemeris are available, lib/chart/cycles.ts returns all four and
- * is used instead. A chart built on the website gets three of the four rather
- * than a fourth that is a year out.
+ * Doing it honestly through the API meant about sixty five calls per chart, for
+ * an answer identical for every person alive. So it is a table instead:
+ * lib/hd/kiron.ts, sampled once out of Swiss Ephemeris. Kiron now walks the
+ * same way Saturn and Uranus do, locally and for nothing.
  */
 
 export async function cyclesFor(args: {
   birthUtc: string;
   /** Birth longitudes, which the caller already has from the chart it cast. */
-  natal: { Saturn: number; Uranus: number };
+  natal: { Saturn: number; Uranus: number; Chiron?: number | null };
   now?: Date;
 }): Promise<Cycle[]> {
   const birth = new Date(args.birthUtc).getTime();
@@ -135,5 +132,8 @@ export async function cyclesFor(args: {
   add("Uranus Opposition",
     crossings("Uranus", (args.natal.Uranus + 180) % 360, at(36), at(48)));
   add("Second Saturn Return", crossings("Saturn", args.natal.Saturn, at(55), at(62)));
+  if (args.natal.Chiron != null) {
+    add("Kiron Return", crossings("Chiron", args.natal.Chiron, at(45), at(56)));
+  }
   return out.sort((a, b) => a.firstPass.localeCompare(b.firstPass));
 }

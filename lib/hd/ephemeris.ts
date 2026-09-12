@@ -43,6 +43,7 @@ import {
   Body, GeoVector, Ecliptic, EclipticGeoMoon,
 } from "astronomy-engine";
 import { GATE_ARC_DEGREES, LINE_ARC_DEGREES } from "@/lib/hd/gate-longitude";
+import { kironLongitudeAt } from "@/lib/hd/kiron";
 
 /** The rungs of the wheel, coarse to fine. Base is deliberately absent. */
 export const COLOR_ARC_DEGREES = LINE_ARC_DEGREES / 6;
@@ -74,6 +75,9 @@ export const COMPUTABLE_BODIES = ["Moon", ...Object.keys(COMPUTABLE)];
  */
 export function longitudeAt(planet: string, when: Date): number | null {
   if (planet === "Moon") return EclipticGeoMoon(when).lon;
+  // Not a body this library knows. It comes from a table sampled out of Swiss
+  // Ephemeris, so the Kiron return costs nothing to find. See lib/hd/kiron.ts.
+  if (planet === "Chiron" || planet === "Kiron") return kironLongitudeAt(when);
   const body = COMPUTABLE[planet];
   if (body === undefined) return null;
   if (body === "earth") {

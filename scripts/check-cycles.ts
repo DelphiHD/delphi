@@ -44,12 +44,17 @@ async function main() {
     const reference = await computeCycles(chart.birth.utcDate);
     const mine = await cyclesFor({
       birthUtc: chart.birth.utcDate,
-      natal: { Saturn: lonOf(chart, "Saturn")!, Uranus: lonOf(chart, "Uranus")! },
+      natal: {
+        Saturn: lonOf(chart, "Saturn")!,
+        Uranus: lonOf(chart, "Uranus")!,
+        Chiron: lonOf(chart, "Chiron"),
+      },
     });
 
     const pairs: [string, { firstPass: string; allPasses: string[] }][] = [
       ["Saturn Return", reference.saturnReturn],
       ["Uranus Opposition", reference.uranusOpposition],
+      ["Kiron Return", reference.chironReturn],
       ["Second Saturn Return", reference.secondSaturnReturn],
     ];
 
@@ -67,7 +72,7 @@ async function main() {
   }
   console.log(`\n${rows} cycles compared, worst disagreement ${worst} day(s)`);
   if (worst > 1) { console.error("Too far apart to trust. Not shipping this."); process.exit(1); }
-  console.log("Kiron is not compared: the node version does not compute it. See lib/hd/cycles-node.ts.");
+
 }
 
 main();
