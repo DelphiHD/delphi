@@ -6335,6 +6335,11 @@ var card = document.getElementById('card');
 card.addEventListener('mousemove', function (e) {
   var o = e.target.closest ? e.target.closest('.opt') : null;
   if (!o) return;
+  // The document's own mousemove hides the tip while a card is open, and it
+  // runs after this one, so without stopping here the text appears and is
+  // wiped in the same gesture. Kaycee, 2026-09-12: "the delphi basic gate
+  // mouseovers aren't working on the options for the uncertain placements."
+  e.stopPropagation();
   showTip(e, '<b>' + esc(o.textContent) + '</b>' + esc(o.dataset.basic));
 });
 card.addEventListener('mouseleave', function () { tip.hidden = true; });
@@ -6927,8 +6932,8 @@ function pendingNote(field) {
     }).join('</li><li>') + '</li></ul>';
   }
   return '<span class="kn">Not settled without an exact birth time</span>' +
-    '<div class="body"><p>Drawn open because this depends on the hour. ' +
-    'The chart was cast for ' + esc(clock12(T.window.castFor)) + '.</p>' + when + '</div>';
+    '<div class="body"><p>This chart was cast for ' + esc(clock12(T.window.castFor)) + '.</p>' +
+    when + '</div>';
 }
 
 function capFirst(t) { return String(t || '').charAt(0).toUpperCase() + String(t || '').slice(1); }
