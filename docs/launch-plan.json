@@ -1,7 +1,7 @@
 {
   "project": "Client Portal",
   "goal": "Free chart is the hook. Account required. Reports, extra charts and a subscription are what sells.",
-  "updated": "2026-09-10",
+  "updated": "2026-09-12",
   "event": {
     "label": "Kaycee's event",
     "date": "2026-09-16",
@@ -184,6 +184,12 @@
       "why": "Kaycee expects to run events regularly. Each one is a different deal, and the machinery should not care which.",
       "items": [
         {
+          "id": "p5g",
+          "title": "A chart says what its birth time cannot settle",
+          "status": "doing",
+          "note": "Scan engine working 12 September, proven on Kaycee's own chart: in a single hour around her birth time, Motivation, Sense, Design Sense and two Moon lines all move. Still to do: carry the accuracy through to the builder, mark the fields that move, say which time a day-segment used, and a reliability indicator on the dashboard so a booking arrives with its certainty attached."
+        },
+        {
           "id": "p5a",
           "title": "An event, with its own terms",
           "status": "todo",
@@ -223,6 +229,26 @@
     }
   ],
   "decided": [
+    {
+      "on": "2026-09-12",
+      "what": "A chart scans to the LINE and no finer. Colour, tone and base are declared unreliable without an exact birth time rather than searched for, because the Moon crosses a colour every ~17 minutes, a tone every ~3, and a base about every 30 seconds. No scan can bracket that honestly. Kaycee, 2026-09-12: \"I like your instinct, let's do that.\" Consequence: all four variables and both senses are unreliable on any chart without a to-the-minute time, and the chart says so."
+    },
+    {
+      "on": "2026-09-12",
+      "what": "How often to sample across a birth-time window is set by the Moon, not a fixed step. Kaycee, 2026-09-12: \"Can the scan timing logic be based on the speed of the moon since it's the one that changes most frequently?\" The Moon runs between about 11.8 and 15.4 degrees a day depending where it is in its orbit, which is why some days carry far more change than others. Its speed is measured from the two endpoint casts rather than assumed, so it costs nothing extra."
+    },
+    {
+      "on": "2026-09-12",
+      "what": "An uncertain chart reports what actually moves on that person's date, not a blanket warning. A blanket warning is noise on a quiet day and nowhere near enough on a busy one. Where nothing moves the chart says so, which is the reassuring and true answer. Fields that move get a mark; clicking it says what it changes to and when. Chart and dashboard stay uncluttered: Kaycee's design."
+    },
+    {
+      "on": "2026-09-12",
+      "what": "Everything is compared, not a headline set: the eight properties, all fifteen planets on both sides to gate and line, all nine centres, every channel, all four variables and both senses. A chart is structured data, so comparing two casts is a field-by-field comparison."
+    },
+    {
+      "on": "2026-09-12",
+      "what": "Wheel position comes from lib/hd/gate-longitude, the same mapping the mandala is drawn from. Gate numbers are not in wheel order, so subtracting gate numbers says nothing about distance travelled; a second, wrong mapping was written and replaced before it shipped."
+    },
     {
       "on": "2026-09-10",
       "what": "Wix wraps every HTML embed in its own sandbox frame served from filesusr.com, so frame-ancestors has to name the sandbox as well as her site. Naming delphihd.com alone leaves the embed blank with no error, which cost an hour. Worth remembering for any future embed."
