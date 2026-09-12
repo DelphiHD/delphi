@@ -3684,7 +3684,7 @@ if (DATA.client) {
     // uncluttered."
     var body = m.couldBe
       ? '<span class="needtime">' + esc(m.value) + '</span>' +
-        (m.couldBe.length ? '<span class="pendmark" data-couldbe="' + m.key + '">could be ' + m.couldBe.length + '</span>' : '')
+        (m.couldBe.length ? '<span class="pendmark" data-couldbe="' + m.key + '">' + m.couldBe.length + ' Possible</span>' : '')
       : m.value;
     return '<div class="prop' + (m.report ? ' has' : '') + (m.wide ? ' wide' : '') +
       (m.couldBe ? ' unsettled' : '') +
