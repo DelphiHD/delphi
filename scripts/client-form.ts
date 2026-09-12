@@ -1930,12 +1930,19 @@ createServer((req, res) => {
           });
         }
         const named = new Set(people.map((p) => p.name.toLowerCase()));
+        // Letters only, lowercased: "Tiff Polamateer" and "tiffpolmateer" are the
+        // same person, and matching on the exact name listed her twice. Spelling
+        // differences between a chart and an account are normal, so the email is
+        // checked first and the loose name second.
+        const loose = (v: string) => String(v ?? "").toLowerCase().replace(/[^a-z]/g, "");
         for (const a of accounts ?? []) {
           const nm = a.full_name ?? (a.email ?? "").split("@")[0];
-          // an account whose name already appears on the roster is the same
-          // person, so fill in their email rather than listing them twice
-          const hit = people.find((p) => p.name.toLowerCase() === String(nm).toLowerCase());
-          if (hit) { hit.email = a.email ?? null; continue; }
+          const mail = (a.email ?? "").toLowerCase();
+          const hit = people.find((p) =>
+            (p.email && p.email.toLowerCase() === mail) ||
+            loose(p.name) === loose(String(nm)) ||
+            (mail && loose(p.name) === loose(mail.split("@")[0])));
+          if (hit) { hit.email = hit.email ?? a.email ?? null; continue; }
           people.push({
             name: nm, email: a.email ?? null, source: "signup",
             joined: a.created_at ?? null, chart: null, reports: "none", revoked: false,
