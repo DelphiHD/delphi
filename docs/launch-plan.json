@@ -372,6 +372,22 @@
   {
    "on": "2026-09-12",
    "what": "The birth-time scan casts its sampling grid all at once instead of one after another, and the ceiling went from 14 casts to 48. Kaycee, 2026-09-12: 'Even a stranger on my site deserves good service.' A cast takes about a third of a second, and the grid does not depend on itself, so the old serial version was charging somebody seconds of waiting for nothing. Measured after: a whole-day window is 48 casts in 9.2 seconds, an afternoon 21 casts in 5.5. Charts are unlimited on the Business plan, so the ceiling costs no money, only patience."
+  },
+  {
+   "on": "2026-09-12",
+   "what": "The birth-time scan computes planet positions locally (astronomy-engine) to decide which minutes to ask bodygraph.com about, instead of sampling 48 moments across the window. Kaycee, 2026-09-12: 'My vote is for better accuracy.' The split is strict and she asked it be stated plainly: bodygraph.com remains the only authority on what a chart says, including Chiron, Lilith and both nodes; the local maths only decides when to look. Charts are unaffected, byte for byte. Verified against bodygraph.com across three births, both sides, every computable body: worst disagreement 0.64 arcminutes, against a line of 56. The four bodies it cannot compute are the four slowest on the chart, the fastest needing 8.6 days to change a line, so none can move inside a birth window; a bisecting safety net still catches anything the endpoints disagree about that the local maths did not predict."
+  },
+  {
+   "on": "2026-09-12",
+   "what": "The scan reports every value a field passes through across the window, not just the first change. Somebody who does not know their birth time cannot use a time, but they can use 'it is one of these three'. This turned up the finding below."
+  },
+  {
+   "on": "2026-09-12",
+   "what": "FINDING, needs a product decision: across a six-hour window the four variables are not merely uncertain, they are unknown. Kaycee's own birth date, 12:00 to 18:00: Sense and Design Sense each cycle through all six possible values, Determination through four, Motivation through four. Line-level activations are far steadier over the same window (the Moon moved one gate, everything else a line or none). So an approximate birth time costs the variables entirely while leaving most of the chart intact. The chart should say that specifically rather than warn vaguely about the whole thing."
+  },
+  {
+   "on": "2026-09-12",
+   "what": "bodygraph.com's published soft limit is 100K chart pulls a month. Kaycee checked their backend and it recorded 3 pulls for August, so it appears to meter only their own widget and not the API. Treated as uncounted luck, not as budget: everything is planned against the 100K as though it were enforced. At the new ceiling a vague-time chart costs about 35 calls, so 250 of them a month is 12K."
   }
  ],
  "open": [
@@ -401,6 +417,9 @@
   },
   {
    "what": "Whether to add a local ephemeris (planet positions computed on the machine, offline, in microseconds) alongside the chart provider. The provider stays the authority on Human Design; a local ephemeris would only answer 'where was the Moon at 14:37', which is astronomy, not HD. It would make the birth-time scan exact rather than sampled, remove the cast ceiling entirely, and is the only way the teaching deck can work at an event with no signal. Kaycee, 2026-09-12: 'if we need to start looking at better APIs we should figure that out.' Structural: needs her decision before anything is built."
+  },
+  {
+   "what": "bodygraph.com refuses a burst of calls that follows a busy stretch (429). The scan handles it itself by pacing and retrying. Whether that pacing and retry belongs in lib/mybodygraph, where it would protect every other caller too, is a change to a spine module and needs Kaycee's decision."
   }
  ],
  "brief": "https://claude.ai/code/artifact/3428e24e-262a-4fd7-86a6-93468244cb44"
