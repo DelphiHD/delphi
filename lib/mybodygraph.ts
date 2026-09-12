@@ -142,6 +142,40 @@ async function ask(url: URL, what: string): Promise<Response> {
   return last!;
 }
 
+/**
+ * Timezone names bodygraph.com's own location lookup returns but its chart
+ * engine refuses.
+ *
+ * Found on 2026-09-12: Kaycee picked Nuuk from their picker, their locations
+ * endpoint answered "America/Godthab", and their chart endpoint answered 500 to
+ * it. The zone was renamed America/Nuuk in 2020; their place database is older
+ * than their chart engine, and the two disagree.
+ *
+ * Sixteen real cities were checked and only Greenland is actually affected
+ * today: India, Vietnam, Myanmar, Nepal, Argentina and Montreal all come back
+ * canonical. Kaycee: "I don't actually know anyone from nuuk." Quite. The rest
+ * are here because their engine rejects every one of them when asked directly,
+ * so if their place database ever hands one back it fails the same way, and
+ * this costs nothing.
+ */
+const RENAMED_ZONES: Record<string, string> = {
+  "America/Godthab": "America/Nuuk",
+  "America/Buenos_Aires": "America/Argentina/Buenos_Aires",
+  "America/Montreal": "America/Toronto",
+  "Asia/Calcutta": "Asia/Kolkata",
+  "Asia/Chongqing": "Asia/Shanghai",
+  "Asia/Katmandu": "Asia/Kathmandu",
+  "Asia/Rangoon": "Asia/Yangon",
+  "Asia/Saigon": "Asia/Ho_Chi_Minh",
+  "Atlantic/Faeroe": "Atlantic/Faroe",
+  "Pacific/Enderbury": "Pacific/Kanton",
+};
+
+/** The name their chart engine will accept for a zone. */
+export function canonicalZone(tz: string): string {
+  return RENAMED_ZONES[tz] ?? tz;
+}
+
 export async function getTimezoneForLocation(query: string): Promise<string> {
   const url = new URL(API_BASE + LOCATIONS_PATH);
   url.searchParams.set("api_key", apiKey());
@@ -154,7 +188,7 @@ export async function getTimezoneForLocation(query: string): Promise<string> {
   if (!Array.isArray(data) || data.length === 0) {
     throw new Error(`mybodygraph: no location match for "${query}"`);
   }
-  return data[0].timezone;
+  return canonicalZone(data[0].timezone);
 }
 
 export interface GetChartArgs {
@@ -181,7 +215,7 @@ export async function getChart(args: GetChartArgs): Promise<Chart> {
   const url = new URL(API_BASE + CHART_PATH);
   url.searchParams.set("api_key", apiKey());
   url.searchParams.set("date", `${birthDate} ${birthTime}`);
-  url.searchParams.set("timezone", timezone);
+  url.searchParams.set("timezone", canonicalZone(timezone));
   if (args.latitude !== undefined) url.searchParams.set("lat", String(args.latitude));
   if (args.longitude !== undefined) url.searchParams.set("long", String(args.longitude));
   // mybodygraph's `design` parameter selects the bodygraph visual template.

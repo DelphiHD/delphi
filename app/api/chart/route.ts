@@ -187,7 +187,11 @@ export async function POST(request: Request): Promise<Response> {
     // A chart that failed to build must not leave a link that opens nothing.
     await db.from("charts").delete().eq("token", token);
     await db.from("client_charts").delete().eq("token", token);
-    return bad(`the chart could not be drawn: ${e instanceof Error ? e.message : e}`, 500);
+    // What went wrong belongs in the log, not on her form. A stranger saw
+    // "mybodygraph hd-data failed: 500 Internal Server Error" on 2026-09-12,
+    // which is a developer's sentence and names her supplier besides.
+    console.error(`chart ${token} failed to build: ${e instanceof Error ? e.stack ?? e.message : e}`);
+    return bad("Something went wrong drawing your chart. Please try again in a moment, or write to hello@delphihd.com and we will sort it out.", 500);
   }
 
   // The link, in their inbox, so closing the tab does not lose the chart. This
