@@ -436,6 +436,10 @@
   {
    "on": "2026-09-12",
    "what": "MEASURED, needs a decision before the event. The whole chart is built inside the web request, which has a 120 second ceiling. Six people with no birth time submitting at the same moment: every chart succeeded, and every one took 29 seconds. The scan is about 42 of the calls in each. Extrapolating the same shape, roughly 25 people at the same instant is where the ceiling is. Caching does not help this, because it only saves the rebuild and every one of these is a first build. BFKI is pre-registration spread over days rather than a room submitting at once, which is the main thing making this survivable, but a group hitting signal together after a day with none is exactly Kaycee's stated situation."
+  },
+  {
+   "on": "2026-09-12",
+   "what": "Two open questions closed by the day's work. The local ephemeris was added and is now the source for the birth time scan and all four cycle dates, with bodygraph.com still the only authority on Human Design itself. And the pacing and retry for bodygraph.com's rate limit went into the shared layer, so every caller is protected and not just the scan."
   }
  ],
  "open": [
@@ -464,16 +468,13 @@
    "what": "http://localhost:3000/** is on the production redirect allow list. Dev convenience left in production; low risk, worth removing before launch."
   },
   {
-   "what": "Whether to add a local ephemeris (planet positions computed on the machine, offline, in microseconds) alongside the chart provider. The provider stays the authority on Human Design; a local ephemeris would only answer 'where was the Moon at 14:37', which is astronomy, not HD. It would make the birth-time scan exact rather than sampled, remove the cast ceiling entirely, and is the only way the teaching deck can work at an event with no signal. Kaycee, 2026-09-12: 'if we need to start looking at better APIs we should figure that out.' Structural: needs her decision before anything is built."
-  },
-  {
-   "what": "bodygraph.com refuses a burst of calls that follows a busy stretch (429). The scan handles it itself by pacing and retrying. Whether that pacing and retry belongs in lib/mybodygraph, where it would protect every other caller too, is a change to a spine module and needs Kaycee's decision."
-  },
-  {
    "what": "The dashboard birth time reliability indicator is not built yet. Everything it needs now exists on the chart row once the migration is applied: time_accuracy, and time_scan carrying whether the identity fields are among the casualties."
   },
   {
    "what": "Whether to deliver the chart first and scan after, rebuilding in the background, so nobody waits on the scan. It would take each person's wait back to roughly what an exact time costs and remove the event ceiling risk entirely. It changes how a chart is made, so it is Kaycee's decision, not a side effect."
+  },
+  {
+   "what": "Left on unknown birth times: the astrology view still draws its angles and house ring as though the hour were known. Kaycee approved the treatment on 2026-09-12 ('1- yes, 2-let's handle it the same') and the groundwork is in and dormant: the wheel knows its angles are never settled without an exact time, and the Moon's signs across the window are read locally. Nothing draws them yet."
   }
  ],
  "brief": "https://claude.ai/code/artifact/3428e24e-262a-4fd7-86a6-93468244cb44"
