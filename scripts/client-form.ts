@@ -960,14 +960,27 @@ const PAGE = /* html */ `<!doctype html>
 
   // ---- the list of everyone -------------------------------------------------
   var PEOPLE = [], SORT = { key: 'name', dir: 1 };
+  // Chart sits beside the name because opening somebody's chart is the thing
+  // she does most, and email goes last because it is the widest column and she
+  // was scrolling past it to reach everything else. Kaycee, 2026-09-12.
   var COLS = [
     { key: 'name',    label: 'Name' },
-    { key: 'email',   label: 'Email' },
+    { key: 'chart',   label: 'Chart' },
     { key: 'source',  label: 'How they got here' },
     { key: 'joined',  label: 'Since' },
     { key: 'reports', label: 'Reports' },
-    { key: 'chart',   label: 'Chart' }
+    { key: 'email',   label: 'Email' }
   ];
+
+  // "Vandenberg, Kaycee". Sorting and scanning a list of people is done by
+  // surname, and she is looking somebody up, not reading a sentence. A single
+  // word stays as it is; everything before the last word is the given name, so
+  // middle names travel with it rather than being mistaken for a surname.
+  function fileAs(n) {
+    var t = String(n || '').trim().split(/\s+/);
+    if (t.length < 2) return String(n || '');
+    return t[t.length - 1] + ', ' + t.slice(0, -1).join(' ');
+  }
   async function loadPeople() {
     var box = document.getElementById('peopleTable');
     try {
@@ -980,7 +993,8 @@ const PAGE = /* html */ `<!doctype html>
   function drawPeople() {
     var box = document.getElementById('peopleTable');
     var rows = PEOPLE.slice().sort(function (a, b) {
-      var x = a[SORT.key], y = b[SORT.key];
+      var x = SORT.key === 'name' ? fileAs(a.name) : a[SORT.key];
+      var y = SORT.key === 'name' ? fileAs(b.name) : b[SORT.key];
       if (x === null || x === undefined || x === '') return 1;
       if (y === null || y === undefined || y === '') return -1;
       return String(x).localeCompare(String(y), undefined, { numeric: true }) * SORT.dir;
@@ -999,12 +1013,12 @@ const PAGE = /* html */ `<!doctype html>
       }).join('') + '</tr></thead><tbody>' +
       rows.map(function (p) {
         return '<tr' + (p.revoked ? ' class="off"' : '') + '>' +
-          '<td>' + esc(p.name) + '</td>' +
-          '<td>' + (p.email ? '<a href="mailto:' + esc(p.email) + '">' + esc(p.email) + '</a>' : '<span class="sub">—</span>') + '</td>' +
-          '<td>' + (p.source === 'signup' ? 'Signed up' : 'Roster') + '</td>' +
+          '<td>' + esc(fileAs(p.name)) + '</td>' +
+          '<td>' + (p.chart ? '<a href="' + esc(p.chart) + '" target="_blank" rel="noreferrer">open</a>' : '<span class="sub">—</span>') + '</td>' +
+          '<td>' + esc(p.source === 'signup' ? 'Signed up' : p.source === 'roster' ? 'Roster' : p.source) + '</td>' +
           '<td class="tnum">' + (p.joined ? esc(String(p.joined).slice(0, 10)) : '—') + '</td>' +
           '<td>' + (p.reports === 'both' ? 'Both' : p.reports === 'none' ? '<span class="sub">none</span>' : esc(p.reports)) + '</td>' +
-          '<td>' + (p.chart ? '<a href="' + esc(p.chart) + '" target="_blank" rel="noreferrer">open</a>' : '<span class="sub">—</span>') + '</td>' +
+          '<td>' + (p.email ? '<a href="mailto:' + esc(p.email) + '">' + esc(p.email) + '</a>' : '<span class="sub">—</span>') + '</td>' +
           '</tr>';
       }).join('') + '</tbody></table></div>';
     [].forEach.call(box.querySelectorAll('th[data-k]'), function (th) {
