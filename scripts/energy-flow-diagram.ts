@@ -3036,6 +3036,9 @@ svg.canvas.plain .pleg.lit { fill:${HL_GOLD} !important; }
   stroke-width:1.6 !important; stroke-dasharray:6 4; }
 .gdisc.pending { fill:none !important; stroke:#2b2b33 !important;
   stroke-width:1.2 !important; stroke-dasharray:3 3; }
+.castat { margin:0 0 4px; font-size:12px; letter-spacing:.02em; opacity:.75; }
+.possible { margin:8px 0 2px; font-size:11px; font-weight:700; letter-spacing:.08em;
+  text-transform:uppercase; color:#845095; }
 /* one of the answers a withheld field could have had, with its own text */
 .opt { border-bottom:1px dotted #845095; cursor:help; }
 .opt:hover { background:#f3ecf6; }
@@ -3060,8 +3063,6 @@ svg.canvas.plain .pleg.lit { fill:${HL_GOLD} !important; }
 .couldbe { margin:6px 0 0; padding:0 0 0 16px; }
 .couldbe li { margin:3px 0; }
 .couldbe .whn { display:block; font-size:11px; opacity:.6; letter-spacing:.02em; }
-.castline { cursor:pointer; }
-.castline:hover { fill:#5d3569 !important; }
 .pendarrow { cursor:pointer; }
 /* the legend badge and the fields that had to withhold a value */
 .pendmark { display:inline-block; margin-left:6px; padding:1px 6px; border-radius:9px;
@@ -3846,25 +3847,6 @@ if (DATA.client) {
       if (hit) el.classList.add('pending');
     });
   })();
-
-  // the line under the name explains the dashes, once, on request
-  [].forEach.call(document.querySelectorAll('.castline'), function (el) {
-    el.addEventListener('click', function (e) {
-      // The page closes any open card on a document click, so without this the
-      // card opens and shuts inside the same gesture and looks like nothing.
-      e.stopPropagation();
-      var T = DATA.client && DATA.client.time; if (!T || !T.window) return;
-      var names = T.unsettled.map(function (u) { return u.field; });
-      openCard(el,
-        '<b>Your birth window</b><span class="kn">' + esc(capFirst(T.window.label)) + '</span>' +
-        '<div class="body"><p>This chart was cast for ' + esc(clock12(T.window.castFor)) +
-        '. Anything drawn with a dashed line is true for part of ' +
-        esc(T.window.label) + ' and not the rest, so it is shown open rather than filled in.</p>' +
-        '<p>Everything drawn solid is yours whatever hour you were born.</p></div>' +
-        '<div class="body"><p><b>Not settled without an exact time</b></p><ul class="couldbe"><li>' +
-        names.map(esc).join('</li><li>') + '</li></ul></div>');
-    });
-  });
 
   var bIsl = document.getElementById('tIslands');
   bIsl.onclick = function () { bIsl.classList.toggle('on'); paintIslands(bIsl.classList.contains('on')); };
@@ -6841,10 +6823,10 @@ function couldBeHtml(label, field, couldBe) {
   var out = '<b>' + esc(label) + '</b>' +
     '<span class="kn">Exact Birth Time Required</span>';
   if (w) {
-    out += '<div class="body"><p>This chart was cast for ' + esc(clock12(w.castFor)) + '.</p></div>';
+    out += '<div class="body"><p class="castat">Chart Cast at ' + esc(clock12(w.castFor)) + '</p></div>';
   }
   if (couldBe && couldBe.length) {
-    out += '<div class="body"><p><b>What it could be</b></p><ul class="couldbe">';
+    out += '<div class="body"><p class="possible">' + couldBe.length + ' Possible</p><ul class="couldbe">';
     for (var i = 0; i < couldBe.length; i++) {
       var when = '';
       if (u && u.spans) {
@@ -6859,8 +6841,6 @@ function couldBeHtml(label, field, couldBe) {
         (when ? '<span class="whn">' + esc(when) + '</span>' : '') + '</li>';
     }
     out += '</ul></div>';
-  } else {
-    out += '<div class="body"><p>This one turns over faster than any birth window can pin down, so there is no short list to choose from.</p></div>';
   }
   // Kaycee's own approved wording, the same as on the form that made this
   // chart: the short certificate most people keep does not carry the time, the
@@ -6919,21 +6899,24 @@ function optTag(field, value) {
     esc(value) + '</span>';
 }
 
-// Why a thing on the drawing is dashed, with the hours each state covers.
-// Short on purpose: it sits inside a card that already has its own content.
+// What an unsettled field says. Kaycee, 2026-09-12, giving the whole spec:
+// "All it should say is Gate 30.1 The Gate Name, The Line Name and then Chart
+// Cast at XXX Time, X# Possible, then list the bullets the way they are with
+// mouseovers." No narration about why it is drawn the way it is, no sentence
+// restating the heading. The bullets carry her own text on hover.
 function pendingNote(field) {
   var T = (DATA.client && DATA.client.time) || null;
   if (!T || !T.window) return '';
   var u = T.unsettled.filter(function (x) { return x.field === field; })[0];
-  var when = '';
-  if (u && u.spans && u.spans.length) {
-    when = '<ul class="couldbe"><li>' + u.spans.map(function (s) {
-      return optTag(field, s.value) + '<span class="whn">' + clock12(s.from) + ' to ' + clock12(s.to) + '</span>';
-    }).join('</li><li>') + '</li></ul>';
+  if (!u) return '';
+  var out = '<div class="body"><p class="castat">Chart Cast at ' + esc(clock12(T.window.castFor)) + '</p>';
+  if (u.spans && u.spans.length) {
+    out += '<p class="possible">' + u.spans.length + ' Possible</p><ul class="couldbe"><li>' +
+      u.spans.map(function (s) {
+        return optTag(field, s.value) + '<span class="whn">' + clock12(s.from) + ' to ' + clock12(s.to) + '</span>';
+      }).join('</li><li>') + '</li></ul>';
   }
-  return '<span class="kn">Not settled without an exact birth time</span>' +
-    '<div class="body"><p>This chart was cast for ' + esc(clock12(T.window.castFor)) + '.</p>' +
-    when + '</div>';
+  return out + '</div>';
 }
 
 function capFirst(t) { return String(t || '').charAt(0).toUpperCase() + String(t || '').slice(1); }
@@ -7055,12 +7038,18 @@ function ctrHtml(k) {
 }
 function gateHtml(p) {
   var sideName = p.side === 'design' ? 'Design' : 'Personality';
-  // A planet that lands on a different gate at a different hour says so here,
-  // where somebody meets the placement, rather than only in the header.
   var moves = pendingNote(sideName + ' ' + p.planet);
+  // A planet that lands on a different gate at a different hour gets the short
+  // card and nothing else. Reading somebody the full description of the gate we
+  // happened to cast is the same mistake as labelling an unsettled centre: it
+  // is one of several answers, presented as the answer.
+  if (moves) {
+    return '<b>Gate ' + p.gate + '.' + p.line + (p.fix ? ' ' + p.fix : '') + '</b>' +
+      '<span class="kn">' + esc(p.gateName) + (p.lineName ? ' · ' + esc(p.lineName) : '') + '</span>' +
+      moves;
+  }
   return '<b>Gate ' + p.gate + '.' + p.line + (p.fix ? ' ' + p.fix : '') + '</b>' +
-    (moves ? moves : '<span class="kn">' + esc(p.gateName) + (p.lineName ? ' · ' + esc(p.lineName) : '') + '</span>') +
-    (moves ? '<span class="kn">' + esc(p.gateName) + (p.lineName ? ' · ' + esc(p.lineName) : '') + '</span>' : '') +
+    '<span class="kn">' + esc(p.gateName) + (p.lineName ? ' · ' + esc(p.lineName) : '') + '</span>' +
     tags([{ text: sideName + ' ' + p.planet, bg: p.side === 'design' ? '#e06666' : '#c9b6e4' },
           p.circuit ? { text: p.circuit } : null,
           p.quarter ? { text: 'Quarter of ' + p.quarter } : null,
