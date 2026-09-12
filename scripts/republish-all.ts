@@ -13,6 +13,19 @@
  * Sequential on purpose. Every build casts real charts, and forty-six at once
  * would be a stampede at bodygraph.com for no gain: nobody is waiting on this.
  *
+ * BUILD EACH ONE THE WAY IT WAS FIRST BUILT
+ *
+ * The first version of this rebuilt everything by token, and for a roster chart
+ * that is wrong: the builder read the token as a roster slug, minted a fresh
+ * token and published to a new address. The original file, the one behind the
+ * link already in somebody's inbox, was never touched. Nothing broke, but
+ * thirty-seven charts reported "ok" while staying exactly as they were, and
+ * thirty-seven junk link records appeared behind them.
+ *
+ * So the link record decides. A record whose slug is not its own token is one of
+ * Kaycee's roster, and is rebuilt by that slug, which republishes over the file
+ * the link already points at.
+ *
  * Run:
  *   npx tsx scripts/republish-all.ts            # everything
  *   npx tsx scripts/republish-all.ts --dry-run  # list what would be rebuilt
@@ -38,10 +51,25 @@ async function main() {
     .order("created_at", { ascending: true });
   if (error) throw new Error(`could not list the charts: ${error.message}`);
 
-  const charts = data ?? [];
+  const links = (await db().from("client_charts").select("token, client_slug")).data ?? [];
+  const slugOf = new Map(links.map((r) => [String(r.token), String(r.client_slug)]));
+
+  const charts = (data ?? []).map((c) => {
+    const slug = slugOf.get(String(c.token));
+    // A roster chart is one whose link record carries a real slug rather than a
+    // copy of its own token. It has to be rebuilt by that slug or the file
+    // behind its existing link is left alone.
+    const roster = !!slug && slug !== String(c.token);
+    // The builder takes a roster slug as a bare argument and a database chart
+    // behind --token. Passing the wrong one is what caused the mess this
+    // comment exists because of.
+    return { ...c, how: roster ? [slug!] : ["--token", String(c.token)], roster };
+  });
+  const rosterCount = charts.filter((c) => c.roster).length;
+  console.log(`  ${rosterCount} from the roster, ${charts.length - rosterCount} from the website`);
   console.log(`${charts.length} chart(s)${dry ? " would be rebuilt" : " to rebuild"}\n`);
   if (dry) {
-    for (const c of charts) console.log(`  ${String(c.person_name).padEnd(28)} ${c.token}`);
+    for (const c of charts) console.log(`  ${String(c.person_name).padEnd(28)} ${c.how.join(" ")}`);
     return;
   }
 
@@ -54,7 +82,7 @@ async function main() {
     const label = `[${String(i + 1).padStart(2)}/${charts.length}] ${String(c.person_name).slice(0, 30).padEnd(30)}`;
     const t0 = Date.now();
     try {
-      await runBuilder(["--token", c.token, "--publish", "--no-png"]);
+      await runBuilder([...c.how, "--publish", "--no-png"]);
       console.log(`${label} ok    ${((Date.now() - t0) / 1000).toFixed(0)}s`);
     } catch (e) {
       const why = e instanceof Error ? e.message : String(e);
