@@ -1856,6 +1856,11 @@ createServer((req, res) => {
     return;
   }
 
+  // What each event slug is called in the funnel. Kaycee reads this column, so
+  // it says the event, not a code.
+  const EVENT_LABEL: Record<string, string> = {
+    bfki: "BFKI",
+  };
   if (req.method === "GET" && path === "/people") {
     void (async () => {
       const out: Record<string, unknown> = { people: [] };
@@ -1872,7 +1877,7 @@ createServer((req, res) => {
         // which table it turned up in. Seed is Kaycee's own roster; anything else
         // was made by somebody through the portal.
         const { data: records } = await db.from("charts")
-          .select("token, tier, owner_id, for_email");
+          .select("token, tier, owner_id, for_email, source");
         const byToken = new Map((records ?? []).map(
           (r: { token: string }) => [r.token, r as Record<string, unknown>]));
         const { data: accounts } = await db.from("profiles")
@@ -1899,7 +1904,11 @@ createServer((req, res) => {
           people.push({
             name: c.client_name ?? c.client_slug,
             email: (rec?.for_email as string) ?? null,
-            source: tier === "seed" ? "roster" : "signup",
+            // Recorded, not guessed. A chart made through an event's own link
+            // carries that event, so "how they got here" can finally answer
+            // with something other than roster or signup.
+            source: EVENT_LABEL[(rec?.source as string) ?? ""]
+              ?? (tier === "seed" ? "roster" : "signup"),
             joined: c.created_at ?? null,
             chart: c.token ? `https://charts.delphihd.com/c/${c.token}` : null,
             reports: got.size === 2 ? "both" : got.size === 1 ? [...got][0] : "none",

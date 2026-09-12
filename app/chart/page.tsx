@@ -18,6 +18,11 @@ import { useEffect, useRef, useState } from "react";
 
 type Accuracy = "document" | "told" | "approximate" | "unknown";
 
+/** Events with a live registration link. The name is shown; the key is stored. */
+const EVENTS: Record<string, string> = {
+  bfki: "The Big Fucking Kick It",
+};
+
 interface Place { value: string; timezone: string }
 
 const ACCURACY_LABEL: Record<Accuracy, string> = {
@@ -40,6 +45,11 @@ export default function ChartPage() {
   // two amounts of room. Detected rather than configured, so the Wix embed
   // needs no special URL and cannot be pasted in wrong.
   const [, setCompact] = useState(false);
+  // Which event sent them, if any. Arrives as ?e=bfki from the short /e/ address
+  // a QR code points at. It changes what the page says, and it is stored on the
+  // chart so that later "everyone who registered for this event" is a question
+  // with an answer, which is what the teaching module will need.
+  const [event, setEvent] = useState<{ slug: string; name: string } | null>(null);
   useEffect(() => {
     let inFrame = false;
     try {
@@ -49,6 +59,12 @@ export default function ChartPage() {
     }
     setCompact(inFrame);
     document.body.classList.toggle("compact", inFrame);
+    try {
+      const e = (new URLSearchParams(location.search).get("e") ?? "").toLowerCase();
+      if (EVENTS[e]) setEvent({ slug: e, name: EVENTS[e] });
+    } catch {
+      // no query string to read; the plain form is the right fallback
+    }
   }, []);
 
   const [name, setName] = useState("");
@@ -105,6 +121,7 @@ export default function ChartPage() {
           timeAccuracy: accuracy,
           place: place!.value,
           timezone: place!.timezone,
+          event: event?.slug ?? null,
         }),
       });
       const j = await r.json();
@@ -123,10 +140,11 @@ export default function ChartPage() {
 
       {result ? (
         <section className="card done">
-          <h2>Your chart is ready.</h2>
+          <h2>{event ? "You are registered." : "Your chart is ready."}</h2>
           <p>
-            This link is yours. It works on any device and it stays live, so
-            save it somewhere you will find it again.
+            {event
+              ? `See you at ${event.name}. Your chart is below, and I will have it with me in the workshop.`
+              : "This link is yours. It works on any device and it stays live, so save it somewhere you will find it again."}
           </p>
           {/* A new tab, always. Embedded in her home page this link was
               trying to load the chart INSIDE Wix's frame, and a chart refuses
@@ -147,6 +165,16 @@ export default function ChartPage() {
         </section>
       ) : (
         <section className="card">
+          {event && (
+            <div className="ev">
+              <span className="evlab">Pre-registration</span>
+              <span className="evname">{event.name}</span>
+              <span className="evfine">
+                Your chart is built before the workshop, so it is ready whether
+                or not there is signal when we get there.
+              </span>
+            </div>
+          )}
           {/* Side by side rather than stacked. Embedded in a hero there is
               width going spare and no height at all, and every stacked field
               is another seventy pixels the section has to find.
@@ -376,6 +404,16 @@ export default function ChartPage() {
            come out as dark glyphs on a dark field and look broken. */
         input[type="date"], input[type="time"] { color-scheme: dark; }
         .fine { color: rgba(255, 255, 255, 0.76); font-size: 12px; margin: 7px 0 0; line-height: 1.55; }
+        /* The event header. Gold for the label because that is what the event's
+           own artwork uses, so the page and the poster look related. */
+        .ev { display: block; margin: 0 0 18px; padding: 0 0 14px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.16); }
+        .evlab { display: block; font-size: 10px; letter-spacing: 0.2em;
+          text-transform: uppercase; color: var(--gold); font-weight: 700; }
+        .evname { display: block; margin-top: 4px; font-size: 17px; font-weight: 600;
+          color: #fff; letter-spacing: 0.01em; }
+        .evfine { display: block; margin-top: 6px; font-size: 12px; line-height: 1.55;
+          color: rgba(255, 255, 255, 0.76); }
         .fine.ok { color: var(--purple-light); font-weight: 500; }
         .error {
           background: rgba(224, 102, 102, 0.16); color: #ffd9d5; border-radius: 12px;

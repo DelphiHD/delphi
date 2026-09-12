@@ -32,7 +32,16 @@ interface Body {
   timezone?: string;       // ditto
   timeAccuracy?: string;   // document | told | approximate | unknown
   forEmail?: string;
+  event?: string | null;   // the event whose link they arrived from
 }
+
+/**
+ * Events with a live registration link. Checked against this rather than
+ * stored as given: the value comes from a query string a stranger controls,
+ * and it is going to be the thing the teaching module trusts when it asks who
+ * registered for an event. An unknown event is dropped, not recorded.
+ */
+const EVENTS = new Set(["bfki"]);
 
 const ACCURACY = new Set(["document", "told", "approximate", "unknown"]);
 
@@ -74,6 +83,8 @@ export async function POST(request: Request): Promise<Response> {
   // Checked before anything is created and before the provider is called, so a
   // script in a loop costs a database count rather than a chart.
   const caller = callerHash(callerIp(request));
+  const asked = (body.event ?? "").toString().trim().toLowerCase();
+  const eventSlug = EVENTS.has(asked) ? asked : null;
   const askedFor = (body.forEmail ?? "").trim().toLowerCase() || null;
   const verdict = await withinLimits({ email: askedFor, caller }, async ({ email, caller: c, since }) => {
     const [e, i, t] = await Promise.all([
@@ -151,6 +162,7 @@ export async function POST(request: Request): Promise<Response> {
     tier: "free",
     token,
     request_ip_hash: caller,
+    source: eventSlug,
     for_email: body.forEmail?.trim() || null,
   });
   if (chartErr) {
