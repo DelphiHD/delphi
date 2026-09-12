@@ -153,10 +153,10 @@ export default function ChartPage() {
           <a className="go" href={result.url} target="_blank" rel="noreferrer">Open My Chart</a>
           <p className="fine">
             {result.emailed
-              ? `Sent to ${email}.`
+              ? `Sent to ${email} as well, so you have it twice.`
               : result.account
-                ? `Saved to ${email}.`
-                : "Save this link."}
+                ? `Saved to ${email}, so you can find it again later.`
+                : "Save the link: it is the only way back to this chart."}
           </p>
         </section>
       ) : (
@@ -238,7 +238,9 @@ export default function ChartPage() {
           {showsPartOfDay && (
             <>
               <p className="fine">
-                Which part of the day?
+                {accuracy === "unknown"
+                  ? "If you know roughly when, say so. A six hour window tells us far more than a whole day."
+                  : "Which part of the day?"}
               </p>
               <div className="chips">
                 {PART_OF_DAY.map((p) => (
@@ -252,6 +254,21 @@ export default function ChartPage() {
 
           {(accuracy === "unknown" || accuracy === "approximate") && (
             <div className="note">
+              <p>
+                <strong>Your birth time is probably findable.</strong> The short
+                birth certificate most people keep does not carry it, but the
+                long form does, and nearly anyone can request one from the
+                office of vital records in the state or country they were born
+                in. Ask for the <em>long form</em>, sometimes called the vault
+                copy or the certified copy of the original certificate of live
+                birth.
+              </p>
+              <p>
+                Without a time, your Type and Authority are usually still
+                reliable, but your Profile, your Ascendant and all four of your
+                variables may not be. Your chart will say which is which rather
+                than guess.
+              </p>
               <p>
                 <a href="https://cal.com/delphihumandesign/birth-time-rectification" target="_blank" rel="noreferrer">
                   Book A Rectification Session
