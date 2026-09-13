@@ -165,6 +165,15 @@ and were not in scope.
   this chart." (website form), the quarter stopgap text. The "brand mark
   missing" line is a terminal warning, not client text.
 
+## Hover and click rule (Kaycee, 2026-09-13)
+
+Everywhere, every view: hover shows a tip with her Delphi Basic; click pins a
+card, which carries the person's own report when they have one and the Delphi
+Basic otherwise. Applies to gates, channels, centers, header fields, the
+Circuitry, Channels, Variables and planet lists, planet glyphs, mandala
+quarters, transit rows and every Stats row. In a list with tick boxes, the box
+switches the item and the name pins its card. Keep new elements to this rule.
+
 ## Standing rules to carry over
 
 Never run the sync without asking. Never remove a rule without asking. No

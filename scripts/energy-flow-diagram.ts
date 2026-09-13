@@ -4215,6 +4215,17 @@ if (DATA.client) {
       '" data-key="' + m.key + '"><span>' + m.label + '</span> ' + body + '</div>';
   }).join('');
   // what a withheld field could have been, and when each one applies
+  // Every header field explains itself on hover in her Delphi Basic; a click pins
+  // the card, which carries this person's own report when there is one.
+  // Kaycee, 2026-09-13: "delphi basic descriptions as the hover and the report
+  // descriptions on click".
+  document.getElementById('pmeta').addEventListener('mousemove', function (e) {
+    var pr = e.target.closest ? e.target.closest('.prop') : null;
+    var m = pr && metaBy[pr.dataset.key];
+    if (!m || !m.basic || m.couldBe) { if (!pinned) tip.hidden = true; return; }
+    showTip(e, '<b>' + esc(m.value) + '</b><span class="tipbody">' + esc(m.basic) + '</span>');
+  });
+  document.getElementById('pmeta').addEventListener('mouseleave', function () { tip.hidden = true; });
   document.getElementById('pmeta').addEventListener('click', function (e) {
     var b = e.target.closest ? e.target.closest('.pendmark') : null;
     if (!b) return;
@@ -4936,10 +4947,25 @@ if (DATA.client) {
           '<span style="opacity:.45"> &middot; </span>' +
           '<span style="color:#0d9488">' + esc(s[2]) + ' ' + esc(s[3]) + '</span><br>';
       }
-      showTip(e, '<b>' + esc(head) + '</b>' + split + (sub ? sub + '<br>' : '') +
+      var rest = split + (sub ? sub + '<br>' : '') +
         (split ? '' : (gl ? '<span style="opacity:.7">' + esc(gl) + '</span>'
-            : (list.length ? '' : 'None in this chart.'))));
+            : (list.length ? '' : 'None in this chart.')));
+      if (e) showTip(e, '<b>' + esc(head) + '</b>' + rest);
+      // the pinned card says exactly what the hover said, in card form
+      return '<b>' + esc(head) + '</b><div class="basic">' + rest + '</div>';
     };
+    // a Stats row pins the same description on click. A centre row opens the
+    // centre's own card, which carries the person's report when they have one.
+    document.getElementById('tab-stats').addEventListener('click', function (e) {
+      if (e.target.closest && e.target.closest('[data-gate]')) return;
+      var el = e.target.closest ? e.target.closest('.bar, .cyc[data-pl]') : null;
+      if (!el) return;
+      if (el.dataset.kind === 'center') {
+        var ck = DATA.centers.filter(function (x) { return x.name === el.dataset.key; })[0];
+        if (ck && ctrByID[ck.id]) { openCard(el, ctrHtml(ctrByID[ck.id]), null, gatesInCenter(ck.id)); return; }
+      }
+      openCard(el, statTip(el, null));
+    });
     document.getElementById('tab-stats').addEventListener('mousemove', function (e) {
       // the category heading explains what its table counts
       var sm = e.target.closest ? e.target.closest('summary[data-help]') : null;
@@ -4980,8 +5006,10 @@ if (DATA.client) {
     markRowsFor((DATA.placements || []).filter(function (p) {
       return p.gate === c.srcGate || p.gate === c.tgtGate;
     }));
+    showTip(e, chanTipHtml(c));
   });
   cl.addEventListener('mouseleave', function () {
+    tip.hidden = true;
     if (!pinned) { hot(null); litGate(null); markRowsFor(null); }
   });
   // ── today's read ────────────────────────────────────────────────────────
@@ -5472,9 +5500,21 @@ if (DATA.client) {
   document.getElementById('planets').addEventListener('mousemove', function (e) {
     var lb = e.target.closest ? e.target.closest('label.cc') : null;
     if (!lb) { tip.hidden = true; return; }
+    // this list sits in the dock, outside the panel, so the page's own hover
+    // handler would clear the tip straight after it appears
+    e.stopPropagation();
     showTip(e, planetTipHtml(lb.textContent.trim()));
   });
   document.getElementById('planets').addEventListener('mouseleave', function () { tip.hidden = true; });
+  document.getElementById('planets').addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('input')) return;
+    var lb = e.target.closest ? e.target.closest('label.cc') : null;
+    if (!lb || !planetBasic(lb.textContent.trim())) return;
+    // the name pins its description; the tick box alone switches the planet
+    e.preventDefault();
+    e.stopPropagation();
+    openCard(lb, planetCardHtml(lb.textContent.trim()));
+  });
   // A collapsed section can hide the fact that something is switched off, so the
   // line itself says how many. Chiron and Lilith never count: they start off,
   // and a badge permanently reading "2 off" would tell nobody anything.
@@ -6892,6 +6932,17 @@ host.addEventListener('mousemove', function (e) {
   showTip(e, '<b>' + esc(c.name) + '</b><span class="tipbody">' + esc(info) + '</span>');
 });
 host.addEventListener('mouseleave', function () { tip.hidden = true; });
+host.addEventListener('click', function (e) {
+  if (e.target.closest && e.target.closest('input')) return;
+  var lb = e.target.closest ? e.target.closest('label.cc') : null;
+  var bx = lb && lb.querySelector('.cbx');
+  var c = bx && DATA.circuits.filter(function (x) { return x.id === bx.dataset.id; })[0];
+  var info = c && (DATA.tagInfo || {})[String(c.name).trim().toLowerCase()];
+  if (!info) return;
+  // the name pins the description; the tick box alone switches the circuit
+  e.preventDefault();
+  openCard(lb, '<b>' + esc(c.name) + '</b><div class="basic">' + esc(info) + '</div>');
+});
 document.getElementById('all').onclick = function () {
   [].forEach.call(document.querySelectorAll('.cbx'), function (b) { b.checked = true; }); sync();
 };
@@ -7769,6 +7820,10 @@ function planetBasic(name) {
   var key = libKeyFor('planet', String(name || '').split('_').join(' '));
   return ((DATA.basicLib || {}).planet || {})[key] || '';
 }
+function planetCardHtml(name) {
+  var b = planetBasic(name);
+  return '<b>' + esc(name) + '</b>' + (b ? '<div class="basic">' + esc(b) + '</div>' : '');
+}
 function planetTipHtml(name) {
   var b = planetBasic(name);
   return '<b>' + esc(name) + '</b>' + (b ? '<span class="tipbody">' + esc(b) + '</span>' : '');
@@ -7833,6 +7888,12 @@ function propHtml(m) {
     (m.report ? prose(m.report) : (m.basic ? '<div class="basic">' + esc(m.basic) + '</div>' : ''));
 }
 
+// A channel's hover: its name, circuit and type, and her Delphi Basic. The
+// card on click carries the person's report when they have one.
+function chanTipHtml(c) {
+  return '<b>' + esc(c.name) + '</b>' + esc(c.circuitName) + (c.type ? ' \u00b7 ' + esc(c.type) : '') +
+    (c.basic ? '<span class="tipbody">' + esc(c.basic) + '</span>' : '');
+}
 function chanHtml(c) {
   return '<b>' + esc(c.name) + '</b>' +
     (c.pending ? pendingNote('Channel ' + c.key) : '') +
@@ -7919,6 +7980,20 @@ document.addEventListener('click', function (e) {
   if (e.target.closest && e.target.closest('.card')) return;
   var va = e.target.closest ? e.target.closest('.varrow') : null;
   if (va && varBy[va.dataset.var]) { openCard(va, varHtml(varBy[va.dataset.var])); return; }
+  // Hover gives the tip, click pins the same thing as a card, everywhere.
+  // Kaycee, 2026-09-13: "make sure to be consistent across views".
+  var pgc = e.target.closest ? e.target.closest('.pgl') : null;
+  if (pgc) { openCard(pgc, planetCardHtml(pgc.dataset.pname)); return; }
+  var qc = e.target.closest ? e.target.closest('.mandala .q-label, .mandala .q-sector') : null;
+  if (qc) {
+    var QNc = ['Initiation', 'Civilization', 'Duality', 'Mutation'];
+    var qic = qc.classList.contains('q-label') ? +qc.dataset.quarter
+      : [].indexOf.call(qc.parentNode.querySelectorAll('.q-sector'), qc);
+    var qtc = QNc[qic] && (DATA.tagInfo || {})['quarter of ' + QNc[qic].toLowerCase()];
+    if (qtc) { openCard(qc, '<b>Quarter of ' + QNc[qic] + '</b><div class="basic">' + esc(qtc) + '</div>'); return; }
+  }
+  var trc = e.target.closest ? e.target.closest('.trow') : null;
+  if (trc) { openCard(trc, gateLibHtml(+trc.dataset.gate), null, +trc.dataset.gate); return; }
   // the mandala: a planet on its spoke, or any gate cell on the wheel
   var mp = e.target.closest ? e.target.closest('.mandala [data-planet]') : null;
   if (mp) {
@@ -8091,7 +8166,7 @@ document.addEventListener('mousemove', function (e) {
   if (ch && chByKey[chanUnder(e, ch)]) {
     var c = chByKey[chanUnder(e, ch)];
     hot(c.key); litGate([c.srcGate, c.tgtGate]);
-    showTip(e, '<b>' + esc(c.name) + '</b>' + esc(c.circuitName) + (c.type ? ' · ' + esc(c.type) : ''));
+    showTip(e, chanTipHtml(c));
     show('<b>' + esc(c.name) + '</b><span class="meta">' + esc(c.circuitName) +
       (c.type ? ' · ' + esc(c.type) : '') +
       '<br>Gate ' + c.srcGate + ' in the ' + esc(c.from) + ' feeds gate ' + c.tgtGate + ' in the ' + esc(c.to) + '.</span>');
@@ -8122,8 +8197,7 @@ document.addEventListener('mousemove', function (e) {
   if (uk) {
     var uc = chByKey[uk];
     hot(uk); litGate([uc.srcGate, uc.tgtGate]);
-    showTip(e, '<b>' + esc(uc.name) + '</b>' + esc(uc.circuitName) +
-      (uc.type ? ' \u00b7 ' + esc(uc.type) : ''));
+    showTip(e, chanTipHtml(uc));
     return;
   }
   hot(null); litGate(null); markRows(null); tip.hidden = true;
