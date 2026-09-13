@@ -21,6 +21,7 @@
  */
 
 import { longitudeAt } from "@/lib/hd/ephemeris";
+import { cyclesFor } from "@/lib/hd/cycles-node";
 
 const DAY = 86_400_000;
 const MINUTE = 60_000;
@@ -79,16 +80,114 @@ export function designMomentFor(momentUtc: string | Date): Date | null {
 }
 
 /**
- * The Rave Return: when the Sun comes back to where it stood at birth.
+ * The Solar Return: when the Sun comes back to where it stood at birth.
  *
- * `after` is where to start looking, so a caller can ask for this year's or any
- * other. The reading belongs three months before the birthday rather than on
- * it, because the design side arrives first and carries the unconscious themes.
+ * `after` is where to start looking, so a caller can ask for any year's.
  */
-export function raveReturnAfter(birthUtc: string | Date, after: string | Date): Date | null {
+export function solarReturnAfter(birthUtc: string | Date, after: string | Date): Date | null {
   const natal = longitudeAt("Sun", new Date(birthUtc));
   if (natal === null) return null;
   const from = new Date(after).getTime();
   const found = crossingNear("Sun", natal, from, from + 370 * DAY);
   return found === null ? null : new Date(Math.round(found / MINUTE) * MINUTE);
+}
+
+/** A return, with the design moment that belongs to it. */
+export interface ReturnMoment {
+  kind: "Solar Return" | "Saturn Return" | "Uranus Opposition" | "Kiron Return"
+    | "Second Saturn Return" | "Uranus Return";
+  /** Where this one sits relative to now. */
+  when: "current" | "next";
+  /** The instant the return happens, UTC. */
+  moment: string;
+  /** 88 solar degrees before it, which is where the reading starts. */
+  design: string;
+  /** When the reading belongs, which is not the same as when the return is. */
+  readFrom: string;
+}
+
+/**
+ * The Solar Return somebody is living in, and the one coming.
+ *
+ * Kaycee, 2026-09-12: "could we do current return and next return?" Both,
+ * because a return is a year long and the one you are inside is the one
+ * explaining your life right now, while the next is the one worth preparing
+ * for. Neither alone is the answer.
+ *
+ * `readFrom` is the design moment rather than the return itself. The method is
+ * explicit that a Solar Return reading belongs about three months before the
+ * birthday, when the unconscious themes arrive, not on the day.
+ */
+export function solarReturns(birthUtc: string | Date, now = new Date()): ReturnMoment[] {
+  const out: ReturnMoment[] = [];
+  const t = now.getTime();
+
+  // Start a year and a bit back so the crossing before now is certainly found.
+  const previous = solarReturnAfter(birthUtc, new Date(t - 380 * DAY));
+  const current = previous && previous.getTime() <= t
+    ? previous
+    : solarReturnAfter(birthUtc, new Date(t - 745 * DAY));
+  const next = current ? solarReturnAfter(birthUtc, new Date(current.getTime() + DAY)) : null;
+
+  for (const [when, m] of [["current", current], ["next", next]] as const) {
+    if (!m) continue;
+    const design = designMomentFor(m);
+    if (!design) continue;
+    out.push({
+      kind: "Solar Return", when,
+      moment: m.toISOString(),
+      design: design.toISOString(),
+      readFrom: design.toISOString(),
+    });
+  }
+  return out;
+}
+
+/**
+ * The long cycle behind somebody and the one ahead of them.
+ *
+ * Saturn, the Uranus Opposition, Kiron, the second Saturn and the Uranus
+ * Return. Each happens once, so "current" is the one most recently crossed and
+ * "next" is the one coming; a life usually has one of each in view.
+ *
+ * `readFrom` is not the return. The method is explicit that a Saturn Return
+ * should not be delivered at the Saturn: wait until the middle thirties, three
+ * or four years after, when somebody has actually been inside it. Kiron reads
+ * three and a half years either side. So the date to act on is stored beside
+ * the date it happens, and they are not the same date.
+ */
+const READING_OFFSET_DAYS: Record<string, number> = {
+  "Saturn Return": 3.5 * 365,
+  "Second Saturn Return": 3.5 * 365,
+  "Uranus Opposition": 0,
+  "Kiron Return": -3.5 * 365,
+  "Uranus Return": 0,
+};
+
+export async function longCycleReturns(birthUtc: string | Date, now = new Date()): Promise<ReturnMoment[]> {
+  const cycles = await cyclesFor({ birthUtc: new Date(birthUtc).toISOString(), now });
+  const t = now.getTime();
+  const dated = cycles
+    .filter((c) => c.firstPassUtc)
+    .map((c) => ({ kind: c.label as ReturnMoment["kind"], at: new Date(c.firstPassUtc).getTime() }))
+    .sort((a, b) => a.at - b.at);
+
+  const past = dated.filter((c) => c.at <= t).pop();
+  const ahead = dated.find((c) => c.at > t);
+  const out: ReturnMoment[] = [];
+
+  for (const [when, c] of [["current", past], ["next", ahead]] as const) {
+    if (!c) continue;
+    const moment = new Date(c.at);
+    const design = designMomentFor(moment);
+    if (!design) continue;
+    const offset = READING_OFFSET_DAYS[c.kind] ?? 0;
+    out.push({
+      kind: c.kind, when,
+      moment: moment.toISOString(),
+      design: design.toISOString(),
+      readFrom: new Date(c.at + offset * DAY).toISOString(),
+    });
+  }
+  return out;
 }
