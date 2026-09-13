@@ -87,7 +87,9 @@ function variableParts(key: string, colorNumber: number, toneNumber: number, arr
     : variable === "Perspective" ? ["Distraction", c.distraction] : null;
   if (extra && extra[1]) {
     const other = L.byVariable[variable].find((x) => x.colorName === extra[1]);
-    parts.push({ text: `, ${extra[0]}: ` }, { text: extra[1], key: other ? `${shown}|Color|${other.colorNumber}` : undefined });
+    // its own text, not the color's: Transference and Distraction mean something
+    // different from having that color. Kaycee, 2026-09-13: "Definitely need their own text."
+    parts.push({ text: `, ${extra[0]}: ` }, { text: extra[1], key: other ? `${shown}|${extra[0]}|${other.colorNumber}` : undefined });
   }
   return parts;
 }
@@ -1766,22 +1768,6 @@ function tagInfo(chunks: Chunk[]): Record<string, string> {
     if (c.source_kind === "channel_type") put(name, m.Description ?? "", false);
     if (c.source_kind === "quarter") put(`quarter of ${name.replace(/^\d+:\s*/, "")}`, delphiText(m));
   }
-  // Stopgap: the HD Quarters database is ticked for sync but does not reach the
-  // library yet (its table sits a page deeper than the sync looks). These are
-  // Kaycee's own Theme and Quarter Description, read straight off that database
-  // on 2026-08-24, so the pills read correctly meanwhile. The loop above wins
-  // the moment quarters do come through the sync.
-  const QUARTERS_STOPGAP: Record<string, string> = {
-    "quarter of initiation":
-      "Purpose fulfilled through Mind. In the First Quarter the witness returns to earth, bringing renewal to the evolution of consciousness on the mental plane: thinking, educating, conceptualizing, explaining and sharing what it means to be alive in a Form.",
-    "quarter of civilization":
-      "Purpose fulfilled through Form. The Second Quarter concretizes the mind's initiated concepts into form, building the structures, communities and civilizations that support the body so everyone can develop and thrive.",
-    "quarter of duality":
-      "Purpose fulfilled through Bonding. The Third Quarter is the most intimately human of the four, where we cross the barrier of our separateness and address our need for the other, and the two become one.",
-    "quarter of mutation":
-      "Purpose fulfilled through Transformation. In the Fourth Quarter an authentic life is brought to completion and assessed for meaning; what survives is carried forward as truths for the next generation.",
-  };
-  for (const [k, v] of Object.entries(QUARTERS_STOPGAP)) if (!out[k]) out[k] = v;
 
   // No generic tooltip for the Defined / Undefined / Open pills. It used to be
   // the Definitive Book's text taken off whichever centre the library happened
@@ -3633,6 +3619,8 @@ button.disabled:hover, button:disabled:hover { background:var(--paper); color:in
 .vcomp .vv { margin-left:auto; text-align:right; }
 .vcomp.vpart { cursor:pointer; border-bottom:0; }
 .vcomp.vpart:hover { background:rgba(132,80,149,.14); }
+.varrow-item > span.vname { cursor:pointer; }
+.varrow-item > span.vname:hover { opacity:.85; color:var(--purple); }
 .vcard { margin-top:2px; }
 .vcard-row { padding:5px 0; border-top:1px solid rgba(132,80,149,.14); }
 .vcard-row:first-child { border-top:0; }
@@ -4256,8 +4244,11 @@ if (DATA.client) {
               (b ? ' data-basic="' + esc(b).split('"').join('&quot;') + '" data-label="' + esc(r.label + ': ' + r.value) + '"' : '') +
               '><span class="vk">' + esc(r.label) + '</span><span class="vv">' + esc(r.value) + '</span></div>';
           }).join('');
+      // the variable's own name carries what that variable is
+      var vb = ((DATA.basicLib || {}).variable_component || {})[v.label + '|Variable|1'] || '';
       return '<div class="varrow-item" data-var="' + i + '">' +
-        '<span>' + esc(v.label) + '</span>' + val + '</div>';
+        '<span' + (vb ? ' class="vpart vname" data-basic="' + esc(vb).split('"').join('&quot;') + '" data-label="' + esc(v.label) + '"' : '') +
+        '>' + esc(v.label) + '</span>' + val + '</div>';
     }).join('');
     document.getElementById('varlist').addEventListener('mousemove', function (e) {
       var o = e.target.closest ? e.target.closest('.vpart') : null;
@@ -4460,7 +4451,7 @@ if (DATA.client) {
     var L = (DATA.gateLib || {})[el.dataset.gate] || {};
     // the same gate hover as everywhere else, with what it would do as a bridge
     showTip(e, gateTipHtml(+el.dataset.gate) +
-      '<span class="tipbody">' + (L.bridge ? '<i>If it bridged your split:</i> ' + esc(L.bridge)
+      '<span class="tipbody">' + (L.bridge ? '<i>As a bridge gate,</i> ' + esc(L.bridge)
         : 'would complete a channel across the split') + '</span>');
   });
   document.getElementById('deflist').addEventListener('click', function (e) {
@@ -4701,7 +4692,6 @@ if (DATA.client) {
       var max = Math.max.apply(null, rows.map(function (r) { return r[1]; }).concat([1]));
       // what each category counts, in plain terms, on the heading itself
       var NOTE = {
-        line: 'Every activation sorted by its line number, 1 to 6. The line is the second number in a placement: in 12.4 the line is 4. Lines carry the same theme in any gate, so the shape of this list says something about how the whole design behaves.',
         group: 'Every activation sorted by the circuit its gate belongs to. Individual keeps mutation, Tribal keeps support and bargain, Collective keeps sharing. Integration is the small group that serves survival of the self.',
         center: 'Every activation sorted by the center its gate sits in. All nine are listed. A center showing zero has no activations at all, which is as much a fact about the design as a full one.',
         sign: 'Every activation placed in the zodiac, grouped by element and heaviest first. The mandala and the zodiac are the same wheel, so each gate and line falls at an exact degree of a sign.'
@@ -5873,11 +5863,10 @@ if (DATA.client) {
         })
         .catch(function (e) {
           relGo.disabled = false;
-          // A fault while drawing lands here too, so name it rather than blaming
-          // the network for something on this side.
-          status.textContent = (e && e.message)
-            ? 'Drew the data but could not paint it: ' + e.message
-            : 'Could not reach the chart service.';
+          // One plain message whatever went wrong. Kaycee, 2026-09-13: no
+          // technical detail on a client's screen.
+          void e;
+          status.textContent = 'Chart could not be generated. Please try again.';
         });
     };
   }
@@ -6075,7 +6064,7 @@ if (DATA.client) {
     var html =
       section('Activations by Line', ['Line 1', 'Line 2', 'Line 3', 'Line 4', 'Line 5', 'Line 6'],
         function (r) { return 'Line ' + r.p.line; },
-        'Every activation sorted by its line number, one bar per line. The number is both of you; the mouseover splits it.', 'line') +
+        '', 'line') +
       section('Activations by Center',
         centers.map(function (c) { return centerName[c] || c; }),
         function (r) { var L = lib[r.p.gate]; return L ? L.center : null; },
@@ -7369,8 +7358,8 @@ function paintRelationship() {
       both: 'You both carry these.',
       one: 'One of you carries it, the other meets it.',
       between: 'Defined only by the two of you together.',
-      und: 'Undefined even together: gates, but no channel.',
-      open: 'Open in both of you: nothing activated there.'
+      und: 'Undefined in Relationship',
+      open: 'Open in Relationship'
     };
     var BAND_NAME = { both: 'Both of you', one: 'One of you', between: 'Between you',
       und: 'Undefined together', open: 'Open together' };
@@ -7721,7 +7710,9 @@ function varHtml(v) {
       '</span><span class="vv">' + esc(r.value) + '</span></div>' +
       (b ? '<div class="vdesc">' + esc(b) + '</div>' : '') + '</div>';
   }).join('');
+  var vb = lib[v.label + '|Variable|1'] || '';
   return '<b>' + esc(v.label) + '</b>' +
+    (vb ? '<div class="vdesc" style="margin-bottom:6px">' + esc(vb) + '</div>' : '') +
     tags([{ text: v.side === 'design' ? 'Design' : 'Personality',
             bg: v.side === 'design' ? '#e06666' : '#c9b6e4' },
           { text: v.arrow + ' arrow' }]) +
@@ -7833,7 +7824,7 @@ function gateLibHtml(gate) {
 
     (L.basic ? '<div class="basic">' + esc(L.basic) + '</div>' : '') +
     (isBridge(gate) && L.bridge
-      ? '<div class="basic"><i>If it bridged your split:</i> ' + esc(L.bridge) + '</div>' : '') +
+      ? '<div class="basic"><i>As a bridge gate,</i> ' + esc(L.bridge) + '</div>' : '') +
     '<span class="meta">Not activated in this chart.</span>';
 }
 function propHtml(m) {

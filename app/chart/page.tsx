@@ -156,7 +156,7 @@ export default function ChartPage() {
               ? `Sent to ${email} as well, so you have it twice.`
               : result.account
                 ? `Saved to ${email}, so you can find it again later.`
-                : "Save the link: it is the only way back to this chart."}
+                : <>Link to Chart: <a href={result.url} target="_blank" rel="noreferrer">{result.url}</a></>}
           </p>
         </section>
       ) : (

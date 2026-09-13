@@ -56,7 +56,8 @@ function stripComments(src: string): string {
         return line.slice(0, i);
       }
     }
-    return line;
+    // a terminal message is for whoever runs the build, not the client
+    return /\bconsole\.(log|warn|error)\(/.test(line) ? "" : line;
   }).join("\n");
 }
 
