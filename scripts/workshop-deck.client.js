@@ -295,7 +295,7 @@
     var s = slides[cur];
     app.innerHTML = '<div class="deck"><div class="top">' + (D.logo ? '<img class="logo" src="' + D.logo + '" alt="Delphi">' : '') +
       '<span class="crumb">' + esc(s.section) + '</span><span class="spacer"></span><span class="count">' + ROOM.length + ' in the room</span>' +
-      '<button id="menubtn">Sections</button></div><div class="slide">' + s.render() + '</div>' +
+      '<button id="menubtn">Sections</button></div><div class="slide"><div class="fit">' + s.render() + '</div></div>' +
       '<div class="nav"><button id="prev" aria-label="Back">&#8592;</button><span class="pos">' + (cur + 1) + ' / ' + slides.length +
       '</span><button id="next" aria-label="Next">&#8594;</button></div></div>';
     document.getElementById('prev').onclick = function () { go(cur - 1); };
@@ -303,7 +303,45 @@
     document.getElementById('menubtn').onclick = toggleMenu;
     [].forEach.call(document.querySelectorAll('[data-goto]'), function (el) { el.onclick = function () { go(indexOf(el.dataset.goto)); }; });
     if (s.after) s.after();
+    fit();
+    // images and embedded pages settle after the first paint
+    setTimeout(fit, 60); setTimeout(fit, 400);
   }
+  // Every slide fits the screen with no scrolling. Kaycee, 2026-09-13: "every
+  // screen should fit on one page so I don't have to scroll". A slide holding an
+  // embedded page (the wheel, the bodygraph) sizes that page to the screen
+  // instead; everything else scales down until it fits.
+  function fit() {
+    var slide = document.querySelector('.slide'), box = document.querySelector('.fit'), nav = document.querySelector('.nav');
+    if (!slide || !box) return;
+    box.style.transform = ''; box.style.width = '';
+    var top = box.getBoundingClientRect().top;
+    var bottom = nav ? nav.getBoundingClientRect().top - 12 : slide.getBoundingClientRect().bottom - 12;
+    var availH = bottom - top;
+    var frame = box.querySelector('iframe.frame');
+    if (frame) {
+      frame.style.height = Math.max(200, bottom - frame.getBoundingClientRect().top) + 'px';
+      return;
+    }
+    // shrinking widens the box, which reflows the text shorter, so settle it
+    var k = 1;
+    for (var i = 0; i < 8; i++) {
+      var h = box.scrollHeight;
+      var next = Math.min(1, availH / h * k > 1 ? 1 : availH / (h / (1 / k) * k)) ;
+      next = Math.min(1, (availH * (1 / k)) / h * k);
+      if (Math.abs(next - k) < 0.005) break;
+      k = next;
+      box.style.width = (100 / k) + '%';
+    }
+    // step down until the scaled height is inside the screen
+    for (var j = 0; j < 30 && box.scrollHeight * k > availH; j++) {
+      k = k * 0.97;
+      box.style.width = (100 / k) + '%';
+    }
+    if (k < 1) box.style.transform = 'scale(' + k + ')';
+    else box.style.width = '';
+  }
+  window.addEventListener('resize', fit);
   function toggleMenu() {
     var m = document.querySelector('.menu');
     if (m) { m.remove(); return; }
