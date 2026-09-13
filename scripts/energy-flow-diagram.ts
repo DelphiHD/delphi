@@ -1498,9 +1498,13 @@ function basicByValue(chunks: Chunk[]): Record<string, Record<string, string>> {
   const norm = normValue;
 
   for (const c of chunks) {
-    const basic = delphiText(c.metadata);
-    if (!basic) continue;
     const kind = c.source_kind ?? "";
+    // The Types column was titled "Text 1" in the 09-13 sync; Kaycee renamed it
+    // to Delphi Basic afterwards. The words are hers either way, so the synced
+    // copy is read until the next sync carries the new name.
+    const basic = delphiText(c.metadata) ||
+      (kind === "type" ? ((c.metadata ?? {})["Text 1"] ?? "").trim() : "");
+    if (!basic) continue;
     if (kind === "gate") {
       const n = Number((c.metadata ?? {})["Gate #"] ?? (c.title ?? "").match(/\d+/)?.[0]);
       if (n) out.gate[String(n)] = basic;
@@ -1647,16 +1651,20 @@ function tagInfo(chunks: Chunk[]): Record<string, string> {
     const m = clean.match(/^(?:[^.!?]+[.!?]+){1,2}/);
     return (m ? m[0] : clean.slice(0, 220)).trim();
   };
-  const put = (key: string, text: string) => {
-    const t = twoSentences(text ?? "");
+  // Her Delphi Basic goes in whole; only the older Description is cut short.
+  const put = (key: string, text: string, whole = true) => {
+    const t = whole ? (text ?? "").replace(/\s+/g, " ").trim() : twoSentences(text ?? "");
     if (key && t) out[key.trim().toLowerCase()] = t;
   };
   for (const c of chunks) {
     const m = c.metadata ?? {};
     const name = (m.Name ?? c.title ?? "").trim();
-    if (c.source_kind === "circuit") put(name, m.Description ?? "");
-    if (c.source_kind === "channel_type") put(name, m.Description ?? "");
-    if (c.source_kind === "quarter") put(`quarter of ${name.replace(/^\d+:\s*/, "")}`, m.Description ?? c.body ?? "");
+    // Pills read her Delphi Basic. Kaycee, 2026-09-13: "There should be Delphi
+    // Basic fields for those." Channel Types has none and keeps Description:
+    // "the descriptions we had were fine." 
+    if (c.source_kind === "circuit") put(name, delphiText(m));
+    if (c.source_kind === "channel_type") put(name, m.Description ?? "", false);
+    if (c.source_kind === "quarter") put(`quarter of ${name.replace(/^\d+:\s*/, "")}`, delphiText(m));
   }
   // Stopgap: the HD Quarters database is ticked for sync but does not reach the
   // library yet (its table sits a page deeper than the sync looks). These are
