@@ -4187,8 +4187,7 @@ ${d.client ? "" : viewControls}
 ${d.client ? `<div class="booknote"><div class="booklab">Book a session</div>${(d.client.established ? [...BOOKING_SESSIONS, DROP_IN] : BOOKING_SESSIONS).map(
       (s) => `<a href="${BOOKING_URL}/${s.slug}" target="_blank" rel="noopener"><span>${s.name}</span><em>${s.meta}</em></a>`,
     ).join("")}</div>` : ""}
-${d.client ? "" : `<div class="readout" id="readout"><b>Hover the bodygraph</b><span class="meta">Click to pin a description over the chart.</span></div>
-    <p class="hint">Arrows point the way energy travels: toward the Throat, hop by hop. Click a channel or a center to pin its description over the bodygraph.</p>`}
+${d.client ? "" : `<div class="readout" id="readout"></div>`}
   </aside>
 </div>
 <script>
