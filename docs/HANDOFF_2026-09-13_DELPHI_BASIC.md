@@ -174,6 +174,11 @@ Circuitry, Channels, Variables and planet lists, planet glyphs, mandala
 quarters, transit rows and every Stats row. In a list with tick boxes, the box
 switches the item and the name pins its card. Keep new elements to this rule.
 
+## Published 09-13
+
+Everything above was logged in DECISIONS.md (three entries dated 2026-09-13),
+pushed, and republished to every chart with scripts/republish-all.ts.
+
 ## Standing rules to carry over
 
 Never run the sync without asking. Never remove a rule without asking. No

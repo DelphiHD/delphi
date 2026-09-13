@@ -525,3 +525,64 @@ completeness guard compares against that kind's last copy only, and the local
 
 **Also 09-13.** Types gained `Delphi Strategy Basic` and `Delphi Frequencies
 Basic` (Kaycee's go-ahead), read by the chart's Strategy and Frequencies cards.
+
+## Delphi Basic everywhere, one hover rule (2026-09-13)
+
+**Decision (Kaycee).** Her Delphi Basic columns are the client text on the chart;
+The Definitive Book's Keynote, Function and DBHD Description no longer appear or
+ship in the page. The rule for every view and list: hover shows a tip with the
+Delphi Basic, click pins a card, and the card carries the person's own report
+text when they have one. Tick-box lists: the box switches, the name pins.
+
+**What reads what.** Gates, channels, crosses (matched on the four gates in the
+Crosses `Cross` field), planets, profiles, profile lines, authorities (Ego is
+Ego Manifested or Ego Projected by Type), variables (PHS notation), circuits
+and circuit families, quarters, types: `Delphi Basic`. Strategy and
+Frequencies: Types `Delphi Strategy Basic` and `Delphi Frequencies Basic`.
+Centers: `Themes` plus the three Delphi state fields. Channel Types keep
+`Description` (no Delphi column; Kaycee: fine as is). "Split Definition" gets no
+text until simple and wide split is wired.
+
+**Variables.** Cards, the panel and hovers show every piece of the Foundation
+header (color, arrow, mode, variant, tone, Transference or Distraction), built by
+lib/chart/variables.ts, each piece with its own text from the new HD Variable
+Components database (108 rows: the four variables, 24 colors, 48 variants, 12
+tones, 8 arrow modes, 6 Transference, 6 Distraction). Drafts written 09-13,
+Reviewed checkbox per row for Kaycee. Digestion color 4 is Touch, not Taste
+(lookup corrected; the Foundation headers change with it). Motivation and
+Perspective sharing the same six variant pairs is correct (Kaycee's matrix).
+Determination is labelled Digestion everywhere on the chart.
+
+**Chart changes.** Mandala view renamed The Wheel; circuit colours by family
+(Individual blues, Collective greens, Tribal orange and red, Integration
+purple); circuitry toggle on the bodygraph and The Wheel; circuit family totals
+and readable zeros; pills colour-coded on gates, channels (type colours) and
+centers (function colours), white text on deep colours; body-part associations
+on centers switched off until Kaycee corrects them. HD Circuits gained family
+rows Individual, Collective, Tribal (drafts).
+
+**Copy.** Tooltips rewritten and approved. Removed: the "Ask Kaycee" subscription
+line on free charts, hover instructions, failure explanations, the line-number
+help, the quarter stopgap. Her name never appears in client text.
+
+## Two guards that exist because of today (2026-09-13)
+
+**The copy check was blind.** It skipped any string containing a tag, an HTML
+entity, a semicolon or a colon, which is how "Ask Kaycee" and a dozen other
+unapproved lines reached client charts with every check passing. It now reads
+text as a client sees it (tags stripped, entities decoded), ignores terminal
+messages, and fails outright on "Kaycee" in client text.
+
+**A page script can break silently.** The chart page is one template literal, and
+backslashes inside it vanish. A regex that was valid in the editor arrived as a
+syntax error and stopped every hover on the sandbox chart. `publishChart` now
+parses every page script first and refuses to publish on failure. Inside the
+page template, never use a backslash; split strings by hand.
+
+## Sync one database, the gotchas (2026-09-13)
+
+Dashboard: pick a database, Sync this one. A database must have Sync to Delphi
+ticked and, for a new one, a KIND_MAP entry. After a sync, a chart rebuild reads
+the chunks table, not `.cache/chunks.json`. Browsers can hold an old chart page:
+verify a republish with a fresh URL or a no-cache fetch before concluding a
+change did not land.
