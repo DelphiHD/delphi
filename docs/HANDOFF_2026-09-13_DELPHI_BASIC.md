@@ -91,6 +91,35 @@ and were not in scope.
 4. Run the copy check, push, then `scripts/republish-all.ts` (roster rebuilds by
    slug, website charts by token). Verify on the live URLs, not the files.
 
+## Progress, 09-13 afternoon (committed, not pushed or republished)
+
+- Sync finished (11:05). Delphi Basic text per database: gates 64/64, channels
+  36/36, crosses 194/194, planets 14/14, profiles 12/12, authorities 8/8,
+  variables 16/16, circuits 7/7, quarters 4/4, profile lines 6/6, definitions
+  6/7 (the old "Wide Split (Broad Split)" row is empty; "Wide Split" has text).
+- Types 0/5: the column was named `Text 1`. Kaycee renamed it to `Delphi Basic`
+  on 09-13 after the sync. The text is already correct (Manifestor checked word
+  for word); it reaches the chart at the next sync, no code change needed.
+- Sun check: the live Notion `Delphi Basic` ends at "...primary self and
+  actions." and the sync matches it exactly. The rest of the sentence Kaycee
+  quoted lives in the Layer, Profile Applicability and Has Return in Life
+  columns, not in Delphi Basic.
+- Wired: the gate hover on every view (Keynote gone, Keynote and Function no
+  longer shipped in the page at all); header cards for Profile, Authority,
+  Variables, Definition and Incarnation Cross (a chart's own report still wins);
+  planets (glyph in placement tables, planet names in the panel, astrology
+  wheel), replacing the provider's planet blurb. Crosses match on the four
+  gates in the Crosses `Cross` field. Authority "Ego" is Ego Manifested or Ego
+  Projected by Type. "Split Definition" gets no text until simple and wide
+  split is wired (tabled).
+- One shared gate hover with colour-coded pills (side and planet, circuit,
+  quarter in the mandala's quarter colour, centre in its function colour).
+- Circuit colours by family: Individual blues, Collective greens, Tribal orange
+  and red, Integration purple. Circuitry panel shows family totals, and zero
+  counts are no longer faded out.
+- Still reading `Description`, untouched pending Kaycee: circuit and channel
+  type pills. Lines have no Delphi Basic column.
+
 ## Standing rules to carry over
 
 Never run the sync without asking. Never remove a rule without asking. No

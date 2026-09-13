@@ -65,14 +65,18 @@ import { castSkyAt } from "@/lib/transit/sky";
 
 // ── palettes ────────────────────────────────────────────────────────────────
 // Circuit colors: saturated, they carry the moving light.
+// One colour family per circuit group, so a glance says which family a channel
+// belongs to before it says which circuit. Kaycee, 2026-09-13: "make all of the
+// individual circuitry some shade of blue". Individual blues, Collective greens,
+// Tribal warm orange and red, Integration purple.
 const CIRCUITS = [
-  { id: "ind-knowing",  name: "Individual: Knowing",                group: "Individual",  color: "#a259ff" },
-  { id: "ind-centering",name: "Individual: Centering",              group: "Individual",  color: "#ff5fa2" },
-  { id: "col-logic",    name: "Collective: Understanding (Logic)",  group: "Collective",  color: "#29a3ff" },
-  { id: "col-abstract", name: "Collective: Sensing (Abstract)",     group: "Collective",  color: "#17c9c0" },
+  { id: "ind-knowing",  name: "Individual: Knowing",                group: "Individual",  color: "#3d7fe0" },
+  { id: "ind-centering",name: "Individual: Centering",              group: "Individual",  color: "#8ec0ff" },
+  { id: "col-logic",    name: "Collective: Understanding (Logic)",  group: "Collective",  color: "#2fa35f" },
+  { id: "col-abstract", name: "Collective: Sensing (Abstract)",     group: "Collective",  color: "#9ad88a" },
   { id: "tri-ego",      name: "Tribal: Ego",                        group: "Tribal",      color: "#ff9f1c" },
   { id: "tri-defense",  name: "Tribal: Defense",                    group: "Tribal",      color: "#ef4b4b" },
-  { id: "integration",  name: "Integration",                        group: "Integration", color: "#7ee787" },
+  { id: "integration",  name: "Integration",                        group: "Integration", color: "#a77ee0" },
 ] as const;
 type CircuitId = (typeof CIRCUITS)[number]["id"];
 
@@ -3216,7 +3220,10 @@ button.on { background:var(--purple); color:#fff; }
 #pmeta .prop { padding:3px 6px; margin:0 -2px; border-radius:7px; }
 #pmeta .prop.has { cursor:pointer; }
 #pmeta .prop.has:hover { background:rgba(132,80,149,.22); }
-label.cc.absent { opacity:.38; }
+/* a zero is information, not an absence: Kaycee, 2026-09-13, "we need to show
+   zero values as well, they are informative" */
+label.cc.absent { opacity:.8; }
+.grp .cnt { float:right; font-size:10.5px; }
 label.cc .cnt { margin-left:auto; font-size:10.5px; opacity:.55; }
 body.nohang .ch.hang { display:none; }
 
@@ -4298,7 +4305,8 @@ if (DATA.client) {
     var L = (DATA.gateLib || {})[el.dataset.gate] || {};
     // the same gate hover as everywhere else, with what it would do as a bridge
     showTip(e, gateTipHtml(+el.dataset.gate) +
-      (L.bridge ? '<span class="tipbody"><i>If it bridged your split:</i> ' + esc(L.bridge) + '</span>' : ''));
+      '<span class="tipbody">' + (L.bridge ? '<i>If it bridged your split:</i> ' + esc(L.bridge)
+        : 'would complete a channel across the split') + '</span>');
   });
   document.getElementById('deflist').addEventListener('click', function (e) {
     var el = e.target.closest ? e.target.closest('.brg') : null;
@@ -6702,8 +6710,17 @@ if (DATA.client) relight();
 var host = document.getElementById('circuits');
 var groups = {};
 DATA.circuits.forEach(function (c) { (groups[c.group] = groups[c.group] || []).push(c); });
+var liveIn = function (c) {
+  return DATA.channels.filter(function (x) { return x.circuit === c.id && x.live; }).length;
+};
 host.innerHTML = Object.keys(groups).map(function (g) {
-  return '<div class="grp">' + g.toUpperCase() + '</div>' + groups[g].map(function (c) {
+  // The family's own total, so the balance between the families reads at a
+  // glance. Kaycee, 2026-09-13: "Can we add a total to the main circuits?"
+  var gn = 0, gt = 0;
+  groups[g].forEach(function (c) { gn += liveIn(c); gt += c.total; });
+  return '<div class="grp">' + g.toUpperCase() +
+    (DATA.client ? '<span class="cnt">' + gn + '/' + gt + '</span>' : '') + '</div>' +
+    groups[g].map(function (c) {
     var n = DATA.channels.filter(function (x) { return x.circuit === c.id && x.live; }).length;
     var absent = DATA.client && n === 0;
     return '<label class="cc' + (absent ? ' absent' : '') + '">' +
