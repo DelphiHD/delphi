@@ -3080,7 +3080,10 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
       const state = defined === null ? null : defined ? "defined" : carries ? "undefined" : "open";
       const pending = !!d.client && d.client.pending.centers.has(c);
       return {
-        id: c, name: CENTER_DISPLAY[c], fns: d.fn[c], biology: d.biology[c],
+        // The body-part associations are off until Kaycee has corrected them.
+        // Kaycee, 2026-09-13: "please remove the body part associations from the
+        // centers, I need to fix those." Every display reads this one field.
+        id: c, name: CENTER_DISPLAY[c], fns: d.fn[c], biology: "",
         defined, state, pending,
         // The scan's own name for this centre, carried rather than rebuilt from
         // the display name: the two vocabularies do not match on Heart or G.
@@ -4895,17 +4898,37 @@ if (DATA.client) {
       var gates = list.map(function (p) { return p.gate; });
       litGate(gates);
       markRowsFor(list);
-      var head = el.dataset.key, sub = '';
+      var head = el.dataset.key, sub = '', familyCard = '';
       if (el.dataset.kind === 'line') {
         var n = String(el.dataset.key).split(' ')[1];
         head = 'Line ' + n + ': ' + ((DATA.lineNames || {})[n] || '');
         // her HD Profile Lines Delphi Basic for that line
         sub = esc(((DATA.basicLib || {}).profile_line || {})[n] || '');
       } else if (el.dataset.kind === 'group' || el.dataset.kind === 'circuit') {
-        // a family row, or one of its circuits: her HD Circuits Delphi Basic,
-        // the same text as the circuit's pill
-        sub = esc((DATA.groupInfo || {})[el.dataset.key] ||
-          (DATA.tagInfo || {})[String(el.dataset.key).trim().toLowerCase()] || '');
+        // A family has no row of its own in HD Circuits (Integration aside), so
+        // it speaks through its circuits: each one's count on hover, each one's
+        // Delphi Basic on the pinned card. Kaycee, 2026-09-13: "still no
+        // descriptions on the circuit stats page".
+        var fam = (DATA.circuits || []).filter(function (c) { return c.group === el.dataset.key; });
+        if (fam.length > 1) {
+          var subOf = function (p) {
+            return (typeof formedCircuit === 'function' && formedCircuit(p.gate)) || ((DATA.gateLib || {})[p.gate] || {}).circuit || '';
+          };
+          var fr = fam.map(function (c) {
+            var n = list.filter(function (p) { return String(subOf(p)).trim() === String(c.name).trim(); }).length;
+            return { name: c.name, short: c.name.replace(/^[^:]+:\s*/, ''), n: n,
+              text: (DATA.tagInfo || {})[String(c.name).trim().toLowerCase()] || '' };
+          });
+          sub = fr.map(function (r) { return esc(r.short) + ' ' + r.n; }).join(' &middot; ');
+          familyCard = '<b>' + esc(el.dataset.key) + '</b>' + fr.map(function (r) {
+            return '<div class="vcard-row"><div class="vcomp"><span class="vk">' + esc(r.short) +
+              '</span><span class="vv">' + r.n + '</span></div>' +
+              (r.text ? '<div class="vdesc">' + esc(r.text) + '</div>' : '') + '</div>';
+          }).join('');
+        } else {
+          sub = esc((DATA.groupInfo || {})[el.dataset.key] ||
+            (DATA.tagInfo || {})[String(el.dataset.key).trim().toLowerCase()] || '');
+        }
       } else if (el.dataset.kind === 'center') {
         var c = DATA.centers.filter(function (x) { return x.name === el.dataset.key; })[0];
         // The state label is this client's own, so it is left off a bar that
@@ -4951,8 +4974,9 @@ if (DATA.client) {
         (split ? '' : (gl ? '<span style="opacity:.7">' + esc(gl) + '</span>'
             : (list.length ? '' : 'None in this chart.')));
       if (e) showTip(e, '<b>' + esc(head) + '</b>' + rest);
-      // the pinned card says exactly what the hover said, in card form
-      return '<b>' + esc(head) + '</b><div class="basic">' + rest + '</div>';
+      // the pinned card says what the hover said, in card form; a circuit family
+      // lists each of its circuits with its description
+      return familyCard || '<b>' + esc(head) + '</b><div class="basic">' + rest + '</div>';
     };
     // a Stats row pins the same description on click. A centre row opens the
     // centre's own card, which carries the person's report when they have one.
