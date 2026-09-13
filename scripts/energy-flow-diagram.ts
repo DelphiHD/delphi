@@ -3447,13 +3447,7 @@ body.view-transit .todaysec, body.view-transit .datesec { display:block; }
    whole row only fits on one line without them. */
 .dfield::-webkit-calendar-picker-indicator { display:none; }
 .dfield::-webkit-inner-spin-button { display:none; }
-.cycrow { display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
-.cycpill { font-size:10px; padding:4px 9px; border-radius:999px; line-height:1.1;
-  border:1px solid rgba(132,80,149,.34); background:transparent; color:inherit;
-  font-family:inherit; cursor:pointer; }
-.cycpill:hover { border-color:var(--purple); }
-.cycpill.on { background:var(--purple); border-color:var(--purple); color:#fff; font-weight:600; }
-.datesec.loading .datepick, .datesec.loading .cycrow { opacity:.45; pointer-events:none; }
+.datesec.loading .datepick { opacity:.45; pointer-events:none; }
 .noread { font-size:11.5px; opacity:.62; line-height:1.5; margin-top:6px; }
 /* in the transit view the panel is about today, not about their design.
    Show is not part of that: it used to be the placements drawer on the right
@@ -5049,23 +5043,29 @@ if (DATA.client) {
     var cache = {};
     cache[DATA.sky.date + 'T' + DATA.sky.time] = DATA.sky.positions;
 
-    // ── the cycle pills ──────────────────────────────────────────────────────
-    var pills = ((DATA.client || {}).cycles || []).map(function (c) {
-      return { label: c.label, date: fromLongDate(c.date), status: c.status };
-    }).filter(function (c) { return !!c.date; });
-    if (pills.length) {
-      var wrap = document.createElement('div');
-      wrap.className = 'cycrow';
-      wrap.innerHTML = pills.map(function (c, i) {
-        return '<button class="cycpill" data-i="' + i + '" title="' + esc(c.label) +
-          ' &middot; ' + esc(c.status) + '">' + esc(c.label) + '</button>';
-      }).join('');
-      sec.appendChild(wrap);
-      wrap.addEventListener('click', function (e) {
-        var b = e.target.closest ? e.target.closest('.cycpill') : null;
-        if (b) go(pills[+b.dataset.i].date, curT);
-      });
-    }
+    // ── the cycle pills are gone, and should not come back like this ─────────
+    //
+    // They jumped the transit view to a cycle's date and kept whatever time of
+    // day the picker happened to be on, so the chart they drew was that date at
+    // an arbitrary hour rather than the moment of the return. Kaycee compared
+    // her Uranus Opposition here against Maia Mechanics on 2026-09-12: Maia has
+    // the cycle at 20:48 UTC, this drew 7:07 PM local, and the two are not the
+    // same sky.
+    //
+    // The hour matters more than it looks. She put it plainly: "The line on the
+    // sun/earth placements is incredibly important as it's a profile that sets
+    // the tone for the cycle." A line is a hundred minutes of solar travel, so
+    // an arbitrary hour can hand somebody the wrong profile for their cycle.
+    //
+    // A return chart also needs its own design side, about 88 solar degrees
+    // before the return, exactly as a birth chart does. A transit view has no
+    // such thing, which is why this was never the right home for it.
+    //
+    // The dates themselves are sound and stay on the Dates tab: computed from
+    // Swiss Ephemeris data, every one matching the reference to the minute,
+    // retrograde passes included. What is missing is a way to draw the return
+    // itself, and that is its own piece of work. Kaycee: "We don't have to
+    // tackle it now, but we should remove the inaccurate pills."
 
     // ── painting one moment onto the chart ───────────────────────────────────
     function repaint(d, t, positions) {
@@ -5142,9 +5142,6 @@ if (DATA.client) {
       curD = d; curT = t;
       dfield.value = d;
       tfield.value = t;
-      [].forEach.call(document.querySelectorAll('.cycpill'), function (b) {
-        b.classList.toggle('on', pills[+b.dataset.i].date === d);
-      });
       var iso = instant(d, t).toISOString();
       var utcD = iso.slice(0, 10), utcT = iso.slice(11, 16), key = utcD + 'T' + utcT;
       if (cache[key]) { repaint(d, t, cache[key]); litGate(null); return; }

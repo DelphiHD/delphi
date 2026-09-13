@@ -186,8 +186,8 @@
     {
      "id": "p5g",
      "title": "A chart says what its birth time cannot settle",
-     "status": "doing",
-     "note": "Scan engine working 12 September, proven on Kaycee's own chart: in a single hour around her birth time, Motivation, Sense, Design Sense and two Moon lines all move. Still to do: carry the accuracy through to the builder, mark the fields that move, say which time a day-segment used, and a reliability indicator on the dashboard so a booking arrives with its certainty attached."
+     "status": "done",
+     "note": "Done 12 September. A field the scan watches move carries no value: it reads Exact Birth Time Required and opens to what it could be, with the hours each answer covers. The four variables are withheld whenever the time is not exact, whether or not the scan caught them moving. The bodygraph draws solid only what holds at every hour of the window and draws the rest open, so nothing on the picture is ever wrong; a centre says which channels define it, and an unsettled centre no longer wears the label of the hour it was cast at. The astrology wheel draws its angles and house ring open, because the Ascendant crosses the whole zodiac in a day. The dashboard carries a Birth Time column: Exact, Told, Rough, or Rough with the type moving, so a booking arrives with its certainty attached. The scan is stored on the chart row and versioned, so it never re-runs and never serves a stale shape. Measured across 24 birth dates: 42 per cent of six-hour windows move type, profile, authority, definition or the cross."
     },
     {
      "id": "p5a",
@@ -440,6 +440,10 @@
   {
    "on": "2026-09-12",
    "what": "Two open questions closed by the day's work. The local ephemeris was added and is now the source for the birth time scan and all four cycle dates, with bodygraph.com still the only authority on Human Design itself. And the pacing and retry for bodygraph.com's rate limit went into the shared layer, so every caller is protected and not just the scan."
+  },
+  {
+   "on": "2026-09-12",
+   "what": "The cycle pills are off the transit tab. They jumped the view to a cycle's date and kept whatever time of day the picker was on, so the chart drawn was that date at an arbitrary hour rather than the moment of the return. Kaycee compared her Uranus Opposition against Maia Mechanics: Maia has it at 20:48 UTC, this drew 7:07 PM local. The dates themselves are sound and stay on the Dates tab."
   }
  ],
  "open": [
@@ -475,6 +479,9 @@
   },
   {
    "what": "Left on unknown birth times: the astrology view still draws its angles and house ring as though the hour were known. Kaycee approved the treatment on 2026-09-12 ('1- yes, 2-let's handle it the same') and the groundwork is in and dormant: the wheel knows its angles are never settled without an exact time, and the Moon's signs across the window are read locally. Nothing draws them yet."
+  },
+  {
+   "what": "Return charts, properly. Kaycee, 2026-09-12: 'we need to remove the return chart pills from the transit page, they still aren't entirely accurate and it will be important that they are for this part.' Three things a real return chart needs that a transit view cannot give it. The exact moment, not the date: 'The line on the sun/earth placements is incredibly important as it's a profile that sets the tone for the cycle', and a line is about a hundred minutes of solar travel. Its own design side, about 88 solar degrees before the return, exactly as a birth chart has. And probably its own drawing, closer to a relationship chart than a transit: the return laid over the natal, two states at once, which she first raised on 2026-09-10 about the Uranus Opposition cross. The moments are already computed to the second and verified against Swiss Ephemeris, so the arithmetic is done; the chart is not."
   }
  ],
  "brief": "https://claude.ai/code/artifact/3428e24e-262a-4fd7-86a6-93468244cb44"
