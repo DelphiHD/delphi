@@ -576,6 +576,33 @@ interface Target {
   isLineCompanion: boolean;
 }
 
+/**
+ * One database at a time. Kaycee, 2026-09-13: "I would love to be able to just
+ * sync one database to avoid timeouts." A whole walk takes half an hour for a
+ * one-column change.
+ *
+ *   npx tsx scripts/sync-notion.ts --only "HD Types"
+ *   npx tsx scripts/sync-notion.ts --list      # the ticked databases, as JSON
+ *
+ * The name is the row in the HD Database Directory, and the row still has to
+ * have Sync to Delphi ticked. Only that database's kind is replaced in the
+ * chunks table, under the same guard as a full run: a batch thinner than what
+ * is stored is refused and nothing changes. Every other kind is left alone,
+ * in the table and in the local copy.
+ */
+const ONLY: string | null = (() => {
+  const i = process.argv.indexOf("--only");
+  return i > -1 ? (process.argv[i + 1] ?? "").trim() || null : null;
+})();
+
+async function tickedDatabaseNames(): Promise<string[]> {
+  const dirResp = await queryDataSource(DIRECTORY_ID, {
+    filter: { property: "Sync to Delphi", checkbox: { equals: true } },
+  });
+  return dirResp.results.filter(isFullPage).map(pageTitle)
+    .filter((n: string) => !FIREWALL_NAMES.has(n)).sort();
+}
+
 async function resolveTargets(): Promise<Target[]> {
   const dirResp = await queryDataSource(DIRECTORY_ID, {
     filter: { property: "Sync to Delphi", checkbox: { equals: true } },
@@ -585,6 +612,8 @@ async function resolveTargets(): Promise<Target[]> {
   for (const row of dirResp.results) {
     if (!isFullPage(row)) continue;
     const name = pageTitle(row);
+    // one database: resolve only that row, which also skips the slow lookups
+    if (ONLY && name !== ONLY) continue;
     if (FIREWALL_NAMES.has(name)) {
       console.warn(`  ⚠ Skipping ${name} (firewalled)`);
       continue;
@@ -816,7 +845,7 @@ async function saveCheckpoint(chunks: Chunk[]): Promise<void> {
 // missing entirely, keep the last-good copy. Kaycee reviews the flags and
 // decides whether a shrink was correct (e.g. wrong content removed) or a
 // failure. Nothing is dropped without a loud, visible record.
-async function applyCompletenessGuard(fresh: Chunk[]): Promise<Chunk[]> {
+async function applyCompletenessGuard(fresh: Chunk[], onlyKinds?: Set<string>): Promise<Chunk[]> {
   let lastGood: Chunk[] = [];
   try {
     const data = JSON.parse(await readFile(CHECKPOINT_PATH, "utf8"));
@@ -824,6 +853,9 @@ async function applyCompletenessGuard(fresh: Chunk[]): Promise<Chunk[]> {
   } catch {
     return fresh; // no prior library to guard against
   }
+  // A one-database run is guarded against that database's last copy only;
+  // the rest of the library did not take part and is not "missing".
+  if (onlyKinds) lastGood = lastGood.filter((c) => onlyKinds.has(c.source_kind));
   if (!lastGood.length) return fresh;
 
   const keyOf = (c: Chunk) => `${c.source_kind}|${c.gate_number}|${c.line_number}|${c.slug}`;
@@ -878,7 +910,11 @@ async function applyCompletenessGuard(fresh: Chunk[]): Promise<Chunk[]> {
 }
 
 async function main() {
-  console.log("Phase 3 sync starting");
+  if (process.argv.includes("--list")) {
+    console.log(JSON.stringify(await tickedDatabaseNames()));
+    return;
+  }
+  console.log(ONLY ? `Sync of one database starting: ${ONLY}` : "Phase 3 sync starting");
 
   // Resume from a previous Notion walk if one is fresh on disk. Lets us
   // recover from OpenAI / Supabase failures without re-paying the 10-minute
@@ -886,12 +922,16 @@ async function main() {
   // SYNC_FORCE_WALK forces a fresh Notion read (ignore any checkpoint). We keep
   // the existing chunks.json in place: saveCheckpoint only overwrites it at the
   // very end on success, so if the walk crashes, the current library is untouched.
-  let allChunks: Chunk[] | null = process.env.SYNC_FORCE_WALK ? null : await loadCheckpoint();
+  let allChunks: Chunk[] | null = process.env.SYNC_FORCE_WALK || ONLY ? null : await loadCheckpoint();
   if (allChunks) {
     console.log(`Resuming from checkpoint: ${allChunks.length} chunks already extracted`);
   } else {
     console.log("\nResolving tagged databases…");
     const targets = await resolveTargets();
+    if (ONLY && !targets.length) {
+      const names = await tickedDatabaseNames();
+      throw new Error(`"${ONLY}" is not a ticked database in the HD Database Directory. Ticked: ${names.join(", ")}`);
+    }
     console.log(`Resolved ${targets.length} target databases:`);
     for (const t of targets) {
       console.log(`  • ${t.rowName.padEnd(28)} → kind=${t.kind}${t.isLineCompanion ? "  [line companion]" : ""}`);
@@ -919,8 +959,18 @@ async function main() {
       }
     }
     console.log(`Total: ${allChunks.length} chunks`);
-    allChunks = await applyCompletenessGuard(allChunks);
-    await saveCheckpoint(allChunks);
+    if (ONLY) {
+      if (!allChunks.length) throw new Error(`${ONLY} came through empty. Nothing was changed.`);
+      const kinds = new Set(allChunks.map((c) => c.source_kind));
+      allChunks = await applyCompletenessGuard(allChunks, kinds);
+      // the local copy keeps every other kind exactly as it was
+      let rest: Chunk[] = [];
+      try { rest = (JSON.parse(await readFile(CHECKPOINT_PATH, "utf8")).chunks ?? []) as Chunk[]; } catch { /* none on this machine */ }
+      if (rest.length) await saveCheckpoint([...rest.filter((c) => !kinds.has(c.source_kind)), ...allChunks]);
+    } else {
+      allChunks = await applyCompletenessGuard(allChunks);
+      await saveCheckpoint(allChunks);
+    }
     console.log(`Checkpoint saved to ${CHECKPOINT_PATH}`);
   }
 

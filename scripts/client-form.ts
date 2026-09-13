@@ -295,6 +295,16 @@ interface Job {
 }
 
 const RUNS_DIR = ".cache/runs";
+/** The one-database sync in flight, if any. */
+let syncOne: { database: string; pid?: number; log: string } | null = null;
+/** The last thing a run printed, for a one-line status. */
+function lastLogLine(log: string): string {
+  try {
+    const lines = readFileSync(log, "utf8").split(/[\r\n]+/).map((l) => l.trim())
+      .filter((l) => l && !l.startsWith("◇"));
+    return (lines.pop() ?? "").slice(0, 160);
+  } catch { return ""; }
+}
 const alive = (pid?: number) => {
   if (!pid) return false;
   try { process.kill(pid, 0); return true; } catch { return false; }
@@ -902,7 +912,12 @@ const PAGE = /* html */ `<!doctype html>
       (bad ? bad + ' thing' + (bad > 1 ? 's' : '') + ' need' + (bad > 1 ? '' : 's') + ' a look'
            : 'Everything ran') +
       '<button type="button" id="syncNow" class="hbbtn">Sync now</button>' +
-      '<span id="syncSaid" class="hbsaid"></span></div>' +
+      '<span id="syncSaid" class="hbsaid"></span>' +
+      // One database at a time, run on this Mac. Kaycee, 2026-09-13: "I would
+      // love to be able to just sync one database to avoid timeouts."
+      '<select id="syncOneDb" class="hbbtn"><option value="">One database…</option></select>' +
+      '<button type="button" id="syncOne" class="hbbtn">Sync this one</button>' +
+      '<span id="syncOneSaid" class="hbsaid"></span></div>' +
       jobs.map(function (x) {
         var cls = x.detail === 'running now' ? 'busy'
           : x.ok === true ? 'ok' : x.ok === false ? 'bad' : 'unknown';
@@ -911,6 +926,7 @@ const PAGE = /* html */ `<!doctype html>
           '<div class="hbwhat">' + esc(x.what) + '</div>' +
           '<div class="hbdetail">' + esc(x.detail) + '</div></div>';
       }).join('');
+    setupSyncOne();
     var btn = document.getElementById('syncNow');
     if (btn) btn.onclick = async function () {
       var said = document.getElementById('syncSaid');
@@ -922,6 +938,44 @@ const PAGE = /* html */ `<!doctype html>
         if (r.ok) setTimeout(loadHeartbeat, 6000);
       } catch (e) { said.textContent = 'Could not start it.'; }
       setTimeout(function () { btn.disabled = false; }, 8000);
+    };
+  }
+
+  // ---- Sync one database ---------------------------------------------------
+  var syncOneNames = null, syncOnePoll = null;
+  async function setupSyncOne() {
+    var sel = document.getElementById('syncOneDb');
+    var go = document.getElementById('syncOne');
+    var said = document.getElementById('syncOneSaid');
+    if (!sel || !go) return;
+    if (!syncOneNames) {
+      try { syncOneNames = (await (await fetch('/sync-one/databases')).json()).names || []; }
+      catch (e) { syncOneNames = []; }
+    }
+    sel.innerHTML = '<option value="">One database…</option>' + syncOneNames.map(function (n) {
+      return '<option>' + esc(n) + '</option>';
+    }).join('');
+    var watch = async function () {
+      var st;
+      try { st = await (await fetch('/sync-one/status', { cache: 'no-store' })).json(); } catch (e) { return; }
+      if (!st.database) return;
+      said.textContent = st.running ? st.database + ': ' + (st.last || 'starting…')
+        : st.ok ? st.database + ' synced.' : st.database + ' did not finish: ' + (st.last || 'see the log');
+      go.disabled = !!st.running;
+      if (st.running && !syncOnePoll) syncOnePoll = setInterval(watch, 3000);
+      if (!st.running && syncOnePoll) { clearInterval(syncOnePoll); syncOnePoll = null; }
+    };
+    watch();
+    go.onclick = async function () {
+      if (!sel.value) { said.textContent = 'Pick a database first.'; return; }
+      go.disabled = true;
+      said.textContent = 'Starting ' + sel.value + '…';
+      try {
+        var r = await (await fetch('/sync-one', { method: 'POST',
+          headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ database: sel.value }) })).json();
+        if (!r.ok) { said.textContent = r.message; go.disabled = false; return; }
+      } catch (e) { said.textContent = 'Could not start it.'; go.disabled = false; return; }
+      if (!syncOnePoll) syncOnePoll = setInterval(watch, 3000);
     };
   }
 
@@ -1691,6 +1745,55 @@ createServer((req, res) => {
   // spoke was a log file nobody opens. Kaycee, 2026-09-09.
   // Sync now: Kaycee edits Notion, presses this, and watches the heartbeat.
   // Runs in GitHub, not here, so it does not depend on this laptop staying awake.
+  if (req.method === "GET" && path === "/sync-one/databases") {
+    void (async () => {
+      let names: string[] = [];
+      try {
+        const { execFileSync } = await import("node:child_process");
+        const out = execFileSync("./node_modules/.bin/tsx", ["scripts/sync-notion.ts", "--list"],
+          { cwd: process.cwd(), encoding: "utf8", timeout: 60000 });
+        names = JSON.parse(out.trim().split("\n").pop() ?? "[]");
+      } catch { /* the picker just stays empty */ }
+      res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      res.end(JSON.stringify({ names }));
+    })();
+    return;
+  }
+  if (req.method === "GET" && path === "/sync-one/status") {
+    const st = syncOne ? {
+      database: syncOne.database, running: alive(syncOne.pid),
+      last: lastLogLine(syncOne.log),
+      ok: existsSync(syncOne.log) && readFileSync(syncOne.log, "utf8").includes("✓ Sync complete."),
+    } : {};
+    res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+    res.end(JSON.stringify(st));
+    return;
+  }
+  if (req.method === "POST" && path === "/sync-one") {
+    let body = "";
+    req.on("data", (c) => { body += c; });
+    req.on("end", () => {
+      const say = (ok: boolean, message: string) => {
+        res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+        res.end(JSON.stringify({ ok, message }));
+      };
+      let database = "";
+      try { database = String(JSON.parse(body).database ?? "").trim(); } catch { /* handled below */ }
+      if (!database) { say(false, "Pick a database first."); return; }
+      if (syncOne && alive(syncOne.pid)) { say(false, `${syncOne.database} is still syncing.`); return; }
+      mkdirSync(RUNS_DIR, { recursive: true });
+      const log = join(RUNS_DIR, `sync-one-${Date.now()}.log`);
+      const fd = openSync(log, "a");
+      const child = spawn("./node_modules/.bin/tsx", ["scripts/sync-notion.ts", "--only", database],
+        { cwd: process.cwd(), detached: true, stdio: ["ignore", fd, fd] });
+      child.unref();
+      closeSync(fd);
+      syncOne = { database, pid: child.pid, log };
+      say(true, `Started ${database}.`);
+    });
+    return;
+  }
+
   if (req.method === "POST" && path === "/sync-now") {
     void (async () => {
       const say = (ok: boolean, message: string) => {

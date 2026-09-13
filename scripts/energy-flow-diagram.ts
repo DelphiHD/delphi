@@ -1100,7 +1100,10 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
     // whether or not the scan happened to catch them moving: catching nothing
     // across a sample is luck, not evidence.
     variables: [
-      { key: "determination", label: "Determination", side: "design" as const,
+      // Kaycee calls it Digestion, as the Foundation Report does. Kaycee,
+      // 2026-09-13: "I prefer digestion." The birth time scan still names the
+      // field Determination, which is what unsettled is keyed by below.
+      { key: "determination", label: "Digestion", side: "design" as const,
         arrow: chart.variables.determination.arrow, theme: chart.variables.determination.theme },
       { key: "environment", label: "Environment", side: "design" as const,
         arrow: chart.variables.environment.arrow, theme: chart.variables.environment.theme },
@@ -1122,7 +1125,8 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
       const withDetail = { ...v, detail, color: a?.color ?? 0, tone: a?.tone ?? 0 };
       return reliability.exact
         ? withDetail
-        : { ...withDetail, unsettled: true, couldBe: reliability.unsettled.get(v.label)?.couldBe ?? [] };
+        : { ...withDetail, unsettled: true,
+            couldBe: reliability.unsettled.get(v.key === "determination" ? "Determination" : v.label)?.couldBe ?? [] };
     }),
     // A field the scan watched move is not given a value. Kaycee, 2026-09-12:
     // "Is it possible to return some kind of message like Exact Birth Time
@@ -1521,11 +1525,7 @@ function basicByValue(chunks: Chunk[]): Record<string, Record<string, string>> {
       if ((m["Delphi Strategy Basic"] ?? "").trim()) out.strategy[k] = m["Delphi Strategy Basic"].trim();
       if ((m["Delphi Frequencies Basic"] ?? "").trim()) out.frequencies[k] = m["Delphi Frequencies Basic"].trim();
     }
-    // The Types column was titled "Text 1" in the 09-13 sync; Kaycee renamed it
-    // to Delphi Basic afterwards. The words are hers either way, so the synced
-    // copy is read until the next sync carries the new name.
-    const basic = delphiText(c.metadata) ||
-      (kind === "type" ? ((c.metadata ?? {})["Text 1"] ?? "").trim() : "");
+    const basic = delphiText(c.metadata);
     if (!basic) continue;
     if (kind === "gate") {
       const n = Number((c.metadata ?? {})["Gate #"] ?? (c.title ?? "").match(/\d+/)?.[0]);
@@ -3061,7 +3061,11 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
     groupInfo: Object.fromEntries(
       ["Individual", "Collective", "Tribal", "Integration"].map((g) => {
         const first = CIRCUITS.find((c) => c.group === g);
-        return [g, first ? (d.tagInfo[first.name.trim().toLowerCase()] ?? "") : ""];
+        // A family has no row of its own in HD Circuits, only Integration does,
+        // so a family says nothing rather than borrowing its first circuit's
+        // Delphi Basic under the family's name.
+        void first;
+        return [g, d.tagInfo[g.toLowerCase()] ?? ""];
       }),
     ),
     gateLib: Object.fromEntries(
@@ -4776,8 +4780,11 @@ if (DATA.client) {
         var n = String(el.dataset.key).split(' ')[1];
         // the keynote only: line meanings are Kaycee's to write, not mine
         head = 'Line ' + n + ': ' + ((DATA.lineNames || {})[n] || '');
-      } else if (el.dataset.kind === 'group') {
-        sub = (DATA.groupInfo || {})[el.dataset.key] || '';
+      } else if (el.dataset.kind === 'group' || el.dataset.kind === 'circuit') {
+        // a family row, or one of its circuits: her HD Circuits Delphi Basic,
+        // the same text as the circuit's pill
+        sub = esc((DATA.groupInfo || {})[el.dataset.key] ||
+          (DATA.tagInfo || {})[String(el.dataset.key).trim().toLowerCase()] || '');
       } else if (el.dataset.kind === 'center') {
         var c = DATA.centers.filter(function (x) { return x.name === el.dataset.key; })[0];
         // The state label is this client's own, so it is left off a bar that
@@ -6768,6 +6775,16 @@ function sync() {
   });
 }
 host.addEventListener('change', sync);
+// each circuit in the panel reads its HD Circuits Delphi Basic
+host.addEventListener('mousemove', function (e) {
+  var lb = e.target.closest ? e.target.closest('label.cc') : null;
+  var bx = lb && lb.querySelector('.cbx');
+  var c = bx && DATA.circuits.filter(function (x) { return x.id === bx.dataset.id; })[0];
+  var info = c && (DATA.tagInfo || {})[String(c.name).trim().toLowerCase()];
+  if (!info) { tip.hidden = true; return; }
+  showTip(e, '<b>' + esc(c.name) + '</b><span class="tipbody">' + esc(info) + '</span>');
+});
+host.addEventListener('mouseleave', function () { tip.hidden = true; });
 document.getElementById('all').onclick = function () {
   [].forEach.call(document.querySelectorAll('.cbx'), function (b) { b.checked = true; }); sync();
 };
@@ -7556,7 +7573,8 @@ function clock12(hhmm) {
 }
 
 function varHtml(v) {
-  if (v.unsettled) return couldBeHtml(v.label, v.label, v.couldBe || []);
+  // the scan's field is still called Determination; the heading says Digestion
+  if (v.unsettled) return couldBeHtml(v.label, v.key === 'determination' ? 'Determination' : v.label, v.couldBe || []);
   return '<b>' + esc(v.label) + '</b>' +
     '<span class="kn">' + esc(v.detail || v.theme) + '</span>' +
     tags([{ text: v.side === 'design' ? 'Design' : 'Personality',

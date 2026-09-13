@@ -507,3 +507,21 @@ that, anyone answering their chart email would have been talking to nobody.
 
 Mail is never fatal: `sendChartEmail` returns whether it went and does not throw. A
 chart that exists must not be undone by a mail server having a bad afternoon.
+
+## 2026-09-13 · Sync one database at a time
+
+**Decision (Kaycee).** The Notion sync can run a single database:
+`npx tsx scripts/sync-notion.ts --only "HD Types"`, or from the dashboard's
+heartbeat bar (pick a database, Sync this one). It runs on the Mac, not in
+GitHub, and takes a minute or two instead of half an hour. Kaycee: "I would love
+to be able to just sync one database to avoid timeouts."
+
+**How it stays safe.** Only the ticked row of that name in the HD Database
+Directory is walked. Only that kind is replaced in `chunks`, under the same
+guard as a full run (a thinner batch is refused, nothing changes). The
+completeness guard compares against that kind's last copy only, and the local
+`.cache/chunks.json` keeps every other kind as it was. First run, HD Types:
+5 rows landed whole, the table still held 861 rows.
+
+**Also 09-13.** Types gained `Delphi Strategy Basic` and `Delphi Frequencies
+Basic` (Kaycee's go-ahead), read by the chart's Strategy and Frequencies cards.
