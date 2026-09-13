@@ -533,3 +533,5 @@ was kept and can be restored.
 | 2026-09-13 02:24 | Sandbox Reflector No | first publish | none |
 | 2026-09-13 02:24 | Sandbox Reflector No Definition | page only | yes |
 | 2026-09-13 17:18 | Sandbox Generator Single | page only | yes |
+| 2026-09-13 17:51 | Sandbox Generator Single | page only | yes |
+| 2026-09-13 17:52 | Sandbox Generator Single | page only | yes |

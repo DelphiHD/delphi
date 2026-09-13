@@ -118,6 +118,12 @@ const KIND_MAP: Record<string, string> = {
   "HD Profile Lines": "profile_line",
   "HD Geometry": "geometry",
   "HD Quarters": "quarter",
+  "HD Planetary Conjunctions": "planetary_conjunctions",
+  "HD Lifecycle Phases": "lifecycle_phases",
+  "HD Planetary Frames": "planetary_frames",
+  // Colors, left and right variants, tones and arrow modes, one row each, with
+  // Kaycee's Delphi Basic. Created 2026-09-13.
+  "HD Variable Components": "variable_component",
 };
 
 function nameToKind(name: string): string {
