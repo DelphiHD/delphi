@@ -52,6 +52,45 @@ import { longitudeOf, GATE_RANGES, GATE_ARC_DEGREES, LINE_ARC_DEGREES } from "@/
 import type { CenterName, Chart } from "@/lib/chart/types";
 import { gateName } from "@/lib/hd/gate-names";
 import { buildVariableHeader, type VariableName } from "@/lib/chart/variables";
+import variablesLookup from "@/lib/chart/variables-lookup.json";
+
+/** One variable's line in pieces, each piece keyed to its row in Kaycee's HD
+ *  Variable Components database, so every designation can carry its own Delphi
+ *  Basic. Same words, same order as buildVariableHeader. Kaycee, 2026-09-13: "I
+ *  would like all of those designations to be clickable with the delphi basic
+ *  info." A piece with no key is punctuation. */
+function variableParts(key: string, colorNumber: number, toneNumber: number, arrow: "left" | "right") {
+  const L = variablesLookup as unknown as {
+    bodyToneNames: string[]; mindToneNames: string[];
+    modeLabels: Record<string, { left: string; right: string }>;
+    byVariable: Record<string, { colorNumber: number; colorName: string; leftSubVariant: string | null;
+      rightSubVariant: string | null; transference: string | null; distraction: string | null }[]>;
+  };
+  const variable = key.charAt(0).toUpperCase() + key.slice(1);
+  const shown = variable === "Determination" ? "Digestion" : variable;
+  const body = variable === "Determination" || variable === "Environment";
+  const c = L.byVariable[variable]?.find((x) => x.colorNumber === colorNumber);
+  if (!c) return [];
+  const side = arrow === "left" ? "Left" : "Right";
+  const sub = arrow === "left" ? c.leftSubVariant : c.rightSubVariant;
+  const parts: { text: string; key?: string }[] = [
+    { text: `Color ${colorNumber}: ${c.colorName}`, key: `${shown}|Color|${colorNumber}` },
+    { text: ", " },
+    { text: `${side} Arrow`, key: `${shown}|Arrow Mode|${arrow === "left" ? 1 : 2}` },
+    { text: " | " },
+    { text: L.modeLabels[variable]?.[arrow] ?? "", key: `${shown}|Arrow Mode|${arrow === "left" ? 1 : 2}` },
+  ];
+  if (sub) parts.push({ text: ": " }, { text: sub, key: `${shown}|${side} Variant|${colorNumber}` });
+  const tone = (body ? L.bodyToneNames : L.mindToneNames)[toneNumber - 1];
+  parts.push({ text: ", " }, { text: `Tone ${toneNumber}: ${tone}`, key: `${body ? "Body" : "Mind"}|Tone|${toneNumber}` });
+  const extra = variable === "Motivation" ? ["Transference", c.transference]
+    : variable === "Perspective" ? ["Distraction", c.distraction] : null;
+  if (extra && extra[1]) {
+    const other = L.byVariable[variable].find((x) => x.colorName === extra[1]);
+    parts.push({ text: `, ${extra[0]}: ` }, { text: extra[1], key: other ? `${shown}|Color|${other.colorNumber}` : undefined });
+  }
+  return parts;
+}
 import { loadLibraryNames } from "@/lib/hd/library-names";
 import { renderFullMandala } from "@/lib/render/mandala";
 import { getAstro, type AstroChart } from "@/lib/astro";
@@ -1122,7 +1161,8 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
         variable: (v.key.charAt(0).toUpperCase() + v.key.slice(1)) as VariableName,
         colorNumber: a.color, toneNumber: a.tone, arrow: v.arrow,
       }).replace(/^[^-]+-\s*/, "") : "";
-      const withDetail = { ...v, detail, color: a?.color ?? 0, tone: a?.tone ?? 0 };
+      const parts = a ? variableParts(v.key, a.color, a.tone, v.arrow) : [];
+      const withDetail = { ...v, detail, parts, color: a?.color ?? 0, tone: a?.tone ?? 0 };
       return reliability.exact
         ? withDetail
         : { ...withDetail, unsettled: true,
@@ -1509,7 +1549,7 @@ function gateMeta(chunks: Chunk[]): Record<number, GateMeta> {
 function basicByValue(chunks: Chunk[]): Record<string, Record<string, string>> {
   const out: Record<string, Record<string, string>> = {
     type: {}, authority: {}, profile: {}, definition: {}, gate: {}, variable: {}, channel: {},
-    cross: {}, planet: {}, strategy: {}, frequencies: {}, profile_line: {},
+    cross: {}, planet: {}, strategy: {}, frequencies: {}, profile_line: {}, variable_component: {},
   };
   // "Triple Split Definition" and "Triple Split" have to land on the same key,
   // and so do "1 / 3" and "1/3: The Investigator Martyr".
@@ -1527,6 +1567,17 @@ function basicByValue(chunks: Chunk[]): Record<string, Record<string, string>> {
     }
     const basic = delphiText(c.metadata);
     if (!basic) continue;
+    // HD Variable Components: keyed by variable, component and number, the way
+    // variableParts names each piece
+    if (kind === "variable_component") {
+      const m = c.metadata ?? {};
+      const n = parseInt(String(m.Number ?? ""), 10);
+      if (m.Variable && m.Component && n) {
+        const v = String(m.Variable).startsWith("Body") ? "Body" : String(m.Variable).startsWith("Mind") ? "Mind" : m.Variable;
+        out.variable_component[`${v}|${m.Component}|${n}`] = basic;
+      }
+      continue;
+    }
     if (kind === "gate") {
       const n = Number((c.metadata ?? {})["Gate #"] ?? (c.title ?? "").match(/\d+/)?.[0]);
       if (n) out.gate[String(n)] = basic;
@@ -4156,11 +4207,22 @@ if (DATA.client) {
         ? '<span class="needtime">Exact Birth Time Required</span>'
         // the full line, color, arrow, mode and tone, the same as the card.
         // Kaycee, 2026-09-13: "Why are color and tone not there?"
-        : esc(v.detail || ((v.arrow === 'left' ? 'Left' : 'Right') + ' \u00b7 ' + v.theme));
+        : varPartsHtml(v);
       return '<div class="varrow-item" data-var="' + i + '">' +
         '<span>' + esc(v.label) + '</span>' + val + '</div>';
     }).join('');
+    document.getElementById('varlist').addEventListener('mousemove', function (e) {
+      var o = e.target.closest ? e.target.closest('.vpart') : null;
+      if (!o) { tip.hidden = true; return; }
+      showTip(e, '<b>' + esc(o.textContent) + '</b>' + esc(o.dataset.basic));
+    });
+    document.getElementById('varlist').addEventListener('mouseleave', function () { tip.hidden = true; });
     document.getElementById('varlist').addEventListener('click', function (e) {
+      var part = e.target.closest ? e.target.closest('.vpart') : null;
+      if (part) {
+        openCard(part, '<b>' + esc(part.textContent) + '</b><div class="basic">' + esc(part.dataset.basic) + '</div>');
+        return;
+      }
       var el = e.target.closest ? e.target.closest('.varrow-item') : null;
       if (el) openCard(el, varHtml(vs[+el.dataset.var]));
     });
@@ -6903,6 +6965,13 @@ var card = document.getElementById('card');
 // Hovering one of the possible answers says what it would mean, in Kaycee's own
 // words. A popup on a popup, which she asked for and which is the only place
 // the difference between Generator and Projector can actually be shown.
+// a designation inside a variable card pins its own description when clicked
+card.addEventListener('click', function (e) {
+  var part = e.target.closest ? e.target.closest('.vpart') : null;
+  if (!part) return;
+  e.stopPropagation();
+  openCard(part, '<b>' + esc(part.textContent) + '</b><div class="basic">' + esc(part.dataset.basic) + '</div>');
+});
 card.addEventListener('mousemove', function (e) {
   var o = e.target.closest ? e.target.closest('.opt') : null;
   if (!o) return;
@@ -7580,11 +7649,22 @@ function clock12(hhmm) {
   return h12 + ':' + m + ' ' + ap;
 }
 
+// A variable's line with each designation carrying its Delphi Basic: hover to
+// read it, click to pin it.
+function varPartsHtml(v) {
+  if (!v.parts || !v.parts.length) return esc(v.detail || v.theme);
+  var lib = (DATA.basicLib || {}).variable_component || {};
+  return v.parts.map(function (p) {
+    var b = p.key ? lib[p.key] : '';
+    return b ? '<span class="vpart opt" data-basic="' + esc(b).split('"').join('&quot;') + '">' + esc(p.text) + '</span>'
+      : esc(p.text);
+  }).join('');
+}
 function varHtml(v) {
   // the scan's field is still called Determination; the heading says Digestion
   if (v.unsettled) return couldBeHtml(v.label, v.key === 'determination' ? 'Determination' : v.label, v.couldBe || []);
   return '<b>' + esc(v.label) + '</b>' +
-    '<span class="kn">' + esc(v.detail || v.theme) + '</span>' +
+    '<span class="kn">' + varPartsHtml(v) + '</span>' +
     tags([{ text: v.side === 'design' ? 'Design' : 'Personality',
             bg: v.side === 'design' ? '#e06666' : '#c9b6e4' },
           { text: v.arrow + ' arrow' }]) +
