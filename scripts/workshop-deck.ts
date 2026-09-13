@@ -108,12 +108,23 @@ async function library() {
     line: {} as Record<string, string>,
     planet: {} as Record<string, string>,
     quarter: {} as Record<string, string>,
+    // her Workshop Slides database, by slide name
+    slides: {} as Record<string, string>,
+    notSelf: {} as Record<string, string>,
+    channels: {} as Record<string, { name: string; basic: string }>,
   };
   for (const c of chunks) {
     const m = (c.metadata ?? {}) as Record<string, string>;
     const title = (c.title ?? "").trim();
     switch (c.source_kind) {
+      case "workshop_slide": if (delphi(m)) lib.slides[title] = delphi(m); break;
+      case "channel": {
+        const id = (title.match(/(\d{1,2})\s*-\s*(\d{1,2})/) ?? []).slice(1, 3).map(Number).sort((a, b) => a - b).join("-");
+        if (id) lib.channels[id] = { name: title.replace(/^[^:]*:\s*/, ""), basic: delphi(m) };
+        break;
+      }
       case "center":
+        lib.notSelf[title] = (m["Not Self Themes"] ?? "").trim();
         lib.centers[title] = {
           themes: (m.Themes ?? "").trim(), type: (m.Type ?? "").trim(),
           defined: (m["Delphi Defined Basic"] ?? "").trim(),
@@ -193,7 +204,7 @@ async function main() {
       profile, definition, cross: chart.incarnationCross.value,
       signature: chart.signature.value, notSelf: chart.notSelfTheme.value,
       centers,
-      channels: (chart.channels ?? []).map((c) => c.id),
+      channels: (chart.channels ?? []).map((c) => String(c.id).split("-").map(Number).sort((a, b) => a - b).join("-")),
       gates: [...gates].sort((a, b) => a - b),
       sunGate: `${sun.gate}.${sun.line}`, designSunGate: `${dSun.gate}.${dSun.line}`,
       sunLon: longitudeOf(sun.gate, sun.line, sun.color ?? 1, sun.tone ?? 1, sun.base ?? 1),

@@ -102,3 +102,23 @@ button { font-family:inherit; }
 .chip-h { cursor:pointer; }
 .chip-h:hover { text-decoration:underline; }
 .cmp .bg svg { max-height:52vh; }
+
+.textslide .big { font-size:32px; line-height:1.55; max-width:1100px; color:#3b3550; margin:10px auto 0; }
+.textslide h1 { font-size:48px; }
+.notself { font-size:17px; color:#3b3550; margin:-6px 0 14px; }
+.notself i { color:var(--purple); }
+.suns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px 26px; margin-top:8px; }
+.sunrow { display:grid; grid-template-columns:1fr 70px 70px; font-size:17px; padding:5px 0; border-bottom:1px solid #f0e8f3; cursor:pointer; }
+.sunrow .pers { color:#1c1a2e; text-align:right; }
+.sunrow .des { color:var(--red); text-align:right; }
+.planets .glyph { color:var(--purple); font-size:26px; }
+.fill.soft { background:#c9b6e4; }
+
+.bg svg { width:100%; height:auto; max-height:60vh; display:block; }
+
+.ptile { text-align:center; cursor:pointer; padding:14px 8px; font-size:17px; }
+.ptile .glyph { display:block; font-size:34px; color:var(--purple); line-height:1.2; }
+.ptile.on { background:var(--purple); color:#fff; border-color:var(--purple); }
+.ptile.on .glyph { color:#fff; }
+.pread .big { font-size:24px; line-height:1.55; color:#3b3550; margin-top:8px; }
+.pread .glyph { color:var(--purple); }

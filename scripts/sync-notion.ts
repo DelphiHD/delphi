@@ -124,6 +124,8 @@ const KIND_MAP: Record<string, string> = {
   // Colors, left and right variants, tones and arrow modes, one row each, with
   // Kaycee's Delphi Basic. Created 2026-09-13.
   "HD Variable Components": "variable_component",
+  // One row per workshop slide, Delphi Basic text for the teaching deck. 2026-09-13.
+  "HD Workshop Slides": "workshop_slide",
 };
 
 function nameToKind(name: string): string {

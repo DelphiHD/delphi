@@ -87,6 +87,17 @@
   // ---- slides --------------------------------------------------------------
   var slides = [];
   function add(title, section, render, after) { slides.push({ title: title, section: section, render: render, after: after }); }
+  // her Workshop Slides text, by slide name
+  function S(name) { return (LIB.slides || {})[name] || ''; }
+  function lede(name) { return S(name) ? '<p class="lede">' + esc(S(name)) + '</p>' : ''; }
+  // a slide that is only her words, large, in the middle of the screen
+  function textSlide(title, section, name, extra) {
+    add(title, section, function () {
+      return '<div class="hero textslide">' + '<h1>' + esc(title) + '</h1><p class="big">' + esc(S(name)) + '</p>' + (extra ? extra() : '') + '</div>';
+    });
+  }
+  var GLYPH = { 'Sun': '\u2609', 'Earth': '\u2295', 'North Node': '\u260A', 'South Node': '\u260B', 'Moon': '\u263D', 'Mercury': '\u263F',
+    'Venus': '\u2640', 'Mars': '\u2642', 'Jupiter': '\u2643', 'Saturn': '\u2644', 'Uranus': '\u2645', 'Neptune': '\u2646', 'Pluto': '\u2647' };
 
   add('Welcome', 'Welcome', function () {
     return '<div class="hero">' + (D.logo ? '<img class="logo" src="' + D.logo + '" alt="Delphi">' : '') +
@@ -94,17 +105,21 @@
       chips(ROOM) + (D.know ? '<img class="know" src="' + D.know + '" alt="Know thyself">' : '') + '</div>';
   });
 
+  textSlide('What Human Design Is', 'Foundations', 'What Human Design Is');
+
   add('The Room', 'The Room', function () {
     var g = by('type');
-    return '<h1>The Room</h1><div class="grid cols' + Math.min(5, Math.max(2, Object.keys(g).length)) + '" style="grid-template-columns:repeat(' + Math.max(2, Object.keys(g).length) + ',minmax(0,1fr))">' +
+    return '<h1>The Room</h1>' + lede('You Are Unique') + '<div class="grid cols' + Math.min(5, Math.max(2, Object.keys(g).length)) + '" style="grid-template-columns:repeat(' + Math.max(2, Object.keys(g).length) + ',minmax(0,1fr))">' +
       TYPE_ORDER.filter(function (t) { return g[t]; }).map(function (t) {
         return '<div class="card" style="border-top:6px solid ' + TYPE_COLOR[t] + '"><div class="n">' + g[t].length + '</div><h3>' + esc(t) + '</h3>' +
           '<div class="small">' + esc(g[t][0].strategy) + '</div><div style="margin-top:12px">' + chips(g[t]) + '</div></div>';
       }).join('') + '</div>';
   });
 
+  textSlide('The Experiment', 'Foundations', 'The Experiment');
+
   add('The Wheel', 'The Wheel', function () {
-    return '<h1>The Wheel</h1><div class="tabs"><button class="on" data-wheel="live">The Sky Moving</button><button data-wheel="suns">Our Birth Suns</button></div>' +
+    return '<h1>The Wheel</h1>' + lede('The Wheel') + '<div class="tabs"><button class="on" data-wheel="live">The Sky Moving</button><button data-wheel="suns">Our Birth Suns</button></div>' +
       '<div id="wheelbox"></div>';
   }, function () {
     var box = document.getElementById('wheelbox');
@@ -126,9 +141,76 @@
     show('live');
   });
 
-  add('The Bodygraph', 'The Bodygraph', function () {
-    return '<h1>The Bodygraph</h1><iframe class="frame" src="Bodygraph.html"></iframe>';
+  add('Personality and Design', 'Foundations', function () {
+    var ex = ROOM[0];
+    return '<h1>Personality and Design</h1>' + lede('Personality and Design') +
+      '<div class="split" style="grid-template-columns:minmax(0,40%) 1fr">' +
+      (ex ? '<div><h2 class="chip-h" data-person="' + esc(ex.name) + '">' + esc(ex.name) + '</h2><div class="bg">' + ex.svg + '</div></div>' : '<div></div>') +
+      '<div class="card"><h3>Sun at birth, and Sun at the Design moment</h3><div class="suns">' + ROOM.map(function (p) {
+        return '<div class="sunrow" data-person="' + esc(p.name) + '"><span>' + esc(p.name) + '</span><b class="pers">' + esc(p.sunGate) +
+          '</b><b class="des">' + esc(p.designSunGate) + '</b></div>';
+      }).join('') + '</div></div></div>';
   });
+
+  add('The Bodygraph', 'The Bodygraph', function () {
+    return '<h1>The Bodygraph</h1>' + lede('The Bodygraph') + '<iframe class="frame" src="Bodygraph.html"></iframe>';
+  });
+
+  add('Planets', 'Foundations', function () {
+    var order = ['Sun', 'Earth', 'North Node', 'South Node', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto'];
+    // the planets as tiles, the chosen one read large beside them
+    var pick = window.__planet || 'Sun';
+    return '<h1>Planets</h1>' + lede('Planets') + '<div class="split" style="grid-template-columns:minmax(0,55%) 1fr"><div class="grid planets" style="grid-template-columns:repeat(4,minmax(0,1fr))">' +
+      order.map(function (n) {
+        return '<div class="card ptile' + (n === pick ? ' on' : '') + '" data-planet="' + esc(n) + '"><span class="glyph">' + (GLYPH[n] || '') + '</span><div>' + esc(n) + '</div></div>';
+      }).join('') + '</div><div class="card pread"><h3><span class="glyph">' + (GLYPH[pick] || '') + '</span> ' + esc(pick) + '</h3><div class="big">' +
+      esc((LIB.planet || {})[pick] || '') + '</div></div></div>';
+  }, function () {
+    [].forEach.call(document.querySelectorAll('.ptile'), function (el) {
+      var choose = function () { if (window.__planet !== el.dataset.planet) { window.__planet = el.dataset.planet; render(); } };
+      el.onclick = choose; el.onmouseenter = choose;
+    });
+  });
+
+  add('Gates and Channels', 'Foundations', function () {
+    var count = {};
+    ROOM.forEach(function (p) { p.channels.forEach(function (c) { (count[c] = count[c] || []).push(p); }); });
+    var top = Object.keys(count).sort(function (a, b) { return count[b].length - count[a].length; }).slice(0, 6);
+    return '<h1>Gates and Channels</h1>' + lede('Gates and Channels') + '<h2>Defined channels in this room</h2><div class="grid cols3">' +
+      top.map(function (c) {
+        var L = (LIB.channels || {})[c] || {};
+        return '<div class="card"><div class="n">' + count[c].length + '</div><h3>' + esc(c) + ' ' + esc(L.name || '') + '</h3>' + chips(count[c]) +
+          '<div class="txt">' + esc(L.basic || '') + '</div></div>';
+      }).join('') + '</div>';
+  });
+
+  add('Conditioning', 'Foundations', function () {
+    return '<h1>Conditioning</h1>' + lede('Conditioning') + '<div class="split">' + bodyHtml('cond') +
+      '<div class="bars"><h2>Open or undefined here</h2>' + D.centerOrder.map(function (c) {
+        var n = ROOM.length - share(c, 'defined');
+        return '<div class="row" data-goto="center-' + c + '"><span>' + esc(D.centerName[c]) + '</span><div class="track"><div class="fill soft" style="width:' +
+          Math.round(100 * n / Math.max(1, ROOM.length)) + '%"></div></div><b>' + n + '</b></div>';
+      }).join('') + '</div></div>';
+  }, function () {
+    paintBody('cond', function (c) {
+      var d = share(c, 'defined') / Math.max(1, ROOM.length);
+      return 'rgba(132,80,149,' + (0.08 + d * 0.8).toFixed(2) + ')';
+    });
+  });
+
+  add('Types of Centers', 'Centers', function () {
+    var kinds = ['Pressure', 'Motor', 'Awareness', 'Identity', 'Manifestation'];
+    return '<h1>Types of Centers</h1>' + lede('Types of Centers') + '<div class="grid" style="grid-template-columns:repeat(5,minmax(0,1fr))">' +
+      kinds.map(function (k) {
+        var list = D.centerOrder.filter(function (c) { return ((LIB.centers[D.centerLib[c]] || {}).type || '').indexOf(k) > -1; });
+        return '<div class="card"><h3>' + esc(k) + '</h3>' + list.map(function (c) {
+          return '<div class="f" data-goto="center-' + c + '" style="cursor:pointer;display:flex;justify-content:space-between;padding:5px 0"><span>' + esc(D.centerName[c]) +
+            '</span><b>' + share(c, 'defined') + ' defined</b></div>';
+        }).join('') + '</div>';
+      }).join('') + '</div>';
+  });
+
+  textSlide('Centers and the Mind', 'Centers', 'Centers and the Mind');
 
   add('Nine Centers', 'Centers', function () {
     return '<h1>Nine Centers in This Room</h1><div class="split">' + bodyHtml('heat') +
@@ -159,6 +241,9 @@
       return '<h1>' + esc(D.centerName[c]) + '</h1>' +
         (L.type ? L.type.split(',').map(function (t) { return '<span class="pill">' + esc(t.trim()) + '</span>'; }).join('') : '') +
         '<p class="lede">' + esc(L.themes || '') + '</p>' +
+        ((LIB.notSelf || {})[D.centerLib[c]] || S('Not-Self Talk: ' + D.centerName[c])
+          ? '<div class="notself">' + ((LIB.notSelf || {})[D.centerLib[c]] ? '<span class="pill">Not-Self</span> ' + esc(LIB.notSelf[D.centerLib[c]]) + ' ' : '') +
+            (S('Not-Self Talk: ' + D.centerName[c]) ? '<i>' + esc(S('Not-Self Talk: ' + D.centerName[c])) + '</i>' : '') + '</div>' : '') +
         '<div class="split" style="grid-template-columns:minmax(300px,34%) 1fr">' + bodyHtml('one') +
         '<div class="grid cols3">' + col('defined', 'Defined', 'def') + col('undefined', 'Undefined', 'und') + col('open', 'Open', 'open') + '</div></div>';
     }, function () {
@@ -172,13 +257,17 @@
     slides[slides.length - 1].id = 'center-' + c;
   });
 
+  textSlide('Health and the Not-Self', 'Centers', 'Health and the Not-Self');
+
   add('Definition', 'Definition', function () {
     var g = by('definition');
-    return '<h1>Definition</h1><div class="grid cols3">' + DEF_ORDER.filter(function (k) { return g[k]; }).map(function (k) {
+    return '<h1>Definition</h1>' + lede('Definition') + '<div class="grid cols3">' + DEF_ORDER.filter(function (k) { return g[k]; }).map(function (k) {
       return '<div class="card"><div class="n">' + g[k].length + '</div><h3>' + esc(k) + '</h3>' + chips(g[k]) + '<div class="txt">' +
         esc(LIB.definition[norm(k)] || '') + '</div></div>';
     }).join('') + '</div>';
   });
+
+  textSlide('Strategy and Authority', 'The Solution', 'Strategy and Authority');
 
   add('Authority', 'Authority', function () {
     var g = by('authority');
@@ -196,6 +285,7 @@
         '<p class="lede">' + esc(L.basic || '') + '</p>' +
         '<div class="grid cols2"><div class="card"><h3>Strategy</h3><div class="txt">' + esc(L.strategy || '') + '</div></div>' +
         '<div class="card"><h3>' + esc(L.signature || '') + ' / ' + esc(L.notSelf || '') + '</h3><div class="txt">' + esc(L.frequencies || '') + '</div></div></div>' +
+        (S('Living as a ' + t) ? '<div class="card" style="margin-top:14px"><h3>Living as a ' + esc(t) + '</h3><div class="txt">' + esc(S('Living as a ' + t)) + '</div></div>' : '') +
         '<h2>In the room</h2>' + chips(list);
     });
   });
@@ -228,7 +318,7 @@
     var restA = asks.slice(i), restB = answers.slice(i);
     // anyone left over joins a pair as a third
     restA.concat(restB).forEach(function (p, k) { if (pairs.length) pairs[k % pairs.length].push(p); else pairs.push([p]); });
-    return '<h1>Sacral Pairs</h1><div class="tabs"><button data-reshuffle="1">New Pairs</button></div><div class="grid cols4">' +
+    return '<h1>Sacral Pairs</h1>' + lede('Sacral Pairs') + '<div class="tabs"><button data-reshuffle="1">New Pairs</button></div><div class="grid cols4">' +
       pairs.map(function (pr, n) {
         return '<div class="card"><div class="small">Pair ' + (n + 1) + '</div>' + chips(pr) +
           '<div class="small" style="margin-top:8px">' + pr.map(function (p) { return esc(p.name) + ': Sacral ' + p.centers.sacral; }).join('<br>') + '</div></div>';
@@ -267,6 +357,12 @@
       };
     });
   });
+
+  add('Reflectors and the Moon', 'Groups and Pairs', function () {
+    return '<h1>Reflectors and the Moon</h1>' + lede('Reflectors and the Moon') + '<iframe class="frame" src="Living Mandala.html"></iframe>';
+  });
+
+  textSlide('The Experiment Begins', 'Close', 'The Experiment Begins');
 
   add('Know Thyself', 'Close', function () {
     return '<div class="hero">' + (D.logo ? '<img class="logo" src="' + D.logo + '" alt="Delphi">' : '') +
