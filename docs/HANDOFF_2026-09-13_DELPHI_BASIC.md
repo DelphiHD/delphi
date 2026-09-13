@@ -31,10 +31,11 @@ first one that has text:
 2. `Delphi Basic Description`
 3. `Delphi Free Chart`
 
-The fallbacks exist because the Notion databases name the field differently.
-Kaycee has not confirmed the Planets database: it has both `Delphi Basic` and
-`Delphi Basic Description`, both filled in. Ask her which one clients see.
-Channels deliberately have both `Delphi Report` and `Delphi Free Chart`.
+The fallbacks exist because older synced copies used different field names.
+Kaycee confirmed 09-13: the Planets database has one field, `Delphi Basic`, and
+that is the planet description everywhere a planet is hovered (glyph or name in
+the placement tables, the control panel, anywhere else). Settled; do not ask
+again. Channels deliberately have both `Delphi Report` and `Delphi Free Chart`.
 
 The Crosses database field was renamed from `Delphi Basic Description` to
 `Delphi Basic` on 09-13, and the rename can be undone. A Planets rename was
