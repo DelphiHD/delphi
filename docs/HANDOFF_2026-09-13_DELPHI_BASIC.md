@@ -144,6 +144,27 @@ and were not in scope.
   "Taste" (same as color 2) and gives Motivation and Perspective identical
   left/right pairs. Drafts follow the lookup as is.
 
+## Progress, 09-13 late
+
+- Variables: the control panel lists each designation as a row (Color, Arrow
+  with mode, Variant, Tone, Transference or Distraction) and the arrow card
+  shows the same rows with each description written underneath. Keys:
+  `<Digestion|Environment|Motivation|Perspective>|<Component>|<Number>`, tones
+  `Body|Tone|n` or `Mind|Tone|n`, read from HD Variable Components. Kaycee: a
+  teaching tool; every piece of the report header in both places, not the
+  header's exact format. Descriptions appear once that database is synced.
+- Digestion color 4 is Touch (lookup fixed, matrix page has a Digestion table).
+- Mandala view is called The Wheel. Tooltips rewritten and approved. Removed:
+  "Ask Kaycee" sell line, hover instructions, two failure explanations.
+- copy-check now reads text as a client sees it (tags stripped, entities
+  decoded, colons allowed) and fails on "Kaycee" in client text. Still
+  unapproved, waiting on Kaycee: "Drew the data but could not paint it:",
+  the Stats line-number help, "If it bridged your split:", "One island: nothing
+  to bridge.", "Open in both of you: nothing activated there.", "Undefined even
+  together: gates, but no channel.", "Save the link: it is the only way back to
+  this chart." (website form), the quarter stopgap text. The "brand mark
+  missing" line is a terminal warning, not client text.
+
 ## Standing rules to carry over
 
 Never run the sync without asking. Never remove a rule without asking. No
