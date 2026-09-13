@@ -91,6 +91,31 @@ function variableParts(key: string, colorNumber: number, toneNumber: number, arr
   }
   return parts;
 }
+
+/** The same pieces as rows for the control panel: what each designation is,
+ *  and its value. */
+function variableRows(parts: { text: string; key?: string }[]) {
+  const keyed = parts.filter((p) => p.key);
+  const rows: { label: string; value: string; key: string }[] = [];
+  for (const p of keyed) {
+    const [, comp] = p.key!.split("|");
+    const m = p.text.match(/^(Color|Tone) (\d+): (.+)$/);
+    if (m) { rows.push({ label: m[1], value: `${m[2]} \u00b7 ${m[3]}`, key: p.key! }); continue; }
+    if (comp === "Arrow Mode") {
+      const prev = rows.find((r) => r.key === p.key);
+      if (prev) prev.value = `${prev.value} \u00b7 ${p.text}`;
+      else rows.push({ label: "Arrow", value: p.text.replace(/ Arrow$/, ""), key: p.key! });
+      continue;
+    }
+    if (comp === "Left Variant" || comp === "Right Variant") { rows.push({ label: "Variant", value: p.text, key: p.key! }); continue; }
+  }
+  // Transference or Distraction: the last keyed Color piece after a label
+  const i = parts.findIndex((p) => /Transference|Distraction/.test(p.text));
+  if (i > -1 && parts[i + 1]?.key) {
+    rows.push({ label: parts[i].text.replace(/[,:\s]/g, ""), value: parts[i + 1].text, key: parts[i + 1].key! });
+  }
+  return rows;
+}
 import { loadLibraryNames } from "@/lib/hd/library-names";
 import { renderFullMandala } from "@/lib/render/mandala";
 import { getAstro, type AstroChart } from "@/lib/astro";
@@ -1162,7 +1187,7 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
         colorNumber: a.color, toneNumber: a.tone, arrow: v.arrow,
       }).replace(/^[^-]+-\s*/, "") : "";
       const parts = a ? variableParts(v.key, a.color, a.tone, v.arrow) : [];
-      const withDetail = { ...v, detail, parts, color: a?.color ?? 0, tone: a?.tone ?? 0 };
+      const withDetail = { ...v, detail, parts, rows: variableRows(parts), color: a?.color ?? 0, tone: a?.tone ?? 0 };
       return reliability.exact
         ? withDetail
         : { ...withDetail, unsettled: true,
@@ -3598,6 +3623,19 @@ button.disabled:hover, button:disabled:hover { background:var(--paper); color:in
 .varrow-item:hover { background:rgba(132,80,149,.14); }
 .varrow-item > span { font-size:9px; letter-spacing:.1em; text-transform:uppercase;
   opacity:.5; }
+/* one row per designation, laid out like a Circuitry row: name left, value right */
+.vcomp { display:flex; align-items:baseline; gap:8px; font-size:12px; padding:2px 6px; margin:0 -6px;
+  border-radius:6px; }
+.vcomp .vk { opacity:.55; font-size:10.5px; flex:0 0 78px; }
+.vcomp .vv { margin-left:auto; text-align:right; }
+.vcomp.vpart { cursor:pointer; border-bottom:0; }
+.vcomp.vpart:hover { background:rgba(132,80,149,.14); }
+.vcard { margin-top:2px; }
+.vcard-row { padding:5px 0; border-top:1px solid rgba(132,80,149,.14); }
+.vcard-row:first-child { border-top:0; }
+.vcard .vcomp { margin:0; padding:0; font-weight:600; }
+.vcard .vk { font-weight:400; }
+.vdesc { font-size:11.5px; line-height:1.5; opacity:.85; margin-top:2px; }
 .offcount { font-size:9px; font-weight:600; letter-spacing:.06em; color:var(--purple);
   background:rgba(132,80,149,.12); border-radius:8px; padding:1px 6px; margin-left:auto;
   margin-right:6px; text-transform:none; }
@@ -4205,22 +4243,29 @@ if (DATA.client) {
     document.getElementById('varlist').innerHTML = vs.map(function (v, i) {
       var val = v.unsettled
         ? '<span class="needtime">Exact Birth Time Required</span>'
-        // the full line, color, arrow, mode and tone, the same as the card.
-        // Kaycee, 2026-09-13: "Why are color and tone not there?"
-        : varPartsHtml(v);
+        // Each designation on its own row, like the Circuitry rows, carrying its
+        // description. Kaycee, 2026-09-13: "list each component, make it look
+        // pretty and match the rest of the control panel formatting, but each
+        // component should carry its description on mouseover/click."
+        : (v.rows || []).map(function (r) {
+            var b = ((DATA.basicLib || {}).variable_component || {})[r.key] || '';
+            return '<div class="vcomp' + (b ? ' vpart' : '') + '"' +
+              (b ? ' data-basic="' + esc(b).split('"').join('&quot;') + '" data-label="' + esc(r.label + ': ' + r.value) + '"' : '') +
+              '><span class="vk">' + esc(r.label) + '</span><span class="vv">' + esc(r.value) + '</span></div>';
+          }).join('');
       return '<div class="varrow-item" data-var="' + i + '">' +
         '<span>' + esc(v.label) + '</span>' + val + '</div>';
     }).join('');
     document.getElementById('varlist').addEventListener('mousemove', function (e) {
       var o = e.target.closest ? e.target.closest('.vpart') : null;
       if (!o) { tip.hidden = true; return; }
-      showTip(e, '<b>' + esc(o.textContent) + '</b>' + esc(o.dataset.basic));
+      showTip(e, '<b>' + esc(o.dataset.label || o.textContent) + '</b>' + esc(o.dataset.basic));
     });
     document.getElementById('varlist').addEventListener('mouseleave', function () { tip.hidden = true; });
     document.getElementById('varlist').addEventListener('click', function (e) {
       var part = e.target.closest ? e.target.closest('.vpart') : null;
       if (part) {
-        openCard(part, '<b>' + esc(part.textContent) + '</b><div class="basic">' + esc(part.dataset.basic) + '</div>');
+        openCard(part, '<b>' + esc(part.dataset.label || part.textContent) + '</b><div class="basic">' + esc(part.dataset.basic) + '</div>');
         return;
       }
       var el = e.target.closest ? e.target.closest('.varrow-item') : null;
@@ -7663,11 +7708,21 @@ function varPartsHtml(v) {
 function varHtml(v) {
   // the scan's field is still called Determination; the heading says Digestion
   if (v.unsettled) return couldBeHtml(v.label, v.key === 'determination' ? 'Determination' : v.label, v.couldBe || []);
+  // A teaching card: each designation on its own row with what it means written
+  // underneath, so the arrow explains itself without hunting. Kaycee,
+  // 2026-09-13: "Same with the arrow boxes ... we're making a teaching tool."
+  var lib = (DATA.basicLib || {}).variable_component || {};
+  var rows = (v.rows || []).map(function (r) {
+    var b = lib[r.key] || '';
+    return '<div class="vcard-row"><div class="vcomp"><span class="vk">' + esc(r.label) +
+      '</span><span class="vv">' + esc(r.value) + '</span></div>' +
+      (b ? '<div class="vdesc">' + esc(b) + '</div>' : '') + '</div>';
+  }).join('');
   return '<b>' + esc(v.label) + '</b>' +
-    '<span class="kn">' + varPartsHtml(v) + '</span>' +
     tags([{ text: v.side === 'design' ? 'Design' : 'Personality',
             bg: v.side === 'design' ? '#e06666' : '#c9b6e4' },
           { text: v.arrow + ' arrow' }]) +
+    (rows ? '<div class="vcard">' + rows + '</div>' : '<span class="kn">' + varPartsHtml(v) + '</span>') +
     prose(v.report);
 }
 // One gate behaviour for every view. Each view had grown its own handler, so a
