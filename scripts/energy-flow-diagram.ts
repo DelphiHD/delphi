@@ -3190,9 +3190,9 @@ body.view-transit .panel, body.view-plain .panel { background:rgba(132,80,149,.0
 body.view-transit .card, body.view-plain .card { background:rgba(255,255,255,.98); border-color:rgba(132,80,149,.28);
   color:#1c1a2e; box-shadow:0 14px 34px rgba(60,40,80,.18); }
 body.view-transit .tip, body.view-plain .tip { background:rgba(255,255,255,.98); color:#1c1a2e; border-color:rgba(132,80,149,.25); }
-/* circuit colouring means nothing on the other two views; the defined and
-   hanging buttons still do, except on the mandala */
-body.view-plain #circdrop, body.view-mandala #circdrop, body.view-transit #circdrop { display:none; }
+/* Circuitry works on the bodygraph and the mandala too. Kaycee, 2026-09-13:
+   "Can we add the circuitry toggle to the bodygraph and mandala views as well?" */
+body.view-transit #circdrop { display:none; }
 /* a gate number sitting on a hidden disc has to come back to dark */
 .pnum.off { fill:#1c1a2e !important; }
 /* the traditional chart carries its own coloring: leave the gate numbers alone */
@@ -3396,6 +3396,14 @@ svg.canvas.plain .pleg.lit { fill:${HL_GOLD} !important; }
 .mandala line[data-gate].lit { stroke:#c79a2e !important; stroke-width:3.4 !important; stroke-opacity:1 !important; }
 .mandala text[data-gate].lit { font-weight:bold; }
 ${CIRCUITS.map((c) => `body.off-${c.id} .ch[data-circuit="${c.id}"]:not(.hang) { display:none; }`).join("\n")}
+/* On the bodygraph and the mandala's hub a channel is its drawn legs, so a
+   circuit switched off fades them rather than cutting holes in the drawing. */
+${CIRCUITS.map((c) => {
+  const keys = d.channels.filter((ch) => ch.circuit === c.id).map((ch) => ch.key);
+  return keys.length
+    ? keys.map((k) => `body.off-${c.id} svg.canvas.plain .chgrp[data-ch="${k}"], body.off-${c.id} .mandala .chgrp[data-ch="${k}"]`).join(",\n") + " { opacity:.12; }"
+    : "";
+}).join("\n")}
 body.nodefined .ch:not(.hang) { display:none; }
 /* a deselected planet or side leaves the placement columns alone, dropping out
    of the mandala; its table row just dims */
