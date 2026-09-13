@@ -3626,6 +3626,9 @@ button.disabled:hover, button:disabled:hover { background:var(--paper); color:in
 /* one row per designation, laid out like a Circuitry row: name left, value right */
 .vcomp { display:flex; align-items:baseline; gap:8px; font-size:12px; padding:2px 6px; margin:0 -6px;
   border-radius:6px; }
+/* in the panel the rows sit indented under their variable, so each section reads
+   as one group. Kaycee, 2026-09-13: "indent the components". */
+#varlist .vcomp { margin-left:8px; }
 .vcomp .vk { opacity:.55; font-size:10.5px; flex:0 0 78px; }
 .vcomp .vv { margin-left:auto; text-align:right; }
 .vcomp.vpart { cursor:pointer; border-bottom:0; }
