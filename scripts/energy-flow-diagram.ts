@@ -51,6 +51,7 @@ import {
 import { longitudeOf, GATE_RANGES, GATE_ARC_DEGREES, LINE_ARC_DEGREES } from "@/lib/hd/gate-longitude";
 import type { CenterName, Chart } from "@/lib/chart/types";
 import { gateName } from "@/lib/hd/gate-names";
+import { buildVariableHeader, type VariableName } from "@/lib/chart/variables";
 import { loadLibraryNames } from "@/lib/hd/library-names";
 import { renderFullMandala } from "@/lib/render/mandala";
 import { getAstro, type AstroChart } from "@/lib/astro";
@@ -1107,9 +1108,22 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
         arrow: chart.variables.motivation.arrow, theme: chart.variables.motivation.theme },
       { key: "perspective", label: "Perspective", side: "personality" as const,
         arrow: chart.variables.perspective.arrow, theme: chart.variables.perspective.theme },
-    ].map((v) => reliability.exact
-      ? v
-      : { ...v, unsettled: true, couldBe: reliability.unsettled.get(v.label)?.couldBe ?? [] }),
+    ].map((v) => {
+      // The same line the Foundation Report carries, built by the same code:
+      // "Color 3: Thirst, Right Arrow | Passive: Cold, Tone 6: Touch". Kaycee,
+      // 2026-09-13: "This is the level of information I expect to see."
+      const src = { determination: ["design", "Sun"], environment: ["design", "North Node"],
+        motivation: ["personality", "Sun"], perspective: ["personality", "North Node"] }[v.key]!;
+      const a = chart.activations[src[0] as "design" | "personality"].find((x) => x.planet === src[1]);
+      const detail = a ? buildVariableHeader({
+        variable: (v.key.charAt(0).toUpperCase() + v.key.slice(1)) as VariableName,
+        colorNumber: a.color, toneNumber: a.tone, arrow: v.arrow,
+      }).replace(/^[^-]+-\s*/, "") : "";
+      const withDetail = { ...v, detail, color: a?.color ?? 0, tone: a?.tone ?? 0 };
+      return reliability.exact
+        ? withDetail
+        : { ...withDetail, unsettled: true, couldBe: reliability.unsettled.get(v.label)?.couldBe ?? [] };
+    }),
     // A field the scan watched move is not given a value. Kaycee, 2026-09-12:
     // "Is it possible to return some kind of message like Exact Birth Time
     // Required... in those fields if it changes?" What it could instead be is
@@ -1491,7 +1505,7 @@ function gateMeta(chunks: Chunk[]): Record<number, GateMeta> {
 function basicByValue(chunks: Chunk[]): Record<string, Record<string, string>> {
   const out: Record<string, Record<string, string>> = {
     type: {}, authority: {}, profile: {}, definition: {}, gate: {}, variable: {}, channel: {},
-    cross: {}, planet: {},
+    cross: {}, planet: {}, strategy: {}, frequencies: {},
   };
   // "Triple Split Definition" and "Triple Split" have to land on the same key,
   // and so do "1 / 3" and "1/3: The Investigator Martyr".
@@ -1499,6 +1513,14 @@ function basicByValue(chunks: Chunk[]): Record<string, Record<string, string>> {
 
   for (const c of chunks) {
     const kind = c.source_kind ?? "";
+    // Strategy and Frequencies belong to Type, so their text lives on the Types
+    // rows in two columns of their own, added 2026-09-13 with Kaycee's go-ahead.
+    if (kind === "type") {
+      const m = c.metadata ?? {};
+      const k = normValue(c.title ?? "");
+      if ((m["Delphi Strategy Basic"] ?? "").trim()) out.strategy[k] = m["Delphi Strategy Basic"].trim();
+      if ((m["Delphi Frequencies Basic"] ?? "").trim()) out.frequencies[k] = m["Delphi Frequencies Basic"].trim();
+    }
     // The Types column was titled "Text 1" in the 09-13 sync; Kaycee renamed it
     // to Delphi Basic afterwards. The words are hers either way, so the synced
     // copy is read until the next sync carries the new name.
@@ -1548,6 +1570,8 @@ function metaBasic(field: string, value: string, type: string,
   const t = (kind: string, v: string) => lib[kind]?.[normValue(v)] ?? "";
   switch (field) {
     case "Type": return t("type", value);
+    case "Strategy": return t("strategy", type);
+    case "Signature": return t("frequencies", type);
     // the header writes "1 / 3 Investigator Martyr"; her entry is "1/3: ..."
     case "Profile": return t("profile", (value.match(/\d\s*\/\s*\d/) ?? [""])[0]);
     case "Variables": return t("variable", value);
@@ -7534,7 +7558,7 @@ function clock12(hhmm) {
 function varHtml(v) {
   if (v.unsettled) return couldBeHtml(v.label, v.label, v.couldBe || []);
   return '<b>' + esc(v.label) + '</b>' +
-    '<span class="kn">' + esc(v.theme) + '</span>' +
+    '<span class="kn">' + esc(v.detail || v.theme) + '</span>' +
     tags([{ text: v.side === 'design' ? 'Design' : 'Personality',
             bg: v.side === 'design' ? '#e06666' : '#c9b6e4' },
           { text: v.arrow + ' arrow' }]) +
@@ -7831,7 +7855,7 @@ document.addEventListener('mousemove', function (e) {
     hot(null); litGate(null); markRows(null);
     showTip(e, '<b>' + esc(v.label) + '</b>' + (v.unsettled
       ? '<span style="color:#845095">Exact Birth Time Required</span>'
-      : esc(v.theme) + ' &middot; ' + esc(v.arrow) + ' arrow'));
+      : esc(v.detail || (v.theme + ' \u00b7 ' + v.arrow + ' arrow'))));
     return;
   }
   var mp = e.target.closest ? e.target.closest('.mandala [data-planet]') : null;
