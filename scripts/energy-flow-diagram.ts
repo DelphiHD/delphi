@@ -34,6 +34,7 @@ loadEnv({ path: ".env.local", override: true });
 import { randomBytes } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { Script } from "node:vm";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { join } from "node:path";
 
@@ -1497,7 +1498,7 @@ function centerFunctions(chunks: Chunk[]): Record<Center, string[]> {
 /** Defined, undefined and open are three different things in Human Design, not
  *  two: undefined means the centre carries an activated gate but no completed
  *  channel, open means it carries nothing at all. Kaycee writes all three. */
-interface CenterStates { theme: string; defined: string; undefined: string; open: string }
+interface CenterStates { theme: string; themes: string; defined: string; undefined: string; open: string }
 
 /**
  * Kaycee's own words for an entry, wherever she put them.
@@ -1692,6 +1693,8 @@ function centerStates(chunks: Chunk[]): Record<Center, CenterStates> {
     };
     out[center] = {
       theme: (m["Not Self Themes"] ?? "").trim(),
+      // what the centre is the center of, from her Themes column (added 09-13)
+      themes: (m.Themes ?? "").trim(),
       defined: field("Delphi Defined Basic"),
       undefined: field("Delphi Undefined Basic"),
       open: field("Delphi Open Basic"),
@@ -3083,7 +3086,7 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
         // The body-part associations are off until Kaycee has corrected them.
         // Kaycee, 2026-09-13: "please remove the body part associations from the
         // centers, I need to fix those." Every display reads this one field.
-        id: c, name: CENTER_DISPLAY[c], fns: d.fn[c], biology: "",
+        id: c, name: CENTER_DISPLAY[c], fns: d.fn[c], biology: "", themes: d.states[c].themes,
         defined, state, pending,
         // The scan's own name for this centre, carried rather than rebuilt from
         // the display name: the two vocabularies do not match on Heart or G.
@@ -4900,7 +4903,7 @@ if (DATA.client) {
       var gates = list.map(function (p) { return p.gate; });
       litGate(gates);
       markRowsFor(list);
-      var head = el.dataset.key, sub = '', familyCard = '';
+      var head = el.dataset.key, sub = '', familyCard = '', centerHead = '';
       if (el.dataset.kind === 'line') {
         var n = String(el.dataset.key).split(' ')[1];
         head = 'Line ' + n + ': ' + ((DATA.lineNames || {})[n] || '');
@@ -4939,13 +4942,18 @@ if (DATA.client) {
         var c = DATA.centers.filter(function (x) { return x.name === el.dataset.key; })[0];
         // The state label is this client's own, so it is left off a bar that
         // counts two people: the centers table says who has what.
-        if (c) sub = c.fns.join(' + ') +
-          (!el.dataset.split && c.stateLabel ? ' &middot; ' + c.stateLabel : '') +
-          (c.biology ? '. ' + c.biology : '') +
-          // her Delphi Basic for the state this centre is in, the same words its
-          // card opens with; left off a pair, where each person's state differs
-          (!el.dataset.split && !c.pending && c.stateShort
-            ? '<span class="tipbody">' + esc(c.stateShort) + '</span>' : '');
+        // the same center hover as on the chart: pills, Themes, and her text for
+        // its state, which is left off a pair, where each person's state differs
+        if (c) {
+          var ck2 = ctrByID[c.id] || c;
+          var tipC = ctrTipHtml(ck2, !!el.dataset.split);
+          head = '';
+          // split at the end of the heading by hand: a backslash does not
+          // survive this template, so no pattern here
+          var cut = tipC.indexOf('</b>') + 4;
+          centerHead = tipC.slice(0, cut);
+          sub = tipC.slice(cut);
+        }
       } else if (el.dataset.kind === 'sign' && el.className.indexOf('grp') > -1) {
         // an element is a total, so the useful breakdown is which of its three
         // signs carries the weight, not twelve planets and their degrees
@@ -4979,7 +4987,7 @@ if (DATA.client) {
       var rest = split + (sub ? sub + '<br>' : '') +
         (split ? '' : (gl ? '<span style="opacity:.7">' + esc(gl) + '</span>'
             : (list.length ? '' : 'None in this chart.')));
-      if (e) showTip(e, '<b>' + esc(head) + '</b>' + rest);
+      if (e) showTip(e, (centerHead || '<b>' + esc(head) + '</b>') + rest);
       // the pinned card says what the hover said, in card form; a circuit family
       // lists each of its circuits with its description
       return familyCard || '<b>' + esc(head) + '</b><div class="basic">' + rest + '</div>';
@@ -7962,6 +7970,20 @@ function chanHtml(c) {
     (c.report ? prose(c.report)
               : (c.basic ? '<div class="basic">' + esc(c.basic) + '</div>' : ''));
 }
+// The center type as pills in its function colours, the same as a gate's
+// pills, then her Themes, then her Delphi text for the state it is in.
+// Kaycee, 2026-09-13: "add that to the centers mouseovers ... make pills for
+// the center type."
+function ctrPills(k) {
+  return tags(k.fns.map(function (f) { return { text: f, bg: fnColor[f] }; }));
+}
+function ctrTipHtml(k, noState) {
+  var st = noState ? '' : (k.pending ? ' &middot; Not settled' : k.stateLabel ? ' &middot; ' + k.stateLabel : '');
+  return '<b>' + esc(k.name) + st + '</b>' +
+    '<span class="tiptags">' + ctrPills(k) + '</span>' +
+    (k.themes ? '<span class="tipbody">' + esc(k.themes) + '</span>' : '') +
+    (!noState && !k.pending && k.stateShort ? '<span class="tipbody">' + esc(k.stateShort) + '</span>' : '');
+}
 function ctrHtml(k) {
   var t = k.fns.map(function (f) { return { text: f, bg: fnColor[f] }; });
   // An unsettled centre must not wear the label of the hour it happened to be
@@ -7977,6 +7999,7 @@ function ctrHtml(k) {
   // their own reading first when this chart has one, Kaycee's general text for
   // the state otherwise, so a center always says something
   return '<b>' + esc(k.name) + '</b>' + tags(t) +
+    (k.themes ? '<div class="basic">' + esc(k.themes) + '</div>' : '') +
     (k.pending ? pendingNote(k.pendField) : '') +
     (k.biology ? '<span class="meta">' + esc(k.biology) + '</span>' : '') + extra +
     prose(k.pending ? k.report : (k.report || k.stateText));
@@ -8141,9 +8164,13 @@ document.addEventListener('mousemove', function (e) {
   if (va && varBy[va.dataset.var]) {
     var v = varBy[va.dataset.var];
     hot(null); litGate(null); markRows(null);
+    // what the variable is, in her words, above this person's line. Kaycee,
+    // 2026-09-13: "add the variable level descriptions to the arrows on mouseover"
+    var vdesc = ((DATA.basicLib || {}).variable_component || {})[v.label + '|Variable|1'] || '';
     showTip(e, '<b>' + esc(v.label) + '</b>' + (v.unsettled
       ? '<span style="color:#845095">Exact Birth Time Required</span>'
-      : esc(v.detail || (v.theme + ' \u00b7 ' + v.arrow + ' arrow'))));
+      : esc(v.detail || (v.theme + ' \u00b7 ' + v.arrow + ' arrow'))) +
+      (vdesc ? '<span class="tipbody">' + esc(vdesc) + '</span>' : ''));
     return;
   }
   var mp = e.target.closest ? e.target.closest('.mandala [data-planet]') : null;
@@ -8234,9 +8261,7 @@ document.addEventListener('mousemove', function (e) {
   if (ct && ctrByID[ct.dataset.center]) {
     var k = ctrByID[ct.dataset.center];
     hot(null); litGate(gatesInCenter(ct.dataset.center)); markCenter(ct.dataset.center); markRows(ct.dataset.center);
-    showTip(e, '<b>' + esc(k.name) + (k.pending ? ' &middot; Not settled' : k.stateLabel ? ' &middot; ' + k.stateLabel : '') + '</b>' +
-      '<span style="opacity:.68">' + k.fns.join(' + ') + '</span>' +
-      (k.stateShort ? '<span class="tipbody">' + esc(k.stateShort) + '</span>' : ''));
+    showTip(e, ctrTipHtml(k));
     show('<b>' + esc(k.name) + (k.pending ? ' &middot; Not settled' : k.stateLabel ? ' &middot; ' + k.stateLabel : '') +
       '</b><span class="meta">' + k.fns.join(' + ') +
       (k.biology ? '<br>' + esc(k.biology) : '') + '</span>' + prose(k.stateText));
@@ -8274,7 +8299,28 @@ document.addEventListener('mousemove', function (e) {
 // charts.delphihd.com, never the apex: delphihd.com serves Kaycee's Wix site.
 const SITE = process.env.DELPHI_SITE_URL ?? "https://charts.delphihd.com";
 
+/**
+ * Refuse to publish a page whose own script does not parse. The page is one
+ * template literal, and a backslash inside it silently vanishes, so a pattern
+ * that is fine in the editor can arrive as a syntax error that stops every
+ * hover and click on the chart. On 2026-09-13 exactly that reached the sandbox
+ * chart. Loud and before upload, so it can never reach a client's link.
+ */
+function assertPageScriptsParse(html: string): void {
+  const re = /<script>([\s\S]*?)<\/script>/g;
+  let m: RegExpExecArray | null;
+  let i = 0;
+  while ((m = re.exec(html))) {
+    i++;
+    try { new Script(m[1]); }
+    catch (e) {
+      throw new Error(`chart page script ${i} does not parse (${e instanceof Error ? e.message : e}). Nothing was published.`);
+    }
+  }
+}
+
 async function publishChart(client: ClientCtx, html: string): Promise<string> {
+  assertPageScriptsParse(html);
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error("NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set to publish");
