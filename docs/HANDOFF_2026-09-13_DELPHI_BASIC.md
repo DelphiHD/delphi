@@ -121,6 +121,29 @@ and were not in scope.
 - Still reading `Description`, untouched pending Kaycee: circuit and channel
   type pills. Lines have no Delphi Basic column.
 
+## Progress, 09-13 evening (committed, sandbox republished, clients not)
+
+- Sync one database: `--only "<directory row name>"`, and a picker plus Sync
+  this one on the dashboard heartbeat bar (runs on the Mac). See DECISIONS.
+  HD Types synced this way; library still 861 rows.
+- Types: `Delphi Strategy Basic` and `Delphi Frequencies Basic` added and
+  filled (Kaycee approved the wording); Strategy and Frequencies cards read
+  them. Channel Types keep Description (Kaycee: "the descriptions we had were
+  fine"). Circuit and quarter pills, Circuitry panel, Stats circuit, line and
+  center rows, and mandala quarters read Delphi Basic.
+- Variables: cards show the Foundation line ("Color 3: Thirst, Right Arrow |
+  Passive: Cold, Tone 6: Touch") from lib/chart/variables.ts. Determination is
+  labelled Digestion everywhere on the chart.
+- New Notion database HD Variable Components (in the directory, Sync to Delphi
+  UNticked, Status Working on It): 92 drafted rows (24 colors, 48 left/right
+  variants, 12 tones, 8 arrow modes), each with Delphi Basic and a Reviewed
+  checkbox. Kaycee reviews, then ticks Sync; KIND_MAP kind is
+  `variable_component`. Not wired into the chart yet.
+- Circuitry toggle works on bodygraph and mandala (fades channel legs).
+- Open question for Kaycee: variables-lookup.json names Digestion color 4
+  "Taste" (same as color 2) and gives Motivation and Perspective identical
+  left/right pairs. Drafts follow the lookup as is.
+
 ## Standing rules to carry over
 
 Never run the sync without asking. Never remove a rule without asking. No
