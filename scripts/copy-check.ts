@@ -33,6 +33,7 @@ const SOURCES = [
   "app/chart/page.tsx",              // the form on her website
   "scripts/event-qr.ts",             // the QR card an organiser prints
   "lib/email.ts",                    // the chart email
+  "app/c/[token]/route.ts",          // what a chart link says when it cannot open
 ];
 
 const APPROVED = "docs/CLIENT_COPY.json";
@@ -57,7 +58,7 @@ function stripComments(src: string): string {
       }
     }
     // a terminal message is for whoever runs the build, not the client
-    return /\bconsole\.(log|warn|error)\(/.test(line) ? "" : line;
+    return /\bconsole\.(log|warn|error)\(|\bthrow new Error\(/.test(line) ? "" : line;
   }).join("\n");
 }
 
