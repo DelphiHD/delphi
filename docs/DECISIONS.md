@@ -508,7 +508,7 @@ that, anyone answering their chart email would have been talking to nobody.
 Mail is never fatal: `sendChartEmail` returns whether it went and does not throw. A
 chart that exists must not be undone by a mail server having a bad afternoon.
 
-## 2026-09-13 · Sync one database at a time
+## Sync one database at a time (2026-09-13)
 
 **Decision (Kaycee).** The Notion sync can run a single database:
 `npx tsx scripts/sync-notion.ts --only "HD Types"`, or from the dashboard's
