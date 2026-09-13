@@ -54,6 +54,14 @@ attempted, collided with the existing field, and was reverted.
 - Verified on Sandbox Generator Single (token 62927e854e1debca6927a9d59de37923):
   no Keynote or Function lines anywhere, 36 of 36 channels carry text.
 
+## Check to run after the sync
+
+Kaycee gave the correct Sun text on 09-13. The Sun hover must show exactly:
+
+> The Sun is the conscious carrier of purpose, embodying the Father archetype and the Life Force theme; it delivers about 70 percent of all programming, serving as the core yang energy that defines our primary self and actions, is universally applicable, belongs to the Fundamental layer, and has no return in life.
+
+If it shows anything else, find out why. Do not ask her to retype it.
+
 ## Next steps, in order
 
 1. The sync ran 09-13 with her go ahead (log: `.cache/logs/sync-2026-09-13.log`).
