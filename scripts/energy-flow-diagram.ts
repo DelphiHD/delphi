@@ -1509,7 +1509,7 @@ function gateMeta(chunks: Chunk[]): Record<number, GateMeta> {
 function basicByValue(chunks: Chunk[]): Record<string, Record<string, string>> {
   const out: Record<string, Record<string, string>> = {
     type: {}, authority: {}, profile: {}, definition: {}, gate: {}, variable: {}, channel: {},
-    cross: {}, planet: {}, strategy: {}, frequencies: {},
+    cross: {}, planet: {}, strategy: {}, frequencies: {}, profile_line: {},
   };
   // "Triple Split Definition" and "Triple Split" have to land on the same key,
   // and so do "1 / 3" and "1/3: The Investigator Martyr".
@@ -4778,8 +4778,9 @@ if (DATA.client) {
       var head = el.dataset.key, sub = '';
       if (el.dataset.kind === 'line') {
         var n = String(el.dataset.key).split(' ')[1];
-        // the keynote only: line meanings are Kaycee's to write, not mine
         head = 'Line ' + n + ': ' + ((DATA.lineNames || {})[n] || '');
+        // her HD Profile Lines Delphi Basic for that line
+        sub = esc(((DATA.basicLib || {}).profile_line || {})[n] || '');
       } else if (el.dataset.kind === 'group' || el.dataset.kind === 'circuit') {
         // a family row, or one of its circuits: her HD Circuits Delphi Basic,
         // the same text as the circuit's pill
@@ -4791,7 +4792,11 @@ if (DATA.client) {
         // counts two people: the centers table says who has what.
         if (c) sub = c.fns.join(' + ') +
           (!el.dataset.split && c.stateLabel ? ' &middot; ' + c.stateLabel : '') +
-          (c.biology ? '. ' + c.biology : '');
+          (c.biology ? '. ' + c.biology : '') +
+          // her Delphi Basic for the state this centre is in, the same words its
+          // card opens with; left off a pair, where each person's state differs
+          (!el.dataset.split && !c.pending && c.stateShort
+            ? '<span class="tipbody">' + esc(c.stateShort) + '</span>' : '');
       } else if (el.dataset.kind === 'sign' && el.className.indexOf('grp') > -1) {
         // an element is a total, so the useful breakdown is which of its three
         // signs carries the weight, not twelve planets and their degrees
