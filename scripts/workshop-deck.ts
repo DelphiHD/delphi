@@ -60,6 +60,7 @@ const FROM_API: Record<string, Center> = {
   head: "head", ajna: "ajna", throat: "throat", g: "g", heart: "heart", ego: "heart",
   "solar plexus": "solar-plexus", sacral: "sacral", spleen: "spleen", root: "root",
 };
+const DEMO_NAMES = ["Ava", "Ben", "Cora", "Dane", "Eli", "Faye", "Gus", "Hana", "Ivy", "Jude", "Kai", "Lena", "Milo", "Nora", "Owen", "Pia"];
 const CORE = new Set(["Sun", "Earth", "North Node", "South Node", "Moon", "Mercury", "Venus",
   "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"]);
 
@@ -196,7 +197,8 @@ async function main() {
     const type = chart.type.value;
     const profile = (chart.profile.value.match(/\d\s*\/\s*\d/) ?? [""])[0].replace(/\s/g, "");
     room.push({
-      name: DEMO ? String(r.person_name).replace(/^Sandbox\s+/, "") : first,
+      // the demo stands in short first names, like the real room will have
+      name: DEMO ? DEMO_NAMES[room.length % DEMO_NAMES.length] : first,
       fullName: String(r.person_name),
       token: r.token,
       type, strategy: chart.strategy.value, authority: chart.authority.value,
@@ -209,6 +211,11 @@ async function main() {
       sunGate: `${sun.gate}.${sun.line}`, designSunGate: `${dSun.gate}.${dSun.line}`,
       sunLon: longitudeOf(sun.gate, sun.line, sun.color ?? 1, sun.tone ?? 1, sun.base ?? 1),
       designSunLon: longitudeOf(dSun.gate, dSun.line, dSun.color ?? 1, dSun.tone ?? 1, dSun.base ?? 1),
+      // every placement with its exact place on the wheel, for building a chart live
+      acts: (["personality", "design"] as const).flatMap((side) => chart.activations[side]
+        .filter((a) => CORE.has(a.planet))
+        .map((a) => ({ side, planet: a.planet, gate: a.gate, line: a.line,
+          lon: longitudeOf(a.gate, a.line, a.color ?? 1, a.tone ?? 1, a.base ?? 1) }))),
       svg: chart.bodygraphSvg ?? chart.chartImageSvg ?? "",
       timeKnown: r.time_accuracy !== "unknown",
     });
@@ -310,6 +317,24 @@ async function main() {
   const out = join(OUT_DIR, "Workshop.html");
   writeFileSync(out, html);
   console.log(`\n✓ ${out}`);
+
+  // The stage: one screen, no slides, everything happening on the bodygraph and
+  // the wheel. Kaycee, 2026-09-13: "It still looks like a powerpoint slideshow...
+  // I was hoping to see some creative ideas about how to illustrate the concepts
+  // graphically using the pretty tools we created."
+  const wheelGeo = { cx: wheel.cx, cy: wheel.cy, rIn: wheel.r.gateInner, rOut: wheel.r.gateOuter };
+  const stageJson = JSON.stringify({ ...data, wheelGeo, top: 268.25 }).replace(/</g, "\\u003c");
+  const stage = `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Delphi Human Design · ${data.event}</title>
+<style>${fontFace}${readFileSync("scripts/workshop-stage.css", "utf8")}</style></head><body>
+<div id="app"></div>
+<script id="deck-data" type="application/json">${stageJson}</script>
+<script>${readFileSync("scripts/workshop-stage.client.js", "utf8")}</script>
+</body></html>`;
+  const stageOut = join(OUT_DIR, "Stage.html");
+  writeFileSync(stageOut, stage);
+  console.log(`✓ ${stageOut}`);
 }
 
 main().catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); });

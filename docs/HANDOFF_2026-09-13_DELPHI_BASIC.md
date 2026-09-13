@@ -200,6 +200,12 @@ again at the venue if signal allows. `--demo` uses the sandbox charts;
 Reuse what exists (Kaycee, 09-13: "We shouldn't have to recreate much"): the
 chart builder, teaching bodygraph and mandala motion are embedded, not redrawn.
 
+Kaycee disliked the slide deck ("still looks like a powerpoint"). The builder now
+also writes Stage.html: one screen, no slides, six views on the teaching
+bodygraph and the wheel with the room's names moving (Centers, Channels, The
+Sky, Auras, Build a Chart, Conditioning). Stage is the direction; the slide
+deck stays in the folder as a fallback.
+
 ## Tabled until after the BFKI event (Sept 14 to 18)
 
 Cycle mode return charts (Solar Return and long cycles as two modes, current and
