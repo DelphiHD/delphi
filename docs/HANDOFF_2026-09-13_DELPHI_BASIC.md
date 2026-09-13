@@ -102,7 +102,9 @@ and were not in scope.
 - Sun check: the live Notion `Delphi Basic` ends at "...primary self and
   actions." and the sync matches it exactly. The rest of the sentence Kaycee
   quoted lives in the Layer, Profile Applicability and Has Return in Life
-  columns, not in Delphi Basic.
+  columns, not in Delphi Basic. Kaycee, 09-13: she removed those sentences on
+  purpose, the synced text is right, and planet hovers show no other columns.
+  Settled.
 - Wired: the gate hover on every view (Keynote gone, Keynote and Function no
   longer shipped in the page at all); header cards for Profile, Authority,
   Variables, Definition and Incarnation Cross (a chart's own report still wins);
