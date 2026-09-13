@@ -187,8 +187,21 @@ theme. The Life Cycles Analysis PDF is a protected reference: never in the sync,
 the repo, or client artifacts. Sandbox charts use real roster birth data and are
 private.
 
+## Workshop deck (built 09-13, for Kaycee's BFKI session Tuesday 09-15)
+
+Correction: the teaching deck was never tabled; it is for Tuesday. Sandbox event,
+low stakes. `scripts/workshop-deck.ts` builds a folder on the Desktop
+(Mandala Renderer Output/Educational/BFKI Workshop/) with Workshop.html, the
+living mandala, the teaching bodygraph and every attendee's own Delphi chart.
+Attendees are charts tagged `bfki` (registration link), plus Kaycee and Max from
+the roster. First names on screen are approved. Rebuild the night before and
+again at the venue if signal allows. `--demo` uses the sandbox charts;
+`--no-charts` and `--no-motion` skip the slow parts for layout changes.
+Reuse what exists (Kaycee, 09-13: "We shouldn't have to recreate much"): the
+chart builder, teaching bodygraph and mandala motion are embedded, not redrawn.
+
 ## Tabled until after the BFKI event (Sept 14 to 18)
 
 Cycle mode return charts (Solar Return and long cycles as two modes, current and
 next), weather impact classification, a notification system, wiring the simple
-and wide split, the teaching deck (needs her running order and slides).
+and wide split.
