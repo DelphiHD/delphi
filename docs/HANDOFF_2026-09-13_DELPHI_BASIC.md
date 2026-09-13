@@ -63,6 +63,20 @@ Basic). Use it to confirm the planet hovers read that column. The Sun hover shou
 
 If it shows anything else, find out why. Do not ask her to retype it.
 
+## Sync result (09-13, 11:05, finished cleanly)
+
+The Sun's Delphi Basic matches her example. Rows with `Delphi Basic` text:
+gates 64/64, channels 36/36, crosses 194/194, planets 14/14, profiles 12/12,
+profile lines 6/6, variables 16/16, authorities 8/8, circuits 7/7, quarters 4/4,
+definitions 6/7. Centers keep their three fields (9/9 each).
+
+Not found in the synced copy: `Delphi Basic` on **Types (0/5)** and **Channel
+Types (0/4)**, and one of the 7 definitions. Look at the synced metadata keys for
+those rows first (the field may be named differently or be outside what the
+sync reads) before mentioning it to Kaycee; she believes everything is filled
+in, so treat this as our problem to find, not hers. Lines have no Delphi Basic
+and were not in scope.
+
 ## Next steps, in order
 
 1. The sync ran 09-13 with her go ahead (log: `.cache/logs/sync-2026-09-13.log`).

@@ -1443,7 +1443,7 @@ function delphiText(metadata?: Record<string, string> | null): string {
   return "";
 }
 
-interface GateMeta { name: string; keynote: string; func: string; circuit: string;
+interface GateMeta { name: string; circuit: string;
   quarter: string; basic: string; bridge: string }
 /** Per-gate detail from her HD Gates database, for the gate popups. */
 function gateMeta(chunks: Chunk[]): Record<number, GateMeta> {
@@ -1455,8 +1455,6 @@ function gateMeta(chunks: Chunk[]): Record<number, GateMeta> {
     if (!n) continue;
     out[n] = {
       name: (m["Gate Name"] ?? c.title ?? "").replace(/^\d+:\s*/, "").trim(),
-      keynote: (m.Keynote ?? "").trim(),
-      func: (m["Function - DBHD - The 9 Centers"] ?? "").split("\n")[0].trim(),
       circuit: (m["Human Design Circuits"] ?? "").trim(),
       quarter: (m.Quarter ?? m["HD Quarters"] ?? "").replace(/^\d+:\s*/, "").trim(),
       // Kaycee's own words for the free tier, and for what this gate would do
@@ -1489,11 +1487,11 @@ function gateMeta(chunks: Chunk[]): Record<number, GateMeta> {
 function basicByValue(chunks: Chunk[]): Record<string, Record<string, string>> {
   const out: Record<string, Record<string, string>> = {
     type: {}, authority: {}, profile: {}, definition: {}, gate: {}, variable: {}, channel: {},
+    cross: {}, planet: {},
   };
   // "Triple Split Definition" and "Triple Split" have to land on the same key,
   // and so do "1 / 3" and "1/3: The Investigator Martyr".
-  const norm = (v: string) =>
-    v.toLowerCase().split(":")[0].replace(/\bdefinition\b/g, "").replace(/[^a-z0-9/]/g, "");
+  const norm = normValue;
 
   for (const c of chunks) {
     const basic = delphiText(c.metadata);
@@ -1504,11 +1502,59 @@ function basicByValue(chunks: Chunk[]): Record<string, Record<string, string>> {
       if (n) out.gate[String(n)] = basic;
       continue;
     }
+    // A cross is named three or four ways ("RAC of Eden 3", "Right Angle Cross
+    // of Eden (11/12 | 46/25)"), but its four gates are one cross and one only.
+    // Her Crosses database carries them in the Cross field.
+    if (kind === "cross") {
+      const k = crossKey((c.metadata ?? {}).Cross ?? "");
+      if (k) out.cross[k] = basic;
+      continue;
+    }
     if (!(kind in out)) continue;
     const key = norm(c.title ?? "");
     if (key) out[kind][key] = basic;
   }
   return out;
+}
+
+/** "(45/26 | 36/6)" and "( 45/26|36/6 )" both read "45/26|36/6". */
+function crossKey(v: string): string {
+  const m = v.match(/\(([\d\s/|]+)\)/);
+  return m ? m[1].replace(/\s+/g, "") : "";
+}
+const normValue = (v: string) =>
+  v.toLowerCase().split(":")[0].replace(/\bdefinition\b/g, "").replace(/[^a-z0-9/]/g, "");
+
+/**
+ * Her Delphi Basic for one header field, as the chart writes the value.
+ *
+ * The chart provider and her databases name some answers differently. Where
+ * the difference is a spelling, it is mapped here. "Ego" is two entries in her
+ * Authorities database, Ego Manifested and Ego Projected, and which one is
+ * decided by Type, never guessed. "Split Definition" is either Simple-Split or
+ * Wide Split, and nothing on the chart says which yet, so it gets no text
+ * rather than the wrong one.
+ */
+function metaBasic(field: string, value: string, type: string,
+  lib: Record<string, Record<string, string>>): string {
+  const t = (kind: string, v: string) => lib[kind]?.[normValue(v)] ?? "";
+  switch (field) {
+    case "Type": return t("type", value);
+    // the header writes "1 / 3 Investigator Martyr"; her entry is "1/3: ..."
+    case "Profile": return t("profile", (value.match(/\d\s*\/\s*\d/) ?? [""])[0]);
+    case "Variables": return t("variable", value);
+    case "Definition": return t("definition", value);
+    case "Incarnation Cross": return lib.cross?.[crossKey(value)] ?? "";
+    case "Authority": {
+      const a = value.trim().toLowerCase();
+      if (a === "ego") return t("authority", type === "Manifestor" ? "Ego Manifested" : "Ego Projected");
+      if (a === "lunar") return t("authority", "Lunar Authority");
+      if (a === "mental") return t("authority", "Environment (Mental Projectors)");
+      if (a === "self projected" || a === "self-projected") return t("authority", "Self Projected");
+      return t("authority", value);
+    }
+    default: return "";
+  }
 }
 
 /** The three states of a center in Kaycee's own words. Her HD Centers database
@@ -1644,7 +1690,7 @@ function centerBiology(chunks: Chunk[]): Record<Center, string> {
 
 const pairKey = (a: number, b: number) => (a < b ? `${a}-${b}` : `${b}-${a}`);
 
-/** channel -> { circuit id, her channel name, her keynote }, from HD Channels,
+/** channel -> { circuit id, her channel name, her Delphi Basic }, from HD Channels,
  *  back-filled from the HD Circuits database where a row leaves Circuit blank. */
 interface ChannelMeta { circuit: CircuitId; name: string; basic: string; type: string }
 function channelCircuits(chunks: Chunk[]): Map<string, ChannelMeta> {
@@ -2220,6 +2266,13 @@ function uranusGlyph(x: number, y: number, color: string, scale = 1): string {
     `<circle cx="${c}" cy="${y + 1}" r="1.7" fill="${color}" stroke="none"></circle></g>`;
 }
 
+/** A planet glyph in a placement table, marked so hovering the glyph itself
+ *  reads the planet (her Planets Delphi Basic) and the rest of the row reads
+ *  the gate. */
+function pglyph(planet: string, inner: string): string {
+  return `<g class="pgl" data-pname="${esc(planet)}">${inner}</g>`;
+}
+
 /** Placement column, pared to glyph and gate.line. The planet name and gate
  *  name live in the hover tip and the click card instead. Design red on the
  *  left, Personality on the right, same order as her placement images. */
@@ -2254,9 +2307,9 @@ function placementTable(
       `data-gate="${a.gate}" data-line="${a.line}">`;
     s += `<rect x="2" y="${ry - 19}" width="${TABLE_W - 4}" height="${rowH}" rx="7" ` +
       `fill="${i % 2 === 1 ? zebra : "transparent"}"></rect>`;
-    s += planet === "Uranus"
+    s += pglyph(planet, planet === "Uranus"
       ? uranusGlyph(glyphX, ry, accent, 1.15)
-      : `<text x="${glyphX}" y="${ry}" font-size="17" fill="${accent}">${esc(PLANET_GLYPHS[planet])}</text>`;
+      : `<text x="${glyphX}" y="${ry}" font-size="17" fill="${accent}">${esc(PLANET_GLYPHS[planet])}</text>`);
     s += `<text x="${gateX}" y="${ry}" font-size="15" font-weight="600" fill="${accent}">${a.gate}.${a.line}</text>`;
     if (a.fix) {
       s += `<text x="${gateX + 36}" y="${ry}" font-size="12" fill="${accent}">${a.fix}</text>`;
@@ -2301,8 +2354,8 @@ function pairTable(
     if (i % 2 === 0) {
       s += `<rect x="4" y="${ry - 19}" width="${W - 8}" height="${rowH - 4}" rx="6" fill="${zebra}"></rect>`;
     }
-    s += `<text x="${W / 2}" y="${ry}" text-anchor="middle" font-size="13" fill="${skin.muted}">` +
-      `${esc(PLANET_GLYPHS[planet] ?? planet)}</text>`;
+    s += pglyph(planet, `<text x="${W / 2}" y="${ry}" text-anchor="middle" font-size="13" fill="${skin.muted}">` +
+      `${esc(PLANET_GLYPHS[planet] ?? planet)}</text>`);
     if (p) {
       s += `<text class="prow" data-gate="${p.gate}" x="${W * 0.3}" y="${ry}" text-anchor="middle" ` +
         `font-size="14" font-weight="600" fill="${dark}">${p.gate}.${p.line}</text>`;
@@ -2339,9 +2392,9 @@ function mergedClientTable(client: ClientCtx, skin: Skin, x: number, y: number):
       `fill="${i % 2 === 1 ? zebra : "transparent"}"></rect>`;
     if (d) s += `<text x="${W / 2 - 22}" y="${ry}" text-anchor="end" font-size="14" font-weight="600" ` +
       `fill="${DESIGN_RED}">${d.gate}.${d.line}</text>`;
-    s += planet === "Uranus"
+    s += pglyph(planet, planet === "Uranus"
       ? uranusGlyph(W / 2 - 8, ry, skin.ink, 1.05)
-      : `<text x="${W / 2}" y="${ry}" text-anchor="middle" font-size="16" fill="${skin.ink}">${esc(PLANET_GLYPHS[planet])}</text>`;
+      : `<text x="${W / 2}" y="${ry}" text-anchor="middle" font-size="16" fill="${skin.ink}">${esc(PLANET_GLYPHS[planet])}</text>`);
     if (pp) s += `<text x="${W / 2 + 22}" y="${ry}" font-size="14" font-weight="600" ` +
       `fill="${skin.ink}">${pp.gate}.${pp.line}</text>`;
     s += `</g>`;
@@ -2385,9 +2438,9 @@ function transitTable(sky: NonNullable<SceneData["sky"]>, skin: Skin, x: number,
       `fill="${TRANSIT_INK}">${fixMark(a.fixingState)}</text>`;
     s += `<text class="tgl" data-planet="${esc(planet)}" x="30" y="${ry}" font-size="15" ` +
       `font-weight="600" fill="${TRANSIT_INK}">${a.gate}.${a.line}</text>`;
-    s += planet === "Uranus"
+    s += pglyph(planet, planet === "Uranus"
       ? uranusGlyph(W - 26, ry, TRANSIT_INK, 1.15)
-      : `<text x="${W - 18}" y="${ry}" font-size="17" fill="${TRANSIT_INK}">${esc(PLANET_GLYPHS[planet])}</text>`;
+      : `<text x="${W - 18}" y="${ry}" font-size="17" fill="${TRANSIT_INK}">${esc(PLANET_GLYPHS[planet])}</text>`);
     s += `</g>`;
   });
   return s + `</g>`;
@@ -2882,6 +2935,8 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
             key: m.label.toLowerCase().replace(/^incarnation cross$/, "cross"),
             report: d.client!.report.props[m.label.toLowerCase().replace(/^incarnation cross$/, "cross")] ?? "",
             wide: /cross|frequencies/i.test(m.label),
+            basic: m.couldBe ? "" : metaBasic(m.field ?? m.label, m.value,
+              d.client!.meta.find((x) => x.field === "Type")?.value ?? "", d.basicLib ?? {}),
           })),
           defined: [...d.client.channels], centers: [...d.client.centers],
           // Option 2: solid means true at every hour of the window. These are
@@ -2950,8 +3005,6 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
           gate: a.gate, line: a.line, fix: a.fix,
           gateName: d.gateInfo[a.gate]?.name ?? gateName(a.gate),
           lineName: d.lineName(a.gate, a.line),
-          keynote: d.gateInfo[a.gate]?.keynote ?? "",
-          func: d.gateInfo[a.gate]?.func ?? "",
           circuit: d.gateInfo[a.gate]?.circuit ?? "",
           quarter: d.gateInfo[a.gate]?.quarter ?? "",
           // Her general words for this gate. A chart with no synthesis of its
@@ -2978,8 +3031,6 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
     gateLib: Object.fromEntries(
       Array.from({ length: 64 }, (_, i) => i + 1).map((g) => [g, {
         name: d.gateInfo[g]?.name ?? gateName(g),
-        keynote: d.gateInfo[g]?.keynote ?? "",
-        func: d.gateInfo[g]?.func ?? "",
         circuit: d.gateInfo[g]?.circuit ?? "",
         quarter: d.gateInfo[g]?.quarter ?? "",
         basic: d.gateInfo[g]?.basic ?? "",
@@ -3127,6 +3178,10 @@ details.drop[open] > summary::after { content:" \\25B4"; }
 .tip[hidden] { display:none; }
 .tip b { display:block; font-size:12px; }
 .tip .tipbody { display:block; margin-top:5px; font-size:10.5px; line-height:1.5; }
+.tip .tiptags { display:block; margin-top:5px; }
+.tip .tag { display:inline-block; font-size:8.5px; font-weight:600; letter-spacing:.08em; padding:1px 7px;
+  border-radius:8px; margin:0 4px 3px 0; color:#231f33; }
+.tip .tag.ghost { background:none; border:1px solid currentColor; color:inherit; opacity:.6; }
 .halo > *:not(:last-child) { opacity:0; transition:opacity .2s; }
 .halo.on > *:not(:last-child) { opacity:1; }
 .halo.on .hl-fill { opacity:.28; }
@@ -4024,7 +4079,7 @@ if (DATA.client) {
       ? '<span class="needtime">' + esc(m.value) + '</span>' +
         (m.couldBe.length ? '<span class="pendmark" data-couldbe="' + m.key + '">' + m.couldBe.length + ' Possible</span>' : '')
       : m.value;
-    return '<div class="prop' + (m.report ? ' has' : '') + (m.wide ? ' wide' : '') +
+    return '<div class="prop' + (m.report || m.basic ? ' has' : '') + (m.wide ? ' wide' : '') +
       (m.couldBe ? ' unsettled' : '') +
       '" data-key="' + m.key + '"><span>' + m.label + '</span> ' + body + '</div>';
   }).join('');
@@ -4241,9 +4296,9 @@ if (DATA.client) {
     if (!el) return;
     litGate(+el.dataset.gate);
     var L = (DATA.gateLib || {})[el.dataset.gate] || {};
-    showTip(e, '<b>Gate ' + el.dataset.gate + '</b>' + esc(L.name || '') + '<br>' +
-      '<span style="opacity:.7">' +
-      (L.bridge ? esc(L.bridge) : 'would complete a channel across the split') + '</span>');
+    // the same gate hover as everywhere else, with what it would do as a bridge
+    showTip(e, gateTipHtml(+el.dataset.gate) +
+      (L.bridge ? '<span class="tipbody"><i>If it bridged your split:</i> ' + esc(L.bridge) + '</span>' : ''));
   });
   document.getElementById('deflist').addEventListener('click', function (e) {
     var el = e.target.closest ? e.target.closest('.brg') : null;
@@ -5258,6 +5313,13 @@ if (DATA.client) {
     relight();
   });
   document.getElementById('planets').dispatchEvent(new Event('change', { bubbles: true }));
+  // each planet's name in the panel reads the same as its glyph anywhere else
+  document.getElementById('planets').addEventListener('mousemove', function (e) {
+    var lb = e.target.closest ? e.target.closest('label.cc') : null;
+    if (!lb) { tip.hidden = true; return; }
+    showTip(e, planetTipHtml(lb.textContent.trim()));
+  });
+  document.getElementById('planets').addEventListener('mouseleave', function () { tip.hidden = true; });
   // A collapsed section can hide the fact that something is switched off, so the
   // line itself says how many. Chiron and Lilith never count: they start off,
   // and a badge permanently reading "2 off" would tell nobody anything.
@@ -6174,7 +6236,8 @@ if (DATA.client) {
         pill(pl.quality) + pill(pl.element) +
         (HOUSE_N[pl.house] ? '<span class="pill house">House ' + HOUSE_N[pl.house] + '</span>' : '') +
         (g ? '<span class="pill house">Gate ' + g + '</span>' : '') +
-        (pl.blurb ? '<br><span style="opacity:.78">' + esc(pl.blurb) + '</span>' : '');
+        (planetBasic(pl.label || pretty(pl.name)) ? '<br><span style="opacity:.78">' +
+          esc(planetBasic(pl.label || pretty(pl.name))) + '</span>' : '');
     };
 
     // The geometry of an aspect, which is fact rather than interpretation.
@@ -6575,7 +6638,8 @@ if (DATA.client) {
           html = '<b>' + esc(sideNm + (pl.label || pretty(pl.name))) + ' in ' + esc(pl.sign) +
             ' ' + dg(pl.position) + '</b>' + moonNote +
             pill(pl.quality) + pill(pl.element) + housePill +
-            (pl.blurb ? '<br><span style="opacity:.72">' + esc(pl.blurb) + '</span>' : '');
+            (planetBasic(pl.label || pretty(pl.name)) ? '<br><span style="opacity:.72">' +
+              esc(planetBasic(pl.label || pretty(pl.name))) + '</span>' : '');
         }
         showTip(e, html);
       });
@@ -7311,6 +7375,7 @@ function libKindFor(field) {
   if (field === 'Authority') return 'authority';
   if (field === 'Profile') return 'profile';
   if (field === 'Definition') return 'definition';
+  if (field === 'Incarnation Cross') return 'cross';
   if (field.indexOf('Personality ') === 0 || field.indexOf('Design ') === 0) return 'gate';
   if (field.indexOf('Channel ') === 0) return 'channel';
   return 'variable';
@@ -7324,6 +7389,11 @@ function libKeyFor(kind, value) {
   var v = String(value == null ? '' : value);
   if (kind === 'gate') return v.split('.')[0];
   if (kind === 'channel') return v;
+  // a cross is keyed by its four gates, "45/26|36/6", the way crossKey does it
+  if (kind === 'cross') {
+    var open = v.lastIndexOf('('), close = v.lastIndexOf(')');
+    return open >= 0 && close > open ? v.slice(open + 1, close).split(' ').join('') : '';
+  }
   var low = v.toLowerCase().split(':')[0];
   if (kind === 'definition') low = low.split('definition').join('');
   var out = '';
@@ -7401,7 +7471,7 @@ function channelText(id) {
   var basic = ((DATA.basicLib || {}).channel || {})[id] || '';
   var c = (DATA.channels || []).filter(function (x) { return x.key === id; })[0];
   var name = c ? c.name : '';
-  if (basic) return name ? name + ' — ' + basic : basic;
+  if (basic) return name ? name + '. ' + basic : basic;
   return name;
 }
 
@@ -7474,24 +7544,65 @@ function chanFromTarget(t) {
   var el = t.closest('[data-ch]');
   return el && chByKey[el.dataset.ch] ? el.dataset.ch : null;
 }
+// The pills a gate wears, in one place, so the hover and the card on every view
+// show the same ones in the same colours. Kaycee, 2026-09-13: "make sure that
+// the gate mouseovers are consistent across views and that the pills are color
+// coded and show up on mouse over." Side and planet in the chart's red and
+// lavender, the circuit in its own circuit colour, the quarter in the mandala's
+// quarter colour, the centre in its function colour.
+var circByName = {};
+DATA.circuits.forEach(function (c) { circByName[String(c.name).trim().toLowerCase()] = c.color; });
+// the same fills the mandala paints its four quarters with
+var QUARTER_BG = { initiation: '#fbf7b2', civilization: '#e8e8e8', duality: '#f5d4d4', mutation: '#e8d8ed' };
+function centerBg(cid) {
+  var c = (DATA.centers || []).filter(function (x) { return x.id === cid; })[0];
+  return c && c.fns && c.fns.length ? fnColor[c.fns[0]] : null;
+}
+// Her Planets database, Delphi Basic, for a planet wherever it is hovered: the
+// astrology wheel, its summary, the placement tables. Settled with Kaycee on
+// 2026-09-13; the chart provider's own planet blurb is not shown.
+function planetBasic(name) {
+  var key = libKeyFor('planet', String(name || '').split('_').join(' '));
+  return ((DATA.basicLib || {}).planet || {})[key] || '';
+}
+function planetTipHtml(name) {
+  var b = planetBasic(name);
+  return '<b>' + esc(name) + '</b>' + (b ? '<span class="tipbody">' + esc(b) + '</span>' : '');
+}
+function sidePill(p, withLine) {
+  return { text: (p.side === 'design' ? 'Design ' : 'Personality ') + p.planet +
+      (withLine ? ' ' + p.gate + '.' + p.line : ''),
+    bg: p.side === 'design' ? '#e06666' : '#c9b6e4' };
+}
+function gatePills(L, here, withLine) {
+  return tags((here || []).map(function (p) { return sidePill(p, withLine); }).concat([
+    L.circuit ? { text: L.circuit, bg: circByName[String(L.circuit).trim().toLowerCase()] } : null,
+    L.quarter ? { text: 'Quarter of ' + L.quarter, bg: QUARTER_BG[String(L.quarter).trim().toLowerCase()] } : null,
+    L.center ? { text: L.center, bg: centerBg(L.cid) } : null]));
+}
+
 // The short form, for a hover. The long form is the card, which is gateLibHtml
-// and already knows whether this chart carries the gate.
-function gateTipHtml(g) {
+// and already knows whether this chart carries the gate. Every view's gate
+// hover comes through here: the bodygraph, the mandala, the astrology ring,
+// the placements list and the bridge chips.
+function gateTipHtml(g, only) {
   var L = (DATA.gateLib || {})[g] || {};
-  var here = (byGate[g] || []);
-  // What this chart does with the gate comes first when it has one, because
-  // that is the thing the person is actually looking at. The library's own
-  // words carry the rest, and stand alone for a gate they do not carry.
-  var who = here.map(function (p) {
-    return (p.side === 'design' ? 'Design ' : 'Personality ') + esc(p.planet) +
-      ' ' + p.gate + '.' + p.line;
-  }).join(' &middot; ');
-  return '<b>Gate ' + g + '</b>' + esc(L.name || '') +
-    '<span style="opacity:.68"><br>' + esc(L.center || '') +
-    (L.circuit ? ' &middot; ' + esc(L.circuit) : '') +
-    (here.length ? '' : ' &middot; not in this chart') + '</span>' +
-    (who ? '<span style="opacity:.85"><br>' + who + '</span>' : '') +
-    (L.keynote ? '<span class="tipbody">' + esc(L.keynote) + '</span>' : '');
+  var here = only || byGate[g] || [];
+  // A hover on one placement leads with its line. A hover on the gate itself
+  // names each of this chart's placements in it, line and all, on its pill.
+  var one = only && here.length === 1 ? here[0] : null;
+  // A placement that lands elsewhere at another hour is not read the gate's
+  // text as if it were theirs, the same rule the card keeps.
+  var moving = here.some(function (p) {
+    return pendingNote((p.side === 'design' ? 'Design ' : 'Personality ') + p.planet);
+  });
+  return '<b>Gate ' + g + (one ? '.' + one.line : '') + '</b>' + esc(L.name || '') +
+    (one && one.lineName ? ' &middot; ' + esc(one.lineName) : '') +
+    '<span class="tiptags">' + gatePills(L, here, !one) + '</span>' +
+    (DATA.client && !here.length ? '<span style="opacity:.68">Not activated in this chart.</span>' : '') +
+    // Her Delphi Basic, never the Definitive Book's Keynote. Kaycee, 2026-09-13:
+    // "I just want what's in the Delphi Basic field to show up everywhere."
+    (L.basic && !moving ? '<span class="tipbody">' + esc(L.basic) + '</span>' : '');
 }
 function gateLibHtml(gate) {
   var L = (DATA.gateLib || {})[gate] || {};
@@ -7500,9 +7611,7 @@ function gateLibHtml(gate) {
     return here.map(gateHtml).join('<hr style="border:0;border-top:1px solid rgba(128,128,128,.25);margin:10px 0">');
   }
   return '<b>Gate ' + gate + '</b><span class="kn">' + esc(L.name || '') + '</span>' +
-    tags([L.circuit ? { text: L.circuit } : null,
-          L.quarter ? { text: 'Quarter of ' + L.quarter } : null,
-          L.center ? { text: L.center } : null]) +
+    gatePills(L, [], false) +
     // Keynote and Function come from The Definitive Book, not from Kaycee, and
     // they were sitting above her own words on every gate card. Her Delphi
     // Basic is the client's text now and the only one. Kaycee, 2026-09-13: "I
@@ -7515,7 +7624,9 @@ function gateLibHtml(gate) {
     '<span class="meta">Not activated in this chart.</span>';
 }
 function propHtml(m) {
-  return '<b>' + esc(m.value) + '</b><span class="meta">' + esc(m.label) + '</span>' + prose(m.report);
+  // Their own reading when this chart has one, her Delphi Basic otherwise.
+  return '<b>' + esc(m.value) + '</b><span class="meta">' + esc(m.label) + '</span>' +
+    (m.report ? prose(m.report) : (m.basic ? '<div class="basic">' + esc(m.basic) + '</div>' : ''));
 }
 
 function chanHtml(c) {
@@ -7561,10 +7672,7 @@ function gateHtml(p) {
   }
   return '<b>Gate ' + p.gate + '.' + p.line + (p.fix ? ' ' + p.fix : '') + '</b>' +
     '<span class="kn">' + esc(p.gateName) + (p.lineName ? ' · ' + esc(p.lineName) : '') + '</span>' +
-    tags([{ text: sideName + ' ' + p.planet, bg: p.side === 'design' ? '#e06666' : '#c9b6e4' },
-          p.circuit ? { text: p.circuit } : null,
-          p.quarter ? { text: 'Quarter of ' + p.quarter } : null,
-          { text: p.center }]) +
+    gatePills((DATA.gateLib || {})[p.gate] || {}, [p], false) +
 
     (p.report ? prose(p.report)
               : (p.basic ? '<div class="basic">' + esc(p.basic) + '</div>' : ''));
@@ -7686,6 +7794,12 @@ document.addEventListener('mousemove', function (e) {
   }
   // off the pill: the tip goes, even while a card is pinned
   if (pinned) { tip.hidden = true; return; }
+  var pg = e.target.closest ? e.target.closest('.pgl') : null;
+  if (pg) {
+    hot(null); markRows(null); litGate(null);
+    showTip(e, planetTipHtml(pg.dataset.pname));
+    return;
+  }
   var va = e.target.closest ? e.target.closest('.varrow') : null;
   if (va && varBy[va.dataset.var]) {
     var v = varBy[va.dataset.var];
@@ -7700,8 +7814,7 @@ document.addEventListener('mousemove', function (e) {
     var mpl = placeBy[mp.dataset.side + '|' + mp.dataset.planet];
     if (mpl) {
       hot(null); markRows(null); litGate(mpl.gate);
-      showTip(e, '<b>' + (mpl.side === 'design' ? 'Design ' : 'Personality ') + esc(mpl.planet) + '</b>' +
-        esc(mpl.gate + '.' + mpl.line) + ' ' + esc(mpl.gateName));
+      showTip(e, gateTipHtml(mpl.gate, [mpl]));
       return;
     }
   }
@@ -7723,10 +7836,10 @@ document.addEventListener('mousemove', function (e) {
   }
   var trow = e.target.closest ? e.target.closest('.trow') : null;
   if (trow) {
-    var tg = +trow.dataset.gate, TL = (DATA.gateLib || {})[tg] || {};
+    var tg = +trow.dataset.gate;
     hot(null); markRows(null); litGate(tg);
-    showTip(e, '<b>Transit ' + esc(trow.dataset.planet) + '</b>' +
-      esc(tg + '.' + trow.dataset.line) + (TL.name ? ' ' + esc(TL.name) : ''));
+    showTip(e, '<b>Transit ' + esc(trow.dataset.planet) + ' ' + esc(tg + '.' + trow.dataset.line) + '</b>' +
+      gateTipHtml(tg));
     return;
   }
   var row = e.target.closest ? e.target.closest('.prow') : null;
@@ -7734,18 +7847,16 @@ document.addEventListener('mousemove', function (e) {
     var both = sidesOf(row);
     if (!both.length) return;
     litGate(both.map(function (x) { return x.gate; }));
-    showTip(e, '<b>' + esc(both[0].planet) + '</b>' + both.map(function (x) {
-      return (x.side === 'design' ? 'Design ' : 'Personality ') + x.gate + '.' + x.line;
-    }).join(' \u00b7 '));
+    // one hover per gate, the same one every view gives it
+    showTip(e, both.map(function (x) { return gateTipHtml(x.gate, [x]); })
+      .join('<hr style="border:0;border-top:1px solid rgba(128,128,128,.25);margin:6px 0">'));
     return;
   }
   if (row) {
     var p = placeBy[row.dataset.side + '|' + row.dataset.planet];
     if (!p) return;
     litGate(p.gate);
-    showTip(e, '<b>' + (p.side === 'design' ? 'Design ' : 'Personality ') + esc(p.planet) + '</b>' +
-      esc(p.gate + '.' + p.line) + ' ' + esc(p.gateName) +
-      (p.lineName ? ' · ' + esc(p.lineName) : ''));
+    showTip(e, gateTipHtml(p.gate, [p]));
     show('<b>' + esc(p.gateName) + ' ' + p.gate + '.' + p.line + '</b><span class="meta">' +
       (p.side === 'design' ? 'Design ' : 'Personality ') + esc(p.planet) + ' in the ' + esc(p.center) +
       '. Click for the full reading.</span>');
