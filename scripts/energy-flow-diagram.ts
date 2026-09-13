@@ -1410,6 +1410,39 @@ function centerFunctions(chunks: Chunk[]): Record<Center, string[]> {
  *  channel, open means it carries nothing at all. Kaycee writes all three. */
 interface CenterStates { theme: string; defined: string; undefined: string; open: string }
 
+/**
+ * Kaycee's own words for an entry, wherever she put them.
+ *
+ * The field is called "Delphi Basic" in some databases, "Delphi Basic
+ * Description" in others and "Delphi Free Chart" in the Channels, because it
+ * was added at different times over months. That is a naming accident, not a
+ * decision, and the chart should not care: it asks for her text and takes
+ * whichever column holds it.
+ *
+ * Nothing else is client text. The Definitive Book's Keynote, Function and
+ * DBHD Description are reference material for her and for the report engine,
+ * and they were appearing on client cards above her own writing. Kaycee,
+ * 2026-09-13: "I just want what's in the Delphi Basic field to show up
+ * everywhere and remove the garbage data that's been pushed."
+ *
+ * If she adds another name for it one day, add it here and it works everywhere
+ * at once. There is one list.
+ */
+const DELPHI_FIELDS = [
+  "Delphi Basic",
+  "Delphi Basic Description",
+  "Delphi Free Chart",
+] as const;
+
+function delphiText(metadata?: Record<string, string> | null): string {
+  const m = metadata ?? {};
+  for (const f of DELPHI_FIELDS) {
+    const t = (m[f] ?? "").toString().trim();
+    if (t) return t;
+  }
+  return "";
+}
+
 interface GateMeta { name: string; keynote: string; func: string; circuit: string;
   quarter: string; basic: string; bridge: string }
 /** Per-gate detail from her HD Gates database, for the gate popups. */
@@ -1428,7 +1461,7 @@ function gateMeta(chunks: Chunk[]): Record<number, GateMeta> {
       quarter: (m.Quarter ?? m["HD Quarters"] ?? "").replace(/^\d+:\s*/, "").trim(),
       // Kaycee's own words for the free tier, and for what this gate would do
       // if it arrived to bridge a split. Both authored per gate in Notion.
-      basic: (m["Delphi Basic"] ?? "").trim(),
+      basic: delphiText(m),
       bridge: (m["Delphi Bridge Text"] ?? "").trim(),
     };
   }
@@ -1463,7 +1496,7 @@ function basicByValue(chunks: Chunk[]): Record<string, Record<string, string>> {
     v.toLowerCase().split(":")[0].replace(/\bdefinition\b/g, "").replace(/[^a-z0-9/]/g, "");
 
   for (const c of chunks) {
-    const basic = ((c.metadata ?? {})["Delphi Basic"] ?? "").toString().trim();
+    const basic = delphiText(c.metadata);
     if (!basic) continue;
     const kind = c.source_kind ?? "";
     if (kind === "gate") {
@@ -1613,7 +1646,7 @@ const pairKey = (a: number, b: number) => (a < b ? `${a}-${b}` : `${b}-${a}`);
 
 /** channel -> { circuit id, her channel name, her keynote }, from HD Channels,
  *  back-filled from the HD Circuits database where a row leaves Circuit blank. */
-interface ChannelMeta { circuit: CircuitId; name: string; keynote: string; type: string }
+interface ChannelMeta { circuit: CircuitId; name: string; basic: string; type: string }
 function channelCircuits(chunks: Chunk[]): Map<string, ChannelMeta> {
   const byName = new Map<string, CircuitId>();
   for (const c of CIRCUITS) byName.set(c.name.toLowerCase(), c.id);
@@ -1644,7 +1677,11 @@ function channelCircuits(chunks: Chunk[]): Map<string, ChannelMeta> {
     if (!circuit) throw new Error(`No circuit for channel ${key} ("${name}") in the library.`);
     out.set(key, {
       circuit, name,
-      keynote: (c.metadata?.Keynote ?? "").trim(),
+      // Channel Type and the circuit are classification and stay: Kaycee,
+      // 2026-09-13, "I still want to know the channel type and the circuitry,
+      // gate center". Keynote is The Definitive Book's and goes; her own text
+      // takes its place, which no chart was showing at all before now.
+      basic: delphiText(c.metadata as Record<string, string> | undefined),
       type: (c.metadata?.["Channel Type"] ?? c.metadata?.Type ?? "").trim(),
     });
   }
@@ -1653,7 +1690,7 @@ function channelCircuits(chunks: Chunk[]): Map<string, ChannelMeta> {
     if (!out.has(key)) {
       const circuit = fromCircuitDb.get(key);
       if (!circuit) throw new Error(`Channel ${key} is missing from the synced HD Channels database.`);
-      out.set(key, { circuit, name: `${key}: The Channel of ${ch.name}`, keynote: "", type: "" });
+      out.set(key, { circuit, name: `${key}: The Channel of ${ch.name}`, basic: "", type: "" });
     }
   }
   return out;
@@ -1681,7 +1718,7 @@ interface ChannelGeom {
   gates: [number, number];
   circuit: CircuitId;
   name: string;
-  keynote: string;
+  basic: string;
   type: string;
   source: Center;
   target: Center;
@@ -1871,7 +1908,7 @@ function buildChannels(
     const ax = t.mx - t.ux * back, ay = t.my - t.uy * back;
     channels.push({
       key, gates: ch.gates as [number, number], circuit: meta.circuit, name: meta.name,
-      keynote: meta.keynote, type: meta.type,
+      basic: meta.basic, type: meta.type,
       source: d.source, target: d.target, srcGate: d.srcGate, tgtGate: d.tgtGate,
       slot: slotOf(d.source), halves: halves as HalfGeom[], arrow: { x: ax, y: ay, ux: t.ux, uy: t.uy },
     });
@@ -2875,7 +2912,7 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
       circuitName: CIRCUITS.find((x) => x.id === c.circuit)!.name,
       from: CENTER_DISPLAY[c.source], to: CENTER_DISPLAY[c.target],
       cFrom: c.source, cTo: c.target,
-      srcGate: c.srcGate, tgtGate: c.tgtGate, keynote: c.keynote, type: c.type,
+      srcGate: c.srcGate, tgtGate: c.tgtGate, basic: c.basic, type: c.type,
       live: !d.client || d.client.channels.has(c.key),
       pending: !!d.client && d.client.pending.channels.has(c.key),
       report: d.client?.report.channels[c.key] ?? "",
@@ -7466,8 +7503,12 @@ function gateLibHtml(gate) {
     tags([L.circuit ? { text: L.circuit } : null,
           L.quarter ? { text: 'Quarter of ' + L.quarter } : null,
           L.center ? { text: L.center } : null]) +
-    (L.keynote ? '<span class="meta"><i>Keynote:</i> ' + esc(L.keynote) + '</span>' : '') +
-    (L.func ? '<span class="meta"><i>Function:</i> ' + esc(L.func) + '</span>' : '') +
+    // Keynote and Function come from The Definitive Book, not from Kaycee, and
+    // they were sitting above her own words on every gate card. Her Delphi
+    // Basic is the client's text now and the only one. Kaycee, 2026-09-13: "I
+    // just want what's in the Delphi Basic field to show up everywhere and
+    // remove the garbage data that's been pushed."
+
     (L.basic ? '<div class="basic">' + esc(L.basic) + '</div>' : '') +
     (isBridge(gate) && L.bridge
       ? '<div class="basic"><i>If it bridged your split:</i> ' + esc(L.bridge) + '</div>' : '') +
@@ -7481,10 +7522,11 @@ function chanHtml(c) {
   return '<b>' + esc(c.name) + '</b>' +
     (c.pending ? pendingNote('Channel ' + c.key) : '') +
     (DATA.client && !c.live && !c.pending ? '<span class="meta">Not defined in this chart.</span>' : '') +
-    (c.keynote ? '<span class="kn">' + esc(c.keynote) + '</span>' : '') +
     tags([{ text: c.circuitName, bg: circColor[c.circuit] }, c.type ? { text: c.type } : null]) +
     '<span class="meta">Gate ' + c.srcGate + ' in the ' + esc(c.from) + ' feeds gate ' + c.tgtGate +
-    ' in the ' + esc(c.to) + '.</span>' + prose(c.report);
+    ' in the ' + esc(c.to) + '.</span>' +
+    (c.report ? prose(c.report)
+              : (c.basic ? '<div class="basic">' + esc(c.basic) + '</div>' : ''));
 }
 function ctrHtml(k) {
   var t = k.fns.map(function (f) { return { text: f, bg: fnColor[f] }; });
@@ -7523,8 +7565,7 @@ function gateHtml(p) {
           p.circuit ? { text: p.circuit } : null,
           p.quarter ? { text: 'Quarter of ' + p.quarter } : null,
           { text: p.center }]) +
-    (p.keynote ? '<span class="meta"><i>Keynote:</i> ' + esc(p.keynote) + '</span>' : '') +
-    (p.func ? '<span class="meta"><i>Function:</i> ' + esc(p.func) + '</span>' : '') +
+
     (p.report ? prose(p.report)
               : (p.basic ? '<div class="basic">' + esc(p.basic) + '</div>' : ''));
 }
