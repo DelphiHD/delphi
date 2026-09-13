@@ -57,7 +57,7 @@
     {
       "variable": "Determination",
       "colorNumber": 4,
-      "colorName": "Taste",
+      "colorName": "Touch",
       "activeVariant": "Calm",
       "passiveVariant": "Nervous",
       "transference": null,
@@ -348,7 +348,7 @@
       {
         "variable": "Determination",
         "colorNumber": 4,
-        "colorName": "Taste",
+        "colorName": "Touch",
         "activeVariant": "Calm",
         "passiveVariant": "Nervous",
         "transference": null,
