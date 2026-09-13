@@ -7583,13 +7583,20 @@ function litGate(gates) {
     el.classList.toggle('lit', !!cens[el.dataset.center]);
   });
 }
+// a deep pill colour takes white text so the label stays readable
+function isDark(hex) {
+  var h = String(hex || '').replace('#', '');
+  if (h.length !== 6) return false;
+  var r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) < 150;
+}
 function tags(list) {
   var info = DATA.tagInfo || {};
   return list.filter(Boolean).map(function (t) {
     var d = info[String(t.text).trim().toLowerCase()];
     return '<span class="tag' + (t.bg ? '' : ' ghost') + (d ? ' has' : '') + '"' +
       (d ? ' data-info="' + esc(d) + '" data-label="' + esc(t.text) + '"' : '') +
-      (t.bg ? ' style="background:' + t.bg + '"' : '') + '>' + esc(t.text).toUpperCase() + '</span>';
+      (t.bg ? ' style="background:' + t.bg + (isDark(t.bg) ? ';color:#fff' : '') + '"' : '') + '>' + esc(t.text).toUpperCase() + '</span>';
   }).join('');
 }
 function prose(text) {
@@ -7931,15 +7938,25 @@ function propHtml(m) {
 
 // A channel's hover: its name, circuit and type, and her Delphi Basic. The
 // card on click carries the person's report when they have one.
+// Channel pills, the same way a gate's: circuit in its circuit colour, the
+// channel type in its own. Kaycee, 2026-09-13: "pills for the circuit and
+// channel type in the channel boxes ... similar to the gates".
+var CHANTYPE_BG = { 'generated': '#f3a9a2', 'projected': '#a5dbe6',
+  'manifested': '#e7bff0', 'manifesting generated': '#f0dca6', 'manifested generated': '#f0dca6' };
+function chanPills(c) {
+  return tags([{ text: c.circuitName, bg: circColor[c.circuit] },
+    c.type ? { text: c.type, bg: CHANTYPE_BG[String(c.type).trim().toLowerCase()] } : null]);
+}
 function chanTipHtml(c) {
-  return '<b>' + esc(c.name) + '</b>' + esc(c.circuitName) + (c.type ? ' \u00b7 ' + esc(c.type) : '') +
+  return '<b>' + esc(c.name) + '</b>' +
+    '<span class="tiptags">' + chanPills(c) + '</span>' +
     (c.basic ? '<span class="tipbody">' + esc(c.basic) + '</span>' : '');
 }
 function chanHtml(c) {
   return '<b>' + esc(c.name) + '</b>' +
     (c.pending ? pendingNote('Channel ' + c.key) : '') +
     (DATA.client && !c.live && !c.pending ? '<span class="meta">Not defined in this chart.</span>' : '') +
-    tags([{ text: c.circuitName, bg: circColor[c.circuit] }, c.type ? { text: c.type } : null]) +
+    chanPills(c) +
     '<span class="meta">Gate ' + c.srcGate + ' in the ' + esc(c.from) + ' feeds gate ' + c.tgtGate +
     ' in the ' + esc(c.to) + '.</span>' +
     (c.report ? prose(c.report)
