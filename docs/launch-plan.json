@@ -444,6 +444,10 @@
   {
    "on": "2026-09-12",
    "what": "The cycle pills are off the transit tab. They jumped the view to a cycle's date and kept whatever time of day the picker was on, so the chart drawn was that date at an arbitrary hour rather than the moment of the return. Kaycee compared her Uranus Opposition against Maia Mechanics: Maia has it at 20:48 UTC, this drew 7:07 PM local. The dates themselves are sound and stay on the Dates tab."
+  },
+  {
+   "on": "2026-09-12",
+   "what": "Return charts: the hard part is done and proved. A cycle chart is the connection endpoint called with the person's birth and the return moment, so bodygraph.com computes the four connection types itself, and those are exactly the classification the method uses: Dominance is Educational, Electromagnetic and Compromise are Personal, a bare gate activation is Environmental. It also returns the return's own design side, which landed within a minute of both Maia Mechanics and our own calculation. Kaycee's Uranus Opposition came back with 5 dominances, 5 electromagnetics, 3 compromises and a 4/6 cycle profile. What is left is plumbing a Cycle mode that reuses the relationship drawing, which is deliberately left until after the 14-18 September event: every builder change today needed all 46 charts republished and several surfaced edge cases, and that risk should not land on the week the charts need to be stable."
   }
  ],
  "open": [
