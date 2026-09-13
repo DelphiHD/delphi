@@ -2882,16 +2882,16 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
   // diagram has room, so there they stay in the panel.
   const viewControls = `<div class="sec" id="modsec" hidden>CHART TYPE</div>
     <div class="row" id="modrow" hidden>
-      <button id="mSelf" class="on" data-help="This person's own chart, from their birth moment. Everything below reads their design alone." data-help-label="Individual">Individual</button>
-      <button id="mTransit" data-help="Today's sky laid over this chart: what the planets are activating right now and which channels they complete. Circuits are unavailable here, because a transit carries none of its own." data-help-label="Transit">Transit</button>
-      <button id="mRelation" data-help="Two charts read as one. The centers they define together, and every channel between them sorted into the four connection types." data-help-label="Relationship">Relationship</button>
+      <button id="mSelf" class="on" data-help="Your own chart, from your birth moment: your design on its own." data-help-label="Individual">Individual</button>
+      <button id="mTransit" data-help="Today's sky over your chart: the planets activating your gates now, and the channels they complete for you." data-help-label="Transit">Transit</button>
+      <button id="mRelation" data-help="Two charts read together: the centers you define as a pair, and the channels that connect you." data-help-label="Relationship">Relationship</button>
     </div>
     <div class="sec" id="viewsec" hidden>VIEW</div>
     <div class="row" id="viewrow" hidden>
-      <button id="vPlain" class="on" data-help="The chart as it is normally drawn. Nine centers, the channels between them, and every gate you carry. Defined centers are filled; the rest are white." data-help-label="Bodygraph">Bodygraph</button>
-      <button id="vBody" data-help="The same body, coloured by circuit. Shows which of the three circuits each defined channel belongs to: Individual for mutation, Tribal for support, Collective for sharing." data-help-label="Circuits">Circuits</button>
-      <button id="vMandala" data-help="The wheel the chart is calculated from. All 64 gates in their zodiac order, with your planets placed where they actually fall." data-help-label="Mandala">Mandala</button>
-      <button id="vAstro" data-help="Your natal chart in the astrological wheel: signs, houses, planets and the aspects between them." data-help-label="Astrology">Astrology</button>
+      <button id="vPlain" class="on" data-help="Your nine centers, the channels between them, and every gate you carry." data-help-label="Bodygraph">Bodygraph</button>
+      <button id="vBody" data-help="Your channels by circuit, the families of energy they belong to: Individual, Tribal, Collective and Integration." data-help-label="Circuits">Circuits</button>
+      <button id="vMandala" data-help="The wheel your chart comes from: all 64 gates in zodiac order, with your planets where they fall." data-help-label="The Wheel">The Wheel</button>
+      <button id="vAstro" data-help="Your natal astrology chart: signs, houses, planets and the aspects between them." data-help-label="Astrology">Astrology</button>
     </div>
     <details class="drop showdrop" id="placements" hidden>
       <summary>Show<span class="offcount" id="offcount" hidden></span></summary>
@@ -2910,9 +2910,9 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
       <div class="row pallnone"><button id="pAll">All</button><button id="pNone">None</button></div>
     </details>
     <div class="row" id="actrow" hidden>
-      <button id="reset" class="gold" data-help="Clears every highlight and selection and returns the chart to how it opened." data-help-label="Reset">Reset</button>
-      <button id="snap" data-help="Downloads the chart exactly as it appears now, including whatever you have highlighted." data-help-label="Save Image">Save Image</button>
-      <button id="copytxt" data-help="Copies the data currently on screen as plain text, ready to paste anywhere. Chart data only, never report writing." data-help-label="Copy Chart Data">Copy Chart Data</button>
+      <button id="reset" class="gold" data-help="Returns your chart to how it first opened." data-help-label="Reset">Reset</button>
+      <button id="snap" data-help="Saves a picture of your chart as it looks now." data-help-label="Save Image">Save Image</button>
+      <button id="copytxt" data-help="Copies your chart details as text, to paste wherever you need them." data-help-label="Copy Chart Data">Copy Chart Data</button>
     </div>`;
   const face = [...fonts.entries()].map(([w, buf]) =>
     `@font-face{font-family:Montserrat;font-style:normal;font-weight:${w};font-display:swap;` +
@@ -4199,8 +4199,7 @@ if (DATA.client) {
         brGates.map(function (g) {
           return '<span class="brg" data-gate="' + g + '">' + g + '</span>';
         }).join(', ') + '</div>' +
-        '<div class="isle" style="opacity:.6">Each would complete a channel across the split. ' +
-        'Hover one to see what it would bring.</div>'
+        '<div class="isle" style="opacity:.6">Each would complete a channel across the split.</div>'
       : (isles.length > 1 ? '' : '<div class="isle" style="opacity:.6">One island: nothing to bridge.</div>'));
 
   // every gate of a channel that sits wholly inside an island
@@ -4390,7 +4389,7 @@ if (DATA.client) {
     var bits = [];
     bits.push(body.classList.contains('view-astro') ? 'Astrology'
       : body.classList.contains('view-transit') ? 'Transit'
-      : body.classList.contains('view-mandala') ? 'Mandala'
+      : body.classList.contains('view-mandala') ? 'The Wheel'
       : body.classList.contains('view-plain') ? 'Bodygraph' : 'Circuits');
     var sides = [];
     if (!body.classList.contains('off-s-personality')) sides.push('Personality');
@@ -4957,8 +4956,7 @@ if (DATA.client) {
       // a read that cannot be fetched is not a read that does not exist, and
       // saying so wrongly would have a client think Kaycee skipped their day
       var el = document.getElementById('todayread');
-      if (el) el.innerHTML = '<div class="noread">Could not load the reading for ' +
-        esc(shortDate(d)) + '. The chart above is still that day&rsquo;s sky.</div>';
+      if (el) el.innerHTML = '';
     });
   }
 
@@ -5309,9 +5307,7 @@ if (DATA.client) {
         // loud rather than a chart that quietly shows the wrong moment
         document.getElementById('todaylab').textContent = shortDate(d);
         var read = document.getElementById('todayread');
-        if (read) read.innerHTML = '<div class="noread">Could not get the sky for ' +
-          esc(shortDate(d)) + ' at ' + esc(clock12(t)) + '. The chart still shows the ' +
-          'moment it was built for, so nothing on it is wrong.</div>';
+        if (read) read.innerHTML = '';
         document.getElementById('todaylist').innerHTML = '';
       }).then(function () {
         busyFlag = false;
@@ -8001,7 +7997,7 @@ document.addEventListener('mousemove', function (e) {
   }
   hot(null); litGate(null); markRows(null); tip.hidden = true;
   if (!e.target.closest || !e.target.closest('.panel')) {
-    show('<b>Hover the chart</b><span class="meta">Click anything to pin its description.</span>');
+    show('');
   }
 });
 </script></body></html>`;

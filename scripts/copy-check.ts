@@ -81,7 +81,10 @@ function sentences(src: string): string[] {
       .replace(/&[a-z]+;/g, "")
       .trim();
     if (t.split(" ").length < 4) continue;
-    if (/[<>{}#;:=|]/.test(t)) continue;
+    // A colon is ordinary in a sentence ("Your chart: ..."). Skipping every string
+    // with one hid client tooltips from this check; code like "display:none" is
+    // what should be skipped, a word stuck to a colon.
+    if (/[<>{}#;=|]/.test(t) || /[a-z-]:[^\s]/i.test(t)) continue;
     if (/^[.#[\-]/.test(t)) continue;
     if (!/[a-z]{3}\s+[a-z]{2}/.test(t)) continue;
     out.add(t);
