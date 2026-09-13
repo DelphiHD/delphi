@@ -562,6 +562,11 @@ const PAGE = /* html */ `<!doctype html>
   .tm-told  { background:rgba(120,120,130,.14); color:#4a4a55; }
   .tm-rough { background:rgba(241,194,50,.22); color:#7a5c07; }
   .tm-shaky { background:rgba(210,77,255,.16); color:#8b2fae; }
+  /* a chart belonging to nobody: visible, obviously not a client, easy to skip */
+  tr.sandbox { background:rgba(120,120,130,.05); }
+  tr.sandbox td:first-child { font-style:italic; opacity:.75; }
+  .sand { display:inline-block; padding:2px 9px; border-radius:999px; font-size:11px;
+    font-weight:600; letter-spacing:.04em; background:rgba(120,120,130,.16); color:#4a4a55; }
   table.ptable thead th.on { color:var(--ink); }
   table.ptable tbody tr:hover { background:rgba(132,80,149,.04); }
   table.ptable tr.off td { opacity:.45; text-decoration:line-through; }
@@ -1017,9 +1022,15 @@ const PAGE = /* html */ `<!doctype html>
     });
     var count = document.getElementById('peopleCount');
     if (count) {
-      var signups = PEOPLE.filter(function (p) { return p.source === 'signup'; }).length;
-      count.textContent = PEOPLE.length + ' people · ' + signups + ' signed up · ' +
-        (PEOPLE.length - signups) + ' on the roster';
+      // Sandbox charts belong to nobody, so they are counted separately or not
+      // at all. Counting them as people would quietly inflate every number on
+      // this page. Kaycee, 2026-09-12.
+      var real = PEOPLE.filter(function (p) { return !p.sandbox; });
+      var sand = PEOPLE.length - real.length;
+      var signups = real.filter(function (p) { return p.source === 'signup'; }).length;
+      count.textContent = real.length + ' people · ' + signups + ' signed up · ' +
+        (real.length - signups) + ' on the roster' +
+        (sand ? ' · ' + sand + ' sandbox' : '');
     }
     box.innerHTML = '<div class="tblwrap"><table class="ptable"><thead><tr>' +
       COLS.map(function (c) {
@@ -1028,10 +1039,12 @@ const PAGE = /* html */ `<!doctype html>
           (on ? (SORT.dir > 0 ? ' ↑' : ' ↓') : '') + '</th>';
       }).join('') + '</tr></thead><tbody>' +
       rows.map(function (p) {
-        return '<tr' + (p.revoked ? ' class="off"' : '') + '>' +
+        return '<tr class="' + (p.revoked ? 'off ' : '') + (p.sandbox ? 'sandbox' : '') + '">' +
           '<td>' + esc(fileAs(p.name)) + '</td>' +
           '<td>' + (p.chart ? '<a href="' + esc(p.chart) + '" target="_blank" rel="noreferrer">open</a>' : '<span class="sub">—</span>') + '</td>' +
-          '<td>' + esc(p.source === 'signup' ? 'Signed up' : p.source === 'roster' ? 'Roster' : p.source) + '</td>' +
+          '<td>' + (p.sandbox
+            ? '<span class="sand">Sandbox</span>'
+            : esc(p.source === 'signup' ? 'Signed up' : p.source === 'roster' ? 'Roster' : p.source)) + '</td>' +
           '<td>' + (p.account === 'none'
             ? '<span class="sub">no account</span>'
             : '<span class="acct ' + esc(p.account) + '">' + esc(ACCOUNT_LABEL[p.account] || p.account) + '</span>') + '</td>' +
@@ -1839,6 +1852,11 @@ createServer((req, res) => {
   // it says the event, not a code.
   const EVENT_LABEL: Record<string, string> = {
     bfki: "BFKI",
+    // Charts belonging to nobody, one of each type and definition, for trying a
+    // change on before it reaches a real person's chart. Kaycee, 2026-09-12:
+    // "differentiate them somehow on the funnel so they aren't counted as
+    // actual clients."
+    sandbox: "Sandbox",
   };
   if (req.method === "GET" && path === "/people") {
     void (async () => {
@@ -1887,6 +1905,8 @@ createServer((req, res) => {
            * whose top line is not settled, and that changes how a session opens.
            */
           timing: "exact" | "told" | "rough" | "shaky";
+          /** A sandbox chart belongs to nobody and is not a client. */
+          sandbox: boolean;
         };
         /**
          * Birth certificate, remembered, roughly known, or roughly known and
@@ -1921,6 +1941,7 @@ createServer((req, res) => {
             revoked: !!c.revoked_at,
             account: "none",
             timing: timingOf(rec),
+            sandbox: (rec?.source as string) === "sandbox",
           });
         }
         const named = new Set(people.map((p) => p.name.toLowerCase()));
@@ -1947,6 +1968,7 @@ createServer((req, res) => {
             account: (a.account_type as string) ?? "client",
             // an account with no chart has no birth time to judge
             timing: "exact",
+            sandbox: false,
           });
           named.add(String(nm).toLowerCase());
         }

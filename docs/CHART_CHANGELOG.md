@@ -517,3 +517,18 @@ was kept and can be restored.
 | 2026-09-13 01:46 | testig hell | page only | yes |
 | 2026-09-13 01:47 | testytestytesty | page only | yes |
 | 2026-09-13 01:47 | Kaycee Vandenberg | page only | yes |
+| 2026-09-13 02:22 | Sandbox Generator Quadruple Split | first publish | none |
+| 2026-09-13 02:22 | Sandbox Generator Simple Split | first publish | none |
+| 2026-09-13 02:22 | Sandbox Generator Single | first publish | none |
+| 2026-09-13 02:22 | Sandbox Generator Triple Split | first publish | none |
+| 2026-09-13 02:22 | Sandbox Generator Wide Split | first publish | none |
+| 2026-09-13 02:23 | Sandbox MG Simple Split | first publish | none |
+| 2026-09-13 02:23 | Sandbox MG Single | first publish | none |
+| 2026-09-13 02:23 | Sandbox Manifestor Simple Split | first publish | none |
+| 2026-09-13 02:23 | Sandbox Manifestor Single | first publish | none |
+| 2026-09-13 02:23 | Sandbox Manifestor Triple Split | first publish | none |
+| 2026-09-13 02:23 | Sandbox Projector Simple Split | first publish | none |
+| 2026-09-13 02:23 | Sandbox Projector Single | first publish | none |
+| 2026-09-13 02:23 | Sandbox Projector Triple Split | first publish | none |
+| 2026-09-13 02:24 | Sandbox Reflector No | first publish | none |
+| 2026-09-13 02:24 | Sandbox Reflector No Definition | page only | yes |
