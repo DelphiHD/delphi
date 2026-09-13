@@ -8659,8 +8659,10 @@ export async function runBuilder(argv: string[] = process.argv.slice(2)): Promis
   const built = brief;
   const client = brief ? await loadClient(brief) : undefined;
 
+  // CHART_OUT_DIR lets the workshop deck keep each attendee's finished chart
+  // beside it, so the room can open anyone's real chart with no signal.
   const outDir = fromDb
-    ? mkdtempSync(join(tmpdir(), "delphi-chart-"))
+    ? (process.env.CHART_OUT_DIR || mkdtempSync(join(tmpdir(), "delphi-chart-")))
     : client
       ? client.outDir
       : join(process.env.HOME ?? "", "Desktop", "Mandala Renderer Output", "Educational");
