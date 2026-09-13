@@ -3325,6 +3325,8 @@ button.on { background:var(--purple); color:#fff; }
    zero values as well, they are informative" */
 label.cc.absent { opacity:.8; }
 .grp .cnt { float:right; font-size:10.5px; }
+.grp.grpinfo { cursor:pointer; }
+.grp.grpinfo:hover { opacity:.85; color:var(--purple); }
 label.cc .cnt { margin-left:auto; font-size:10.5px; opacity:.55; }
 body.nohang .ch.hang { display:none; }
 
@@ -4919,8 +4921,12 @@ if (DATA.client) {
             return { name: c.name, short: c.name.replace(/^[^:]+:\s*/, ''), n: n,
               text: (DATA.tagInfo || {})[String(c.name).trim().toLowerCase()] || '' };
           });
-          sub = fr.map(function (r) { return esc(r.short) + ' ' + r.n; }).join(' &middot; ');
-          familyCard = '<b>' + esc(el.dataset.key) + '</b>' + fr.map(function (r) {
+          var famText = (DATA.groupInfo || {})[el.dataset.key] || '';
+          sub = (famText ? esc(famText) + '<br>' : '') +
+            fr.map(function (r) { return esc(r.short) + ' ' + r.n; }).join(' &middot; ');
+          familyCard = '<b>' + esc(el.dataset.key) + '</b>' +
+            (famText ? '<div class="vdesc" style="margin-bottom:6px">' + esc(famText) + '</div>' : '') +
+            fr.map(function (r) {
             return '<div class="vcard-row"><div class="vcomp"><span class="vk">' + esc(r.short) +
               '</span><span class="vv">' + r.n + '</span></div>' +
               (r.text ? '<div class="vdesc">' + esc(r.text) + '</div>' : '') + '</div>';
@@ -6928,7 +6934,7 @@ host.innerHTML = Object.keys(groups).map(function (g) {
   // glance. Kaycee, 2026-09-13: "Can we add a total to the main circuits?"
   var gn = 0, gt = 0;
   groups[g].forEach(function (c) { gn += liveIn(c); gt += c.total; });
-  return '<div class="grp">' + g.toUpperCase() +
+  return '<div class="grp' + ((DATA.groupInfo || {})[g] ? ' grpinfo' : '') + '" data-group="' + g + '">' + g.toUpperCase() +
     (DATA.client ? '<span class="cnt">' + gn + '/' + gt + '</span>' : '') + '</div>' +
     groups[g].map(function (c) {
     var n = DATA.channels.filter(function (x) { return x.circuit === c.id && x.live; }).length;
@@ -6956,6 +6962,17 @@ host.addEventListener('mousemove', function (e) {
   showTip(e, '<b>' + esc(c.name) + '</b><span class="tipbody">' + esc(info) + '</span>');
 });
 host.addEventListener('mouseleave', function () { tip.hidden = true; });
+// a family heading reads its own HD Circuits row, hover and click alike
+host.addEventListener('mousemove', function (e) {
+  var gh = e.target.closest ? e.target.closest('.grp.grpinfo') : null;
+  if (!gh) return;
+  showTip(e, '<b>' + esc(gh.dataset.group) + '</b><span class="tipbody">' + esc(DATA.groupInfo[gh.dataset.group]) + '</span>');
+});
+host.addEventListener('click', function (e) {
+  var gh = e.target.closest ? e.target.closest('.grp.grpinfo') : null;
+  if (!gh) return;
+  openCard(gh, '<b>' + esc(gh.dataset.group) + '</b><div class="basic">' + esc(DATA.groupInfo[gh.dataset.group]) + '</div>');
+});
 host.addEventListener('click', function (e) {
   if (e.target.closest && e.target.closest('input')) return;
   var lb = e.target.closest ? e.target.closest('label.cc') : null;
