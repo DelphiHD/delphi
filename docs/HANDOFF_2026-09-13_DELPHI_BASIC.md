@@ -56,7 +56,8 @@ attempted, collided with the existing field, and was reverted.
 
 ## Check to run after the sync
 
-Kaycee gave the correct Sun text on 09-13. The Sun hover must show exactly:
+Kaycee gave the Sun's text on 09-13 as an example of the right column (Delphi
+Basic). Use it to confirm the planet hovers read that column. The Sun hover should show:
 
 > The Sun is the conscious carrier of purpose, embodying the Father archetype and the Life Force theme; it delivers about 70 percent of all programming, serving as the core yang energy that defines our primary self and actions, is universally applicable, belongs to the Fundamental layer, and has no return in life.
 
