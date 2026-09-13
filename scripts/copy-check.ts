@@ -70,7 +70,16 @@ function sentences(src: string): string[] {
   const re = /'([^'\\\n]{12,400})'|"([^"\\\n]{12,400})"/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(src))) {
-    const t = (m[1] ?? m[2]).trim();
+    // Read it the way a client sees it: tags gone, entities decoded. A sentence
+    // with a link or a curly apostrophe in it used to be skipped as markup,
+    // which is how "today&rsquo;s ... Ask Kaycee" reached a client chart on
+    // 2026-09-13 with every check passing.
+    const t = (m[1] ?? m[2])
+      .replace(/<[^>]*>/g, "")
+      .replace(/&rsquo;|&lsquo;|&#39;/g, "'").replace(/&ldquo;|&rdquo;|&quot;/g, '"')
+      .replace(/&middot;/g, "·").replace(/&amp;/g, "&").replace(/&nbsp;/g, " ")
+      .replace(/&[a-z]+;/g, "")
+      .trim();
     if (t.split(" ").length < 4) continue;
     if (/[<>{}#;:=|]/.test(t)) continue;
     if (/^[.#[\-]/.test(t)) continue;
@@ -106,6 +115,14 @@ function main() {
   const known = new Set<string>(
     (JSON.parse(readFileSync(APPROVED, "utf8")).copy ?? []) as string[],
   );
+  // Her name on somebody else's chart is never approvable, so it is not a list
+  // question. Kaycee, 2026-09-13: "my name should NEVER be on other people's charts."
+  const named = current().filter((s) => /kaycee/i.test(s));
+  if (named.length) {
+    console.error(`\nclient copy: Kaycee's name is in text a client can read:\n`);
+    for (const s of named) console.error(`  ${s}`);
+    process.exit(1);
+  }
   const added = now.filter((s) => !known.has(s));
   const gone = [...known].filter((s) => !now.includes(s));
 

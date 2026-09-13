@@ -4982,14 +4982,11 @@ if (DATA.client) {
     if (survey) survey.style.display = R ? '' : 'none';
     if (!R) {
       lab0.textContent = shortDate(day);
-      // Two different silences. A day Kaycee has not written is ordinary. A
-      // chart that does not carry readings at all is not missing anything: it
-      // is a free chart, and this is what the subscription is for.
+      // A chart that does not carry readings says nothing here. It used to sell
+      // the subscription with Kaycee's name on it, on somebody else's chart.
+      // Kaycee, 2026-09-13: "my name should NEVER be on other people's charts."
       readEl.innerHTML = (READ_ENTITLED === false)
-        ? '<div class="noread">The sky above is today&rsquo;s, and it moves every day. ' +
-          'A written reading of what it is doing to <b>your</b> chart, each morning, ' +
-          'comes with a subscription. ' +
-          '<a href="https://cal.com/DelphiHumanDesign" target="_blank" rel="noreferrer">Ask Kaycee</a>.</div>'
+        ? ''
         : '<div class="noread">No written read for this day. ' +
           "The chart above still shows that day's sky.</div>";
       listEl.innerHTML = '';
