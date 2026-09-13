@@ -7895,6 +7895,21 @@ document.addEventListener('mousemove', function (e) {
       return;
     }
   }
+  // the four quarters on the mandala read their HD Quarters Delphi Basic, the
+  // same text as a gate's quarter pill. Kaycee, 2026-09-13. The renderer draws
+  // them in this order and marks only the labels, so a band is known by its place.
+  var qel = e.target.closest ? e.target.closest('.mandala .q-label, .mandala .q-sector') : null;
+  if (qel) {
+    var QN = ['Initiation', 'Civilization', 'Duality', 'Mutation'];
+    var qi = qel.classList.contains('q-label') ? +qel.dataset.quarter
+      : [].indexOf.call(qel.parentNode.querySelectorAll('.q-sector'), qel);
+    var qt = QN[qi] && (DATA.tagInfo || {})['quarter of ' + QN[qi].toLowerCase()];
+    if (qt) {
+      hot(null); markRows(null); litGate(null);
+      showTip(e, '<b>Quarter of ' + QN[qi] + '</b><span class="tipbody">' + esc(qt) + '</span>');
+      return;
+    }
+  }
   var hg = e.target.closest ? e.target.closest('.mandala .pleg, .mandala .pnum, .mandala .gdisc') : null;
   if (hg && hg.dataset.gate) {
     hot(null); markRows(null); litGate(+hg.dataset.gate);
