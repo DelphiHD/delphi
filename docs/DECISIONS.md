@@ -586,3 +586,12 @@ ticked and, for a new one, a KIND_MAP entry. After a sync, a chart rebuild reads
 the chunks table, not `.cache/chunks.json`. Browsers can hold an old chart page:
 verify a republish with a fresh URL or a no-cache fetch before concluding a
 change did not land.
+
+## Chart links never say Not found (2026-09-13)
+
+A momentary database or storage error on /c/<token> came back as a bare "Not
+found" with nothing logged; two live links did it during the 09-13 checks. The
+route now retries each read twice, logs a lasting failure with its reason, and
+shows "Chart could not be opened. Please try again." (Kaycee approved) in brand
+colours. Unknown and revoked links get the same page, so it never reveals
+whether a chart existed. The copy check now covers the link route.
