@@ -8,6 +8,7 @@
   "As a bridge gate,",
   "Birth date, time and place are all needed.",
   "Chart could not be generated. Please try again.",
+  "Chart could not be opened.",
   "Copies your chart details as text, to paste wherever you need them.",
   "Defined only by the two of you together.",
   "Each would complete a channel across the split.",
@@ -24,8 +25,6 @@
   "If you know roughly when, say so. A six hour window tells us far more than a whole day.",
   "Jump to right now",
   "Loading the reading for",
-  "NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set",
-  "NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set to publish",
   "No gate is activated more than once.",
   "No two planets share a gate on the same side.",
   "No written read for this day.",
@@ -46,7 +45,6 @@
   "Show the Classic Set",
   "Shows and hides the two columns of placements either side of the chart.",
   "Start typing a city",
-  "Supabase env vars are missing",
   "Take the first person off the chart, leaving the second alone.",
   "Take the second person off the chart, leaving the first alone.",
   "Take the sky off, leaving their chart alone.",
@@ -87,7 +85,6 @@
   "email is not configured",
   "report text and page",
   "says whether the version this replaced",
-  "server sent a different moment",
   "was kept and can be restored.",
   "would complete a channel across the split"
  ]
