@@ -4154,7 +4154,9 @@ if (DATA.client) {
     document.getElementById('varlist').innerHTML = vs.map(function (v, i) {
       var val = v.unsettled
         ? '<span class="needtime">Exact Birth Time Required</span>'
-        : esc(v.arrow === 'left' ? 'Left' : 'Right') + ' &middot; ' + esc(v.theme);
+        // the full line, color, arrow, mode and tone, the same as the card.
+        // Kaycee, 2026-09-13: "Why are color and tone not there?"
+        : esc(v.detail || ((v.arrow === 'left' ? 'Left' : 'Right') + ' \u00b7 ' + v.theme));
       return '<div class="varrow-item" data-var="' + i + '">' +
         '<span>' + esc(v.label) + '</span>' + val + '</div>';
     }).join('');
