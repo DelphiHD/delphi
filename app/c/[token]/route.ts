@@ -56,6 +56,26 @@ const unavailable = (status: number) =>
     },
   );
 
+// A chart made through an event's link carries a badge to that event's room stats.
+// Added as the page is served, so no chart file is rebuilt. Kaycee, 2026-09-14.
+const EVENT_BADGE: Record<string, string> = {
+  bfki: "The Big Fucking Kick It",
+};
+const BADGE_LINK = "See the room";
+
+function withEventBadge(html: string, event: string): string {
+  const name = EVENT_BADGE[event];
+  const panel = '<aside class="panel">';
+  if (!name || !html.includes(panel)) return html;
+  // at the top of the chart's own panel, where it never covers the chart
+  const badge =
+    `<a href="/events/${event}" target="_blank" rel="noreferrer" style="display:flex;align-items:center;justify-content:space-between;gap:10px;` +
+    `margin:0 0 12px;padding:9px 12px 9px 14px;border-radius:14px;background:#845095;color:#fff;text-decoration:none;` +
+    `font:600 13px Montserrat,'Helvetica Neue',Arial,sans-serif;letter-spacing:.03em;box-shadow:0 6px 16px rgba(60,40,80,.18)">` +
+    `<span>${name}</span><span style="background:#fff;color:#845095;border-radius:999px;padding:3px 10px;font-size:12px;white-space:nowrap">${BADGE_LINK}</span></a>`;
+  return html.replace(panel, panel + badge);
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Up to three tries, a short pause between them. Returns the last result. */
@@ -92,7 +112,12 @@ export async function GET(
     return unavailable(503);
   }
 
-  return new NextResponse(await file.data.arrayBuffer(), {
+  // the event this chart was made through, if any
+  const { data: rec } = await db.from("charts").select("source").eq("token", token).maybeSingle();
+  const event = String(rec?.source ?? "");
+  const body = EVENT_BADGE[event] ? withEventBadge(await file.data.text(), event) : await file.data.arrayBuffer();
+
+  return new NextResponse(body, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "private, no-store",

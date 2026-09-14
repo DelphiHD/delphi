@@ -223,26 +223,26 @@ export default async function EventStats({ params }: { params: Promise<{ event: 
   return (
     <main className={`events ${font.className}`}>
       <style>{`
-        .events { min-height: 100vh; background: #fbf8fc; color: #1c1a2e; padding: 32px 20px 48px; }
-        .events .wrap { max-width: 1080px; margin: 0 auto; }
+        .events { min-height: 100vh; background: #fbf8fc; color: #1c1a2e; padding: 24px 18px 40px; }
+        .events .wrap { max-width: 1040px; margin: 0 auto; }
         .events .brand { font-size: 12px; letter-spacing: .22em; text-transform: uppercase; color: #845095; }
-        .events h1 { font-size: 30px; font-weight: 600; margin: 8px 0 2px; }
-        .events .sub { color: #6b6478; font-size: 14px; }
-        .events .count { display: flex; align-items: baseline; gap: 10px; margin: 22px 0 18px; }
-        .events .count b { font-size: 64px; font-weight: 600; color: #845095; line-height: 1; }
-        .events .count span { font-size: 18px; color: #6b6478; }
-        .events .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
-        .events .card { background: #fff; border: 1px solid rgba(132,80,149,.18); border-radius: 16px; padding: 14px 16px; }
-        .events h2 { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: #845095; font-weight: 600; margin: 0 0 8px; }
-        .events .row { display: grid; grid-template-columns: minmax(0,1.3fr) minmax(0,1fr) 26px 40px; gap: 8px; align-items: center; font-size: 14px; padding: 4px 0; }
-        .events .label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .events .track { height: 10px; background: #f1eaf5; border-radius: 5px; overflow: hidden; }
+        .events h1 { font-size: 24px; font-weight: 600; margin: 6px 0 2px; }
+        .events .sub { color: #6b6478; font-size: 13px; }
+        .events .count { display: flex; align-items: baseline; gap: 8px; margin: 14px 0 14px; }
+        .events .count b { font-size: 44px; font-weight: 600; color: #845095; line-height: 1; }
+        .events .count span { font-size: 15px; color: #6b6478; }
+        .events .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; align-items: start; }
+        .events .card { background: #fff; border: 1px solid rgba(132,80,149,.18); border-radius: 14px; padding: 11px 13px; }
+        .events h2 { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #845095; font-weight: 600; margin: 0 0 6px; }
+        .events .row { display: grid; grid-template-columns: minmax(0,1.7fr) minmax(30px,1fr) 18px 34px; gap: 8px; align-items: center; font-size: 12.5px; padding: 3px 0; }
+        .events .label { white-space: normal; line-height: 1.3; }
+        .events .track { height: 8px; background: #f1eaf5; border-radius: 5px; overflow: hidden; }
         .events .track i { display: block; height: 100%; background: #845095; border-radius: 5px; }
         .events .row b { text-align: right; font-weight: 600; }
-        .events .row em { font-style: normal; font-size: 12px; color: #6b6478; text-align: right; }
+        .events .row em { font-style: normal; font-size: 11px; color: #6b6478; text-align: right; }
         .events .wide { grid-column: 1 / -1; }
-        .events .crow { display: grid; grid-template-columns: 130px 1fr 90px; gap: 10px; align-items: center; font-size: 14px; padding: 5px 0; }
-        .events .stack { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: #f1eaf5; }
+        .events .crow { display: grid; grid-template-columns: 110px 1fr 84px; gap: 10px; align-items: center; font-size: 12.5px; padding: 3px 0; }
+        .events .stack { display: flex; height: 11px; border-radius: 6px; overflow: hidden; background: #f1eaf5; }
         .events .stack i, .events .key span { display: block; height: 100%; }
         .events .d { background: #845095; }
         .events .u { background: #c9b6e4; }
