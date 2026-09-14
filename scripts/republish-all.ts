@@ -29,6 +29,8 @@
  * Run:
  *   npx tsx scripts/republish-all.ts            # everything
  *   npx tsx scripts/republish-all.ts --dry-run  # list what would be rebuilt
+ *   npx tsx scripts/republish-all.ts --type Projector   # only charts of one Type
+ *     (Kaycee, 2026-09-14: after a Delphi Basic edit to one Type, only those charts)
  */
 
 import { config } from "dotenv";
@@ -47,7 +49,7 @@ async function main() {
   const dry = process.argv.includes("--dry-run");
   const { data, error } = await db()
     .from("charts")
-    .select("person_name, token, created_at")
+    .select("person_name, token, created_at, birth_date, birth_time, birth_timezone")
     .order("created_at", { ascending: true });
   if (error) throw new Error(`could not list the charts: ${error.message}`);
 
@@ -65,6 +67,22 @@ async function main() {
     // comment exists because of.
     return { ...c, how: roster ? [slug!] : ["--token", String(c.token)], roster };
   });
+  // --type keeps only the charts of that Type, cast from their birth data
+  const typeArg = process.argv.includes("--type") ? process.argv[process.argv.indexOf("--type") + 1] : "";
+  if (typeArg) {
+    const { getChart } = await import("@/lib/mybodygraph");
+    const keep: typeof charts = [];
+    for (const c of charts) {
+      try {
+        const cast = await getChart({ birthDate: String(c.birth_date), birthTime: String(c.birth_time ?? "12:00").slice(0, 5), timezone: String(c.birth_timezone) });
+        if (cast.type.value.toLowerCase() === typeArg.toLowerCase()) keep.push(c);
+      } catch (e) {
+        console.log(`  could not cast ${c.person_name}: ${e instanceof Error ? e.message : e}`);
+      }
+    }
+    charts.splice(0, charts.length, ...keep);
+    console.log(`  ${charts.length} ${typeArg} chart(s)`);
+  }
   const rosterCount = charts.filter((c) => c.roster).length;
   console.log(`  ${rosterCount} from the roster, ${charts.length - rosterCount} from the website`);
   console.log(`${charts.length} chart(s)${dry ? " would be rebuilt" : " to rebuild"}\n`);
