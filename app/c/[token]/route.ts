@@ -61,7 +61,7 @@ const unavailable = (status: number) =>
 const EVENT_BADGE: Record<string, string> = {
   bfki: "The Big Fucking Kick It",
 };
-const BADGE_LINK = "See the room";
+const BADGE_LINK = "See the event";
 
 function withEventBadge(html: string, event: string): string {
   const name = EVENT_BADGE[event];

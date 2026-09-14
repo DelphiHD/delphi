@@ -3112,6 +3112,8 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
     placements: d.client
       ? d.client.acts.map((a) => ({
           side: a.side, planet: a.planet, pid: planetId(a.planet),
+          // Chiron and Lilith are false: shown and switchable, never counted
+          core: a.core,
           gate: a.gate, line: a.line, fix: a.fix,
           gateName: d.gateInfo[a.gate]?.name ?? gateName(a.gate),
           lineName: d.lineName(a.gate, a.line),
@@ -4713,7 +4715,10 @@ if (DATA.client) {
 
   // stats tab
   (function () {
-    var P = DATA.placements || [], L = DATA.gateLib || {};
+    // Chiron and Lilith stay out of every count; their switches still show and hide
+    // them on the chart. Kaycee, 2026-09-14: "they should be off by default and
+    // shouldn't show up on stats".
+    var P = (DATA.placements || []).filter(function (p) { return p.core !== false; }), L = DATA.gateLib || {};
     var tally = function (keyFn) {
       var o = {};
       P.forEach(function (p) { var k = keyFn(p); if (k) o[k] = (o[k] || 0) + 1; });
