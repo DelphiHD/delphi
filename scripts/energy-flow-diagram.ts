@@ -4464,16 +4464,25 @@ if (DATA.client) {
     var el = e.target.closest ? e.target.closest('.brg') : null;
     if (!el) return;
     litGate(+el.dataset.gate);
-    var L = (DATA.gateLib || {})[el.dataset.gate] || {};
-    // the same gate hover as everywhere else, with what it would do as a bridge
-    showTip(e, gateTipHtml(+el.dataset.gate) +
-      '<span class="tipbody">' + (L.bridge ? '<i>As a bridge gate,</i> ' + esc(L.bridge)
-        : 'would complete a channel across the split') + '</span>');
+    // A bridge chip says only what the gate would do as a bridge. Kaycee,
+    // 2026-09-13: "the bridge gates in the control panel should only show the
+    // Bridge Gate text."
+    e.stopPropagation();
+    showTip(e, bridgeOnly(+el.dataset.gate, false));
   });
   document.getElementById('deflist').addEventListener('click', function (e) {
     var el = e.target.closest ? e.target.closest('.brg') : null;
-    if (el) openCard(el, gateLibHtml(+el.dataset.gate), null, +el.dataset.gate);
+    if (!el) return;
+    // the page's general gate click would replace this with the full gate card
+    e.stopPropagation();
+    openCard(el, bridgeOnly(+el.dataset.gate, true), null, +el.dataset.gate);
   });
+  function bridgeOnly(g, card) {
+    var L = (DATA.gateLib || {})[g] || {};
+    var text = L.bridge ? '<i>As a bridge gate,</i> ' + esc(L.bridge) : 'would complete a channel across the split';
+    return '<b>Gate ' + g + '</b>' + (card ? '<span class="kn">' + esc(L.name || '') + '</span><div class="basic">' + text + '</div>'
+      : esc(L.name || '') + '<span class="tipbody">' + text + '</span>');
+  }
 
   // Save the chart exactly as it stands, with a footer of the basics and a line
   // saying which views and filters were on. The visible SVG is cloned, its
