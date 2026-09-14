@@ -18,7 +18,8 @@ import { Montserrat } from "next/font/google";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getChart } from "@/lib/mybodygraph";
 import { readSplit } from "@/lib/hd/split-kind";
-import type { Center } from "@/lib/hd/gate-center";
+import { longitudeOf } from "@/lib/hd/gate-longitude";
+import { CENTER_GATES, type Center } from "@/lib/hd/gate-center";
 
 export const revalidate = 300;
 
@@ -40,12 +41,36 @@ const CENTER_ORDER: Center[] = ["head", "ajna", "throat", "g", "heart", "spleen"
 const TYPE_ORDER = ["Generator", "Manifesting Generator", "Projector", "Manifestor", "Reflector"];
 const DEF_ORDER = ["Single", "Simple Split", "Wide Split", "Triple Split", "Quadruple Split", "No Definition"];
 
-interface Person { type: string; authority: string; definition: string; profile: string; defined: Set<Center> }
+interface Person { type: string; authority: string; definition: string; profile: string; defined: Set<Center>; gates: Set<number>; sign: string; place: string; age: number | null }
+
+// Just for fun (Kaycee, 2026-09-14): Sun sign, where people were born, and ages.
+const SIGNS = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"];
+function signOf(sun?: { gate: number; line: number; color?: number; tone?: number; base?: number }): string {
+  if (!sun) return "";
+  return SIGNS[Math.floor(longitudeOf(sun.gate, sun.line, sun.color ?? 1, sun.tone ?? 1, sun.base ?? 1) / 30) % 12];
+}
+/** "Lodi, California, United States" -> "California"; outside the US, the country. */
+function regionOf(place: string): string {
+  const parts = place.split(",").map((x) => x.trim()).filter(Boolean);
+  if (!parts.length) return "";
+  const country = parts[parts.length - 1];
+  if (/^(united states|usa|us)$/i.test(country) && parts.length >= 2) return parts[parts.length - 2];
+  return country;
+}
+function ageOf(birthDate: string): number | null {
+  const b = new Date(birthDate + "T12:00:00Z");
+  if (Number.isNaN(b.getTime())) return null;
+  const now = new Date();
+  let a = now.getUTCFullYear() - b.getUTCFullYear();
+  if (now.getUTCMonth() < b.getUTCMonth() || (now.getUTCMonth() === b.getUTCMonth() && now.getUTCDate() < b.getUTCDate())) a--;
+  return a;
+}
+const AGE_BANDS: [string, number, number][] = [["Under 20", 0, 19], ["20s", 20, 29], ["30s", 30, 39], ["40s", 40, 49], ["50s", 50, 59], ["60s", 60, 69], ["70 and up", 70, 200]];
 
 async function room(event: string): Promise<Person[]> {
   const db = createAdminClient();
   const { data } = await db.from("charts")
-    .select("birth_date, birth_time, birth_timezone")
+    .select("birth_date, birth_time, birth_timezone, birth_place")
     .eq("source", event);
   const people: Person[] = [];
   for (const r of data ?? []) {
@@ -71,12 +96,44 @@ async function room(event: string): Promise<Person[]> {
         definition,
         profile: (c.profile.value.match(/\d\s*\/\s*\d/) ?? [""])[0].replace(/\s/g, ""),
         defined,
+        gates: new Set([...c.activations.personality, ...c.activations.design].map((a) => a.gate)),
+        sign: signOf(c.activations.personality.find((a) => a.planet === "Sun")),
+        place: regionOf(String(r.birth_place ?? "")),
+        age: ageOf(String(r.birth_date)),
       });
     } catch {
       // one chart the provider cannot cast is left out of the counts, not the page
     }
   }
   return people;
+}
+
+// Each center split three ways: defined, undefined (gates but no channel), open (no gates)
+function Centers({ people }: { people: Person[] }) {
+  const total = people.length;
+  const pct = (n: number) => (total ? (n / total) * 100 : 0);
+  return (
+    <section className="card wide">
+      <h2>Centers</h2>
+      {CENTER_ORDER.map((c) => {
+        const d = people.filter((p) => p.defined.has(c)).length;
+        const u = people.filter((p) => !p.defined.has(c) && CENTER_GATES[c].some((g) => p.gates.has(g))).length;
+        const o = total - d - u;
+        return (
+          <div className="crow" key={c}>
+            <span className="label">{CENTER_NAME[c]}</span>
+            <span className="stack">
+              <i className="d" style={{ width: `${pct(d)}%` }} />
+              <i className="u" style={{ width: `${pct(u)}%` }} />
+              <i className="o" style={{ width: `${pct(o)}%` }} />
+            </span>
+            <em>{d} · {u} · {o}</em>
+          </div>
+        );
+      })}
+      <div className="key"><span className="d" />Defined <span className="u" />Undefined <span className="o" />Open</div>
+    </section>
+  );
 }
 
 function Bars({ title, rows, total }: { title: string; rows: [string, number][]; total: number }) {
@@ -103,6 +160,7 @@ export default async function EventStats({ params }: { params: Promise<{ event: 
   if (!ev) notFound();
   const people = await room(slug);
   const total = people.length;
+  const ages = people.map((p) => p.age).filter((a): a is number => a !== null);
   const tally = (keys: string[] | null, of: (p: Person) => string): [string, number][] => {
     const n = new Map<string, number>();
     for (const p of people) { const k = of(p); if (k) n.set(k, (n.get(k) ?? 0) + 1); }
@@ -130,6 +188,16 @@ export default async function EventStats({ params }: { params: Promise<{ event: 
         .events .track i { display: block; height: 100%; background: #845095; border-radius: 5px; }
         .events .row b { text-align: right; font-weight: 600; }
         .events .row em { font-style: normal; font-size: 12px; color: #6b6478; text-align: right; }
+        .events .wide { grid-column: 1 / -1; }
+        .events .crow { display: grid; grid-template-columns: 130px 1fr 90px; gap: 10px; align-items: center; font-size: 14px; padding: 5px 0; }
+        .events .stack { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: #f1eaf5; }
+        .events .stack i, .events .key span { display: block; height: 100%; }
+        .events .d { background: #845095; }
+        .events .u { background: #c9b6e4; }
+        .events .o { background: #fff; box-shadow: inset 0 0 0 1px rgba(132,80,149,.25); }
+        .events .crow em { font-style: normal; font-size: 12px; color: #6b6478; text-align: right; }
+        .events .key { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 12px; color: #6b6478; }
+        .events .key span { width: 12px; height: 12px; border-radius: 3px; margin-left: 10px; }
         .events .foot { text-align: center; margin-top: 28px; font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: #9a93a8; }
       `}</style>
       <div className="wrap">
@@ -142,7 +210,11 @@ export default async function EventStats({ params }: { params: Promise<{ event: 
           <Bars title="Authority" rows={tally(null, (p) => p.authority)} total={total} />
           <Bars title="Definition" rows={tally(DEF_ORDER, (p) => p.definition)} total={total} />
           <Bars title="Profile" rows={tally(null, (p) => p.profile)} total={total} />
-          <Bars title="Defined Centers" rows={CENTER_ORDER.map((c) => [CENTER_NAME[c], people.filter((p) => p.defined.has(c)).length])} total={total} />
+          <Bars title="Sun Sign" rows={tally(SIGNS, (p) => p.sign)} total={total} />
+          <Bars title="Born In" rows={tally(null, (p) => p.place)} total={total} />
+          <Bars title={`Age${ages.length ? ` · average ${Math.round(ages.reduce((t, a) => t + a, 0) / ages.length)}` : ""}`}
+            rows={AGE_BANDS.map(([k, lo, hi]) => [k, ages.filter((a) => a >= lo && a <= hi).length])} total={total} />
+          <Centers people={people} />
         </div>
         <div className="foot">Know Thyself</div>
       </div>
