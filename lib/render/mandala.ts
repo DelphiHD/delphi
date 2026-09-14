@@ -248,6 +248,11 @@ function quarterHalo(g: Geometry): string {
 
 /* ---------- Hexagram glyphs ---------- */
 
+// The hexagrams ship with the code so a chart built on the server has them too.
+// They used to be read only from the brand folder on Kaycee's Desktop, which a
+// server does not have, so every chart made through the website on 2026-09-13
+// drew its wheel with no hexagrams at all. The Desktop folder stays as a fallback.
+const HEXAGRAM_BUNDLED_DIR = join(process.cwd(), "assets", "hexagrams");
 const HEXAGRAM_ASSET_DIR = join(
   process.env.HOME ?? "",
   "Desktop",
@@ -263,14 +268,16 @@ const hexagramCache = new Map<number, string>();
 function defaultHexagramResolver(gate: number): string {
   const cached = hexagramCache.get(gate);
   if (cached) return cached;
-  try {
-    const buf = readFileSync(join(HEXAGRAM_ASSET_DIR, `${gate}.png`));
-    const url = `data:image/png;base64,${buf.toString("base64")}`;
-    hexagramCache.set(gate, url);
-    return url;
-  } catch {
-    return "";
+  for (const dir of [HEXAGRAM_BUNDLED_DIR, HEXAGRAM_ASSET_DIR]) {
+    try {
+      const buf = readFileSync(join(dir, `${gate}.png`));
+      const url = `data:image/png;base64,${buf.toString("base64")}`;
+      hexagramCache.set(gate, url);
+      return url;
+    } catch { /* try the next place */ }
   }
+  // Loud, not silent: a wheel without its hexagrams must never be published.
+  throw new Error(`hexagram ${gate} not found in ${HEXAGRAM_BUNDLED_DIR} or ${HEXAGRAM_ASSET_DIR}`);
 }
 
 function hexagramRing(

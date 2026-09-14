@@ -24,6 +24,11 @@ const nextConfig: NextConfig = {
   // the server never does, so it is left outside the bundle and loaded from
   // node_modules if anything ever asks for it.
   serverExternalPackages: ["@resvg/resvg-js"],
+  // Files the chart builder reads at run time, which the bundler cannot see:
+  // without this the server build has no hexagrams or fonts to read.
+  outputFileTracingIncludes: {
+    "/**": ["./assets/hexagrams/**", "./assets/fonts/**"],
+  },
   env: {
     NEXT_PUBLIC_BUILD_ID:
       process.env.VERCEL_DEPLOYMENT_ID ?? process.env.VERCEL_GIT_COMMIT_SHA ?? "",
