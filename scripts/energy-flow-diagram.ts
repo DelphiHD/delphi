@@ -2096,8 +2096,16 @@ function buildChannels(
 }
 
 /** Identity of a shape, so two channels reusing one leg can be detected. */
+/** Which legs are the same drawn shape. It compared only a rect's left edge,
+ *  so legs in the same column (47 and 5; 23, 8, 14, 1 and 2) were taken for one
+ *  shared leg and split into half-width stripes with their arrows pushed off
+ *  centre. Kaycee, 2026-09-13: "some of the circuitry arrows are misaligned and
+ *  the coloring is not uniform". The whole shape decides now. */
 function shapeKey(el: El): string {
-  return el.tag + "|" + (el.attrs.match(/\b(?:d|points|x)="([^"]*)"/)?.[1] ?? el.attrs);
+  const a = el.attrs;
+  const pick = (k: string) => a.match(new RegExp(`\\b${k}="([^"]*)"`))?.[1] ?? "";
+  if (el.tag === "rect") return `rect|${pick("x")}|${pick("y")}|${pick("width")}|${pick("height")}`;
+  return el.tag + "|" + (pick("d") || pick("points") || a);
 }
 
 // ── brand marks ─────────────────────────────────────────────────────────────
