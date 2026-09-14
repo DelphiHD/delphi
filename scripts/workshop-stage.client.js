@@ -27,8 +27,9 @@
     '<div class="layer hide" id="sky">' + D.rings + '</div>' +
     '<div class="layer hide" id="auras"></div>' +
     '<div class="layer hide build" id="build"><div class="split2"><div id="bwheel">' + D.rings + '</div><div id="bbody" class="body">' + D.teachSvg + '</div></div></div>' +
-    '<div class="names" id="names"></div></div>' +
-    '<div class="note hide" id="note"></div><div id="controls"></div><div class="caption" id="caption"></div>';
+    '</div><div class="names" id="names"></div>' +
+    '<div class="note hide" id="note"></div><div id="controls"></div><div class="caption" id="caption"></div>' +
+    '<aside class="cpanel hide" id="cpanel"></aside>';
 
   // ---- the drawings, cropped to what matters -------------------------------
   function crop(svg, sel, pad) {
@@ -106,6 +107,8 @@
 
   function show(layer, roomForPicker) {
     ['body', 'sky', 'auras', 'build'].forEach(function (id) { $('#' + id).classList.toggle('hide', id !== layer); });
+    if (typeof panelOpen === 'function' && mode !== 'Centers') panelOpen(false);
+    controls.innerHTML = '';
     // a row of name buttons along the bottom gets its own space, and the note moves up
     $('#body').style.bottom = roomForPicker ? '84px' : '';
     note.classList.toggle('top', !!roomForPicker);
@@ -121,12 +124,80 @@
   }
 
   // ---- Centers ---------------------------------------------------------------
+  // One panel on the right holds everything: the room's names wait there, and
+  // clicking a center regroups them into Defined, Undefined and Open with her
+  // text for each. Kaycee, 2026-09-13: "one main panel for text when clicking on
+  // centers... maybe just have them rearrange themselves on the right hand side
+  // into their associated categories".
   var STATE = { defined: 'Defined', undefined: 'Undefined', open: 'Open' };
-  function modeCenters() {
-    show('body'); resetBody(bodySvg); controls.innerHTML = ''; caption.innerHTML = '';
-    focused = {}; rest('left'); say('');
-  }
+  var FNS = ['Pressure', 'Motor', 'Awareness', 'Identity', 'Manifestation'];
   var focused = {};
+  var off = { fn: {}, circuit: {} };
+  function centerFns(c) { return ((LIB.centers[D.centerLib[c]] || {}).type || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean); }
+
+  document.addEventListener('scroll', function (e) { if (e.target && e.target.id === 'cpanel') settle(true); }, true);
+  function panelOpen(on) {
+    $('#cpanel').classList.toggle('hide', !on);
+    $('#body').style.right = on ? '470px' : '';
+    $('#body').style.left = on ? '230px' : '';
+  }
+  // the dock: switch center types and circuits on and off, as on the charts
+  function dock() {
+    var fam = {};
+    (D.circuits || []).forEach(function (c) { (fam[c.group] = fam[c.group] || []).push(c); });
+    controls.innerHTML = '<div class="dock"><div class="dh">Center Types</div>' + FNS.map(function (f) {
+      return '<label><input type="checkbox" data-fn="' + f + '"' + (off.fn[f] ? '' : ' checked') + '> ' + f + '</label>';
+    }).join('') + '<div class="dh">Circuitry</div>' + Object.keys(fam).map(function (g) {
+      return '<div class="dg">' + esc(g) + '</div>' + fam[g].map(function (c) {
+        return '<label><input type="checkbox" data-circ="' + c.id + '"' + (off.circuit[c.id] ? '' : ' checked') + '><span class="sw" style="background:' + c.color + '"></span>' +
+          esc(c.name.replace(/^[^:]+:\s*/, '')) + '</label>';
+      }).join('');
+    }).join('') + '</div>';
+    $$('.dock input', controls).forEach(function (b) {
+      b.onchange = function () {
+        if (b.dataset.fn) off.fn[b.dataset.fn] = !b.checked; else off.circuit[b.dataset.circ] = !b.checked;
+        applyOff();
+      };
+    });
+  }
+  function applyOff() {
+    D.centerOrder.forEach(function (c) {
+      var hide = centerFns(c).length && centerFns(c).every(function (f) { return off.fn[f]; });
+      $$('[data-center="' + c + '"]', bodySvg).forEach(function (el) { el.classList.toggle('typeoff', !!hide); });
+    });
+    $$('.ch', bodySvg).forEach(function (el) { el.classList.toggle('circoff', !!off.circuit[el.getAttribute('data-circuit')]); });
+  }
+
+  function roster() {
+    // everyone waiting in the panel, before a center is chosen
+    var P = $('#cpanel');
+    P.innerHTML = '<div class="k">' + ROOM.length + ' in the room</div><h2>The Room</h2><div class="slots" id="slots-all">' +
+      ROOM.map(function (p) { return '<span class="slot" data-n="' + esc(p.name) + '">' + esc(p.name) + '</span>'; }).join('') + '</div>';
+    settle();
+  }
+  // move every name to its slot in the panel
+  function settle(instant) {
+    requestAnimationFrame(function () {
+      var box = $('#cpanel').getBoundingClientRect();
+      ROOM.forEach(function (p) {
+        var slot = $('#cpanel .slot[data-n="' + CSS.escape(p.name) + '"]');
+        if (!slot) { chip[p.name].className = 'nm gone'; return; }
+        var r = slot.getBoundingClientRect();
+        var el = chip[p.name];
+        if (instant) el.style.transition = 'none';
+        el.style.left = (r.left + r.width / 2) + 'px'; el.style.top = (r.top + r.height / 2) + 'px';
+        // a name scrolled out of the panel is not left floating over the chart
+        var inside = r.top >= box.top + 4 && r.bottom <= box.bottom - 4;
+        el.className = 'nm' + (slot.dataset.cls ? ' ' + slot.dataset.cls : '') + (inside ? '' : ' gone');
+        if (instant) { el.offsetHeight; el.style.transition = ''; }
+      });
+    });
+  }
+  function modeCenters() {
+    show('body'); resetBody(bodySvg); caption.innerHTML = ''; say('');
+    focused = {}; panelOpen(true); dock(); applyOff();
+    setTimeout(function () { crop(bodySvg, '.cshape, .ch, .clabel, .chip', 20); roster(); }, 40);
+  }
   function focusCenter(c) {
     focused.center = c;
     $$('.cshape', bodySvg).forEach(function (el) {
@@ -134,28 +205,37 @@
       el.classList.toggle('fade', !on); el.classList.toggle('glow', on);
     });
     bodySvg.parentNode.classList.add('dimch');
-    var el = $('.cshape[data-center="' + c + '"]', bodySvg), at = centerOf(el);
-    var base = Math.max(at.w, at.h) / 2;
     var by = { defined: [], undefined: [], open: [] };
     ROOM.forEach(function (p) { by[p.centers[c]].push(p); });
-    // three rings, wider as they go out and as the room grows, so names never pile up
-    var grow = 6 * Math.sqrt(ROOM.length);
-    ring(by.defined, at.x, at.y, base * 0.6 + 4 * by.defined.length, 'def');
-    ring(by.undefined, at.x, at.y, base + 80 + grow, 'und', -Math.PI / 3);
-    ring(by.open, at.x, at.y, base + 170 + grow * 1.6, 'open', -Math.PI / 6);
     var L = LIB.centers[D.centerLib[c]] || {};
     var talk = (LIB.slides || {})['Not-Self Talk: ' + D.centerName[c]] || '';
-    say('<div class="k">' + esc((L.type || '').split(',').join(' · ')) + '</div><h2>' + esc(D.centerName[c]) + '</h2>' +
-      '<p>' + esc(L.themes || '') + '</p>' +
-      '<div class="counts"><span class="d" data-state="defined">Defined ' + by.defined.length + '</span><span class="u" data-state="undefined">Undefined ' +
-      by.undefined.length + '</span><span class="o" data-state="open">Open ' + by.open.length + '</span></div>' +
-      '<p id="statetext">' + (talk ? '<i>' + esc(talk) + '</i>' : '') + '</p>');
-    $$('.counts span', note).forEach(function (s) {
-      s.onmouseenter = s.onclick = function () {
-        $('#statetext').innerHTML = '<b>' + STATE[s.dataset.state] + '.</b> ' + esc(L[s.dataset.state] || '');
-      };
-    });
+    var cls = { defined: 'def', undefined: 'und', open: 'open' };
+    $('#cpanel').innerHTML = '<button class="x" aria-label="Back to the room">&times;</button>' +
+      '<div class="k">' + esc(centerFns(c).join(' · ')) + '</div><h2>' + esc(D.centerName[c]) + '</h2>' +
+      '<p class="themes">' + esc(L.themes || '') + '</p>' + (talk ? '<p class="talk">' + esc(talk) + '</p>' : '') +
+      ['defined', 'undefined', 'open'].map(function (st) {
+        return '<section class="st ' + cls[st] + '"><div class="sh"><b>' + STATE[st] + '</b><span>' + by[st].length + '</span></div>' +
+          '<div class="slots">' + by[st].map(function (p) {
+            return '<span class="slot" data-cls="' + cls[st] + '" data-n="' + esc(p.name) + '">' + esc(p.name) + '</span>';
+          }).join('') + '</div><p>' + esc(L[st] || '') + '</p></section>';
+      }).join('');
+    $('#cpanel .x').onclick = function () { modeCenters(); };
+    settle();
   }
+  // what each gate does, from her Function column, on hover
+  var tip = document.createElement('div');
+  tip.className = 'gtip hide';
+  document.body.appendChild(tip);
+  bodySvg.addEventListener('mousemove', function (e) {
+    var g = e.target.closest ? e.target.closest('.gnum, .leg') : null;
+    var n = g && +g.getAttribute('data-gate');
+    var txt = n && (LIB.pressure || {})[n];
+    if (!txt || mode !== 'Centers') { tip.className = 'gtip hide'; return; }
+    tip.innerHTML = '<b>Gate ' + n + '</b>' + esc(txt).split(String.fromCharCode(10)).join('<br>');
+    tip.style.left = (e.clientX + 14) + 'px'; tip.style.top = (e.clientY + 14) + 'px';
+    tip.className = 'gtip';
+  });
+  bodySvg.addEventListener('mouseleave', function () { tip.className = 'gtip hide'; });
 
   // ---- Channels --------------------------------------------------------------
   function channelCounts() {

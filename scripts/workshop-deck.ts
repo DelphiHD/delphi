@@ -112,6 +112,8 @@ async function library() {
     // her Workshop Slides database, by slide name
     slides: {} as Record<string, string>,
     notSelf: {} as Record<string, string>,
+    // each gate's Function text, by gate number
+    pressure: {} as Record<string, string>,
     channels: {} as Record<string, { name: string; basic: string }>,
   };
   for (const c of chunks) {
@@ -119,6 +121,17 @@ async function library() {
     const title = (c.title ?? "").trim();
     switch (c.source_kind) {
       case "workshop_slide": if (delphi(m)) lib.slides[title] = delphi(m); break;
+      // The pressure a Head or Root gate carries, read from her Function column.
+      // Kaycee, 2026-09-13: "can you just infer from the function column for this?"
+      // What each gate does, from her Function column, for the stage's gate
+      // hovers in every center. Kaycee, 2026-09-13: "This is where the function
+      // field is actually useful, we just don't need it on the charts right now."
+      case "gate": {
+        const n = Number(m["Gate #"]);
+        const fn = String(m["Function - DBHD - The 9 Centers"] ?? "").trim();
+        if (n && fn) lib.pressure[String(n)] = fn;
+        break;
+      }
       case "channel": {
         const id = (title.match(/(\d{1,2})\s*-\s*(\d{1,2})/) ?? []).slice(1, 3).map(Number).sort((a, b) => a - b).join("-");
         if (id) lib.channels[id] = { name: title.replace(/^[^:]*:\s*/, ""), basic: delphi(m) };
@@ -299,6 +312,15 @@ async function main() {
     builtAt: new Date().toISOString(),
     centerOrder: CENTER_ORDER, centerName: CENTER_NAME, centerLib: CENTER_LIB,
     room, lib, rings, marks, logo, know, blank, teachSvg,
+    circuits: [
+      { id: "ind-knowing", name: "Individual: Knowing", group: "Individual", color: "#3d7fe0" },
+      { id: "ind-centering", name: "Individual: Centering", group: "Individual", color: "#8ec0ff" },
+      { id: "col-logic", name: "Collective: Understanding (Logic)", group: "Collective", color: "#2fa35f" },
+      { id: "col-abstract", name: "Collective: Sensing (Abstract)", group: "Collective", color: "#9ad88a" },
+      { id: "tri-ego", name: "Tribal: Ego", group: "Tribal", color: "#ff9f1c" },
+      { id: "tri-defense", name: "Tribal: Defense", group: "Tribal", color: "#ef4b4b" },
+      { id: "integration", name: "Integration", group: "Integration", color: "#a77ee0" },
+    ],
     centerSvgId: { head: "head-center", ajna: "ajna-center", throat: "throat-center", g: "g-center",
       heart: "heart-center", spleen: "splenic-center", sacral: "sacral-center",
       "solar-plexus": "solar-plexus-center", root: "root-center" },
