@@ -265,7 +265,7 @@ export default async function EventStats({ params }: { params: Promise<{ event: 
         <div className="brand">Delphi Human Design</div>
         <h1>{ev.name}</h1>
         <div className="sub">{ev.when} · {ev.where}</div>
-        <div className="count"><b>{total}</b><span>{total === 1 ? "chart in the room" : "charts in the room"}</span></div>
+        <div className="count"><b>{total}</b><span>{total === 1 ? "attendee" : "attendees"}</span></div>
         <div className="grid">
           <Bars title="Type" rows={tally(TYPE_ORDER, (p) => p.type)} total={total} tip={tip.type} />
           <Bars title="Authority" rows={tally(null, (p) => p.authority)} total={total} tip={tip.authority} />
