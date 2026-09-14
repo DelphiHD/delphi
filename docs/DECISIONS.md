@@ -595,3 +595,15 @@ route now retries each read twice, logs a lasting failure with its reason, and
 shows "Chart could not be opened. Please try again." (Kaycee approved) in brand
 colours. Unknown and revoked links get the same page, so it never reveals
 whether a chart existed. The copy check now covers the link route.
+
+## Charts never depend on the laptop (2026-09-13)
+
+Two charts made through the website on 09-13 drew The Wheel with no hexagrams:
+the server cannot read `~/Desktop/Delphi Brand Assets`. The 64 hexagrams, the
+logo, the know thyself mark and the tab icon now ship in `assets/` with the
+fonts, and are traced into the server build. Nothing in chart building reads the
+Desktop. Kaycee: a missing picture must never be the reason a chart cannot be
+made, so a missing image is logged and the chart still builds; the push check
+(`scripts/copy-check.ts`) refuses any change that loses one from the code. The
+docx report renderer still reads brand assets from the Desktop, which is fine
+because reports are only run on the Mac.

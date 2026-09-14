@@ -603,3 +603,5 @@ was kept and can be restored.
 | 2026-09-13 19:08 | Sandbox Projector Single | page only | yes |
 | 2026-09-13 19:08 | Sandbox Projector Triple Split | page only | yes |
 | 2026-09-13 19:08 | Sandbox Reflector No Definition | page only | yes |
+| 2026-09-14 01:41 | Brittany Kelly | page only | yes |
+| 2026-09-14 01:41 | Jennifer Thomas | page only | yes |
