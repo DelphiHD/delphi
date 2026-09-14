@@ -27,7 +27,7 @@ const nextConfig: NextConfig = {
   // Files the chart builder reads at run time, which the bundler cannot see:
   // without this the server build has no hexagrams or fonts to read.
   outputFileTracingIncludes: {
-    "/**": ["./assets/hexagrams/**", "./assets/fonts/**"],
+    "/**": ["./assets/hexagrams/**", "./assets/fonts/**", "./assets/brand/**"],
   },
   env: {
     NEXT_PUBLIC_BUILD_ID:

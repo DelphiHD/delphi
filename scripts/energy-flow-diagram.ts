@@ -2101,15 +2101,16 @@ function shapeKey(el: El): string {
 }
 
 // ── brand marks ─────────────────────────────────────────────────────────────
-const BRAND_DIR = join(process.env.HOME ?? "", "Desktop", "Delphi Brand Assets", "brand");
+// The logo, the know thyself mark and the tab icon ship with the code, so a
+// chart built on the server has them. They used to be read from Kaycee's Desktop.
+const BRAND_DIR = join(process.cwd(), "assets", "brand");
 
 /** An SVG from the brand folder as a data URI, or "" if it is not there. */
 function brandMark(file: string): string {
   const path = join(BRAND_DIR, file);
-  if (!existsSync(path)) {
-    console.warn(`  (brand mark missing: ${file})`);
-    return "";
-  }
+  // Never the reason a chart cannot be made (Kaycee, 2026-09-13); the push check
+  // guarantees these files are in the code, so this is only a last resort.
+  if (!existsSync(path)) { console.error(`brand mark missing: ${path}`); return ""; }
   return `data:image/svg+xml;base64,${readFileSync(path).toString("base64")}`;
 }
 
@@ -2125,10 +2126,7 @@ const FAVICON_BOX = "112 95 556 556";
 
 function favicon(): string {
   const path = join(BRAND_DIR, "Delphi Small Logo.svg");
-  if (!existsSync(path)) {
-    console.warn("  (brand mark missing: Delphi Small Logo.svg)");
-    return "";
-  }
+  if (!existsSync(path)) { console.error(`brand mark missing: ${path}`); return ""; }
   const src = readFileSync(path, "utf8");
   const glyph = /<path[^>]*\sd="([^"]+)"/.exec(src)?.[1];
   const svg = glyph

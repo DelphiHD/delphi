@@ -251,15 +251,9 @@ function quarterHalo(g: Geometry): string {
 // The hexagrams ship with the code so a chart built on the server has them too.
 // They used to be read only from the brand folder on Kaycee's Desktop, which a
 // server does not have, so every chart made through the website on 2026-09-13
-// drew its wheel with no hexagrams at all. The Desktop folder stays as a fallback.
+// drew its wheel with no hexagrams at all. Nothing is read from the laptop.
 const HEXAGRAM_BUNDLED_DIR = join(process.cwd(), "assets", "hexagrams");
-const HEXAGRAM_ASSET_DIR = join(
-  process.env.HOME ?? "",
-  "Desktop",
-  "Delphi Brand Assets",
-  "sections",
-  "hexagrams",
-);
+
 
 const hexagramCache = new Map<number, string>();
 
@@ -268,7 +262,7 @@ const hexagramCache = new Map<number, string>();
 function defaultHexagramResolver(gate: number): string {
   const cached = hexagramCache.get(gate);
   if (cached) return cached;
-  for (const dir of [HEXAGRAM_BUNDLED_DIR, HEXAGRAM_ASSET_DIR]) {
+  for (const dir of [HEXAGRAM_BUNDLED_DIR]) {
     try {
       const buf = readFileSync(join(dir, `${gate}.png`));
       const url = `data:image/png;base64,${buf.toString("base64")}`;
@@ -276,8 +270,11 @@ function defaultHexagramResolver(gate: number): string {
       return url;
     } catch { /* try the next place */ }
   }
-  // Loud, not silent: a wheel without its hexagrams must never be published.
-  throw new Error(`hexagram ${gate} not found in ${HEXAGRAM_BUNDLED_DIR} or ${HEXAGRAM_ASSET_DIR}`);
+  // Never the reason a chart cannot be made (Kaycee, 2026-09-13). The push check
+  // refuses any change that loses a hexagram from the code, so this is a last
+  // resort: logged where the server logs are read, and the wheel still draws.
+  console.error(`hexagram ${gate} not found in ${HEXAGRAM_BUNDLED_DIR}`);
+  return "";
 }
 
 function hexagramRing(

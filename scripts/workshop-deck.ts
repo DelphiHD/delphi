@@ -45,7 +45,7 @@ const EVENT = (() => {
 
 const OUT_DIR = join(process.env.HOME ?? "", "Desktop", "Mandala Renderer Output", "Educational",
   DEMO ? "Workshop (demo)" : `${EVENT.toUpperCase()} Workshop`);
-const BRAND_DIR = join(process.env.HOME ?? "", "Desktop", "Delphi Brand Assets", "brand");
+const BRAND_DIR = join(process.cwd(), "assets", "brand");
 
 const CENTER_ORDER: Center[] = ["head", "ajna", "throat", "g", "heart", "spleen", "solar-plexus", "sacral", "root"];
 const CENTER_NAME: Record<Center, string> = {

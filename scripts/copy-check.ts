@@ -103,7 +103,24 @@ function current(): string[] {
   return [...all].sort();
 }
 
+/** The pictures a chart needs, which ship with the code. A push that loses any
+ *  of them is refused, so a chart built on the server always has them.
+ *  Kaycee, 2026-09-13: no chart should depend on her laptop. */
+function assetsPresent(): string[] {
+  const need = [
+    ...Array.from({ length: 64 }, (_, i) => `assets/hexagrams/${i + 1}.png`),
+    "assets/brand/Delphi Logo.svg", "assets/brand/Know Thyself.svg", "assets/brand/Delphi Small Logo.svg",
+    "assets/fonts/Montserrat-400.ttf", "assets/fonts/Montserrat-600.ttf",
+  ];
+  return need.filter((f) => !existsSync(f));
+}
+
 function main() {
+  const missing = assetsPresent();
+  if (missing.length) {
+    console.error(`\nchart assets missing from the code:\n  ${missing.join("\n  ")}`);
+    process.exit(1);
+  }
   const now = current();
   const approve = process.argv.includes("--approve");
 
