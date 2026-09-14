@@ -19,6 +19,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getChart } from "@/lib/mybodygraph";
 import { readSplit } from "@/lib/hd/split-kind";
 import { longitudeOf } from "@/lib/hd/gate-longitude";
+import { loadLibraryChunks } from "@/lib/hd/chunks-source";
 import { CENTER_GATES, type Center } from "@/lib/hd/gate-center";
 
 export const revalidate = 300;
@@ -42,6 +43,54 @@ const TYPE_ORDER = ["Generator", "Manifesting Generator", "Projector", "Manifest
 const DEF_ORDER = ["Single", "Simple Split", "Wide Split", "Triple Split", "Quadruple Split", "No Definition"];
 
 interface Person { type: string; authority: string; definition: string; profile: string; defined: Set<Center>; gates: Set<number>; sign: string; place: string; age: number | null }
+
+const SILENT = new Set(["Chiron", "Lilith"]);
+
+/** The provider's authority, named the way her library names it. */
+function authorityName(value: string, type: string): string {
+  const a = value.trim().toLowerCase();
+  if (a === "ego") return type === "Manifestor" ? "Ego Manifested" : "Ego Projected";
+  if (a === "lunar") return "Lunar";
+  if (a === "mental" || a === "none" || a === "environment") return "Environment";
+  if (a === "self" || a === "self projected" || a === "self-projected") return "Self Projected";
+  return value.trim();
+}
+
+/** Her Delphi Basic text for everything the page counts, for the hovers. */
+interface Tips { type: Record<string, string>; authority: Record<string, string>; definition: Record<string, string>;
+  profile: Record<string, string>; center: Record<string, { themes: string; defined: string; undefined: string; open: string }> }
+async function tips(): Promise<Tips> {
+  const out: Tips = { type: {}, authority: {}, definition: {}, profile: {}, center: {} };
+  try {
+    const chunks = await loadLibraryChunks();
+    const basic = (m: Record<string, unknown>) => String(m["Delphi Basic"] ?? m["Delphi Basic Description"] ?? "").trim();
+    const CENTER_TITLE: Record<string, Center> = { "Root": "root", "Spleen": "spleen", "Sacral": "sacral", "Solar Plexus (Emotional)": "solar-plexus",
+      "Ego (Heart, Will)": "heart", "G (Identity)": "g", "Throat": "throat", "Ajna": "ajna", "Head": "head" };
+    for (const c of chunks) {
+      const m = (c.metadata ?? {}) as Record<string, unknown>;
+      const t = String(c.title ?? "").trim();
+      if (c.source_kind === "type") out.type[t] = basic(m);
+      if (c.source_kind === "definition" && basic(m)) out.definition[t] = basic(m);
+      if (c.source_kind === "profile") out.profile[t.split(":")[0].trim()] = basic(m);
+      if (c.source_kind === "authority") {
+        const name = t === "Lunar Authority" ? "Lunar" : t.startsWith("Environment") ? "Environment" : t;
+        out.authority[name] = basic(m);
+      }
+      if (c.source_kind === "center" && CENTER_TITLE[t]) {
+        out.center[CENTER_TITLE[t]] = { themes: String(m.Themes ?? "").trim(), defined: String(m["Delphi Defined Basic"] ?? "").trim(),
+          undefined: String(m["Delphi Undefined Basic"] ?? "").trim(), open: String(m["Delphi Open Basic"] ?? "").trim() };
+      }
+    }
+  } catch {
+    // no library, no hovers: the numbers still show
+  }
+  return out;
+}
+
+function Tip({ text, children }: { text?: string; children: React.ReactNode }) {
+  if (!text) return <>{children}</>;
+  return <span className="tipwrap" tabIndex={0}>{children}<span className="tip" role="tooltip">{text}</span></span>;
+}
 
 // Just for fun (Kaycee, 2026-09-14): Sun sign, where people were born, and ages.
 const SIGNS = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"];
@@ -85,18 +134,19 @@ async function room(event: string): Promise<Person[]> {
       const split = readSplit({
         definedChannels: (c.channels ?? []).map((x) => x.id),
         definedCenters: [...defined],
-        gates: [...c.activations.personality, ...c.activations.design].map((a) => a.gate),
+        gates: [...c.activations.personality, ...c.activations.design].filter((a) => !SILENT.has(a.planet)).map((a) => a.gate),
       });
       let definition = /^no\b/i.test(c.definition.value.trim()) ? "No Definition"
         : c.definition.value.replace(/\s*Definition\s*$/i, "").trim();
       if (definition === "Split" && split.kind) definition = split.kind === "simple" ? "Simple Split" : "Wide Split";
       people.push({
         type: c.type.value,
-        authority: c.authority.value,
+        authority: authorityName(c.authority.value, c.type.value),
         definition,
         profile: (c.profile.value.match(/\d\s*\/\s*\d/) ?? [""])[0].replace(/\s/g, ""),
         defined,
-        gates: new Set([...c.activations.personality, ...c.activations.design].map((a) => a.gate)),
+        // Chiron and Lilith are silent everywhere, so a gate only they hit does not count
+        gates: new Set([...c.activations.personality, ...c.activations.design].filter((a) => !SILENT.has(a.planet)).map((a) => a.gate)),
         sign: signOf(c.activations.personality.find((a) => a.planet === "Sun")),
         place: regionOf(String(r.birth_place ?? "")),
         age: ageOf(String(r.birth_date)),
@@ -109,7 +159,7 @@ async function room(event: string): Promise<Person[]> {
 }
 
 // Each center split three ways: defined, undefined (gates but no channel), open (no gates)
-function Centers({ people }: { people: Person[] }) {
+function Centers({ people, tip }: { people: Person[]; tip: Tips["center"] }) {
   const total = people.length;
   const pct = (n: number) => (total ? (n / total) * 100 : 0);
   return (
@@ -121,13 +171,15 @@ function Centers({ people }: { people: Person[] }) {
         const o = total - d - u;
         return (
           <div className="crow" key={c}>
-            <span className="label">{CENTER_NAME[c]}</span>
+            <span className="label"><Tip text={tip[c]?.themes}>{CENTER_NAME[c]}</Tip></span>
             <span className="stack">
               <i className="d" style={{ width: `${pct(d)}%` }} />
               <i className="u" style={{ width: `${pct(u)}%` }} />
               <i className="o" style={{ width: `${pct(o)}%` }} />
             </span>
-            <em>{d} · {u} · {o}</em>
+            <em>
+              <Tip text={tip[c]?.defined}>{d}</Tip> · <Tip text={tip[c]?.undefined}>{u}</Tip> · <Tip text={tip[c]?.open}>{o}</Tip>
+            </em>
           </div>
         );
       })}
@@ -136,14 +188,14 @@ function Centers({ people }: { people: Person[] }) {
   );
 }
 
-function Bars({ title, rows, total }: { title: string; rows: [string, number][]; total: number }) {
+function Bars({ title, rows, total, tip }: { title: string; rows: [string, number][]; total: number; tip?: Record<string, string> }) {
   const max = Math.max(1, ...rows.map((r) => r[1]));
   return (
     <section className="card">
       <h2>{title}</h2>
       {rows.map(([k, n]) => (
         <div className="row" key={k}>
-          <span className="label">{k}</span>
+          <span className="label"><Tip text={tip?.[k]}>{k}</Tip></span>
           <span className="track"><i style={{ width: `${(n / max) * 100}%` }} /></span>
           <b>{n}</b>
           <em>{total ? Math.round((n / total) * 100) : 0}%</em>
@@ -158,7 +210,7 @@ export default async function EventStats({ params }: { params: Promise<{ event: 
   const slug = (event ?? "").toLowerCase();
   const ev = EVENTS[slug];
   if (!ev) notFound();
-  const people = await room(slug);
+  const [people, tip] = await Promise.all([room(slug), tips()]);
   const total = people.length;
   const ages = people.map((p) => p.age).filter((a): a is number => a !== null);
   const tally = (keys: string[] | null, of: (p: Person) => string): [string, number][] => {
@@ -198,6 +250,15 @@ export default async function EventStats({ params }: { params: Promise<{ event: 
         .events .crow em { font-style: normal; font-size: 12px; color: #6b6478; text-align: right; }
         .events .key { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 12px; color: #6b6478; }
         .events .key span { width: 12px; height: 12px; border-radius: 3px; margin-left: 10px; }
+        .events .tipwrap { position: relative; cursor: help; outline: none; }
+        .events .label .tipwrap { border-bottom: 1px dotted rgba(132,80,149,.45); }
+        .events .crow em .tipwrap { border-bottom: 1px dotted rgba(132,80,149,.45); padding: 0 2px; }
+        .events .crow em .tip { left: auto; right: 0; }
+        .events .tip { display: none; position: absolute; left: 0; top: calc(100% + 6px); z-index: 20; width: min(340px, 80vw);
+          background: #fff; color: #3b3550; border: 1px solid rgba(132,80,149,.25); border-radius: 12px; padding: 10px 12px;
+          font-size: 13px; line-height: 1.5; white-space: normal; box-shadow: 0 10px 26px rgba(60,40,80,.16); text-transform: none; letter-spacing: normal; }
+        .events .tipwrap:hover > .tip, .events .tipwrap:focus > .tip, .events .tipwrap:focus-within > .tip { display: block; }
+        .events .label { overflow: visible; }
         .events .foot { text-align: center; margin-top: 28px; font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: #9a93a8; }
       `}</style>
       <div className="wrap">
@@ -206,15 +267,15 @@ export default async function EventStats({ params }: { params: Promise<{ event: 
         <div className="sub">{ev.when} · {ev.where}</div>
         <div className="count"><b>{total}</b><span>{total === 1 ? "chart in the room" : "charts in the room"}</span></div>
         <div className="grid">
-          <Bars title="Type" rows={tally(TYPE_ORDER, (p) => p.type)} total={total} />
-          <Bars title="Authority" rows={tally(null, (p) => p.authority)} total={total} />
-          <Bars title="Definition" rows={tally(DEF_ORDER, (p) => p.definition)} total={total} />
-          <Bars title="Profile" rows={tally(null, (p) => p.profile)} total={total} />
+          <Bars title="Type" rows={tally(TYPE_ORDER, (p) => p.type)} total={total} tip={tip.type} />
+          <Bars title="Authority" rows={tally(null, (p) => p.authority)} total={total} tip={tip.authority} />
+          <Bars title="Definition" rows={tally(DEF_ORDER, (p) => p.definition)} total={total} tip={tip.definition} />
+          <Bars title="Profile" rows={tally(null, (p) => p.profile)} total={total} tip={tip.profile} />
           <Bars title="Sun Sign" rows={tally(SIGNS, (p) => p.sign)} total={total} />
           <Bars title="Born In" rows={tally(null, (p) => p.place)} total={total} />
           <Bars title={`Age${ages.length ? ` · average ${Math.round(ages.reduce((t, a) => t + a, 0) / ages.length)}` : ""}`}
             rows={AGE_BANDS.map(([k, lo, hi]) => [k, ages.filter((a) => a >= lo && a <= hi).length])} total={total} />
-          <Centers people={people} />
+          <Centers people={people} tip={tip.center} />
         </div>
         <div className="foot">Know Thyself</div>
       </div>
