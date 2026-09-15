@@ -728,11 +728,24 @@ async function persistChunks(chunks: Chunk[]): Promise<void> {
       chars: rows.reduce((n, r) => n + (r.body ?? "").length, 0),
     });
     const incoming = measure(group);
-    const { data: standing } = await supabase
+    const { data: standingRaw } = await supabase
       .from("chunks")
-      .select("body, metadata")
+      .select("body, metadata, notion_page_id, slug")
       .eq("source_kind", kind);
-    const held = measure(standing ?? []);
+    // One Notion page is one row, whatever names it has been stored under: a page
+    // stored once under an old name and once under its new one counts once, as
+    // the row the incoming batch replaces (2026-09-15, the Wide Split rename).
+    const incomingSlugs = new Set(group.map((c) => c.slug));
+    const byPage = new Map<string, { body?: string | null; metadata?: Record<string, unknown> | null; slug?: string }>();
+    const standing: { body?: string | null; metadata?: Record<string, unknown> | null }[] = [];
+    for (const r of standingRaw ?? []) {
+      const id = r.notion_page_id as string | null;
+      if (!id) { standing.push(r); continue; }
+      const prev = byPage.get(id);
+      if (!prev || (!incomingSlugs.has(String(prev.slug)) && incomingSlugs.has(String(r.slug)))) byPage.set(id, r);
+    }
+    standing.push(...byPage.values());
+    const held = measure(standing);
     if (held.rows) {
       const short: string[] = [];
       if (incoming.rows < held.rows) short.push(`rows ${incoming.rows} < ${held.rows}`);
@@ -897,8 +910,14 @@ async function applyCompletenessGuard(fresh: Chunk[], onlyKinds?: Set<string>): 
   // (usually a whole database failed above). Restore them from last-good and
   // flag ONCE with a summary rather than one flag per page.
   const missing: Chunk[] = [];
+  // A page that came through under a new name is the same page, not a missing one:
+  // restoring its old name kept a ghost row alive after Kaycee renamed "Wide Split
+  // (Broad Split)" to "Wide Split" (2026-09-15).
+  const freshPages = new Set(fresh.map((c) => c.notion_page_id).filter(Boolean));
   for (const lg of lastGood) {
-    if (!freshKeys.has(keyOf(lg))) { out.push(lg); missing.push(lg); }
+    if (freshKeys.has(keyOf(lg))) continue;
+    if (lg.notion_page_id && freshPages.has(lg.notion_page_id)) continue;
+    out.push(lg); missing.push(lg);
   }
   if (missing.length) {
     const byKind: Record<string, number> = {};
