@@ -25,7 +25,8 @@ import { Client as NotionClient, isFullPage, isFullBlock } from "@notionhq/clien
 import OpenAI from "openai";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { mkdir, writeFile, readFile, stat } from "node:fs/promises";
-import { logFlag } from "@/lib/flags";
+import { logFlag, HEALTH_DIR } from "@/lib/flags";
+import { appendFileSync as appendRenames, mkdirSync as mkRenamesDir, existsSync as renamesExist } from "node:fs";
 import { dirname } from "node:path";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -913,11 +914,31 @@ async function applyCompletenessGuard(fresh: Chunk[], onlyKinds?: Set<string>): 
   // A page that came through under a new name is the same page, not a missing one:
   // restoring its old name kept a ghost row alive after Kaycee renamed "Wide Split
   // (Broad Split)" to "Wide Split" (2026-09-15).
-  const freshPages = new Set(fresh.map((c) => c.notion_page_id).filter(Boolean));
+  const freshByPage = new Map(fresh.filter((c) => c.notion_page_id).map((c) => [c.notion_page_id as string, c]));
+  const renamed: string[] = [];
   for (const lg of lastGood) {
     if (freshKeys.has(keyOf(lg))) continue;
-    if (lg.notion_page_id && freshPages.has(lg.notion_page_id)) continue;
+    const now = lg.notion_page_id ? freshByPage.get(lg.notion_page_id) : undefined;
+    if (now) {
+      if (now.title !== lg.title) renamed.push(`${lg.source_kind}: "${lg.title}" is now "${now.title}"`);
+      continue;
+    }
     out.push(lg); missing.push(lg);
+  }
+  // Every rename, in the run's output and in System Health/Sync Renames.md, so a
+  // name change in Notion is always on record (Kaycee, 2026-09-15).
+  if (renamed.length) {
+    console.log(`  renamed in Notion since the last sync: ${renamed.length}`);
+    for (const r of renamed) console.log(`    ${r}`);
+    try {
+      const file = `${HEALTH_DIR}/Sync Renames.md`;
+      mkRenamesDir(HEALTH_DIR, { recursive: true });
+      if (!renamesExist(file)) appendRenames(file, "# Pages renamed in Notion\n\nEvery page the sync found under a new name. Newest at the bottom.\n\n");
+      const when = new Date().toISOString().replace("T", " ").slice(0, 16);
+      appendRenames(file, renamed.map((r) => `- ${when} UTC · ${r}\n`).join(""));
+    } catch {
+      // the record is a courtesy; a sync never fails over it
+    }
   }
   if (missing.length) {
     const byKind: Record<string, number> = {};
