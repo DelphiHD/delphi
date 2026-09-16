@@ -1578,6 +1578,9 @@ function basicByValue(chunks: Chunk[]): Record<string, Record<string, string>> {
   const out: Record<string, Record<string, string>> = {
     type: {}, authority: {}, profile: {}, definition: {}, gate: {}, variable: {}, channel: {},
     cross: {}, planet: {}, strategy: {}, frequencies: {}, profile_line: {}, variable_component: {},
+    // the name of the page each cross key came from, so the chart can refuse
+    // text whose cross is not the cross the provider named
+    cross_page: {},
   };
   // "Triple Split Definition" and "Triple Split" have to land on the same key,
   // and so do "1 / 3" and "1/3: The Investigator Martyr".
@@ -1617,7 +1620,7 @@ function basicByValue(chunks: Chunk[]): Record<string, Record<string, string>> {
     // gate is the Personality Sun, to name one cross and one only.
     if (kind === "cross") {
       const k = crossKey(`${c.title ?? ""} ${(c.metadata ?? {}).Cross ?? ""}`);
-      if (k && !(k in out.cross)) out.cross[k] = basic;
+      if (k && !(k in out.cross)) { out.cross[k] = basic; out.cross_page[k] = String(c.title ?? ""); }
       continue;
     }
     if (!(kind in out)) continue;
@@ -1652,6 +1655,16 @@ function crossKey(v: string): string {
   if (!a || g.length !== 4) return "";
   return `${a}#${g[0]}#${[...g].sort((x, y) => Number(x) - Number(y)).join("/")}`;
 }
+/** "Left Angle Cross of Demands (52/58 | 21/48)" and "LAC of Demands" are both "demands". */
+function crossName(v: string): string {
+  return v.toLowerCase()
+    .replace(/\((?:[\d\s/|]+)\)/g, "")
+    .replace(/^\s*(the\s+)?(right angle|left angle|juxtaposition)\s+cross\s+of\s+/, "")
+    .replace(/^\s*(rac|lac|jc)\s+of\s+/, "")
+    .replace(/\bthe\b/g, "")
+    .replace(/\d+/g, "")
+    .replace(/[^a-z]/g, "");
+}
 const normValue = (v: string) =>
   v.toLowerCase().split(":")[0].replace(/\bdefinition\b/g, "").replace(/[^a-z0-9/]/g, "");
 
@@ -1676,7 +1689,22 @@ function metaBasic(field: string, value: string, type: string,
     case "Profile": return t("profile", (value.match(/\d\s*\/\s*\d/) ?? [""])[0]);
     case "Variables": return t("variable", value);
     case "Definition": return t("definition", value);
-    case "Incarnation Cross": return lib.cross?.[crossKey(value)] ?? "";
+    case "Incarnation Cross": {
+      // The provider names the cross; her library only supplies the words for it.
+      // The chart never shows a page whose name is not the name the provider
+      // gave, so a mismatched page can never reach a client's chart quietly.
+      // Kaycee, 2026-09-16: "there are multiple crosses for the same gate ...
+      // how do we make sure this doesn't happen in the future?"
+      const k = crossKey(value);
+      const text = lib.cross?.[k] ?? "";
+      if (!text) return "";
+      const page = lib.cross_page?.[k] ?? "";
+      if (crossName(page) !== crossName(value)) {
+        console.warn(`  ! no cross text: the provider says "${value}" and the nearest page is "${page}"`);
+        return "";
+      }
+      return text;
+    }
     case "Authority": {
       const a = value.trim().toLowerCase();
       if (a === "ego") return t("authority", type === "Manifestor" ? "Ego Manifested" : "Ego Projected");
