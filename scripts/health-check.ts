@@ -104,6 +104,69 @@ async function checkMetadata(): Promise<Check> {
   }
 }
 
+/**
+ * Every cross page has to be findable, and findable as itself.
+ *
+ * Kaycee, 2026-09-16, after a workshop morning spent on this: "how do we make
+ * sure this doesn't happen in the future?" A cross is its angle, its
+ * Personality Sun and its four gates. This walks all of them and says which
+ * pages a chart could not use, or could confuse with another.
+ */
+async function checkCrossLibrary(): Promise<Check> {
+  const name = "Incarnation crosses are all findable";
+  try {
+    const { loadLibraryChunks } = await import("@/lib/hd/chunks-source");
+    const all = await loadLibraryChunks();
+    const opposite = new Map<number, number>();
+    for (const g of all.filter((c) => c.source_kind === "gate")) {
+      const m = (g.metadata ?? {}) as Record<string, string>;
+      const n = parseInt(String(m["Gate #"] ?? ""), 10);
+      const o = parseInt(String(m["Opposite Gate on Mandala"] ?? "").split(":")[0], 10);
+      if (n && o) opposite.set(n, o);
+    }
+    const rows = all.filter((c) => c.source_kind === "cross");
+    const seen = new Map<string, string>();
+    const unusable: string[] = [], mispaired: string[] = [], clashing: string[] = [], twins: string[] = [];
+    for (const c of rows) {
+      const m = (c.metadata ?? {}) as Record<string, string>;
+      const title = String(c.title ?? "");
+      const gates = String(m.Cross ?? "").split(/[^0-9]+/).filter(Boolean).map(Number);
+      const sun = parseInt(String(m["Personality Sun Gate"] ?? "").split(":")[0], 10);
+      const angle = /^lac|left angle/i.test(title) ? "L" : /^rac|right angle/i.test(title) ? "R"
+        : /^jc|juxtaposition/i.test(title) ? "J" : "";
+      if (!angle || gates.length !== 4) { unusable.push(title); continue; }
+      if (opposite.get(gates[0]) !== gates[1] || opposite.get(gates[2]) !== gates[3]
+        || (Number.isFinite(sun) && gates[0] !== sun)) mispaired.push(title);
+      const key = `${angle}#${gates[0]}#${[...gates].sort((a, b) => a - b).join("/")}`;
+      const already = seen.get(key);
+      // Two pages for one cross is a copy of the same cross, which costs a chart
+      // nothing. Two different crosses on one key is the bug from 09-13.
+      const bare = (s: string) => s.toLowerCase().replace(/^(lac|rac|jc)\s+of\s+/, "")
+        .replace(/\bthe\b/g, "").replace(/\d+/g, "").replace(/[^a-z]/g, "");
+      if (already && bare(already) !== bare(title)) clashing.push(`${title} and ${already}`);
+      else if (already) twins.push(`${title} and ${already}`);
+      else seen.set(key, title);
+    }
+    // What a chart cannot use, and what it could pick wrongly, are the failures.
+    // Pages that are simply a second copy of a cross she keeps are a note.
+    const broken: string[] = [];
+    if (mispaired.length) broken.push(`${mispaired.length} whose gates do not pair up (${mispaired.slice(0, 4).join(", ")})`);
+    if (clashing.length) broken.push(`${clashing.length} that clash (${clashing.slice(0, 3).join("; ")})`);
+    const notes: string[] = [];
+    if (unusable.length) notes.push(`${unusable.length} with no gates, unreachable (${unusable.slice(0, 4).join(", ")})`);
+    if (twins.length) notes.push(`${twins.length} written twice (${twins.slice(0, 3).join("; ")})`);
+    const said = [...broken, ...notes].join("; ");
+    return {
+      name,
+      pass: broken.length === 0,
+      detail: said || `${rows.length} pages, all of them findable and none clashing`,
+      fix: broken.length ? "open the named pages in the Crosses database and put their Cross gates right" : undefined,
+    };
+  } catch (e) {
+    return { name, pass: false, detail: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 function checkYesterdayTransit(): Check {
   const d = new Date();
   d.setDate(d.getDate() - 1);
@@ -197,6 +260,7 @@ async function main() {
     await checkSupabase(),
     await checkMetadata(),
     await checkChartApis(),
+    await checkCrossLibrary(),
     checkYesterdayTransit(),
     checkYesterdayEchoes(),
     checkLaunchAgents(),
