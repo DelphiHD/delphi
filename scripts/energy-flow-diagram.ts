@@ -1612,11 +1612,12 @@ function basicByValue(chunks: Chunk[]): Record<string, Record<string, string>> {
       continue;
     }
     // A cross is named three or four ways ("RAC of Eden 3", "Right Angle Cross
-    // of Eden (11/12 | 46/25)"), but its four gates are one cross and one only.
-    // Her Crosses database carries them in the Cross field.
+    // of Eden (11/12 | 46/25)"). Her Crosses database carries the gates in the
+    // Cross field and the angle in the title, and it takes both, plus which
+    // gate is the Personality Sun, to name one cross and one only.
     if (kind === "cross") {
-      const k = crossKey((c.metadata ?? {}).Cross ?? "");
-      if (k) out.cross[k] = basic;
+      const k = crossKey(`${c.title ?? ""} ${(c.metadata ?? {}).Cross ?? ""}`);
+      if (k && !(k in out.cross)) out.cross[k] = basic;
       continue;
     }
     if (!(kind in out)) continue;
@@ -1626,10 +1627,30 @@ function basicByValue(chunks: Chunk[]): Record<string, Record<string, string>> {
   return out;
 }
 
-/** "(45/26 | 36/6)" and "( 45/26|36/6 )" both read "45/26|36/6". */
+/**
+ * A cross, keyed the way a cross is actually told apart: its angle, its
+ * Personality Sun, and its four gates. "Left Angle Cross of Demands (52/58 |
+ * 21/48)" reads "L#52#21/48/52/58".
+ *
+ * Kaycee, 2026-09-15: the cross text was wrong on several charts. Two reasons,
+ * both fixed by this key. Fifty of her quads are two crosses, a Juxtaposition
+ * and a Left or Right Angle on the same four gates, so keying on the gates
+ * alone let one overwrite the other and a Left Angle chart read the
+ * Juxtaposition words. And the four variants of one cross differ only in which
+ * gate is the Personality Sun, which the gates in order carry but two of her
+ * entries pair up wrongly ("RAC of Eden 4 (11/6 | 12/36)", "LAC of Cycles 2
+ * (54/32 | 53/42)"), so the sun and the set of gates are keyed apart. Text
+ * without an angle gets no key, and the chart shows nothing rather than the
+ * wrong cross.
+ */
 function crossKey(v: string): string {
   const m = v.match(/\(([\d\s/|]+)\)/);
-  return m ? m[1].replace(/\s+/g, "") : "";
+  if (!m) return "";
+  const a = /\b(lac|left angle)\b/i.test(v) ? "L" : /\b(rac|right angle)\b/i.test(v) ? "R"
+    : /\b(jc|juxtaposition)\b/i.test(v) ? "J" : "";
+  const g = m[1].split(/[^0-9]+/).filter(Boolean);
+  if (!a || g.length !== 4) return "";
+  return `${a}#${g[0]}#${[...g].sort((x, y) => Number(x) - Number(y)).join("/")}`;
 }
 const normValue = (v: string) =>
   v.toLowerCase().split(":")[0].replace(/\bdefinition\b/g, "").replace(/[^a-z0-9/]/g, "");
@@ -7695,10 +7716,22 @@ function libKeyFor(kind, value) {
   var v = String(value == null ? '' : value);
   if (kind === 'gate') return v.split('.')[0];
   if (kind === 'channel') return v;
-  // a cross is keyed by its four gates, "45/26|36/6", the way crossKey does it
+  // a cross is keyed by its angle, its Personality Sun and its four gates,
+  // "R#36#6/11/12/36", the way crossKey does it
   if (kind === 'cross') {
     var open = v.lastIndexOf('('), close = v.lastIndexOf(')');
-    return open >= 0 && close > open ? v.slice(open + 1, close).split(' ').join('') : '';
+    if (!(open >= 0 && close > open)) return '';
+    var low = v.toLowerCase();
+    var a = low.indexOf('left angle') > -1 ? 'L' : low.indexOf('right angle') > -1 ? 'R'
+      : low.indexOf('juxtaposition') > -1 ? 'J' : '';
+    var inner = v.slice(open + 1, close), num = '', g = [];
+    for (var i = 0; i <= inner.length; i++) {
+      var ch = i < inner.length ? inner.charAt(i) : ' ';
+      if (ch >= '0' && ch <= '9') { num += ch; continue; }
+      if (num) { g.push(num); num = ''; }
+    }
+    if (!a || g.length !== 4) return '';
+    return a + '#' + g[0] + '#' + g.slice().sort(function (x, y) { return Number(x) - Number(y); }).join('/');
   }
   var low = v.toLowerCase().split(':')[0];
   if (kind === 'definition') low = low.split('definition').join('');
