@@ -8399,8 +8399,37 @@ function assertPageScriptsParse(html: string): void {
   }
 }
 
+/**
+ * Nothing goes out carrying another cross's words.
+ *
+ * Kaycee, 2026-09-16: "We shouldn't need a backup if they are published
+ * correctly the first time. That's my expectation." The lookup and its guard
+ * already refuse a mismatch; this reads the finished page one last time, the
+ * way a client would, and refuses the publish outright if the paragraph under
+ * the cross belongs to a different cross than the one the provider named.
+ */
+function assertCrossTextBelongs(html: string, who: string): void {
+  const m = html.match(/\{[^{}]*"field":"Incarnation Cross"[^{}]*\}/);
+  if (!m) return;
+  const value = (m[0].match(/"value":"([^"]*)"/) ?? ["", ""])[1];
+  const basic = (m[0].match(/"basic":"([^"]*)"/) ?? ["", ""])[1];
+  if (!value || !basic) return;
+  // Her text opens by naming the cross ("The Left Angle Cross of Demands
+  // highlights ..."), so the words that follow "Cross of" have to be the cross
+  // the provider named. Text that never names a cross is left alone.
+  const said = basic.match(/(right angle|left angle|juxtaposition)\s+cross\s+of\s+(.{0,60})/i);
+  if (!said) return;
+  const bare = (s: string) => s.toLowerCase().replace(/\bthe\b/g, "").replace(/\d+/g, "").replace(/[^a-z]/g, "");
+  const wanted = crossName(value);
+  const angleSaid = said[1].toLowerCase(), angleWanted = value.toLowerCase();
+  const angleOk = angleWanted.includes(angleSaid);
+  if (!wanted || (angleOk && bare(said[2]).startsWith(wanted))) return;
+  throw new Error(`${who}: the provider says "${value}" but the text under it is about the ${said[1]} Cross of ${said[2].trim()}. Nothing was published.`);
+}
+
 async function publishChart(client: ClientCtx, html: string): Promise<string> {
   assertPageScriptsParse(html);
+  assertCrossTextBelongs(html, client.name);
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error("NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set to publish");
