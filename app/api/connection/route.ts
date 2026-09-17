@@ -50,12 +50,28 @@ export async function GET(request: Request) {
     .maybeSingle();
   if (!rec || rec.revoked_at) return bad("that chart link is not active", 404);
 
-  const me = CLIENTS[rec.client_slug];
+  // A chart made through the website or an event link is a chart record, not a
+  // roster entry, and Relationship broke on every one of them ("that chart is
+  // no longer on the roster", Kaycee 2026-09-17). Either source answers the
+  // same question: whose chart is this.
+  const roster = CLIENTS[rec.client_slug];
+  const { data: chartRec } = roster ? { data: null } : await db
+    .from("charts")
+    .select("person_name, birth_date, birth_time, birth_place, birth_timezone")
+    .eq("token", token)
+    .maybeSingle();
+  const me = roster ?? (chartRec ? {
+    name: String(chartRec.person_name ?? "Their chart"),
+    birthDate: String(chartRec.birth_date),
+    birthTime: String(chartRec.birth_time ?? "12:00").slice(0, 5),
+    birthPlace: String(chartRec.birth_place ?? ""),
+    birthTimezone: String(chartRec.birth_timezone ?? ""),
+  } : null);
   if (!me) return bad("that chart is no longer on the roster", 404);
 
   try {
     const [mineTz, theirTz] = await Promise.all([
-      getTimezoneForLocation(me.birthPlace),
+      (me as { birthTimezone?: string }).birthTimezone || getTimezoneForLocation(me.birthPlace),
       getTimezoneForLocation(place),
     ]);
     const conn = await getConnectionChart(
