@@ -21,6 +21,7 @@ import { readSplit } from "@/lib/hd/split-kind";
 import { longitudeOf } from "@/lib/hd/gate-longitude";
 import { loadLibraryChunks } from "@/lib/hd/chunks-source";
 import { CENTER_GATES, type Center } from "@/lib/hd/gate-center";
+import { crossKey, crossName } from "@/lib/hd/cross-key";
 
 export const revalidate = 300;
 
@@ -42,7 +43,7 @@ const CENTER_ORDER: Center[] = ["head", "ajna", "throat", "g", "heart", "spleen"
 const TYPE_ORDER = ["Generator", "Manifesting Generator", "Projector", "Manifestor", "Reflector"];
 const DEF_ORDER = ["Single", "Simple Split", "Wide Split", "Triple Split", "Quadruple Split", "No Definition"];
 
-interface Person { type: string; authority: string; definition: string; profile: string; defined: Set<Center>; gates: Set<number>; sign: string; place: string; age: number | null }
+interface Person { type: string; authority: string; definition: string; profile: string; cross: string; crossKey: string; defined: Set<Center>; gates: Set<number>; sign: string; place: string; age: number | null }
 
 const SILENT = new Set(["Chiron", "Lilith"]);
 
@@ -58,9 +59,10 @@ function authorityName(value: string, type: string): string {
 
 /** Her Delphi Basic text for everything the page counts, for the hovers. */
 interface Tips { type: Record<string, string>; authority: Record<string, string>; definition: Record<string, string>;
-  profile: Record<string, string>; center: Record<string, { themes: string; defined: string; undefined: string; open: string }> }
+  profile: Record<string, string>; center: Record<string, { themes: string; defined: string; undefined: string; open: string }>;
+  cross: Record<string, { page: string; text: string }> }
 async function tips(): Promise<Tips> {
-  const out: Tips = { type: {}, authority: {}, definition: {}, profile: {}, center: {} };
+  const out: Tips = { type: {}, authority: {}, definition: {}, profile: {}, center: {}, cross: {} };
   try {
     const chunks = await loadLibraryChunks();
     const basic = (m: Record<string, unknown>) => String(m["Delphi Basic"] ?? m["Delphi Basic Description"] ?? "").trim();
@@ -72,6 +74,10 @@ async function tips(): Promise<Tips> {
       if (c.source_kind === "type") out.type[t] = basic(m);
       if (c.source_kind === "definition" && basic(m)) out.definition[t] = basic(m);
       if (c.source_kind === "profile") out.profile[t.split(":")[0].trim()] = basic(m);
+      if (c.source_kind === "cross" && basic(m)) {
+        const k = crossKey(`${t} ${String(m.Cross ?? "")}`);
+        if (k && !out.cross[k]) out.cross[k] = { page: t, text: basic(m) };
+      }
       if (c.source_kind === "authority") {
         const name = t === "Lunar Authority" ? "Lunar" : t.startsWith("Environment") ? "Environment" : t;
         out.authority[name] = basic(m);
@@ -144,6 +150,9 @@ async function room(event: string): Promise<Person[]> {
         authority: authorityName(c.authority.value, c.type.value),
         definition,
         profile: (c.profile.value.match(/\d\s*\/\s*\d/) ?? [""])[0].replace(/\s/g, ""),
+        // named the way the provider names it, without the gates
+        cross: c.incarnationCross.value.replace(/\s*\([\d\s/|]+\)\s*$/, "").replace(/\s+/g, " ").trim(),
+        crossKey: crossKey(c.incarnationCross.value),
         defined,
         // Chiron and Lilith are silent everywhere, so a gate only they hit does not count
         gates: new Set([...c.activations.personality, ...c.activations.design].filter((a) => !SILENT.has(a.planet)).map((a) => a.gate)),
@@ -188,10 +197,10 @@ function Centers({ people, tip }: { people: Person[]; tip: Tips["center"] }) {
   );
 }
 
-function Bars({ title, rows, total, tip }: { title: string; rows: [string, number][]; total: number; tip?: Record<string, string> }) {
+function Bars({ title, rows, total, tip, wide }: { title: string; rows: [string, number][]; total: number; tip?: Record<string, string>; wide?: boolean }) {
   const max = Math.max(1, ...rows.map((r) => r[1]));
   return (
-    <section className="card">
+    <section className={wide ? "card wide" : "card"}>
       <h2>{title}</h2>
       {rows.map(([k, n]) => (
         <div className="row" key={k}>
@@ -213,6 +222,15 @@ export default async function EventStats({ params }: { params: Promise<{ event: 
   const [people, tip] = await Promise.all([room(slug), tips()]);
   const total = people.length;
   const ages = people.map((p) => p.age).filter((a): a is number => a !== null);
+  // A cross's hover is her words for it, and only when there is no doubt which
+  // page they come from: everyone in the row on one variant, and that page named
+  // as the cross the provider named. Otherwise no hover, never a guess.
+  const crossTip: Record<string, string> = {};
+  for (const name of new Set(people.map((p) => p.cross))) {
+    const keys = new Set(people.filter((p) => p.cross === name).map((p) => p.crossKey));
+    const hit = keys.size === 1 ? tip.cross[[...keys][0]] : undefined;
+    if (hit && crossName(hit.page) === crossName(name)) crossTip[name] = hit.text;
+  }
   const tally = (keys: string[] | null, of: (p: Person) => string): [string, number][] => {
     const n = new Map<string, number>();
     for (const p of people) { const k = of(p); if (k) n.set(k, (n.get(k) ?? 0) + 1); }
@@ -275,6 +293,7 @@ export default async function EventStats({ params }: { params: Promise<{ event: 
           <Bars title="Born In" rows={tally(null, (p) => p.place)} total={total} />
           <Bars title={`Age${ages.length ? ` · average ${Math.round(ages.reduce((t, a) => t + a, 0) / ages.length)}` : ""}`}
             rows={AGE_BANDS.map(([k, lo, hi]) => [k, ages.filter((a) => a >= lo && a <= hi).length])} total={total} />
+          <Bars title="Incarnation Cross" rows={tally(null, (p) => p.cross)} total={total} tip={crossTip} wide />
           <Centers people={people} tip={tip.center} />
         </div>
         <div className="foot">Know Thyself</div>
