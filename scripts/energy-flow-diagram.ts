@@ -3003,6 +3003,7 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
   const viewControls = `<div class="sec" id="modsec" hidden>CHART TYPE</div>
     <div class="row" id="modrow" hidden>
       <button id="mSelf" class="on" data-help="Your own chart, from your birth moment: your design on its own." data-help-label="Individual">Individual</button>
+      <button id="mVariations" data-help="Your chart at every time of your birth day: each card is a stretch of the day where the chart reads differently." data-help-label="Variations">Variations</button>
       <button id="mTransit" data-help="Today's sky over your chart: the planets activating your gates now, and the channels they complete for you." data-help-label="Transit">Transit</button>
       <button id="mRelation" data-help="Two charts read together: the centers you define as a pair, and the channels that connect you." data-help-label="Relationship">Relationship</button>
     </div>
@@ -3596,6 +3597,31 @@ button.disabled:hover, button:disabled:hover { background:var(--paper); color:in
 .viewdock.docked #modrow button:first-child { border-radius:10px 10px 0 0; }
 .viewdock.docked #modrow button:last-child { border-radius:0 0 10px 10px; }
 .viewdock.docked #modrow button.on { background:var(--purple); border-color:var(--purple); color:#fff; }
+/* The Variations module (Kaycee, 2026-09-17): the birth day as the charts it
+   holds, one card per stretch, beside the dock and over the chart. */
+.varpanel { position:absolute; top:0; right:0; bottom:0; left:0; z-index:4; background:#fff; overflow:auto; padding:6px 8px 20px 176px; }
+body.mod-variations .varpanel { display:block; }
+body:not(.mod-variations) .varpanel { display:none !important; }
+body.mod-variations #tip, body.mod-variations #card { display:none !important; }
+.varhead { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--purple); font-weight:600; margin:2px 0 10px; }
+.vargrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:10px; }
+.varcard { display:block; text-align:left; background:#fff; color:#1c1a2e; border:1px solid rgba(132,80,149,.2); border-radius:12px; padding:8px 10px 10px; cursor:pointer; font:inherit; }
+.varcard:hover { border-color:rgba(132,80,149,.55); box-shadow:0 6px 18px rgba(60,40,80,.1); }
+.varcard.yours { border:2px solid var(--purple); }
+.varcard .vtime { font-size:12px; font-weight:600; color:var(--purple); }
+.vyours { display:inline-block; margin-top:3px; font-size:10px; letter-spacing:.1em; text-transform:uppercase; background:var(--purple); color:#fff; border-radius:8px; padding:1px 7px; }
+.varcard .vbody svg, .varfocus .vbody svg { width:100%; height:auto; display:block; }
+.varcard .vbody { margin:4px 0 2px; }
+.vfields { display:grid; grid-template-columns:auto 1fr; gap:1px 8px; font-size:11.5px; line-height:1.35; }
+.vfields dt { color:#6b6478; }
+.vfields dd { margin:0; }
+.vfields .chg { color:var(--purple); font-weight:600; }
+.varfocus { display:grid; grid-template-columns:minmax(0, 1.1fr) minmax(0, 1fr); gap:16px; align-items:start; }
+.varfocus .vtime { font-size:15px; font-weight:600; color:var(--purple); margin-bottom:6px; }
+.varfocus .vfields { font-size:13px; gap:4px 12px; }
+.varclose { float:right; border:0; background:transparent; font-size:22px; line-height:1; color:#6b6478; cursor:pointer; padding:0 4px; }
+.varstatus { font-size:13px; color:#6b6478; padding:20px 4px; }
+@media (max-width: 760px) { .varpanel { padding-left:8px; } .varfocus { grid-template-columns:1fr; } }
 .viewdock.docked #viewrow { gap:0; }
 .viewdock.docked #viewrow button { border-radius:0; }
 .viewdock.docked #viewrow button:first-child { border-radius:10px 10px 0 0; }
@@ -4124,7 +4150,7 @@ body.view-mandala .mandala svg { max-height:calc(100vh - 28px); width:auto; heig
 <body class="skin-paper${d.client ? " chart" : ""}">
 <div class="wrap">
   ${logoSrc ? `<img class="brandmark logo" src="${logoSrc}" alt="Delphi">` : ""}
-  <div class="stage">${canvases}${mandala}${astro}<div class="tip" id="tip" hidden></div><div class="card" id="card" hidden></div>${knowSrc ? `<img class="brandmark know" src="${knowSrc}" alt="Know thyself">` : ""}${d.client ? `<div class="viewdock docked">${viewControls}</div>` : ""}</div>
+  <div class="stage">${canvases}${mandala}${astro}<div class="tip" id="tip" hidden></div><div class="card" id="card" hidden></div>${knowSrc ? `<img class="brandmark know" src="${knowSrc}" alt="Know thyself">` : ""}${d.client ? `<div class="varpanel" id="varpanel"></div><div class="viewdock docked">${viewControls}</div>` : ""}</div>
   <aside class="panel">
 ${d.client ? "" : `<h1 id="ptitle">Centers, function, and flow</h1>
     <p class="sub" id="psub">Nine centers, each labeled with what it does. The moving light follows every channel toward the Throat, the only center that turns energy into expression.</p>`}
@@ -5724,7 +5750,87 @@ if (DATA.client) {
   // this person alone, this person under today's sky, or this person with
   // another. The view is how it is drawn. Every view works in every chart
   // except circuits under a transit, which has no circuitry of its own.
-  var MODULES = ['self', 'transit', 'relation'];
+  // ---- the Variations module --------------------------------------------
+  // Kaycee, 2026-09-14/15 and 2026-09-17: every chart shows its birth day as
+  // the charts it holds, one card per stretch where the reading changes, so
+  // anyone can see the pattern. Cast by /api/variations the first time it is
+  // opened, then kept. The card holding an exact chart's own time is marked.
+  window.__variations = (function () {
+    var panel = document.getElementById('varpanel');
+    if (!panel) return null;
+    var parts = location.pathname.split('/');
+    var tok = parts[parts.length - 1];
+    var list = null, loading = false;
+    var FIELDS = [['type', 'Type'], ['profile', 'Profile'], ['authority', 'Authority'], ['definition', 'Definition']];
+    var clock = function (hm) {
+      var h = Number(hm.slice(0, 2)), hh = h % 12 === 0 ? 12 : h % 12;
+      return hh + ':' + hm.slice(3, 5) + ' ' + (h < 12 ? 'AM' : 'PM');
+    };
+    var span = function (i) {
+      var v = list[i], to = i + 1 < list.length ? list[i + 1].from : '23:59';
+      return clock(v.from) + ' to ' + clock(to);
+    };
+    var centerName = function (c) {
+      var n = String(c).split(' center').join('');
+      return n.charAt(0).toUpperCase() + n.slice(1);
+    };
+    var differs = function (i, key) {
+      if (i === 0) return false;
+      var a = list[i][key], b = list[i - 1][key];
+      return Array.isArray(a) ? a.slice().sort().join(',') !== b.slice().sort().join(',') : a !== b;
+    };
+    var fields = function (i, full) {
+      var v = list[i], out = '';
+      var rows = FIELDS.slice();
+      if (full) rows.push(['cross', 'Incarnation Cross']);
+      rows.forEach(function (f) {
+        out += '<dt>' + f[1] + '</dt><dd' + (differs(i, f[0]) ? ' class="chg"' : '') + '>' + esc(v[f[0]]) + '</dd>';
+      });
+      out += '<dt>Channels</dt><dd' + (differs(i, 'channels') ? ' class="chg"' : '') + '>' + esc(v.channels.join(', ')) + '</dd>';
+      if (full) out += '<dt>Centers</dt><dd' + (differs(i, 'centers') ? ' class="chg"' : '') + '>' + esc(v.centers.map(centerName).join(', ')) + '</dd>';
+      return '<dl class="vfields">' + out + '</dl>';
+    };
+    var grid = function () {
+      var html = '<div class="varhead">Variations</div><div class="vargrid">';
+      list.forEach(function (v, i) {
+        html += '<button class="varcard' + (v.yours ? ' yours' : '') + '" data-i="' + i + '">' +
+          '<div class="vtime">' + span(i) + '</div>' +
+          (v.yours ? '<div class="vyours">Your chart</div>' : '') +
+          '<div class="vbody">' + v.svg + '</div>' + fields(i, false) + '</button>';
+      });
+      panel.innerHTML = html + '</div>';
+      [].forEach.call(panel.querySelectorAll('.varcard'), function (b) {
+        b.onclick = function () { open(Number(b.getAttribute('data-i'))); };
+      });
+      panel.scrollTop = 0;
+    };
+    var open = function (i) {
+      var v = list[i];
+      panel.innerHTML = '<button class="varclose" aria-label="Close">&times;</button>' +
+        '<div class="varhead">Variations</div><div class="varfocus">' +
+        '<div class="vbody">' + v.svg + '</div><div><div class="vtime">' + span(i) + '</div>' +
+        (v.yours ? '<div class="vyours" style="margin-bottom:8px">Your chart</div>' : '') + fields(i, true) + '</div></div>';
+      panel.querySelector('.varclose').onclick = grid;
+      panel.scrollTop = 0;
+    };
+    return function (on) {
+      if (!on || list || loading) return;
+      if (!/^[a-f0-9]{32}$/.test(tok)) { panel.innerHTML = '<div class="varstatus">Variations open on a published chart.</div>'; return; }
+      loading = true;
+      panel.innerHTML = '<div class="varstatus">Reading your birth day&hellip;</div>';
+      fetch('/api/variations?token=' + tok).then(function (r) { return r.json(); }).then(function (j) {
+        loading = false;
+        if (!j || !j.ok || !j.variations || !j.variations.length) throw new Error('none');
+        list = j.variations;
+        grid();
+      }).catch(function () {
+        loading = false;
+        panel.innerHTML = '<div class="varstatus">Your birth day could not be read just now.</div>';
+      });
+    };
+  })();
+
+  var MODULES = ['self', 'variations', 'transit', 'relation'];
   var VIEWS = ['plain', 'body', 'mandala', 'astro'];
   var curMod = 'self';
   var curView = 'plain';
@@ -5760,7 +5866,7 @@ if (DATA.client) {
     curMod = id;
     MODULES.forEach(function (k) {
       body.classList.toggle('mod-' + k, k === id);
-      var b = document.getElementById(k === 'self' ? 'mSelf' : k === 'transit' ? 'mTransit' : 'mRelation');
+      var b = document.getElementById(k === 'self' ? 'mSelf' : k === 'variations' ? 'mVariations' : k === 'transit' ? 'mTransit' : 'mRelation');
       if (b) b.classList.toggle('on', k === id);
     });
     applyView();
@@ -5786,6 +5892,7 @@ if (DATA.client) {
     if (typeof partyBtns !== 'undefined' && partyBtns) {
       partyBtns.forEach(function (x) { if (x) x.classList.add('on'); });
     }
+    if (window.__variations) window.__variations(id === 'variations');
   };
 
   var view = function (id) {
@@ -5797,8 +5904,8 @@ if (DATA.client) {
   document.getElementById('vBody').onclick = function () { view('body'); };
   document.getElementById('vPlain').onclick = function () { view('plain'); };
   document.getElementById('vMandala').onclick = function () { view('mandala'); };
-  ['self', 'transit', 'relation'].forEach(function (k) {
-    var b = document.getElementById(k === 'self' ? 'mSelf' : k === 'transit' ? 'mTransit' : 'mRelation');
+  ['self', 'variations', 'transit', 'relation'].forEach(function (k) {
+    var b = document.getElementById(k === 'self' ? 'mSelf' : k === 'variations' ? 'mVariations' : k === 'transit' ? 'mTransit' : 'mRelation');
     if (b) b.onclick = function () { setModule(k); };
   });
   // A chart built without a partner has no Relationship module to show, so the
