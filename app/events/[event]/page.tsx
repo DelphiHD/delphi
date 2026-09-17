@@ -22,6 +22,7 @@ import { longitudeOf } from "@/lib/hd/gate-longitude";
 import { loadLibraryChunks } from "@/lib/hd/chunks-source";
 import { CENTER_GATES, type Center } from "@/lib/hd/gate-center";
 import { crossKey, crossName } from "@/lib/hd/cross-key";
+import { windowFor, type Accuracy } from "@/lib/hd/time-accuracy";
 
 export const revalidate = 300;
 
@@ -43,9 +44,24 @@ const CENTER_ORDER: Center[] = ["head", "ajna", "throat", "g", "heart", "spleen"
 const TYPE_ORDER = ["Generator", "Manifesting Generator", "Projector", "Manifestor", "Reflector"];
 const DEF_ORDER = ["Single", "Simple Split", "Wide Split", "Triple Split", "Quadruple Split", "No Definition"];
 
-interface Person { type: string; authority: string; definition: string; profile: string; cross: string; crossKey: string; defined: Set<Center>; gates: Set<number>; sign: string; place: string; age: number | null }
+interface Person { type: string; authority: string; definition: string; profile: string; cross: string; crossKey: string; variables: string; defined: Set<Center>; gates: Set<number>; sign: string; place: string; age: number | null }
 
 const SILENT = new Set(["Chiron", "Lilith"]);
+
+/**
+ * The four arrows as Kaycee writes them, "PLR DRR": Motivation and Perspective
+ * on the Personality side, Determination and Environment on the Design side.
+ *
+ * They move with the minute, so a birth time that is not exact has none to
+ * report. Kaycee, 2026-09-17: "we won't have it for the unknown birth times,
+ * you can just list those as unknown."
+ */
+function variableCode(v: { motivation: { arrow: string }; perspective: { arrow: string };
+  determination: { arrow: string }; environment: { arrow: string } }, accuracy: Accuracy, birthTime: string): string {
+  if (windowFor(accuracy, birthTime || null) !== null) return "Unknown";
+  const a = (x: { arrow: string }) => (x.arrow === "left" ? "L" : "R");
+  return `P${a(v.motivation)}${a(v.perspective)} D${a(v.determination)}${a(v.environment)}`;
+}
 
 /** The provider's authority, named the way her library names it. */
 function authorityName(value: string, type: string): string {
@@ -127,7 +143,7 @@ const AGE_BANDS: [string, number, number][] = [["Under 20", 0, 19], ["20s", 20, 
 async function room(event: string): Promise<Person[]> {
   const db = createAdminClient();
   const { data } = await db.from("charts")
-    .select("person_name, birth_date, birth_time, birth_timezone, birth_place, created_at")
+    .select("person_name, birth_date, birth_time, birth_timezone, birth_place, time_accuracy, created_at")
     .eq("source", event)
     .order("created_at");
   // Someone who signs up more than once is one person, counted by their newest
@@ -162,6 +178,7 @@ async function room(event: string): Promise<Person[]> {
         // named the way the provider names it, without the gates
         cross: c.incarnationCross.value.replace(/\s*\([\d\s/|]+\)\s*$/, "").replace(/\s+/g, " ").trim(),
         crossKey: crossKey(c.incarnationCross.value),
+        variables: variableCode(c.variables, String(r.time_accuracy ?? "document") as Accuracy, String(r.birth_time ?? "").slice(0, 5)),
         defined,
         // Chiron and Lilith are silent everywhere, so a gate only they hit does not count
         gates: new Set([...c.activations.personality, ...c.activations.design].filter((a) => !SILENT.has(a.planet)).map((a) => a.gate)),
@@ -287,6 +304,10 @@ export default async function EventStats({ params }: { params: Promise<{ event: 
     return list.map((k) => [k, n.get(k) ?? 0]);
   };
 
+  // the codes in order, with the unknown times last rather than mixed in
+  const variableRows = tally(null, (p) => p.variables)
+    .sort((a, b) => (a[0] === "Unknown" ? 1 : b[0] === "Unknown" ? -1 : b[1] - a[1] || a[0].localeCompare(b[0])));
+
   return (
     <main className={`events ${font.className}`}>
       <style>{`
@@ -342,6 +363,7 @@ export default async function EventStats({ params }: { params: Promise<{ event: 
           <Bars title="Authority" rows={tally(null, (p) => p.authority)} total={total} tip={tip.authority} />
           <Bars title="Definition" rows={tally(DEF_ORDER, (p) => p.definition)} total={total} tip={tip.definition} />
           <Bars title="Profile" rows={tally(null, (p) => p.profile)} total={total} tip={tip.profile} />
+          <Bars title="Variables" rows={variableRows} total={total} />
           <Bars title="Sun Sign" rows={tally(SIGNS, (p) => p.sign)} total={total} />
           <Bars title="Born In" rows={tally(null, (p) => p.place)} total={total} />
           <Bars title={`Age${ages.length ? ` · average ${Math.round(ages.reduce((t, a) => t + a, 0) / ages.length)}` : ""}`}
