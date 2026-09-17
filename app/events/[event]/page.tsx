@@ -60,9 +60,9 @@ function authorityName(value: string, type: string): string {
 /** Her Delphi Basic text for everything the page counts, for the hovers. */
 interface Tips { type: Record<string, string>; authority: Record<string, string>; definition: Record<string, string>;
   profile: Record<string, string>; center: Record<string, { themes: string; defined: string; undefined: string; open: string }>;
-  cross: Record<string, { page: string; text: string }> }
+  cross: Record<string, { page: string; text: string }>; crossNumbered: Set<string> }
 async function tips(): Promise<Tips> {
-  const out: Tips = { type: {}, authority: {}, definition: {}, profile: {}, center: {}, cross: {} };
+  const out: Tips = { type: {}, authority: {}, definition: {}, profile: {}, center: {}, cross: {}, crossNumbered: new Set() };
   try {
     const chunks = await loadLibraryChunks();
     const basic = (m: Record<string, unknown>) => String(m["Delphi Basic"] ?? m["Delphi Basic Description"] ?? "").trim();
@@ -77,6 +77,8 @@ async function tips(): Promise<Tips> {
       if (c.source_kind === "cross" && basic(m)) {
         const k = crossKey(`${t} ${String(m.Cross ?? "")}`);
         if (k && !out.cross[k]) out.cross[k] = { page: t, text: basic(m) };
+        // a cross whose versions are numbered in her library ("RAC of Eden 2")
+        if (/\s\d+$/.test(t)) out.crossNumbered.add(`${k.charAt(0)}|${crossName(t)}`);
       }
       if (c.source_kind === "authority") {
         const name = t === "Lunar Authority" ? "Lunar" : t.startsWith("Environment") ? "Environment" : t;
@@ -125,10 +127,17 @@ const AGE_BANDS: [string, number, number][] = [["Under 20", 0, 19], ["20s", 20, 
 async function room(event: string): Promise<Person[]> {
   const db = createAdminClient();
   const { data } = await db.from("charts")
-    .select("birth_date, birth_time, birth_timezone, birth_place")
-    .eq("source", event);
+    .select("person_name, birth_date, birth_time, birth_timezone, birth_place, created_at")
+    .eq("source", event)
+    .order("created_at");
+  // Someone who signs up more than once is one person, counted by their newest
+  // sign-up, the same rule the workshop Stage uses. Kaycee, 2026-09-17: "Only
+  // count Patrick's most recent chart" (unknown birth time, he was experimenting).
+  const first = (n: unknown) => String(n ?? "").trim().split(/\s+/)[0].toLowerCase();
+  const rows = (data ?? []).filter((r, i, all) => !all.slice(i + 1).some((l) =>
+    String(l.birth_date) === String(r.birth_date) && first(l.person_name) === first(r.person_name)));
   const people: Person[] = [];
-  for (const r of data ?? []) {
+  for (const r of rows) {
     try {
       const c = await getChart({
         birthDate: String(r.birth_date),
@@ -214,6 +223,34 @@ function Bars({ title, rows, total, tip, wide }: { title: string; rows: [string,
   );
 }
 
+/** Each cross with its versions beneath it, a version per row with its own words. */
+function Crosses({ groups, total }: { groups: Map<string, Map<string, { n: number; text: string }>>; total: number }) {
+  const sum = (g: Map<string, { n: number }>) => [...g.values()].reduce((t, r) => t + r.n, 0);
+  const ordered = [...groups].sort((a, b) => sum(b[1]) - sum(a[1]) || a[0].localeCompare(b[0]));
+  const max = Math.max(1, ...ordered.flatMap(([, g]) => [...g.values()].map((r) => r.n)));
+  return (
+    <section className="card wide">
+      <h2>Incarnation Cross</h2>
+      {ordered.map(([name, g]) => {
+        const versions = [...g].sort((a, b) => b[1].n - a[1].n || a[0].localeCompare(b[0], undefined, { numeric: true }));
+        return (
+          <div className="xgroup" key={name}>
+            {versions.length > 1 && <div className="xname">{name}<em>{sum(g)}</em></div>}
+            {versions.map(([label, r]) => (
+              <div className={versions.length > 1 ? "row xver" : "row"} key={label}>
+                <span className="label"><Tip text={r.text}>{label}</Tip></span>
+                <span className="track"><i style={{ width: `${(r.n / max) * 100}%` }} /></span>
+                <b>{r.n}</b>
+                <em>{total ? Math.round((r.n / total) * 100) : 0}%</em>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 export default async function EventStats({ params }: { params: Promise<{ event: string }> }) {
   const { event } = await params;
   const slug = (event ?? "").toLowerCase();
@@ -222,14 +259,26 @@ export default async function EventStats({ params }: { params: Promise<{ event: 
   const [people, tip] = await Promise.all([room(slug), tips()]);
   const total = people.length;
   const ages = people.map((p) => p.age).filter((a): a is number => a !== null);
-  // A cross's hover is her words for it, and only when there is no doubt which
-  // page they come from: everyone in the row on one variant, and that page named
-  // as the cross the provider named. Otherwise no hover, never a guess.
-  const crossTip: Record<string, string> = {};
-  for (const name of new Set(people.map((p) => p.cross))) {
-    const keys = new Set(people.filter((p) => p.cross === name).map((p) => p.crossKey));
-    const hit = keys.size === 1 ? tip.cross[[...keys][0]] : undefined;
-    if (hit && crossName(hit.page) === crossName(name)) crossTip[name] = hit.text;
+  // Crosses are always counted by version, because the versions are not the
+  // same cross; versions of one cross sit together under its name. Kaycee,
+  // 2026-09-17: "the crosses need to be split by version, always. They are not
+  // the same, you can group them together though." A version is named by her
+  // page ("RAC of Eden 2" is Eden 2) and carries that page's words, and only
+  // when the page is the cross the provider named.
+  const crossGroups = new Map<string, Map<string, { n: number; text: string }>>();
+  for (const p of people) {
+    if (!p.cross) continue;
+    const hit = tip.cross[p.crossKey];
+    const mine = hit && crossName(hit.page) === crossName(p.cross) ? hit : undefined;
+    const num = mine ? (mine.page.match(/\s(\d+)$/) ?? [])[1]
+      ?? (tip.crossNumbered.has(`${p.crossKey.charAt(0)}|${crossName(p.cross)}`) ? "1" : "") : "";
+    const version = mine ? (num ? `${p.cross} ${num}` : p.cross)
+      : `${p.cross} (${(p.crossKey.split("#")[2] ?? "").replace(/\//g, " ")})`;
+    if (!crossGroups.has(p.cross)) crossGroups.set(p.cross, new Map());
+    const g = crossGroups.get(p.cross)!;
+    const row = g.get(version) ?? { n: 0, text: mine?.text ?? "" };
+    row.n++;
+    g.set(version, row);
   }
   const tally = (keys: string[] | null, of: (p: Person) => string): [string, number][] => {
     const n = new Map<string, number>();
@@ -277,6 +326,10 @@ export default async function EventStats({ params }: { params: Promise<{ event: 
           font-size: 13px; line-height: 1.5; white-space: normal; box-shadow: 0 10px 26px rgba(60,40,80,.16); text-transform: none; letter-spacing: normal; }
         .events .tipwrap:hover > .tip, .events .tipwrap:focus > .tip, .events .tipwrap:focus-within > .tip { display: block; }
         .events .label { overflow: visible; }
+        .events .xgroup + .xgroup { border-top: 1px solid rgba(132,80,149,.08); margin-top: 3px; padding-top: 3px; }
+        .events .xname { display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 600; padding: 3px 0 1px; }
+        .events .xname em { font-style: normal; font-size: 11px; color: #6b6478; font-weight: 400; }
+        .events .xver .label { padding-left: 14px; }
         .events .foot { text-align: center; margin-top: 28px; font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: #9a93a8; }
       `}</style>
       <div className="wrap">
@@ -293,7 +346,7 @@ export default async function EventStats({ params }: { params: Promise<{ event: 
           <Bars title="Born In" rows={tally(null, (p) => p.place)} total={total} />
           <Bars title={`Age${ages.length ? ` · average ${Math.round(ages.reduce((t, a) => t + a, 0) / ages.length)}` : ""}`}
             rows={AGE_BANDS.map(([k, lo, hi]) => [k, ages.filter((a) => a >= lo && a <= hi).length])} total={total} />
-          <Bars title="Incarnation Cross" rows={tally(null, (p) => p.cross)} total={total} tip={crossTip} wide />
+          <Crosses groups={crossGroups} total={total} />
           <Centers people={people} tip={tip.center} />
         </div>
         <div className="foot">Know Thyself</div>
