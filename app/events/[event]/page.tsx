@@ -76,9 +76,10 @@ function authorityName(value: string, type: string): string {
 /** Her Delphi Basic text for everything the page counts, for the hovers. */
 interface Tips { type: Record<string, string>; authority: Record<string, string>; definition: Record<string, string>;
   profile: Record<string, string>; center: Record<string, { themes: string; defined: string; undefined: string; open: string }>;
-  cross: Record<string, { page: string; text: string }>; crossNumbered: Set<string> }
+  cross: Record<string, { page: string; text: string }>; crossNumbered: Set<string>;
+  variable: Record<string, string> }
 async function tips(): Promise<Tips> {
-  const out: Tips = { type: {}, authority: {}, definition: {}, profile: {}, center: {}, cross: {}, crossNumbered: new Set() };
+  const out: Tips = { type: {}, authority: {}, definition: {}, profile: {}, center: {}, cross: {}, crossNumbered: new Set(), variable: {} };
   try {
     const chunks = await loadLibraryChunks();
     const basic = (m: Record<string, unknown>) => String(m["Delphi Basic"] ?? m["Delphi Basic Description"] ?? "").trim();
@@ -90,6 +91,8 @@ async function tips(): Promise<Tips> {
       if (c.source_kind === "type") out.type[t] = basic(m);
       if (c.source_kind === "definition" && basic(m)) out.definition[t] = basic(m);
       if (c.source_kind === "profile") out.profile[t.split(":")[0].trim()] = basic(m);
+      // the four arrows, keyed by the code itself ("PLR DRR")
+      if (c.source_kind === "variable" && basic(m)) out.variable[t.toUpperCase()] = basic(m);
       if (c.source_kind === "cross" && basic(m)) {
         const k = crossKey(`${t} ${String(m.Cross ?? "")}`);
         if (k && !out.cross[k]) out.cross[k] = { page: t, text: basic(m) };
@@ -363,7 +366,7 @@ export default async function EventStats({ params }: { params: Promise<{ event: 
           <Bars title="Authority" rows={tally(null, (p) => p.authority)} total={total} tip={tip.authority} />
           <Bars title="Definition" rows={tally(DEF_ORDER, (p) => p.definition)} total={total} tip={tip.definition} />
           <Bars title="Profile" rows={tally(null, (p) => p.profile)} total={total} tip={tip.profile} />
-          <Bars title="Variables" rows={variableRows} total={total} />
+          <Bars title="Variables" rows={variableRows} total={total} tip={tip.variable} />
           <Bars title="Sun Sign" rows={tally(SIGNS, (p) => p.sign)} total={total} />
           <Bars title="Born In" rows={tally(null, (p) => p.place)} total={total} />
           <Bars title={`Age${ages.length ? ` · average ${Math.round(ages.reduce((t, a) => t + a, 0) / ages.length)}` : ""}`}
