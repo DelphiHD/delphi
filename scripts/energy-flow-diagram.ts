@@ -948,7 +948,10 @@ interface ClientCtx {
   /** Drawn, but visibly not settled: true at some hours of the window and not
    *  others. Kept apart from the sets above so the solid parts of the drawing
    *  are true whatever hour the person was actually born. */
-  pending: { channels: Set<string>; centers: Set<Center>; gates: Set<number> };
+  pending: { channels: Set<string>; centers: Set<Center>; gates: Set<number>;
+    /** A gate one side holds all day and the other only sometimes: the steady
+     *  leg is drawn as her own and only the wandering leg is left open. */
+    legs: { personality: Set<number>; design: Set<number> } };
 }
 
 /** "15:00" -> "3:00 PM". The chart speaks the way a person does. */
@@ -1083,6 +1086,7 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
     channels: unsettledChannels(reliability),
     centers: new Set([...unsettledCenters(reliability)] as Center[]),
     gates: unsettledGates(reliability),
+    legs: { personality: new Set<number>(), design: new Set<number>() },
   };
   const settledChannels = new Set(chart.channels.map((c) => pairKey(c.gates[0], c.gates[1])));
   for (const id of pendingParts.channels) settledChannels.delete(id);
@@ -1137,10 +1141,22 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
   // through 25 as well, and the Moon's wandering was marking the gate itself as
   // a maybe. What is uncertain there is which side carries it, never whether she
   // has it. A gate a steady planet holds is drawn as her own.
-  const steady = new Set<number>(acts
-    .filter((a) => a.core && !reliability.unsettled.has(`${a.side === "design" ? "Design" : "Personality"} ${a.planet}`))
-    .map((a) => a.gate));
+  const sideName = (a: { side: string }) => (a.side === "design" ? "Design" : "Personality");
+  const steadyBySide = { Personality: new Set<number>(), Design: new Set<number>() };
+  for (const a of acts) {
+    if (!a.core) continue;
+    if (!reliability.unsettled.has(`${sideName(a)} ${a.planet}`)) steadyBySide[sideName(a)].add(a.gate);
+  }
+  const steady = new Set<number>([...steadyBySide.Personality, ...steadyBySide.Design]);
+  // Kaycee, 2026-09-20: "I would want to be able to see that her moon gates
+  // change ... but I would expect to see at least half of a design placement as
+  // a for sure thing, and maybe the personality half gets the maybe treatment."
+  // So a gate is only open where the wandering is: the side that holds it all
+  // day is drawn solid, the side that comes and goes is left open.
+  const pendingLegs = { personality: new Set<number>(), design: new Set<number>() };
   for (const g of pendingParts.gates) {
+    if (!steadyBySide.Personality.has(g)) pendingLegs.personality.add(g);
+    if (!steadyBySide.Design.has(g)) pendingLegs.design.add(g);
     if (steady.has(g)) pendingParts.gates.delete(g);
     else gates.delete(g);
   }
@@ -1161,7 +1177,7 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
     gates,
     reliability,
     cycles,
-    pending: pendingParts,
+    pending: { ...pendingParts, legs: pendingLegs },
     // Kaycee's written synthesis, and only for a chart entitled to it. Reports
     // are found on disk by the person's name, so a portal chart for somebody who
     // happens to share a name with a client would have picked theirs up. What
@@ -3116,6 +3132,10 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
             channels: [...d.client.pending.channels],
             centers: [...d.client.pending.centers],
             gates: [...d.client.pending.gates],
+            legs: {
+              personality: [...d.client.pending.legs.personality],
+              design: [...d.client.pending.legs.design],
+            },
           },
           time: {
             exact: d.client.reliability.exact,
@@ -4516,7 +4536,17 @@ if (DATA.client) {
     [].forEach.call(document.querySelectorAll('.chgrp, .ch'), function (g) {
       if (chs[g.dataset.ch]) g.classList.add('pending');
     });
-    [].forEach.call(document.querySelectorAll('.pleg, .gdisc'), function (el) {
+    // A leg belongs to one side: the full-width one is Personality, the overlay
+    // is Design. A gate whose Design planet sits still all day keeps its design
+    // leg solid while its personality leg is left open, and the other way round.
+    var legsP = {}, legsD = {};
+    ((P.legs && P.legs.personality) || P.gates).forEach(function (g) { legsP[g] = 1; });
+    ((P.legs && P.legs.design) || P.gates).forEach(function (g) { legsD[g] = 1; });
+    [].forEach.call(document.querySelectorAll('.pleg'), function (el) {
+      var side = el.dataset.full ? legsP : legsD;
+      if (side[el.dataset.gate]) el.classList.add('pending');
+    });
+    [].forEach.call(document.querySelectorAll('.gdisc'), function (el) {
       if (gts[el.dataset.gate]) el.classList.add('pending');
     });
     // The number sits on top of the disc in white. A disc drawn open needs its
