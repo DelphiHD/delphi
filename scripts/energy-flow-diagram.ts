@@ -3691,13 +3691,13 @@ body.mod-variations #tip, body.mod-variations #card { display:none !important; }
 .vrow .vg { width:16px; text-align:center; color:#6b6478; }
 .vtable.design .vrow .vg { color:#e06666; }
 .vrow .vp { font-variant-numeric:tabular-nums; }
-.vrow .gatechg { background:rgba(132,80,149,.14); border-radius:5px; padding:0 4px; color:#845095; font-weight:600; }
-.vrow .linechg { border-bottom:2px solid #c79a2e; padding-bottom:1px; }
+.gatechg { background:rgba(132,80,149,.14); border-radius:5px; padding:0 4px; color:#845095; font-weight:600; }
+.linechg { border-bottom:2px solid #c79a2e; padding-bottom:1px; }
 .vkey { display:flex; flex-wrap:wrap; align-items:center; gap:6px 14px; font-size:11px; color:#6b6478;
   margin-top:12px; padding-top:10px; border-top:1px solid rgba(132,80,149,.14); }
 .vkey .vkeyitem { display:inline-flex; align-items:center; gap:6px; }
 .vkey .vkeynote { opacity:.75; }
-.vkey .gatechg, .vkey .linechg { font-size:11px; }
+.vkey .gatechg, .vkey .linechg { font-size:11px; font-variant-numeric:tabular-nums; }
 @media (max-width: 760px) { .varpanel { padding-left:8px; } .varfocus { grid-template-columns:1fr; } }
 .viewdock.docked #viewrow { gap:0; }
 .viewdock.docked #viewrow button { border-radius:0; }
@@ -5967,9 +5967,8 @@ if (DATA.client) {
         return '<div class="vtable ' + spec[0] + '"><div class="vhead">' + spec[1] + '</div>' + rows + '</div>';
       }).join('') + '</div>' +
         (prev ? '<div class="vkey">' +
-          '<span class="vkeyitem"><span class="gatechg">34.2</span> a different gate</span>' +
-          '<span class="vkeyitem"><span class="linechg">34.5</span> a different line</span>' +
-          '<span class="vkeynote">from the card before</span></div>' : '');
+          '<span class="vkeyitem"><span class="gatechg">Gate</span> changed</span>' +
+          '<span class="vkeyitem"><span class="linechg">Line</span> changed</span></div>' : '');
     };
 
     var open = function (i) {
