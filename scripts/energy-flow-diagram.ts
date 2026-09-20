@@ -3529,6 +3529,7 @@ svg.canvas.plain .pleg.lit { fill:${HL_GOLD} !important; }
    read as a weaker version of a real one rather than an open question. */
 .chgrp.pending path, .chgrp.pending polygon, .chgrp.pending rect,
 .ch.pending path, .ch.pending polygon, .ch.pending rect,
+polygon.pending, rect.pending, path.pending,
 .pleg.pending {
   fill:#c9b0d6 !important; stroke:none !important; }
 .gdisc.pending { fill:#f3ecf6 !important; stroke:#845095 !important;
@@ -4580,24 +4581,48 @@ if (DATA.client) {
     // the end she holds keeps its colour and only the other end is left open.
     // A channel drawn without legs of its own, as the circuit view draws it,
     // has nothing to split and is marked whole.
+    var gateOpen = function (g) { return !!(gts[g] || legsP[g] || legsD[g]); };
+    // A band drawn as one piece per half and no gate on it: each half is given
+    // to whichever of the channel's two gates it reaches, by where it is drawn.
+    // Which gate a piece of a channel belongs to, without measuring anything on
+    // the page: a leg carries its gate, an unactivated leg carries it in its id
+    // ("design-63"), and the band drawn across the channel is the same shape as
+    // one of those legs, point for point. Kaycee, 2026-09-20, on her 4-63: "the
+    // 4 side should be red ... only the 63 is a maybe."
+    var idGate = function (el) {
+      var id = el.getAttribute && el.getAttribute('id');
+      if (!id) return '';
+      var bits = String(id).split('-');
+      return (bits[0] === 'personality' || bits[0] === 'design') ? bits[1] : '';
+    };
+    var shapeGates = {};
+    [].forEach.call(document.querySelectorAll('[data-ch] polygon, [data-ch] rect, [data-ch] path'), function (el) {
+      var g = (el.dataset && el.dataset.gate) || idGate(el);
+      if (!g) return;
+      var key = el.getAttribute('points') || el.getAttribute('d') || '';
+      if (key) shapeGates[key] = g;
+    });
+    var pieceGate = function (el) {
+      return (el.dataset && el.dataset.gate) || idGate(el) ||
+        shapeGates[el.getAttribute('points') || el.getAttribute('d') || ''] || '';
+    };
     [].forEach.call(document.querySelectorAll('.chgrp, .ch'), function (g) {
-      if (!chs[g.dataset.ch]) return;
-      var legs = g.querySelectorAll('[data-gate]');
-      if (!legs.length) { g.classList.add('pending'); return; }
-      var certain = false;
-      [].forEach.call(legs, function (el) {
-        if (legOpen(el)) el.classList.add('pending'); else certain = true;
+      var id = g.dataset.ch;
+      if (!chs[id]) return;
+      var ends = String(id).split('-');
+      if (ends.length !== 2 || (gateOpen(ends[0]) && gateOpen(ends[1]))) { g.classList.add('pending'); return; }
+      var marked = false;
+      [].forEach.call(g.querySelectorAll('polygon, rect, path'), function (el) {
+        var gate = pieceGate(el);
+        if (!gate) return;
+        var open = el.classList.contains('pleg') ? legOpen(el) : gateOpen(gate);
+        if (open) { el.classList.add('pending'); marked = true; }
       });
-      if (!certain) g.classList.add('pending');
+      // nothing in it could be told apart: mark the channel whole rather than
+      // leave a maybe looking settled
+      if (!marked) g.classList.add('pending');
     });
-    [].forEach.call(document.querySelectorAll('.gdisc'), function (el) {
-      if (gts[el.dataset.gate]) el.classList.add('pending');
-    });
-    // The number sits on top of the disc in white. A disc drawn open needs its
-    // number in ink or it disappears with the fill.
-    [].forEach.call(document.querySelectorAll('.pnum[data-gate]'), function (el) {
-      if (gts[el.dataset.gate]) el.classList.add('pending');
-    });
+
     // the mandala's gate cells and the astrology ring's gate bands
     [].forEach.call(document.querySelectorAll('[data-gatecell], [data-hex], .gateband[data-gate]'), function (el) {
       var g = el.dataset.gatecell || el.dataset.hex || el.dataset.gate;
