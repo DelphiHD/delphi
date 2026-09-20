@@ -1130,7 +1130,20 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
   // A planet that only shifts a line stays on the same gate and the drawing is
   // unaffected; one that crosses into a different gate takes its leg with it,
   // so both gates are pending and neither is drawn as settled.
-  for (const g of pendingParts.gates) gates.delete(g);
+  //
+  // Unless somebody else is holding that gate all day. Kaycee, 2026-09-20, on
+  // Sabrina Carpenter's 25: "she would for sure have it defined in the
+  // bodygraph". Her design Jupiter sits in 25 at every hour; her Moon wanders
+  // through 25 as well, and the Moon's wandering was marking the gate itself as
+  // a maybe. What is uncertain there is which side carries it, never whether she
+  // has it. A gate a steady planet holds is drawn as her own.
+  const steady = new Set<number>(acts
+    .filter((a) => a.core && !reliability.unsettled.has(`${a.side === "design" ? "Design" : "Personality"} ${a.planet}`))
+    .map((a) => a.gate));
+  for (const g of pendingParts.gates) {
+    if (steady.has(g)) pendingParts.gates.delete(g);
+    else gates.delete(g);
+  }
 
   return {
     slug: brief.slug,
