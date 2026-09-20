@@ -1090,6 +1090,19 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
   };
   const settledChannels = new Set(chart.channels.map((c) => pairKey(c.gates[0], c.gates[1])));
   for (const id of pendingParts.channels) settledChannels.delete(id);
+  // A centre defined at every hour is hers, even when a different channel does
+  // the defining early and late. Kaycee, 2026-09-20: "she definitely has her
+  // Ajna defined. That's not a maybe, that center should be colored in." Her
+  // Ajna reads "defined via 23-43 4-63" at one hour and "defined via 23-43" at
+  // another: the wiring moved, the centre never went open. Only a centre that
+  // actually opens at some hour is drawn unfinished.
+  for (const key of [...pendingParts.centers]) {
+    const field = centreField(key);
+    const u = field ? reliability.unsettled.get(field) : undefined;
+    if (u && u.couldBe.length && u.couldBe.every((v) => String(v).startsWith("defined"))) {
+      pendingParts.centers.delete(key as Center);
+    }
+  }
   const settledCenters = new Set(
     chart.centers.filter((c) => c.defined).map((c) => CENTER_FROM_API[c.name]),
   );
@@ -4542,21 +4555,40 @@ if (DATA.client) {
       if (!ctrs[el.dataset.center]) return;
       el.classList.add('pending');
     });
-    // .chgrp is the bodygraph's own legs, .ch is the circuit view's redraw of
-    // the same channel. Kaycee, 2026-09-12: "let's make sure all of this
-    // carries through to the other views."
-    [].forEach.call(document.querySelectorAll('.chgrp, .ch'), function (g) {
-      if (chs[g.dataset.ch]) g.classList.add('pending');
-    });
     // A leg belongs to one side: the full-width one is Personality, the overlay
     // is Design. A gate whose Design planet sits still all day keeps its design
     // leg solid while its personality leg is left open, and the other way round.
     var legsP = {}, legsD = {};
     ((P.legs && P.legs.personality) || P.gates).forEach(function (g) { legsP[g] = 1; });
     ((P.legs && P.legs.design) || P.gates).forEach(function (g) { legsD[g] = 1; });
+    var legOpen = function (el) {
+      var g = el.dataset.gate;
+      if (!g) return false;
+      if (el.classList.contains('pleg')) return !!(el.dataset.full ? legsP[g] : legsD[g]);
+      return !!gts[g];
+    };
     [].forEach.call(document.querySelectorAll('.pleg'), function (el) {
-      var side = el.dataset.full ? legsP : legsD;
-      if (side[el.dataset.gate]) el.classList.add('pending');
+      if (legOpen(el)) el.classList.add('pending');
+    });
+    // .chgrp is the bodygraph's own legs, .ch is the circuit view's redraw of
+    // the same channel. Kaycee, 2026-09-12: "let's make sure all of this
+    // carries through to the other views."
+    //
+    // A channel is only half a maybe when one of its gates is certain. Kaycee,
+    // 2026-09-20, on the 4 end of her 4-63: "the 4 side should be red, no? It's
+    // consistent across all hours of the day ... only the 63 is a maybe." So
+    // the end she holds keeps its colour and only the other end is left open.
+    // A channel drawn without legs of its own, as the circuit view draws it,
+    // has nothing to split and is marked whole.
+    [].forEach.call(document.querySelectorAll('.chgrp, .ch'), function (g) {
+      if (!chs[g.dataset.ch]) return;
+      var legs = g.querySelectorAll('[data-gate]');
+      if (!legs.length) { g.classList.add('pending'); return; }
+      var certain = false;
+      [].forEach.call(legs, function (el) {
+        if (legOpen(el)) el.classList.add('pending'); else certain = true;
+      });
+      if (!certain) g.classList.add('pending');
     });
     [].forEach.call(document.querySelectorAll('.gdisc'), function (el) {
       if (gts[el.dataset.gate]) el.classList.add('pending');
