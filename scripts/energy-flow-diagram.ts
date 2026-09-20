@@ -1142,10 +1142,22 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
   // a maybe. What is uncertain there is which side carries it, never whether she
   // has it. A gate a steady planet holds is drawn as her own.
   const sideName = (a: { side: string }) => (a.side === "design" ? "Design" : "Personality");
+  // A planet that moves is not the same as a planet that changes gate. Design
+  // Earth may read 4.4 at one hour and 4.6 at another and never leave gate 4:
+  // the line moved, the gate did not, and the gate is hers either way. Kaycee,
+  // 2026-09-20, on Sabrina Carpenter's 4: "It's for sure on the design side
+  // earth and north node placements ... this is a problem we need to fix across
+  // the whole chart."
+  const holdsItsGate = (side: string, planet: string, gate: number): boolean => {
+    const u = reliability.unsettled.get(`${side} ${planet}`);
+    if (!u) return true;
+    const couldBe = new Set(u.couldBe.map((v) => Number(String(v).split(".")[0])).filter(Boolean));
+    return couldBe.size <= 1 && (couldBe.size === 0 || couldBe.has(gate));
+  };
   const steadyBySide = { Personality: new Set<number>(), Design: new Set<number>() };
   for (const a of acts) {
     if (!a.core) continue;
-    if (!reliability.unsettled.has(`${sideName(a)} ${a.planet}`)) steadyBySide[sideName(a)].add(a.gate);
+    if (holdsItsGate(sideName(a), a.planet, a.gate)) steadyBySide[sideName(a)].add(a.gate);
   }
   const steady = new Set<number>([...steadyBySide.Personality, ...steadyBySide.Design]);
   // Kaycee, 2026-09-20: "I would want to be able to see that her moon gates
