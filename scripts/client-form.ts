@@ -577,6 +577,8 @@ const PAGE = /* html */ `<!doctype html>
   tr.sandbox td:first-child { font-style:italic; opacity:.75; }
   .sand { display:inline-block; padding:2px 9px; border-radius:999px; font-size:11px;
     font-weight:600; letter-spacing:.04em; background:rgba(120,120,130,.16); color:#4a4a55; }
+  .sand.celeb { background:rgba(217,162,27,.18); color:#8a6508; }
+  tr.publicfigure td:first-child { font-style:italic; }
   table.ptable thead th.on { color:var(--ink); }
   table.ptable tbody tr:hover { background:rgba(132,80,149,.04); }
   table.ptable tr.off td { opacity:.45; text-decoration:line-through; }
@@ -1016,7 +1018,9 @@ const PAGE = /* html */ `<!doctype html>
   }
 
   // ---- the list of everyone -------------------------------------------------
-  var PEOPLE = [], SORT = { key: 'name', dir: 1 };
+  // Newest sign-up first by default. Kaycee, 2026-09-17: "default to opening
+  // with most recent sign up at the top of the list". Headers still re-sort.
+  var PEOPLE = [], SORT = { key: 'joined', dir: -1 };
   // Chart sits beside the name because opening somebody's chart is the thing
   // she does most, and email goes last because it is the widest column and she
   // was scrolling past it to reach everything else. Kaycee, 2026-09-12.
@@ -1045,7 +1049,6 @@ const PAGE = /* html */ `<!doctype html>
   var TIMING = {
     exact: { label: 'Exact', cls: 'tm-exact' },
     told:  { label: 'Told', cls: 'tm-told' },
-    astrodb: { label: 'Astrology database', cls: 'tm-told' },
     rough: { label: 'Rough', cls: 'tm-rough' },
     shaky: { label: 'Rough · type moves', cls: 'tm-shaky' }
   };
@@ -1080,12 +1083,13 @@ const PAGE = /* html */ `<!doctype html>
       // Sandbox charts belong to nobody, so they are counted separately or not
       // at all. Counting them as people would quietly inflate every number on
       // this page. Kaycee, 2026-09-12.
-      var real = PEOPLE.filter(function (p) { return !p.sandbox; });
-      var sand = PEOPLE.length - real.length;
+      var real = PEOPLE.filter(function (p) { return !p.sandbox && !p.publicFigure; });
+      var celeb = PEOPLE.filter(function (p) { return p.publicFigure; }).length;
+      var sand = PEOPLE.length - real.length - celeb;
       var signups = real.filter(function (p) { return p.source === 'signup'; }).length;
       count.textContent = real.length + ' people · ' + signups + ' signed up · ' +
         (real.length - signups) + ' on the roster' +
-        (sand ? ' · ' + sand + ' sandbox' : '');
+        (sand ? ' · ' + sand + ' sandbox' : '') + (celeb ? ' · ' + celeb + ' public figure' + (celeb > 1 ? 's' : '') : '');
     }
     box.innerHTML = '<div class="tblwrap"><table class="ptable"><thead><tr>' +
       COLS.map(function (c) {
@@ -1094,16 +1098,23 @@ const PAGE = /* html */ `<!doctype html>
           (on ? (SORT.dir > 0 ? ' ↑' : ' ↓') : '') + '</th>';
       }).join('') + '</tr></thead><tbody>' +
       rows.map(function (p) {
-        return '<tr class="' + (p.revoked ? 'off ' : '') + (p.sandbox ? 'sandbox' : '') + '">' +
+        return '<tr class="' + (p.revoked ? 'off ' : '') + (p.sandbox ? 'sandbox' : p.publicFigure ? 'publicfigure' : '') + '">' +
           '<td>' + esc(fileAs(p.name)) + '</td>' +
           '<td>' + (p.chart ? '<a href="' + esc(p.chart) + '" target="_blank" rel="noreferrer">open</a>' : '<span class="sub">—</span>') + '</td>' +
           '<td>' + (p.sandbox
             ? '<span class="sand">Sandbox</span>'
+            : p.publicFigure ? '<span class="sand celeb">Public Figure</span>'
             : esc(p.source === 'signup' ? 'Signed up' : p.source === 'roster' ? 'Roster' : p.source)) + '</td>' +
           '<td>' + (p.account === 'none'
             ? '<span class="sub">no account</span>'
             : '<span class="acct ' + esc(p.account) + '">' + esc(ACCOUNT_LABEL[p.account] || p.account) + '</span>') + '</td>' +
           '<td>' + (function () {
+            // A public figure's time is not something they told us: it comes from
+            // the astrology databases. Kaycee, 2026-09-20, and no stored value is
+            // needed for it, the funnel already knows who is a public figure.
+            if (p.publicFigure && (p.timing === 'exact' || p.timing === 'told')) {
+              return '<span class="tm tm-told">Astrology database</span>';
+            }
             var t = TIMING[p.timing] || TIMING.exact;
             return '<span class="tm ' + t.cls + '">' + esc(t.label) + '</span>';
           })() + '</td>' +
@@ -1961,6 +1972,9 @@ createServer((req, res) => {
     // "differentiate them somehow on the funnel so they aren't counted as
     // actual clients."
     sandbox: "Sandbox",
+    // Public figures' charts, for teaching and content readings. Not clients, so
+    // kept out of the people count like the sandbox. Kaycee, 2026-09-14.
+    "public-figure": "Public Figure",
   };
   if (req.method === "GET" && path === "/people") {
     void (async () => {
@@ -2008,9 +2022,11 @@ createServer((req, res) => {
            * whose scan found the type, profile or authority moving is a chart
            * whose top line is not settled, and that changes how a session opens.
            */
-          timing: "exact" | "told" | "astrodb" | "rough" | "shaky";
+          timing: "exact" | "told" | "rough" | "shaky";
           /** A sandbox chart belongs to nobody and is not a client. */
           sandbox: boolean;
+          /** A public figure's chart, for teaching and content; not a client. */
+          publicFigure: boolean;
         };
         /**
          * Birth certificate, remembered, roughly known, or roughly known and
@@ -2021,7 +2037,6 @@ createServer((req, res) => {
         const timingOf = (rec?: Record<string, unknown>): Person["timing"] => {
           const acc = (rec?.time_accuracy as string) ?? "document";
           if (acc === "document") return "exact";
-          if (acc === "astrodb") return "astrodb";
           if (acc === "told") return "told";
           const scan = rec?.time_scan as { identityUnsettled?: boolean } | null;
           return scan?.identityUnsettled ? "shaky" : "rough";
@@ -2047,6 +2062,7 @@ createServer((req, res) => {
             account: "none",
             timing: timingOf(rec),
             sandbox: (rec?.source as string) === "sandbox",
+            publicFigure: (rec?.source as string) === "public-figure",
           });
         }
         const named = new Set(people.map((p) => p.name.toLowerCase()));
@@ -2074,6 +2090,7 @@ createServer((req, res) => {
             // an account with no chart has no birth time to judge
             timing: "exact",
             sandbox: false,
+            publicFigure: false,
           });
           named.add(String(nm).toLowerCase());
         }

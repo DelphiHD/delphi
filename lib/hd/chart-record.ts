@@ -25,7 +25,7 @@ export interface ChartRecord {
   birthTime: string | null;
   birthPlace: string;
   birthTimezone: string;
-  timeAccuracy: "document" | "told" | "astrodb" | "approximate" | "unknown";
+  timeAccuracy: "document" | "told" | "approximate" | "unknown";
   tier: "seed" | "free" | "purchased" | "gift";
   visibility: "private" | "shared" | "public";
   ownerId: string | null;

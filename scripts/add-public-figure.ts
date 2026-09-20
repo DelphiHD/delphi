@@ -16,7 +16,6 @@
  *
  * Run:
  *   npx tsx scripts/add-public-figure.ts --name "Ra Uru Hu" --date 1948-04-09 --time 00:05 --place "Montreal, Quebec"
- *   (--accuracy astrodb by default; document, told, approximate or unknown as well)
  *   npx tsx scripts/add-public-figure.ts --list
  */
 
@@ -61,11 +60,7 @@ async function main() {
   }
 
   const name = arg("--name"), date = arg("--date"), time = arg("--time"), where = arg("--place");
-  // How the birth time is known. Public figures' times usually come from the
-  // astrology databases, so that is the default here (Kaycee, 2026-09-20).
-  const ACCURACY = ["astrodb", "document", "told", "approximate", "unknown"];
-  const accuracy = arg("--accuracy") ?? "astrodb";
-  if (!ACCURACY.includes(accuracy)) throw new Error(`--accuracy is one of: ${ACCURACY.join(", ")}`);
+  const accuracy = arg("--accuracy") ?? "document";
   if (!name || !date || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !time || !/^\d{2}:\d{2}$/.test(time) || !where) {
     throw new Error('needs --name "Full Name" --date YYYY-MM-DD --time HH:MM --place "City, Region"');
   }
