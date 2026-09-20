@@ -3621,6 +3621,24 @@ body.mod-variations #tip, body.mod-variations #card { display:none !important; }
 .varfocus .vfields { font-size:13px; gap:4px 12px; }
 .varclose { float:right; border:0; background:transparent; font-size:22px; line-height:1; color:#6b6478; cursor:pointer; padding:0 4px; }
 .varstatus { font-size:13px; color:#6b6478; padding:20px 4px; }
+/* An opened variation shows its placements, and marks what moved: a different
+   gate is a different theme, a different line the same theme read another way,
+   so they are never the same mark. Kaycee, 2026-09-20. */
+.vtables { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:12px; }
+.vtable { font-size:12px; }
+.vtable .vhead { font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:#6b6478; margin-bottom:4px; }
+.vtable.design .vhead { color:#e06666; }
+.vrow { display:grid; grid-template-columns:18px 1fr; gap:6px; align-items:baseline; line-height:1.7; }
+.vrow .vg { width:16px; text-align:center; color:#6b6478; }
+.vtable.design .vrow .vg { color:#e06666; }
+.vrow .vp { font-variant-numeric:tabular-nums; }
+.vrow .gatechg { background:rgba(132,80,149,.14); border-radius:5px; padding:0 4px; color:#845095; font-weight:600; }
+.vrow .linechg { border-bottom:2px solid #c79a2e; padding-bottom:1px; }
+.vkey { display:flex; flex-wrap:wrap; align-items:center; gap:6px 14px; font-size:11px; color:#6b6478;
+  margin-top:12px; padding-top:10px; border-top:1px solid rgba(132,80,149,.14); }
+.vkey .vkeyitem { display:inline-flex; align-items:center; gap:6px; }
+.vkey .vkeynote { opacity:.75; }
+.vkey .gatechg, .vkey .linechg { font-size:11px; }
 @media (max-width: 760px) { .varpanel { padding-left:8px; } .varfocus { grid-template-columns:1fr; } }
 .viewdock.docked #viewrow { gap:0; }
 .viewdock.docked #viewrow button { border-radius:0; }
@@ -5804,12 +5822,50 @@ if (DATA.client) {
       });
       panel.scrollTop = 0;
     };
+    var GLYPH = DATA.planetGlyphs || {};
+    // Uranus is drawn, not typed: the chart has always drawn it by hand because
+    // the character is missing from the face. Same drawing here, at text size,
+    // in whatever colour the column is. Kaycee, 2026-09-20.
+    var URANUS = '<svg viewBox="0 0 12 15" width="11" height="13" fill="none" stroke="currentColor" ' +
+      'stroke-width="1.3" stroke-linecap="round" aria-hidden="true" style="vertical-align:-2px">' +
+      '<line x1="1.6" y1="1" x2="1.6" y2="9.3"></line><line x1="10.4" y1="1" x2="10.4" y2="9.3"></line>' +
+      '<line x1="1.6" y1="5.1" x2="10.4" y2="5.1"></line><line x1="6" y1="5.1" x2="6" y2="10.6"></line>' +
+      '<circle cx="6" cy="12.6" r="1.6" fill="currentColor" stroke="none"></circle></svg>';
+    var ORDER = (DATA.planetOrder || []).filter(function (p) { return p !== 'Chiron' && p !== 'Lilith'; });
+    var byPlanet = function (rows) {
+      var o = {};
+      (rows || []).forEach(function (r) { o[r.planet] = r; });
+      return o;
+    };
+    // A gate change and a line change are different news, so they are marked
+    // differently: the gate in purple, the line underlined in gold.
+    var tables = function (i) {
+      var v = list[i], prev = i > 0 ? list[i - 1] : null;
+      return '<div class="vtables">' + [['design', 'Design'], ['personality', 'Personality']].map(function (spec) {
+        var mine = byPlanet(v[spec[0]]), was = prev ? byPlanet(prev[spec[0]]) : {};
+        var rows = ORDER.map(function (name) {
+          var r = mine[name];
+          if (!r) return '';
+          var b = was[name];
+          var cls = b && b.gate !== r.gate ? 'gatechg' : (b && b.line !== r.line ? 'linechg' : '');
+          var mark = name === 'Uranus' ? URANUS : (GLYPH[name] || '');
+          return '<div class="vrow"><span class="vg" title="' + esc(name) + '">' + mark + '</span>' +
+            '<span class="vp"><span class="' + cls + '">' + r.gate + '.' + r.line + '</span></span></div>';
+        }).join('');
+        return '<div class="vtable ' + spec[0] + '"><div class="vhead">' + spec[1] + '</div>' + rows + '</div>';
+      }).join('') + '</div>' +
+        (prev ? '<div class="vkey">' +
+          '<span class="vkeyitem"><span class="gatechg">34.2</span> a different gate</span>' +
+          '<span class="vkeyitem"><span class="linechg">34.5</span> a different line</span>' +
+          '<span class="vkeynote">from the card before</span></div>' : '');
+    };
+
     var open = function (i) {
       var v = list[i];
       panel.innerHTML = '<button class="varclose" aria-label="Close">&times;</button>' +
         '<div class="varhead">Variations</div><div class="varfocus">' +
         '<div class="vbody">' + v.svg + '</div><div><div class="vtime">' + span(i) + '</div>' +
-        (v.yours ? '<div class="vyours" style="margin-bottom:8px">Your chart</div>' : '') + fields(i, true) + '</div></div>';
+        (v.yours ? '<div class="vyours" style="margin-bottom:8px">Your chart</div>' : '') + fields(i, true) + tables(i) + '</div></div>';
       panel.querySelector('.varclose').onclick = grid;
       panel.scrollTop = 0;
     };

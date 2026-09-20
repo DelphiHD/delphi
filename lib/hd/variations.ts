@@ -19,6 +19,9 @@
 import { scanWindow } from "@/lib/hd/time-window";
 import { getChart } from "@/lib/mybodygraph";
 
+/** One planet's place, the way the chart's own tables print it. */
+export interface Placement { planet: string; gate: number; line: number }
+
 export interface Variation {
   from: string;            // "05:59"
   to: string;              // "18:05"
@@ -30,6 +33,10 @@ export interface Variation {
   channels: string[];      // "10-20"
   centers: string[];       // defined centers, as the provider names them
   svg: string;             // the provider's Delphi bodygraph, ids made unique
+  // both columns, so an opened variation can show its placements the way the
+  // chart does (Kaycee, 2026-09-20)
+  personality: Placement[];
+  design: Placement[];
   yours?: boolean;         // holds the recorded birth time of an exact chart
 }
 
@@ -46,6 +53,9 @@ export async function castVariations(birth: { birthDate: string; timezone: strin
   // a stretch under ten minutes (one right at midnight, say) folds into its neighbour
   const starts = [...cuts].sort().filter((t, i, all) => i === 0 || (mins(all[i + 1] ?? "23:59") - mins(t)) >= 10);
 
+  const side = (rows: { planet: string; gate: number; line: number }[]): Placement[] =>
+    rows.map((a) => ({ planet: String(a.planet), gate: Number(a.gate), line: Number(a.line) }));
+
   const out: Variation[] = [];
   for (let i = 0; i < starts.length; i++) {
     const from = starts[i], to = starts[i + 1] ?? "23:59";
@@ -61,6 +71,8 @@ export async function castVariations(birth: { birthDate: string; timezone: strin
       type: c.type.value, profile: c.profile.value, authority: c.authority.value,
       definition: c.definition.value, cross: c.incarnationCross.value,
       channels: (c.channels ?? []).map((x) => String(x.id)),
+      personality: side(c.activations.personality),
+      design: side(c.activations.design),
       centers: (c.centers ?? []).filter((x) => x.defined).map((x) => String(x.name)),
       svg,
     });

@@ -49,7 +49,9 @@ export async function GET(request: Request) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(birthDate) || !timezone) return bad("this chart has no birth day to read", 404);
 
   const exact = windowFor(accuracy, birthTime || null) === null;
-  const basis = `${birthDate}|${timezone}|${exact ? birthTime : "open"}`;
+  // "v2" because a kept copy from before the placements were recorded has no
+  // tables to show; bumping it recasts once rather than serving a half answer.
+  const basis = `v2|${birthDate}|${timezone}|${exact ? birthTime : "open"}`;
   const path = `variations/${token}.json`;
 
   const kept = await db.storage.from("charts").download(path);
