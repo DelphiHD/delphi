@@ -1045,6 +1045,7 @@ const PAGE = /* html */ `<!doctype html>
   var TIMING = {
     exact: { label: 'Exact', cls: 'tm-exact' },
     told:  { label: 'Told', cls: 'tm-told' },
+    astrodb: { label: 'Astrology database', cls: 'tm-told' },
     rough: { label: 'Rough', cls: 'tm-rough' },
     shaky: { label: 'Rough · type moves', cls: 'tm-shaky' }
   };
@@ -2007,7 +2008,7 @@ createServer((req, res) => {
            * whose scan found the type, profile or authority moving is a chart
            * whose top line is not settled, and that changes how a session opens.
            */
-          timing: "exact" | "told" | "rough" | "shaky";
+          timing: "exact" | "told" | "astrodb" | "rough" | "shaky";
           /** A sandbox chart belongs to nobody and is not a client. */
           sandbox: boolean;
         };
@@ -2020,6 +2021,7 @@ createServer((req, res) => {
         const timingOf = (rec?: Record<string, unknown>): Person["timing"] => {
           const acc = (rec?.time_accuracy as string) ?? "document";
           if (acc === "document") return "exact";
+          if (acc === "astrodb") return "astrodb";
           if (acc === "told") return "told";
           const scan = rec?.time_scan as { identityUnsettled?: boolean } | null;
           return scan?.identityUnsettled ? "shaky" : "rough";

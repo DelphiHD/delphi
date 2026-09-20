@@ -37,7 +37,10 @@
 import { scanWindow, type WindowReport } from "@/lib/hd/time-window";
 import { longitudeAt } from "@/lib/hd/ephemeris";
 
-export type Accuracy = "document" | "told" | "approximate" | "unknown";
+// "astrodb" is a time taken from the astrology databases, which is how a public
+// figure's time is known (Kaycee, 2026-09-20). It is a source, not a guess, so
+// it reads as settled. Backend only: the public form's endpoint never accepts it.
+export type Accuracy = "document" | "told" | "astrodb" | "approximate" | "unknown";
 
 /** What the chart prints where a value would have gone. */
 export const NEEDS_EXACT = "Exact Birth Time Required";
@@ -86,7 +89,7 @@ export function segmentLabel(birthTime: string | null): string | null {
 }
 
 export function windowFor(accuracy: Accuracy, birthTime: string | null): TimeWindow | null {
-  if (accuracy === "document" || accuracy === "told") return null;
+  if (accuracy === "document" || accuracy === "told" || accuracy === "astrodb") return null;
   const at = (birthTime ?? "").slice(0, 5);
   const seg = SEGMENTS.find((s) => s.at === at);
   if (seg) return { from: seg.from, to: seg.to, label: seg.label, castFor: seg.at };
