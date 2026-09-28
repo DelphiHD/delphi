@@ -16,7 +16,7 @@ import { createServer, type ServerResponse } from "node:http";
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync,
   readSync, statSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 const PORT = Number(process.env.CLIENT_FORM_PORT ?? 4321);
 const JOBS_PATH = ".cache/client-jobs.json";
@@ -683,6 +683,7 @@ const PAGE = /* html */ `<!doctype html>
   <button type="button" class="tab" id="tabFailures">Failures</button>
   <button type="button" class="tab" id="tabChanges">Changes</button>
   <button type="button" class="tab" id="tabFunnel">Funnel</button>
+  <button type="button" class="tab" id="tabTransits">Transits</button>
   <button type="button" class="tab" id="tabLaunch">Launch</button>
 </div>
 <div id="viewAdd">
@@ -731,6 +732,11 @@ const PAGE = /* html */ `<!doctype html>
   <div id="failTable"></div>
 </div>
 
+<div class="dash" id="transits" hidden>
+  <h1 style="margin-bottom:2px">Daily Transit Reports</h1>
+  <p class="sub">Written in the cloud at 6 AM Mountain and kept here. The link opens on any device; it carries its own key, so treat it as private.</p>
+  <div id="transitsBody"></div>
+</div>
 <div class="dash" id="funnel" hidden>
   <h1 style="margin-bottom:2px">Funnel</h1>
   <p class="sub">Accounts, clients and the gap between them. Numbers fill in as each phase lands.</p>
@@ -979,6 +985,31 @@ const PAGE = /* html */ `<!doctype html>
       } catch (e) { said.textContent = 'Could not start it.'; go.disabled = false; return; }
       if (!syncOnePoll) syncOnePoll = setInterval(watch, 3000);
     };
+  }
+
+  // ---- Daily transit reports ---------------------------------------------
+  // Kaycee, 2026-09-28: "Can you add a page for the daily transit report links
+  // to the dashboard." The reports are written on GitHub now and kept beside
+  // the charts, so this lists what is up there, newest first, with the day's
+  // own link and whether her Mac has collected it yet.
+  async function loadTransits() {
+    var el = document.getElementById('transitsBody');
+    el.innerHTML = '<p class="sub">Reading…</p>';
+    var j;
+    try { j = await (await fetch('/transits')).json(); }
+    catch (e) { el.innerHTML = '<p class="sub">Could not read the reports.</p>'; return; }
+    if (j.error) { el.innerHTML = '<p class="sub">' + esc(j.error) + '</p>'; return; }
+    if (!j.days || !j.days.length) { el.innerHTML = '<p class="sub">No reports published yet.</p>'; return; }
+    el.innerHTML = '<div class="tblwrap"><table class="rep"><thead><tr>' +
+      '<th>Day</th><th>Report</th><th>Markdown</th><th>On this Mac</th><th>Published</th>' +
+      '</tr></thead><tbody>' +
+      j.days.map(function (d) {
+        return '<tr><td>' + esc(d.date) + '</td>' +
+          '<td>' + (d.link ? '<a href="' + esc(d.link) + '" target="_blank" rel="noreferrer">open</a>' : '<span class="sub">—</span>') + '</td>' +
+          '<td>' + (d.link ? '<a href="' + esc(d.link) + '&md=1" target="_blank" rel="noreferrer">markdown</a>' : '<span class="sub">—</span>') + '</td>' +
+          '<td>' + (d.local ? 'yes' : '<span class="sub">not yet</span>') + '</td>' +
+          '<td class="tnum">' + esc(String(d.at || '').slice(0, 16).replace('T', ' ')) + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
   }
 
   // ---- Funnel ------------------------------------------------------------
@@ -1506,15 +1537,16 @@ const PAGE = /* html */ `<!doctype html>
   setInterval(refresh, 5000);
 
   var VIEWS = { add: 'viewAdd', status: 'dash', metrics: 'metrics', failures: 'failures', changes: 'changes',
-    funnel: 'funnel', launch: 'launch' };
+    funnel: 'funnel', transits: 'transits', launch: 'launch' };
   var TABS = { add: 'tabAdd', status: 'tabStatus', metrics: 'tabMetrics', failures: 'tabFailures', changes: 'tabChanges',
-    funnel: 'tabFunnel', launch: 'tabLaunch' };
+    funnel: 'tabFunnel', transits: 'tabTransits', launch: 'tabLaunch' };
   function show(which) {
     Object.keys(VIEWS).forEach(function (k) {
       document.getElementById(VIEWS[k]).hidden = (k !== which);
       document.getElementById(TABS[k]).classList.toggle('on', k === which);
     });
     if (which === 'funnel') loadFunnel();
+    else if (which === 'transits') loadTransits();
     else if (which === 'launch') loadLaunch();
     else if (which !== 'add') refresh();
   }
@@ -1530,6 +1562,7 @@ const PAGE = /* html */ `<!doctype html>
   if (location.hash === '#failures') show('failures');
   if (location.hash === '#changes') show('changes');
   if (location.hash === '#funnel') show('funnel');
+  if (location.hash === '#transits') show('transits');
   if (location.hash === '#launch') show('launch');
 
   go.onclick = async function () {
@@ -1687,6 +1720,43 @@ createServer((req, res) => {
   // Who has an account, who is a paying client, and the gap between them. The
   // metrics are defined now and fill in as each phase lands: a number that says
   // "not wired yet" is more useful than a zero pretending to be a measurement.
+  if (req.method === "GET" && path === "/transits") {
+    void (async () => {
+      try {
+        const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        if (!url || !key) throw new Error("no Supabase credentials in this shell");
+        const { createClient } = await import("@supabase/supabase-js");
+        const db = createClient(url, key, { auth: { persistSession: false } });
+        const { data, error } = await db.storage.from("charts").list("transits", {
+          limit: 400, sortBy: { column: "name", order: "desc" },
+        });
+        if (error) throw new Error(error.message);
+        const site = process.env.CHART_SITE ?? "https://charts.delphihd.com";
+        const linkKey = process.env.TRANSIT_LINK_KEY ?? "";
+        const folder = resolve(homedir(), "Desktop", "HD Reports", "Transits");
+        const days = (data ?? [])
+          .filter((f) => f.name.endsWith(".html"))
+          .map((f) => {
+            const date = f.name.replace(/\.html$/, "");
+            return {
+              date,
+              at: (f.updated_at ?? f.created_at ?? "") as string,
+              link: linkKey ? `${site}/t/${date}?k=${linkKey}` : "",
+              local: existsSync(join(folder, `${date} - Daily Transit Report.html`)),
+            };
+          })
+          .sort((a, b) => b.date.localeCompare(a.date));
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ days }));
+      } catch (e) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }));
+      }
+    })();
+    return;
+  }
+
   if (req.method === "GET" && path === "/funnel") {
     void (async () => {
       const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
