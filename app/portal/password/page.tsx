@@ -8,13 +8,12 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { setPassword } from "./actions";
+import { PasswordForm } from "./form";
 
 export const metadata = { title: "Your password — Delphi Human Design" };
 export const dynamic = "force-dynamic";
 
-export default async function PasswordPage({ searchParams }: { searchParams: Promise<{ said?: string }> }) {
-  const { said } = await searchParams;
+export default async function PasswordPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/portal/password");
@@ -35,19 +34,7 @@ export default async function PasswordPage({ searchParams }: { searchParams: Pro
       <h1>Your password</h1>
       <p className="sub">Signed in as {user.email}. Setting one here does not switch off the email link; either will let you in.</p>
 
-      {said && (
-        <p className="said">
-          {said} <a href="/portal/admin">Go to the dashboard</a>
-        </p>
-      )}
-
-      <form action={setPassword}>
-        <label htmlFor="password">New password</label>
-        <input id="password" name="password" type="password" autoComplete="new-password" minLength={12} required />
-        <label htmlFor="again">Type it again</label>
-        <input id="again" name="again" type="password" autoComplete="new-password" minLength={12} required />
-        <button type="submit">Save this password</button>
-      </form>
+      <PasswordForm />
     </main>
   );
 }
