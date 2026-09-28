@@ -35,6 +35,7 @@ body {
   max-width: 720px; margin: 0 auto; padding: 16px 20px;
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
 }
+.brand img { height: 26px; width: auto; display: block; }
 .brand { text-decoration: none; color: var(--purple); font-weight: 600;
   font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; }
 .signout { background: none; border: 0; padding: 0; cursor: pointer;
@@ -96,7 +97,10 @@ export default async function PortalLayout({
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
       <header className="pbar">
         <div className="in">
-          <Link href="/portal" className="brand">Delphi Human Design</Link>
+          <Link href="/portal" className="brand" aria-label="Delphi Human Design">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/delphi-logo.svg" alt="Delphi Human Design" height={26} />
+          </Link>
           <form action={signOut}>
             <button type="submit" className="signout">Sign out</button>
           </form>
