@@ -31,16 +31,19 @@ export function PasswordForm() {
     if (password !== again) { setSaid("Those two did not match."); return; }
     setBusy(true);
     const supabase = createClient();
-    // Whose account this is, before the change: Supabase ends the session when
-    // a password is set, which is why this page used to bounce to the sign-in
-    // screen and the new password looked wrong (Kaycee, 2026-09-28).
     const { data: { user } } = await supabase.auth.getUser();
     const email = user?.email ?? "";
 
-    const { error } = await supabase.auth.updateUser({ password });
-    if (error) { setBusy(false); setSaid(error.message); return; }
+    // Set with the project's own rights, because the browser's updateUser was
+    // silently leaving the account unchanged (Kaycee, 2026-09-28).
+    const res = await fetch("/portal/password/set", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
+    const out = await res.json().catch(() => ({ ok: false, error: "That did not work." }));
+    if (!out.ok) { setBusy(false); setSaid(out.error ?? "That did not work."); return; }
 
-    // Signed out by that change, so sign back in with what she just chose.
+    // Setting a password can end the session, so sign back in with it.
     const back = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
     if (back.error) {
