@@ -313,6 +313,26 @@ async function main() {
   const outPath = resolve(outDir, "System Health.md");
   writeFileSync(outPath, md);
   console.log(`✓ wrote ${outPath}`);
+
+  // The same answer, where the online dashboard can read it. Kaycee,
+  // 2026-09-28: she wants the whole dashboard online, and Status is one of the
+  // tabs that only ever existed on this Mac. Storage rather than a new table,
+  // so it needs no migration and no key she does not already have.
+  try {
+    const supa = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { persistSession: false } });
+    const body = JSON.stringify({
+      at: new Date().toISOString(),
+      allGreen,
+      checks: checks.map((c) => ({ name: c.name, pass: c.pass, detail: c.detail, fix: c.fix ?? null })),
+    });
+    const up = await supa.storage.from("charts").upload("status/health.json", Buffer.from(body, "utf8"), {
+      contentType: "application/json", cacheControl: "0", upsert: true,
+    });
+    console.log(up.error ? `  ! status not published: ${up.error.message}` : "  ✓ status published for the online dashboard");
+  } catch (e) {
+    console.log(`  ! status not published: ${e instanceof Error ? e.message : e}`);
+  }
   console.log(`  ${allGreen ? "ALL GREEN" : `${failed.length} FAILURES`}`);
 
   if (!allGreen) {

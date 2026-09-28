@@ -4,11 +4,11 @@
  * Kaycee, 2026-09-28: "I WANT THE DASHBOARD THAT WE ARE CURRENTLY WORKING FROM
  * TO EXIST ONLINE. EVERY FUCKING PART OF IT."
  *
- * Tabs, sortable tables, working links, a find box. The tabs whose data lives
- * in the database or the repo are all here: Everyone, Funnel, Transits, Launch.
- * The three that read logs written on her Mac (Status, Failures, Changes) say
- * so plainly rather than pretending, and they follow once those logs are
- * written to the database instead of to her disk.
+ * Tabs, sortable tables, working links, a find box. Everyone, Status, Transits,
+ * Changes, Accounts, Decided and Launch. Status used to exist only on her Mac;
+ * the 5 AM health check now publishes its answer to storage as well, so it is
+ * readable from anywhere. Adding a client and running a report are the pieces
+ * still to come, because they take minutes and belong on the runner.
  *
  * Who gets in: public.delphi_admins, the same table the chart policies use.
  */
@@ -16,6 +16,8 @@
 import { redirect } from "next/navigation";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createClient } from "@supabase/supabase-js";
+import { readFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 import launchPlan from "@/docs/launch-plan.json";
 import { SortableTable, Tabs, type Row } from "./table";
 
@@ -58,6 +60,27 @@ export default async function AdminPage() {
     db.from("profiles").select("email, account_type, created_at"),
     db.storage.from("charts").list("transits", { limit: 90, sortBy: { column: "name", order: "desc" } }),
   ]);
+
+  // The 5 AM health check publishes its answer here, so Status is not a thing
+  // that only exists on her Mac (Kaycee, 2026-09-28).
+  let health: { at?: string; allGreen?: boolean; checks?: { name: string; pass: boolean; detail: string; fix?: string | null }[] } = {};
+  try {
+    const f = await db.storage.from("charts").download("status/health.json");
+    if (f.data) health = JSON.parse(await f.data.text());
+  } catch { /* the tab says when it has nothing */ }
+
+  // The chart change log travels with the code, so it can be read here.
+  let changes: Row[] = [];
+  try {
+    const path = join(process.cwd(), "docs", "CHART_CHANGELOG.md");
+    if (existsSync(path)) {
+      changes = readFileSync(path, "utf8").split("\n")
+        .filter((l) => l.startsWith("| 20"))
+        .map((l) => l.split("|").map((c) => c.trim()))
+        .map((c, i) => ({ id: `c${i}`, when: c[1], who: c[2], what: c[3], rollback: c[4] }))
+        .reverse();
+    }
+  } catch { /* the tab says when it has nothing */ }
 
   const rows = charts ?? [];
   const live = new Set((links ?? []).filter((l) => !l.revoked_at).map((l) => l.token));
@@ -108,6 +131,10 @@ export default async function AdminPage() {
       item: it.title, status: it.status ?? "", note: (it.note ?? "").slice(0, 160),
     })));
 
+  const statusRows: Row[] = (health.checks ?? []).map((c, i) => ({
+    id: `s${i}`, check: c.name, state: c.pass ? "pass" : "FAIL", detail: c.detail, fix: c.fix ?? "",
+  }));
+
   const cards: [string, number, string][] = [
     ["People", people.length, "charts that belong to somebody"],
     ["Signed up", signups.length, "through the website or an event"],
@@ -153,7 +180,7 @@ export default async function AdminPage() {
         ))}
       </div>
 
-      <Tabs names={["Everyone", "Accounts", "Transits", "Decided", "Launch", "On the Mac"]}>
+      <Tabs names={["Everyone", "Status", "Transits", "Changes", "Accounts", "Decided", "Launch"]}>
         <SortableTable
           initial={{ key: "since", dir: -1 }}
           columns={[
@@ -166,15 +193,24 @@ export default async function AdminPage() {
           ]}
           rows={everyone}
         />
-        <SortableTable
-          initial={{ key: "since", dir: -1 }}
-          columns={[
-            { key: "email", label: "Email" },
-            { key: "kind", label: "Kind", small: true },
-            { key: "since", label: "Since" },
-          ]}
-          rows={accounts}
-        />
+        <div>
+          <p className="sub">
+            {health.at
+              ? `Checked ${String(health.at).slice(0, 16).replace("T", " ")} UTC. ${health.allGreen ? "All green." : `${statusRows.filter((r) => r.state === "FAIL").length} failing.`}`
+              : "No check has published yet. It publishes at 5 AM, or whenever the check is run."}
+          </p>
+          <SortableTable
+            initial={{ key: "state", dir: 1 }}
+            columns={[
+              { key: "check", label: "Check" },
+              { key: "state", label: "State" },
+              { key: "detail", label: "Detail" },
+              { key: "fix", label: "Fix", small: true },
+            ]}
+            rows={statusRows}
+            empty="Nothing published yet."
+          />
+        </div>
         <SortableTable
           initial={{ key: "date", dir: -1 }}
           columns={[
@@ -185,6 +221,26 @@ export default async function AdminPage() {
           ]}
           rows={days}
           empty="No reports published yet."
+        />
+        <SortableTable
+          initial={{ key: "when", dir: -1 }}
+          columns={[
+            { key: "when", label: "When (UTC)" },
+            { key: "who", label: "Chart" },
+            { key: "what", label: "What changed", small: true },
+            { key: "rollback", label: "Rollback", small: true },
+          ]}
+          rows={changes}
+          empty="No chart publishes recorded."
+        />
+        <SortableTable
+          initial={{ key: "since", dir: -1 }}
+          columns={[
+            { key: "email", label: "Email" },
+            { key: "kind", label: "Kind", small: true },
+            { key: "since", label: "Since" },
+          ]}
+          rows={accounts}
         />
         <SortableTable
           initial={{ key: "on", dir: -1 }}
@@ -201,13 +257,7 @@ export default async function AdminPage() {
           ]}
           rows={items}
         />
-        <p className="note">
-          Status, Failures and Changes read logs written on your Mac: the LaunchAgent logs, the
-          report attempt log and the chart change log. They move here as soon as those are written
-          to the database instead of to disk, which is the next piece of taking things off the
-          laptop. Adding a client and running a report come after that, because they are long jobs
-          and belong on the runner.
-        </p>
+
       </Tabs>
     </main>
   );
