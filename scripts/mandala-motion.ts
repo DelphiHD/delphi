@@ -31,6 +31,7 @@ import { resolve } from "node:path";
 import { castTransitBodygraph, castNatalChart, assertTraditionalBodies } from "@/lib/transit/sky";
 import { WHEEL_SEQUENCE } from "@/lib/hd/gate-longitude";
 import { renderMandalaRings, mandalaWheelGeometry } from "@/lib/render/mandala";
+import { loadLibraryChunks } from "@/lib/hd/chunks-source";
 
 // ── wheel geometry: reuse the real mandala's rings + geometry so planets sit
 //    exactly where the branded wheel puts each gate ─────────────────────────
@@ -496,7 +497,21 @@ async function main() {
 
   const sunCross = await loadOrBuildSunCrossMap();
 
+  // Kaycee's Delphi Basic text for each planet, shown on hover (2026-09-15)
+  const planetText: Record<string, string> = {};
+  try {
+    for (const c of await loadLibraryChunks()) {
+      if (c.source_kind !== "planet") continue;
+      const m = (c.metadata ?? {}) as Record<string, unknown>;
+      const t = String(m["Delphi Basic"] ?? "").trim();
+      if (t) planetText[String(c.title ?? "").trim()] = t;
+    }
+  } catch (e) {
+    console.log(`  planet descriptions unavailable: ${(e as Error).message}`);
+  }
+
   const payload = {
+    planetText,
     date,
     displayTz,
     seq: WHEEL_SEQUENCE,
@@ -507,6 +522,7 @@ async function main() {
     spans,
     skinMode,
     autoplay,
+    glyphs: Object.fromEntries(PLANETS.map((p) => [p.key, p.glyph])),
   };
 
   const outDir = resolve(homedir(), "Desktop", "HD Reports", "Transits");
@@ -523,7 +539,10 @@ function buildHtml(payload: any): string {
   const defs = buildDefs();
   const tokens = PLANETS.map(buildToken).join("\n");
   const stars = buildStars();
-  const groupChips = GROUPS.map((g) => `<button class="chip on" data-group="${g.id}">${g.label}</button>`).join("");
+  // groups, then each planet on its own, with All and None (Kaycee, 2026-09-15)
+  const groupChips = `<span class="allnone"><button class="chip mini" data-all="1">All</button><button class="chip mini" data-none="1">None</button></span>` +
+    `<div class="chiprow">` + GROUPS.map((g) => `<button class="chip on" data-group="${g.id}">${g.label}</button>`).join("") + `</div>` +
+    `<div class="chiprow planets">` + PLANETS.map((p) => `<button class="chip on" data-planet="${p.key}" data-pgroup="${p.group}" title="${p.key}">${p.glyph} ${p.short}</button>`).join("") + `</div>`;
 
   const CLIENT = String.raw`
 (function () {
@@ -669,7 +688,7 @@ function buildHtml(payload: any): string {
       // planet label turns red while the body is retrograde (nodes excluded)
       el.classList.toggle('retro', tr.group !== 'nodes' && retroAt(tr, t));
       // visible planets: light the gate they occupy + beam out to it
-      if (active[tr.group]) {
+      if (on[tr.key]) {
         activeGates[gateNum(lon)] = true;
         // glowing beam from the planet out to its gate cell
         var a = xyAt(rad, lon), b = xyAt(G.gateOuter, lon);
@@ -732,7 +751,7 @@ function buildHtml(payload: any): string {
     var N = 480;
     for (var i = 0; i < TR.length; i++) {
       var tr = TR[i];
-      if (!active[tr.group]) continue;
+      if (!on[tr.key]) continue;
       var pts = '';
       for (var s = 0; s <= N; s++) {
         var xy = xyAt(tr.radius, lonAt(tr, (s / N) * spanMin));
@@ -814,25 +833,46 @@ function buildHtml(payload: any): string {
     });
   }
 
-  // group filter chips
-  var active = {};
-  var chips = document.querySelectorAll('button[data-group]');
-  for (var c = 0; c < chips.length; c++) {
-    active[chips[c].getAttribute('data-group')] = true;
-    chips[c].addEventListener('click', function (e) {
-      var g = e.target.getAttribute('data-group');
-      active[g] = !active[g];
-      e.target.classList.toggle('on', active[g]);
-      applyGroups();
-      drawPaths();
+  // which planets are showing: groups switch their planets together, each planet
+  // can be switched alone, All and None do everything
+  var on = {};
+  for (var oi = 0; oi < TR.length; oi++) on[TR[oi].key] = true;
+  var groupBtns = document.querySelectorAll('button[data-group]');
+  var planetBtns = document.querySelectorAll('button[data-planet]');
+  function refreshPlanets() {
+    for (var i = 0; i < planetBtns.length; i++) planetBtns[i].classList.toggle('on', !!on[planetBtns[i].getAttribute('data-planet')]);
+    for (var j = 0; j < groupBtns.length; j++) {
+      var g = groupBtns[j].getAttribute('data-group'), any = false;
+      for (var k = 0; k < planetBtns.length; k++) if (planetBtns[k].getAttribute('data-pgroup') === g && on[planetBtns[k].getAttribute('data-planet')]) any = true;
+      groupBtns[j].classList.toggle('on', any);
+    }
+    applyGroups();
+    drawPaths();
+    // redraw now, so a switched-off planet's beam and lit gate go with it even while paused
+    render(t);
+    if (typeof fillTable === 'function') fillTable();
+  }
+  for (var gb = 0; gb < groupBtns.length; gb++) {
+    groupBtns[gb].addEventListener('click', function (e) {
+      var g = e.currentTarget.getAttribute('data-group'), anyOn = false;
+      for (var k = 0; k < planetBtns.length; k++) if (planetBtns[k].getAttribute('data-pgroup') === g && on[planetBtns[k].getAttribute('data-planet')]) anyOn = true;
+      for (var k2 = 0; k2 < planetBtns.length; k2++) if (planetBtns[k2].getAttribute('data-pgroup') === g) on[planetBtns[k2].getAttribute('data-planet')] = !anyOn;
+      refreshPlanets();
     });
   }
+  for (var pb = 0; pb < planetBtns.length; pb++) {
+    planetBtns[pb].addEventListener('click', function (e) {
+      var key = e.currentTarget.getAttribute('data-planet');
+      on[key] = !on[key];
+      refreshPlanets();
+    });
+  }
+  var allBtn = document.querySelector('button[data-all]'), noneBtn = document.querySelector('button[data-none]');
+  if (allBtn) allBtn.addEventListener('click', function () { for (var k in on) on[k] = true; refreshPlanets(); });
+  if (noneBtn) noneBtn.addEventListener('click', function () { for (var k in on) on[k] = false; refreshPlanets(); });
   function applyGroups() {
     var pl = svg.querySelectorAll('.planet');
-    for (var i = 0; i < pl.length; i++) {
-      var g = pl[i].getAttribute('data-group');
-      pl[i].style.display = active[g] ? '' : 'none';
-    }
+    for (var i = 0; i < pl.length; i++) pl[i].style.display = on[pl[i].getAttribute('data-key')] ? '' : 'none';
   }
 
   // labels toggle
@@ -855,8 +895,74 @@ function buildHtml(payload: any): string {
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setPresent(false); });
   svg.addEventListener('click', function () { if (root.classList.contains('present')) setPresent(false); });
 
+  // The placements at this moment, shown whenever the wheel is stopped, so the room
+  // can read where everything is. Kaycee, 2026-09-14 (workshop Stage).
+  var ptab = document.getElementById('ptab');
+  function fillTable() {
+    if (!ptab) return;
+    ptab.classList.toggle('show', !playing);
+    if (playing) return;
+    var rows = '';
+    for (var i = 0; i < TR.length; i++) {
+      var tr = TR[i], lon = lonAt(tr, t);
+      rows += '<div class="prow' + (on[tr.key] ? '' : ' off') + '" data-key="' + tr.key + '"><span class="pg" style="color:' + tr.color + '">' + ((MM.glyphs || {})[tr.key] || '') + '</span><span class="pn">' + tr.key + '</span><b>' + gateLine(lon) + '</b>' + (retroAt(tr, t) && tr.key !== 'North Node' && tr.key !== 'South Node' ? '<i>R</i>' : '') + '</div>';
+    }
+    ptab.innerHTML = '<div class="ph">Placements</div>' + rows;
+  }
+  playBtn.addEventListener('click', fillTable);
+
+  // hovering a planet, on the wheel or in the table, shows her description of it
+  var ptip = document.createElement('div');
+  ptip.className = 'ptip'; ptip.hidden = true;
+  root.appendChild(ptip);
+  // average pace through one gate (5.625 degrees) and around the whole wheel; the
+  // inner planets and Pluto vary a lot, so these are averages (Kaycee, 2026-09-15)
+  var PACE = {
+    'Sun': ['about 6 days a gate', 'one year around the wheel'],
+    'Earth': ['about 6 days a gate', 'one year around the wheel'],
+    'Moon': ['about 10 hours a gate', 'about 27 days around the wheel'],
+    'North Node': ['about 3½ months a gate', 'about 18½ years around the wheel'],
+    'South Node': ['about 3½ months a gate', 'about 18½ years around the wheel'],
+    'Mercury': ['about 6 days a gate on average', 'one year around the wheel'],
+    'Venus': ['about 6 days a gate on average', 'one year around the wheel'],
+    'Mars': ['about 11 days a gate on average', 'about 2 years around the wheel'],
+    'Jupiter': ['about 2 months a gate', 'about 12 years around the wheel'],
+    'Saturn': ['about 5½ months a gate', 'about 29½ years around the wheel'],
+    'Uranus': ['about 1⅓ years a gate', 'about 84 years around the wheel'],
+    'Neptune': ['about 2½ years a gate', 'about 165 years around the wheel'],
+    'Pluto': ['about 4 years a gate on average', 'about 248 years around the wheel']
+  };
+  function tipFor(key, e) {
+    var text = (MM.planetText || {})[key];
+    if (!text) { ptip.hidden = true; return; }
+    var pace = PACE[key];
+    ptip.innerHTML = '<b>' + key + '</b>' + (pace ? '<span class="pace">' + pace[0] + ' · ' + pace[1] + '</span>' : '') + text;
+    ptip.hidden = false;
+    var w = ptip.offsetWidth, h = ptip.offsetHeight;
+    var x = e.clientX + 16, y = e.clientY + 16;
+    if (x + w > innerWidth - 8) x = e.clientX - w - 16;
+    if (y + h > innerHeight - 8) y = e.clientY - h - 16;
+    ptip.style.left = Math.max(8, x) + 'px'; ptip.style.top = Math.max(8, y) + 'px';
+  }
+  root.addEventListener('mousemove', function (e) {
+    var el = e.target.closest ? e.target.closest('.planet[data-key], .prow[data-key]') : null;
+    if (el) tipFor(el.getAttribute('data-key'), e); else ptip.hidden = true;
+  });
+  root.addEventListener('mouseleave', function () { ptip.hidden = true; });
+  scrub.addEventListener('input', fillTable);
+  for (var sb = 0; sb < spanBtns.length; sb++) spanBtns[sb].addEventListener('click', fillTable);
+
+  // Opened from the workshop Stage with #year and #paused in the address: start on
+  // the year, stopped, with the table showing.
+  var hash = location.hash || '';
+  if (hash.indexOf('year') > -1 && MM.spans.year) {
+    for (var yb = 0; yb < spanBtns.length; yb++) if (spanBtns[yb].getAttribute('data-span') === 'year') spanBtns[yb].click();
+  }
+  if (hash.indexOf('paused') > -1) playing = false;
+
   playBtn.textContent = playing ? '❙❙ Pause' : '▶ Play';
-  render(0);
+  render(t);
+  fillTable();
   if (playing) startLoop();
 })();
 `;
@@ -868,6 +974,30 @@ function buildHtml(payload: any): string {
   .mm { min-height: 100vh; padding: 16px; transition: background .4s; display: flex; flex-direction: row; align-items: stretch; gap: 22px; }
   .mm.sky  { background: radial-gradient(circle at 40% 40%, #1a1740 0%, #0b0a1f 70%, #060512 100%); color: #e8e6f5; }
   .mm.felt { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E"), radial-gradient(circle at 42% 38%, #8f8bcb 0%, #6f6ab4 60%, #5b56a2 100%); color: #14112b; }
+  .mm { position: relative; }
+  .ptip { position: fixed; z-index: 30; max-width: 300px; padding: 10px 12px; border-radius: 12px; font-size: 13px; line-height: 1.5; pointer-events: none;
+    background: #fff; color: #3b3550; border: 1px solid rgba(132,80,149,.25); box-shadow: 0 10px 26px rgba(0,0,0,.3); }
+  .ptip b { display: block; color: #845095; margin-bottom: 1px; }
+  .ptip .pace { display: block; font-size: 11.5px; color: #8a8298; margin-bottom: 6px; }
+  .ptip[hidden] { display: none; }
+  .planet { cursor: help; }
+  .ptab { position: absolute; left: 18px; top: 50%; transform: translate(-12px, -50%); opacity: 0; pointer-events: none; transition: opacity .4s, transform .4s;
+    min-width: 170px; padding: 12px 14px; border-radius: 14px; font-variant-numeric: tabular-nums; z-index: 5; }
+  .ptab.show { opacity: 1; transform: translate(0, -50%); pointer-events: auto; }
+  .ptab .prow { cursor: help; }
+  .ptab .prow.off { opacity: .3; }
+  .allnone { display: inline-flex; gap: 4px; margin-left: 8px; }
+  .chip.mini { padding: 2px 8px; font-size: 11px; }
+  .chiprow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chiprow.planets .chip { font-size: 11.5px; padding: 3px 8px; }
+  .mm.sky .ptab { background: rgba(11,10,31,.72); border: 1px solid rgba(255,255,255,.14); color: #e8e6f5; }
+  .mm.felt .ptab { background: rgba(255,255,255,.55); border: 1px solid rgba(20,17,43,.18); color: #14112b; }
+  .ptab .ph { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; opacity: .75; margin-bottom: 6px; }
+  .ptab .prow { display: grid; grid-template-columns: 20px 1fr auto 12px; gap: 8px; align-items: baseline; font-size: 14px; line-height: 1.7; }
+  .ptab .pg { font-size: 16px; text-align: center; }
+  .ptab .pn { opacity: .8; }
+  .ptab b { font-weight: 700; }
+  .ptab i { font-style: normal; font-size: 10px; opacity: .7; }
   .wheelcol { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
   .panel { flex: 0 0 300px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; max-height: calc(100vh - 32px); padding: 4px 6px; }
   .panel > .controls { margin: 0; }
@@ -1010,6 +1140,7 @@ function buildHtml(payload: any): string {
     </div>
     <div id="crossbar"></div>
   </div>
+  <div id="ptab" class="ptab"></div>
 
   <aside class="panel">
     <header>

@@ -211,3 +211,25 @@ deck stays in the folder as a fallback.
 Cycle mode return charts (Solar Return and long cycles as two modes, current and
 next), weather impact classification, a notification system, wiring the simple
 and wide split.
+
+## 2026-09-14: state before tonight's BFKI build
+
+- Stage order: The Room, Origins (Ra Uru Hu's real chart, element cards, 64 Gates
+  pops the Sixty-Four Hexagrams grid; Kaycee: leave this page as it is), Living
+  Mandala, Build a Chart, Centers, Authority, Definition, Auras, Conditioning.
+- Conditioning: pair or person + Sky (noon MT, 2026-09-15), one side panel, scores
+  by her definition priorities (weights in memory hd_split_conditioning), gold for
+  centers defined together, simple and wide split bridges.
+- Presenter keys: N notes, E on The Room to rename or hide names (saved on the laptop).
+- Charts opened from the Stage show first names only, no birth details.
+- Workshop switches in the chart builder are LOCAL ONLY and uncommitted; never
+  republish from the main copy while they are in it. The clean copy at
+  ../delphi-fix was used for today's pushes and republishes.
+- Build tonight: `npx tsx scripts/workshop-deck.ts` (BFKI), then
+  `npx tsx scripts/workshop-worksheet.ts --event bfki`.
+- Live today: /events/bfki stats page (no names), event badge "See the event" on
+  charts made through the link, Public Figure tag (Ra Uru Hu), chart Stats leave
+  Chiron and Lilith out, Projector charts republished with new Types text.
+
+- Planned after BFKI: chart Variations for every chart and Working Time for unknown or approximate times, see docs/CHART_VARIATIONS_PLAN.md.
+- After BFKI: catch duplicate emails on event sign-up links (Kaycee, 2026-09-15). Max signed up through /e/bfki while already on the roster, with a birth time one minute different, so he appeared twice until the workshop build matched him by birth date and first name.

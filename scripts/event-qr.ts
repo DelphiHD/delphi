@@ -72,6 +72,12 @@ async function main() {
   // flag, because a printed code that nobody can scan is useless without one,
   // and some organisers want the artwork bare. Kaycee, 2026-09-12.
   const showUrl = !process.argv.includes("--no-url");
+  // --light: a printable card on a light ground, for hanging around the venue
+  // (ink toner, not a sheet of black). Kaycee, 2026-09-14.
+  const light = process.argv.includes("--light");
+  const C = light
+    ? { top: "#ffffff", ground: "#ffffff", code: INK, title: INK, sub: "#5c5347", accent: "#9a6b00", frame: "#9a6b00" }
+    : { top: "#1c1813", ground: INK, code: BONE, title: BONE, sub: DIM, accent: GOLD, frame: GOLD };
   const slug = (process.argv[2] ?? "").toLowerCase();
   const ev = EVENTS[slug];
   if (!ev) {
@@ -88,7 +94,7 @@ async function main() {
 
   // ── the card ────────────────────────────────────────────────────────────
   const W = 1080, H = 1350;
-  const q = await codeSvg(url, BONE);
+  const q = await codeSvg(url, C.code);
   const qSize = 620;
   const qx = (W - qSize) / 2, qy = 366;
   const scale = qSize / q.size;
@@ -96,31 +102,31 @@ async function main() {
   const card = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#1c1813"/>
-      <stop offset="1" stop-color="${INK}"/>
+      <stop offset="0" stop-color="${C.top}"/>
+      <stop offset="1" stop-color="${C.ground}"/>
     </linearGradient>
   </defs>
   <rect width="${W}" height="${H}" fill="url(#g)"/>
-  <rect x="26" y="26" width="${W - 52}" height="${H - 52}" fill="none" stroke="${GOLD}" stroke-opacity=".5" stroke-width="3"/>
+  <rect x="26" y="26" width="${W - 52}" height="${H - 52}" fill="none" stroke="${C.frame}" stroke-opacity=".5" stroke-width="3"/>
 
-  <text x="${W / 2}" y="132" text-anchor="middle" fill="${GOLD}"
+  <text x="${W / 2}" y="132" text-anchor="middle" fill="${C.accent}"
         font-family="Helvetica Neue, Arial, sans-serif" font-size="27" font-weight="700" letter-spacing="7">DELPHI HUMAN DESIGN</text>
 
-  <text x="${W / 2}" y="228" text-anchor="middle" fill="${BONE}"
+  <text x="${W / 2}" y="228" text-anchor="middle" fill="${C.title}"
         font-family="Helvetica Neue, Arial, sans-serif" font-size="62" font-weight="800" letter-spacing="1">KNOW THYSELF.</text>
 
-  <text x="${W / 2}" y="290" text-anchor="middle" fill="${DIM}"
+  <text x="${W / 2}" y="290" text-anchor="middle" fill="${C.sub}"
         font-family="Helvetica Neue, Arial, sans-serif" font-size="28" letter-spacing="2">${esc(ev.action)}</text>
 
-  <rect x="${qx - 26}" y="${qy - 26}" width="${qSize + 52}" height="${qSize + 52}" fill="#ffffff" fill-opacity=".04" rx="10"/>
+  <rect x="${qx - 26}" y="${qy - 26}" width="${qSize + 52}" height="${qSize + 52}" fill="${light ? "#ffffff" : "#ffffff"}" fill-opacity="${light ? ".7" : ".04"}" rx="10"/>
   <g transform="translate(${qx} ${qy}) scale(${scale})">${q.inner}</g>
 
-  <text x="${W / 2}" y="${qy + qSize + 108}" text-anchor="middle" fill="${BONE}"
+  <text x="${W / 2}" y="${qy + qSize + 108}" text-anchor="middle" fill="${C.title}"
         font-family="Helvetica Neue, Arial, sans-serif" font-size="46" font-weight="800" letter-spacing="1">${esc(ev.name.toUpperCase())}</text>
-  <text x="${W / 2}" y="${qy + qSize + 156}" text-anchor="middle" fill="${GOLD}"
+  <text x="${W / 2}" y="${qy + qSize + 156}" text-anchor="middle" fill="${C.accent}"
         font-family="Helvetica Neue, Arial, sans-serif" font-size="26" font-weight="600" letter-spacing="3">${esc(ev.when.toUpperCase())} &#183; ${esc(ev.where.toUpperCase())}</text>
 
-  ${showUrl ? `<text x="${W / 2}" y="${H - 54}" text-anchor="middle" fill="${DIM}"
+  ${showUrl ? `<text x="${W / 2}" y="${H - 54}" text-anchor="middle" fill="${C.sub}"
         font-family="Helvetica Neue, Arial, sans-serif" font-size="25" letter-spacing="1">${esc(url.replace("https://", ""))}</text>` : ""}
 </svg>`;
 
@@ -128,7 +134,7 @@ async function main() {
   const p = await codeSvg(url, INK);
   const plain = `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 ${p.size} ${p.size}">${p.inner}</svg>`;
 
-  const cardName = showUrl ? `${ev.slug}-registration-card.svg` : `${ev.slug}-registration-card-no-url.svg`;
+  const cardName = `${ev.slug}-registration-card${showUrl ? "" : "-no-url"}${light ? "-light" : ""}.svg`;
   writeFileSync(join(out, cardName), card);
   writeFileSync(join(out, `${ev.slug}-qr-plain.svg`), plain);
   await QRCode.toFile(join(out, `${ev.slug}-qr-plain.png`), url, {

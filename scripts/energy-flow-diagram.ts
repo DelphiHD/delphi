@@ -6211,6 +6211,72 @@ if (DATA.client) {
     if (typeof labelParties === 'function') labelParties();
   }
 
+  // ---- workshop stage: a pair, worked out by the Stage ----------------------------
+  // Only on a chart opened from the workshop folder on the laptop (never a live
+  // link), and only when the Stage asks with #stage-cond. The Stage sends the pair
+  // in the same shape the connection answer has, so the Relationship module draws
+  // it exactly as it would. Kaycee, 2026-09-13.
+  var stageLocal = location.protocol === 'file:' || location.hostname === '127.0.0.1' || location.hostname === 'localhost';
+  if (stageLocal && (location.hash || '').indexOf('stage-cond') > -1) {
+    document.body.classList.add('stage-cond');
+    var sc = document.createElement('style');
+    sc.textContent = 'body.stage-cond .viewdock, body.stage-cond .brandmark, body.stage-cond #relpick, body.stage-cond #relBack { display:none !important; }' +
+      '.stagepanel { position:fixed; z-index:4; background:#fff; border:1px solid rgba(132,80,149,.2); border-radius:14px; padding:12px 14px; font-size:13px; line-height:1.45; font-family:inherit; letter-spacing:normal; color:#3b3550; box-shadow:0 8px 22px rgba(60,40,80,.1); }' +
+      '.stagepanel { overflow:auto; }' +
+      '.stagepanel .sec + .sec { border-top:1px solid rgba(132,80,149,.2); margin-top:8px; padding-top:8px; }' +
+      '.stagepanel .hd { display:flex; justify-content:space-between; align-items:baseline; font-size:15px; font-weight:600; }' +
+      '.stagepanel .hd b { font-size:24px; }' +
+      '.stagepanel .k { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#6b6790; }' +
+      '.stagepanel ul { margin:6px 0 0; padding-left:16px; }' +
+      '.stagepanel li { margin:3px 0; }' +
+      '.stagepanel .tg { border-top:1px solid rgba(132,80,149,.2); margin-top:8px; padding-top:6px; }';
+    document.head.appendChild(sc);
+    window.addEventListener('message', function (ev) {
+      var m = ev.data || {};
+      if (m.type !== 'delphi-stage-pair' || !m.conn) return;
+      var rb = document.getElementById('mRelation');
+      if (rb) rb.click();
+      repaintPair(m.conn);
+      // centers neither defines alone but the two of them define together, in gold
+      (m.newCenters || []).forEach(function (c) {
+        [].forEach.call(document.querySelectorAll('svg.canvas.composite .cshape[data-center="' + c + '"]'), function (el) {
+          el.setAttribute('fill', '#e9c46a');
+        });
+      });
+      // what each person brings to the other, in a panel under their own column
+      [].forEach.call(document.querySelectorAll('.stagepanel'), function (el) { el.remove(); });
+      var place = function () {
+        [['left', m.panelA], ['right', m.panelB]].forEach(function (pair) {
+          if (!pair[1]) return;
+          var t = document.querySelector('svg.canvas.composite .ptable[data-side="pair-' + pair[0] + '"]');
+          if (!t) return;
+          var el = document.querySelector('.stagepanel[data-side="' + pair[0] + '"]');
+          if (!el) {
+            el = document.createElement('div');
+            el.className = 'stagepanel';
+            el.setAttribute('data-side', pair[0]);
+            el.innerHTML = pair[1];
+            document.body.appendChild(el);
+          }
+          // beside the bodygraph, under the first person's column, as wide as the room allows
+          var r = t.getBoundingClientRect();
+          // up to the bodygraph's left edge, so the drawing is never covered
+          var body = Infinity;
+          [].forEach.call(document.querySelectorAll('svg.canvas.composite .cshape'), function (c) { body = Math.min(body, c.getBoundingClientRect().left); });
+          var room = (body === Infinity ? r.right : body) - 24;
+          var w = Math.max(200, Math.min(340, room));
+          el.style.width = w + 'px';
+          el.style.left = Math.max(8, Math.min(r.left, room - w + 8)) + 'px';
+          el.style.top = (r.bottom + 18) + 'px';
+          el.style.maxHeight = (window.innerHeight - r.bottom - 30) + 'px';
+        });
+      };
+      setTimeout(place, 60);
+      window.addEventListener('resize', place);
+    });
+    if (window.parent !== window) window.parent.postMessage({ type: 'delphi-stage-ready' }, '*');
+  }
+
   // The birth place is chosen from the provider's own list, never typed freehand.
   // Whatever the reader types is only a search; what gets sent to draw the chart
   // is the canonical value the provider handed back, so a place that appears in
@@ -8642,6 +8708,237 @@ document.addEventListener('mousemove', function (e) {
     show('');
   }
 });
+
+// ---- workshop stage: Origins -------------------------------------------------------
+// Ra Uru Hu's chart on the Stage's Origins page, only from the laptop: the chart with
+// its tables, nothing else, and the Stage's element cards light parts of it.
+// Kaycee, 2026-09-14.
+(function () {
+  var local = location.protocol === 'file:' || location.hostname === '127.0.0.1' || location.hostname === 'localhost';
+  if (!local || (location.hash || '').indexOf('origin-view') < 0) return;
+  var body = document.body;
+  body.classList.add('stage-origin');
+  var P = 'svg.canvas.plain:not(.transit):not(.composite) ';
+  var st = document.createElement('style');
+  st.textContent =
+    'body.stage-origin .panel, body.stage-origin .viewdock, body.stage-origin .brandmark, body.stage-origin #tip { display:none !important; }' +
+    'body.stage-origin .wrap { display:block; padding:0; }' +
+    'body.stage-origin .stage { position:fixed; inset:0; width:auto; height:auto; }' +
+    'body.stage-origin svg.canvas, body.stage-origin .mandala svg { max-height:100vh; }' +
+    'body.stage-origin ' + P + '.cshape, body.stage-origin ' + P + '.pleg, body.stage-origin ' + P + '.gdisc, body.stage-origin ' + P + '.prow text { transition:opacity .4s, fill .4s, stroke .4s; }' +
+    'body.ohl-centers ' + P + '.cshape { stroke:#845095 !important; stroke-width:4px !important; }' +
+    'body.ohl-channels ' + P + '.pleg { filter:drop-shadow(0 0 3px rgba(132,80,149,.9)); }' +
+    'body.ohl-channels ' + P + '.cshape { opacity:.35; }' +
+    'body.ohl-gates ' + P + '.gdisc { fill:#845095 !important; }' +
+    'body.ohl-gates ' + P + '.og, body.ohl-lines ' + P + '.ol { fill:#845095 !important; font-weight:700; }' +
+    'body.ohl-lines ' + P + '.ol { font-size:19px; }' +
+    'body.ohl-planets ' + P + '.pgl text { fill:#845095 !important; font-size:21px; }' +
+    'body.ohl-sides ' + P + '.ptable { filter:drop-shadow(0 0 6px rgba(132,80,149,.55)); }';
+  document.head.appendChild(st);
+  // gate and line as two pieces, so each can be lit on its own
+  [].forEach.call(document.querySelectorAll(P + '.prow'), function (r) {
+    var t = [].filter.call(r.querySelectorAll(':scope > text'), function (x) { return x.textContent.indexOf('.') > 0; })[0];
+    if (!t) return;
+    var parts = t.textContent.split('.');
+    var NS = 'http://www.w3.org/2000/svg';
+    t.textContent = '';
+    var g = document.createElementNS(NS, 'tspan'); g.setAttribute('class', 'og'); g.textContent = parts[0];
+    var l = document.createElementNS(NS, 'tspan'); l.setAttribute('class', 'ol'); l.textContent = '.' + parts[1];
+    t.appendChild(g); t.appendChild(l);
+  });
+  window.addEventListener('message', function (ev) {
+    var m = ev.data || {};
+    if (m.type !== 'delphi-stage-hl') return;
+    body.className = body.className.split(' ').filter(function (c) { return c.indexOf('ohl-') !== 0; }).join(' ');
+    if (m.el) body.classList.add('ohl-' + m.el);
+    var wantWheel = m.el === 'wheel';
+    var inWheel = body.classList.contains('view-mandala');
+    var btn = document.getElementById(wantWheel ? 'vMandala' : 'vPlain');
+    if (btn && wantWheel !== inWheel) btn.click();
+  });
+})();
+
+// ---- workshop stage: privacy on the big screen --------------------------------------
+// Any chart the Stage opens (only from the laptop): first name only, and no birth
+// date, time or place. Kaycee, 2026-09-14.
+(function () {
+  var local = location.protocol === 'file:' || location.hostname === '127.0.0.1' || location.hostname === 'localhost';
+  var h = location.hash || '';
+  if (!local || h.indexOf('stage-') < 0) return;
+  var first = '';
+  h.slice(1).split('&').forEach(function (kv) {
+    var i = kv.indexOf('=');
+    if (i > 0 && kv.slice(0, i) === 'n') first = decodeURIComponent(kv.slice(i + 1));
+  });
+  var st = document.createElement('style');
+  st.textContent = '.ptable text[font-size="8.5"], .tabbtn[data-tab="dates"], #tab-dates, #pmeta .when, .stagehide { display:none !important; }';
+  document.head.appendChild(st);
+  var full = (typeof DATA !== 'undefined' && DATA.client && DATA.client.name) || '';
+  if (!full) return;
+  var shown = first || full.split(' ')[0];
+  document.title = shown;
+  var swap = function (root) {
+    var walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    var n;
+    while ((n = walk.nextNode())) {
+      if (n.nodeValue.indexOf(full) > -1) n.nodeValue = n.nodeValue.split(full).join(shown);
+      else if (n.nodeValue.toUpperCase().indexOf(full.toUpperCase()) > -1) n.nodeValue = n.nodeValue.split(full.toUpperCase()).join(shown.toUpperCase());
+    }
+  };
+  swap(document.body);
+  // parts of the page are drawn later (the pair columns, the panel), so look again
+  new MutationObserver(function (list) {
+    list.forEach(function (m) { [].forEach.call(m.addedNodes, function (x) { if (x.nodeType === 1) swap(x); else if (x.nodeType === 3 && x.parentNode) swap(x.parentNode); }); });
+  }).observe(document.body, { childList: true, subtree: true });
+})();
+
+// ---- workshop stage -------------------------------------------------------------
+// Only when the workshop Stage opens this page with #stage-build in the address.
+// A chart opened any other way never runs this. Kaycee, 2026-09-13: Build a Chart
+// uses the person's own Wheel with the placement tables beside it, design first.
+(function () {
+  var local = location.protocol === 'file:' || location.hostname === '127.0.0.1' || location.hostname === 'localhost';
+  if (!local || (location.hash || '').indexOf('stage-build') < 0) return;
+  var body = document.body;
+  var vm = document.getElementById('vMandala');
+  if (vm) vm.click();
+  body.classList.add('stage-build');
+  var css = document.createElement('style');
+  css.textContent =
+    'body.stage-build .panel, body.stage-build .viewdock, body.stage-build .brandmark, body.stage-build #tip { display:none !important; }' +
+    'body.stage-build .wrap { display:block; padding:0; }' +
+    'body.stage-build .stage { position:fixed; inset:0; width:auto; height:auto; }' +
+    'body.stage-build .mandala { position:absolute; left:22vw; right:22vw; top:0; bottom:0; display:flex; align-items:center; justify-content:center; }' +
+    'body.stage-build .mandala svg { max-height:98vh; max-width:100%; }' +
+    'body.stage-build svg.sbtable { position:fixed; top:9vh; height:88vh; width:20vw; }' +
+    'body.stage-build .sb-hide { visibility:hidden; }' +
+    'body.stage-build .sb-in { animation:sbIn .6s ease; }' +
+    '@keyframes sbIn { from { opacity:0; } to { opacity:1; } }';
+  document.head.appendChild(css);
+  var NS = 'http://www.w3.org/2000/svg';
+  var wheel = document.querySelector('.mandala svg');
+  var canvas = document.querySelector('svg.canvas:not(.composite)');
+  if (!wheel || !canvas) return;
+  // the two placement tables, copied from the bodygraph view to either side
+  var tables = {};
+  ['design', 'personality'].forEach(function (side, i) {
+    var src = canvas.querySelector('.ptable[data-side="' + side + '"]');
+    if (!src) return;
+    var t = document.createElementNS(NS, 'svg');
+    t.setAttribute('class', 'sbtable');
+    t.style[i === 0 ? 'left' : 'right'] = '1vw';
+    var g = src.cloneNode(true);
+    g.removeAttribute('transform');
+    // the pill above already says which side this is, so the heading names the moment
+    // instead: Design Date and Birth Date (Kaycee, 2026-09-15)
+    var head = g.querySelector(':scope > text');
+    if (head) head.textContent = side === 'design' ? 'DESIGN DATE' : 'BIRTH DATE';
+    t.appendChild(g);
+    document.body.appendChild(t);
+    var b = g.getBBox();
+    t.setAttribute('viewBox', (b.x - 6) + ' ' + (b.y - 6) + ' ' + (b.width + 12) + ' ' + (b.height + 12));
+    tables[side] = t;
+  });
+  // everything a placement lights, blanked until its planet arrives
+  var cells = [].slice.call(wheel.querySelectorAll('[data-gatecell] .g-cell'));
+  cells.forEach(function (c) {
+    c.setAttribute('data-sb-fill', c.getAttribute('fill') || ''); c.setAttribute('data-sb-op', c.getAttribute('fill-opacity') || '');
+    c.setAttribute('data-sb-stroke', c.getAttribute('stroke') || '');
+    c.setAttribute('fill', '#ffffff'); c.setAttribute('fill-opacity', '1');
+  });
+  var nums = [].slice.call(wheel.querySelectorAll('.pnum'));
+  nums.forEach(function (n) {
+    n.setAttribute('data-sb-numfill', n.getAttribute('fill') || ''); n.setAttribute('data-sb-cls', n.getAttribute('class') || '');
+    n.setAttribute('fill', '#000000'); n.setAttribute('class', 'pnum off');
+  });
+  var hide = function (sel, root) { [].forEach.call((root || wheel).querySelectorAll(sel), function (el) { el.classList.add('sb-hide'); }); };
+  hide('[data-planet][data-side]'); hide('.pleg'); hide('.gdisc');
+  Object.keys(tables).forEach(function (k) { hide('.prow', tables[k]); });
+  var centers = [].slice.call(wheel.querySelectorAll('.cshape'));
+  centers.forEach(function (c) { c.setAttribute('data-sb-cfill', c.getAttribute('fill') || ''); c.setAttribute('fill', c.getAttribute('data-off') || '#ffffff'); });
+  var CG = { head: [64, 61, 63], ajna: [47, 24, 4, 17, 43, 11], throat: [62, 23, 56, 35, 12, 45, 33, 8, 31, 20, 16],
+    g: [7, 1, 13, 10, 15, 2, 46, 25], heart: [21, 40, 26, 51], spleen: [48, 57, 44, 50, 32, 28, 18],
+    'solar-plexus': [6, 37, 22, 36, 30, 55, 49], sacral: [5, 14, 29, 59, 9, 3, 42, 27, 34], root: [53, 60, 52, 19, 39, 41, 58, 38, 54] };
+  var seq = [];
+  ['design', 'personality'].forEach(function (side) {
+    if (!tables[side]) return;
+    [].forEach.call(tables[side].querySelectorAll('.prow'), function (r) {
+      seq.push({ side: side, planet: r.getAttribute('data-planet'), gate: +r.getAttribute('data-gate'), row: r });
+    });
+  });
+  // what has arrived so far, and which sides are switched on
+  var arrived = [], sideOn = { design: true, personality: true };
+  var bar = document.createElement('div');
+  bar.className = 'sbsides';
+  bar.innerHTML = '<button data-s="design" class="on">Design</button><button data-s="personality" class="on">Personality</button>';
+  document.body.appendChild(bar);
+  var bcss = document.createElement('style');
+  // each side's switch sits at the top of its own column (Kaycee, 2026-09-15)
+  bcss.textContent = 'body.stage-build .sbsides { position:fixed; left:1vw; right:1vw; top:2vh; height:0; z-index:5; }' +
+    'body.stage-build .sbsides button { position:absolute; top:0; width:20vw; }' +
+    'body.stage-build .sbsides button[data-s="design"] { left:0; }' +
+    'body.stage-build .sbsides button[data-s="personality"] { right:0; }' +
+    'body.stage-build .sbsides button { font:600 13px Montserrat, sans-serif; letter-spacing:.08em; text-transform:uppercase; padding:7px 16px; border-radius:16px; cursor:pointer; background:#fff; border:1.5px solid #d9cfe0; color:#6b6790; }' +
+    'body.stage-build .sbsides button[data-s="design"].on { background:#e06666; border-color:#e06666; color:#fff; }' +
+    'body.stage-build .sbsides button[data-s="personality"].on { background:#2f2a33; border-color:#2f2a33; color:#fff; }' +
+    'body.stage-build svg.sbtable.sboff { opacity:.25; }';
+  document.head.appendChild(bcss);
+  [].forEach.call(bar.querySelectorAll('button'), function (btn) {
+    btn.onclick = function () {
+      var k = btn.getAttribute('data-s');
+      sideOn[k] = !sideOn[k];
+      btn.classList.toggle('on', sideOn[k]);
+      render(null);
+    };
+  });
+  var setVis = function (el, on, fresh) {
+    el.classList.toggle('sb-hide', !on);
+    if (on && fresh) { el.classList.remove('sb-in'); void el.getBoundingClientRect(); el.classList.add('sb-in'); }
+  };
+  var render = function (fresh) {
+    var gates = {};
+    Object.keys(tables).forEach(function (k) { tables[k].classList.toggle('sboff', !sideOn[k]); });
+    [].forEach.call(wheel.querySelectorAll('[data-planet][data-side]'), function (el) { setVis(el, false); });
+    [].forEach.call(wheel.querySelectorAll('.pleg, .gdisc'), function (el) { setVis(el, false); });
+    cells.forEach(function (c) { c.setAttribute('fill', '#ffffff'); c.setAttribute('fill-opacity', '1'); });
+    nums.forEach(function (n) { n.setAttribute('fill', '#000000'); n.setAttribute('class', 'pnum off'); });
+    arrived.forEach(function (a) {
+      var isNew = a === fresh;
+      setVis(a.row, true, isNew);
+      if (!sideOn[a.side]) return;
+      var g = a.gate, fill = a.side === 'design' ? 'red' : 'black';
+      gates[g] = true;
+      [].forEach.call(wheel.querySelectorAll('[data-side="' + a.side + '"][data-planet="' + a.planet + '"]'), function (el) { setVis(el, true, isNew); });
+      [].forEach.call(wheel.querySelectorAll('.pleg[data-gate="' + g + '"][data-fill="' + fill + '"], .gdisc[data-gate="' + g + '"]'), function (el) { setVis(el, true, isNew); });
+      var cell = wheel.querySelector('[data-gatecell="' + g + '"] .g-cell');
+      if (cell) { cell.setAttribute('fill', cell.getAttribute('data-sb-fill')); cell.setAttribute('fill-opacity', cell.getAttribute('data-sb-op')); }
+      [].forEach.call(wheel.querySelectorAll('.pnum[data-gate="' + g + '"]'), function (n) { n.setAttribute('fill', n.getAttribute('data-sb-numfill')); n.setAttribute('class', n.getAttribute('data-sb-cls')); });
+    });
+    // a center is defined when a channel into it is complete on the sides switched on
+    var lit = {};
+    [].forEach.call(wheel.querySelectorAll('.chgrp'), function (ch) {
+      var ids = (ch.getAttribute('data-ch') || '').split('-').map(Number);
+      if (!gates[ids[0]] || !gates[ids[1]]) return;
+      centers.forEach(function (c) {
+        var list = CG[c.getAttribute('data-center')] || [];
+        if (list.indexOf(ids[0]) > -1 || list.indexOf(ids[1]) > -1) lit[c.getAttribute('data-center')] = true;
+      });
+    });
+    centers.forEach(function (c) {
+      var on = lit[c.getAttribute('data-center')];
+      c.setAttribute('fill', on ? (c.getAttribute('data-sb-cfill') || c.getAttribute('data-on') || '#bcbcbc') : (c.getAttribute('data-off') || '#ffffff'));
+    });
+  };
+  var i = 0;
+  var step = function () {
+    if (i >= seq.length) return;
+    var a = seq[i++];
+    arrived.push(a);
+    render(a);
+    setTimeout(step, 1100);
+  };
+  setTimeout(step, 900);
+})();
 </script></body></html>`;
 }
 

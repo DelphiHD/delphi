@@ -607,3 +607,28 @@ made, so a missing image is logged and the chart still builds; the push check
 (`scripts/copy-check.ts`) refuses any change that loses one from the code. The
 docx report renderer still reads brand assets from the Desktop, which is fine
 because reports are only run on the Mac.
+
+## Public Figure charts (2026-09-14)
+
+Kaycee wants public figures' charts for teaching and for content readings, starting
+with Ra Uru Hu for the workshop's Origins page. She named the tag "Public Figure"
+(not "Celebrity"). A public figure is a funnel chart with `source = "public-figure"`,
+no account, no email, `visibility = "public"`, and a live link. Added with
+`scripts/add-public-figure.ts` (name, date, time, place), which mirrors the website
+form: the place goes through the provider's own list so the timezone always casts.
+The dashboard labels them Public Figure and leaves them out of the people count, like
+the sandbox. No event room pulls them (the workshop deck selects by event source).
+`republish-all.ts` rebuilds them with everyone else. Ra Uru Hu: 1948-04-09 00:05,
+Montreal, token 5f2133fe9c7aaceee745718497f5b3d1.
+
+## Workshop Stage switches in the chart builder (2026-09-14, not yet committed)
+
+The Stage opens attendees' charts from the workshop folder and needs to drive them
+(build a chart design first, a pair for Conditioning, Origins highlights, first
+names and no birth details on the big screen). A browser will not let a page reach
+into a chart opened from the Desktop, so the chart page itself carries small switches
+that run only when opened from the laptop (`file:` or localhost) with `#stage-build`,
+`#stage-cond`, `#stage-view` or `#origin-view`. A live link never runs them. Kaycee
+approved this on the condition that live charts do not change: no existing chart has
+been republished with them. Ra Uru Hu's new public figure chart was the first page
+published from this builder and carries them, switched off as on any live link.
