@@ -65,6 +65,9 @@ export default async function LoginPage({
         >
           Sign in
         </button>
+        <p className="mt-3 text-sm">
+          <a className="underline" href="/login/reset">Forgot your password?</a>
+        </p>
       </form>
 
       <div className="my-6 flex items-center gap-3 text-xs text-zinc-500">
