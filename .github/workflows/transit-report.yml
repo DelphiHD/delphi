@@ -1,0 +1,93 @@
+name: Daily Transit Report
+
+# Kaycee, 2026-09-28: "Can we move the transit report process off my mac now?"
+# and "I'd like it to run automatically at a specific time every morning."
+#
+# It used to run from a LaunchAgent on her Mac, which meant the report only
+# existed if the machine was awake and its copy of the code was current. Neither
+# held: the nightly pull had been failing for nine days and the report was
+# running from nine-day-old code.
+#
+# Why GitHub Actions and not Vercel Cron: the run takes about eighteen minutes
+# (a cast per phase of the day, then the grounded syntheses). Vercel caps a
+# function long before that. Same reasoning as the Notion sync.
+
+on:
+  schedule:
+    # Six in the morning, Mountain, all year. GitHub only speaks UTC and does
+    # not know about daylight saving, so both hours fire and the one that is not
+    # 6 AM in Denver stops at the first step.
+    - cron: "0 12 * * *"   # 6 AM MDT, summer
+    - cron: "0 13 * * *"   # 6 AM MST, winter
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "A day to (re)build, YYYY-MM-DD. Blank means today."
+        required: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    concurrency:
+      group: transit-report
+      cancel-in-progress: false
+    steps:
+      - name: Is it six in the morning in Denver?
+        id: when
+        run: |
+          HOUR=$(TZ=America/Denver date +%H)
+          DAY=$(TZ=America/Denver date +%F)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "run=yes" >> "$GITHUB_OUTPUT"
+            echo "date=${{ inputs.date }}" >> "$GITHUB_OUTPUT"
+          elif [ "$HOUR" = "06" ]; then
+            echo "run=yes" >> "$GITHUB_OUTPUT"
+            echo "date=$DAY" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=no" >> "$GITHUB_OUTPUT"
+            echo "It is $HOUR:00 in Denver, not six. Leaving today to the other schedule."
+          fi
+
+      - name: Checkout
+        if: steps.when.outputs.run == 'yes'
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        if: steps.when.outputs.run == 'yes'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install deps
+        if: steps.when.outputs.run == 'yes'
+        run: npm ci
+
+      - name: Write the report
+        if: steps.when.outputs.run == 'yes'
+        env:
+          TRANSIT_DATE: ${{ steps.when.outputs.date }}
+          TRANSIT_OUT_DIR: ${{ github.workspace }}/out
+          MYBODYGRAPH_API_KEY: ${{ secrets.MYBODYGRAPH_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npx tsx scripts/transit-report.ts
+
+      - name: Publish it
+        if: steps.when.outputs.run == 'yes'
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npx tsx scripts/publish-transit.ts --date "${{ steps.when.outputs.date }}" --dir "${{ github.workspace }}/out"
+
+      # The report says so itself when something came out thin, and that has to
+      # be visible rather than buried in a log nobody opens.
+      - name: Keep the run's own verdict
+        if: steps.when.outputs.run == 'yes'
+        uses: actions/upload-artifact@v4
+        with:
+          name: transit-${{ steps.when.outputs.date }}
+          path: ${{ github.workspace }}/out
+          retention-days: 14

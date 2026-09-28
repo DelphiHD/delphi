@@ -638,7 +638,12 @@ shifts:        ${scan.shifts.length}
   const finalText = metadataBlock + title + wovenNarrative + "\n\n" + whoSection + appendix;
 
   // 7. Write to a Finder-visible folder + a working cache copy + the log.
-  const outDir = resolve(homedir(), "Desktop", "HD Reports", "Transits");
+  // On her Mac that is her Desktop, where it has always been. In the cloud
+  // there is no Desktop, so the runner says where to put it and the publisher
+  // takes it from there (Kaycee, 2026-09-28: the report runs on GitHub now).
+  const outDir = process.env.TRANSIT_OUT_DIR
+    ? resolve(process.env.TRANSIT_OUT_DIR)
+    : resolve(homedir(), "Desktop", "HD Reports", "Transits");
   mkdirSync(outDir, { recursive: true });
   const outPath = resolve(outDir, `${date} - Daily Transit Report.md`);
   writeFileSync(outPath, finalText);
