@@ -1,7 +1,7 @@
 {
  "project": "Client Portal",
  "goal": "Free chart is the hook. Account required. Reports, extra charts and a subscription are what sells.",
- "updated": "2026-09-12",
+ "updated": "2026-09-28",
  "event": {
   "label": "Kaycee's event",
   "date": "2026-09-16",
@@ -448,6 +448,30 @@
   {
    "on": "2026-09-12",
    "what": "Return charts: the hard part is done and proved. A cycle chart is the connection endpoint called with the person's birth and the return moment, so bodygraph.com computes the four connection types itself, and those are exactly the classification the method uses: Dominance is Educational, Electromagnetic and Compromise are Personal, a bare gate activation is Environmental. It also returns the return's own design side, which landed within a minute of both Maia Mechanics and our own calculation. Kaycee's Uranus Opposition came back with 5 dominances, 5 electromagnetics, 3 compromises and a 4/6 cycle profile. What is left is plumbing a Cycle mode that reuses the relationship drawing, which is deliberately left until after the 14-18 September event: every builder change today needed all 46 charts republished and several surfaced edge cases, and that risk should not land on the week the charts need to be stable."
+  },
+  {
+   "on": "2026-09-16",
+   "what": "The Incarnation Cross text is found by angle, Personality Sun and the four gates, never gates alone. Fifty quads in her Crosses database are two crosses (a Juxtaposition and an angled one) so the old key let one overwrite the other: twenty live charts read another cross's words from 09-13 until now. Publishing refuses a chart whose cross text names a different cross. Fifteen Cross fields in Notion were corrected with her; five with a wrong gate (JC of Possession, JC of Empowering, JC of Oppression, JC of Bargains, LAC of Endeavor) are still open and need her eye. A daily check over all 194 pages runs in the 5 AM health report."
+  },
+  {
+   "on": "2026-09-17",
+   "what": "Variations is live on every chart, between Individual and Transit: one card per stretch of the birth day where the reading changes, cast on first open (about ten seconds) and kept in storage. Opening a card shows the cross, the centres and both placement tables, with a purple pill for a gate that moved and a gold underline for a line that moved. Her words approved 09-17 and 09-20."
+  },
+  {
+   "on": "2026-09-17",
+   "what": "The event stats page carries Incarnation Cross (split by version, grouped by cross) and Variables (PXX DXX, with Unknown for times that are not exact), each with her Delphi Basic on hover. Someone who signs up more than once counts once, by their newest sign-up."
+  },
+  {
+   "on": "2026-09-20",
+   "what": "On a chart whose time is not exact, only what actually changes across the day is drawn unfinished. A line move is not a gate move; a gate a steady planet holds all day is hers; each leg is judged on its own side; a centre defined at every hour is defined even when the wiring changes; a channel with one certain end keeps that end. Found on Sabrina Carpenter's 25, 4 and Ajna."
+  },
+  {
+   "on": "2026-09-28",
+   "what": "The daily transit report runs on GitHub Actions at 6 AM Mountain year round, not on her Mac. It publishes to storage, /t/<date> serves it behind a key, and a LaunchAgent collects it into HD Reports → Transits so Evening Echoes and the health check are unaffected. The report retries any synthesis that comes back empty (on 09-28 the model returned 17 of 25 and three gate popups shipped blank). The dashboard has a Transits page listing each day's link."
+  },
+  {
+   "on": "2026-09-28",
+   "what": "The workshop deck, the Stage, the Living Mandala tables, the worksheet, the light QR card and the chart builder's local-only Stage switches are committed. They had lived only on her Mac since the BFKI workshop, which is why the nightly repo pull had refused to run since 09-17. docs/WORKSHOP_STAGE.md now records how to rebuild the tool for the next event."
   }
  ],
  "open": [

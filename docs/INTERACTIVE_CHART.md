@@ -318,3 +318,90 @@ all: "Calling Claude" then silence until every section is written, fifteen minut
 later. The dashboard should show that as expected rather than stalled, and MUST
 NOT infer a hang from silence. A watchdog built on that inference spent an hour
 killing healthy reports.
+
+## September 2026 — what the chart gained
+
+Written 2026-09-28, covering the month's work on the live client charts. Every
+item below is on every published chart unless it says otherwise.
+
+### Her words, everywhere (09-13)
+
+Delphi Basic replaced Function, Keynote and DBHD Description as the prose in
+every hover: gates, channels, centres, Type, Strategy, Frequencies, Authority,
+Definition, Profile, the variables and the Incarnation Cross. The pills in the
+hovers stayed. Where her library has three states for a centre, the hover shows
+the one that person has.
+
+### Honesty about an unsettled birth time (09-12, refined 09-20)
+
+A chart whose time is not exact draws only what is true at every hour of the
+window solid, and leaves the rest visibly unfinished. The four marks are a light
+purple leg, an open gate disc, a dashed centre outline, and a header field that
+says Exact Birth Time Required with a count of what it could be.
+
+The rules were wrong in four ways and were corrected on 09-20, on Sabrina
+Carpenter's chart:
+
+- A planet that changes line has not changed gate. Design Earth at 4.4 and 4.5
+  is gate 4 either way.
+- A gate a steady planet holds all day is hers even when a fast planet also
+  wanders through it. Her design Jupiter holds 25 at every hour; her Moon only
+  passes through.
+- Each leg belongs to one side and is judged on its own, so a gate can be solid
+  on the design side and open on the personality side.
+- A centre defined at every hour is defined even when a different channel does
+  the defining early and late. Her Ajna is wired by 23-43 throughout.
+- A channel with one certain end keeps that end. The 4 side of her 4-63 is red;
+  only the 63 side, which needs a birth before about 2:56 AM, is open.
+
+### The Incarnation Cross reads the right cross (09-16)
+
+A cross is found by its angle, its Personality Sun and its four gates. Fifty
+quads in her library are two crosses on the same gates, so the old gates-only
+lookup put another cross's words on twenty charts. Publishing now refuses a
+chart whose cross text names a different cross than the provider did. See
+DECISIONS.md, 2026-09-17.
+
+### Variations (09-17, tables 09-20)
+
+A Chart Type button between Individual and Transit. One card per stretch of the
+birth day where the reading changes, each with its bodygraph, Type, Profile,
+Authority, Definition and channels, and anything that changed from the card
+before in purple. Opening a card adds the cross, the centres and both placement
+tables, with a purple pill for a gate that moved and a gold underline for a line
+that moved, and a two-entry key naming those two marks.
+
+The day is cast on first open, about ten seconds, and kept in storage; it is
+recast only when the birth data behind the chart changes. An exact chart marks
+the card holding its own time as Your chart.
+
+### Cycles, and the pills that came off (09-12 to 09-13)
+
+Saturn, the Uranus Opposition, Kiron, the second Saturn and the Uranus Return
+are computed from astronomy rather than read out of a report, and their dates
+sit on the Dates tab. The return pills were removed from the transit tab because
+they drew the cycle's date at whatever hour the picker was on. What a real
+return chart needs is recorded in launch-plan.json, 09-12 and 09-13: it is the
+connection endpoint called with the birth and the return moment, and what
+remains is a Cycle mode reusing the relationship drawing.
+
+### Relationship works for everyone (09-17)
+
+The connection endpoint only knew Kaycee's roster, so every chart made through
+the website form or an event link answered "that chart is no longer on the
+roster". It now reads the chart record for those.
+
+### Event charts (09-14)
+
+A chart made through an event link carries that event's badge in the panel, with
+a link reading See the event that leads to the event's stats page. Chiron and
+Lilith are left out of every count on the stats page while their switches stay
+on the chart.
+
+### Public figures (09-14, more 09-20 and 09-28)
+
+Charts of well-known people, source `public-figure`, labelled Public Figure in
+the funnel and left out of the people count. Ra Uru Hu, Ed Sheeran, Bob Dylan,
+Marilyn Monroe, Sabrina Carpenter, Macklemore, Janis Joplin. Their birth times
+come from the astrology databases, which the funnel says in the Birth Time
+column without storing a new value.

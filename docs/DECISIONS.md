@@ -632,3 +632,113 @@ that run only when opened from the laptop (`file:` or localhost) with `#stage-bu
 approved this on the condition that live charts do not change: no existing chart has
 been republished with them. Ra Uru Hu's new public figure chart was the first page
 published from this builder and carries them, switched off as on any live link.
+
+## 2026-09-17 — A cross is its angle, its Personality Sun and its four gates
+
+**Decision.** The Incarnation Cross text on a chart is found by the cross's angle,
+its Personality Sun and its four gates, never by the gates alone. Fifty quads in
+the Crosses database are two crosses, a Juxtaposition and an angled one, so keying
+on gates alone let one overwrite the other: on 09-13 the cross hover was wired to
+her Delphi Basic and twenty charts began reading another cross's words. Lettie
+Crausby's Left Angle Cross of Cycles read the Juxtaposition Cross of Ambition.
+
+**Guarded three ways**, because prompt-free rules leak the same way copy rules do:
+the key cannot collide, the builder prints nothing when the page it lands on is not
+the cross the provider named, and `publishChart` refuses outright rather than
+publishing a chart whose cross text is about a different cross.
+
+**Her data, corrected with her.** Fifteen Cross fields had their gate pairs read
+across instead of down (Ra's pages print the four gates in two columns). Five more
+have a wrong gate rather than a wrong pairing and are still open: JC of Possession,
+JC of Empowering, JC of Oppression, JC of Bargains, LAC of Endeavor. Two pages are
+the same cross written twice, and RAC of the Maia 1 has no gates; both are left
+alone at her request ("dont delete anything").
+
+**A daily check** over all 194 cross pages runs in the 5 AM health report: it fails
+on gates that do not pair up, on a Personality Sun that is not the gate the entry
+leads with, and on two different crosses that would land on one key.
+
+## 2026-09-17 — Variations: a chart's birth day as the charts it holds
+
+**Decision.** Every chart carries a Variations view, between Individual and
+Transit, showing one card per stretch of the birth day where the reading changes.
+Cards carry the bodygraph, Type, Profile, Authority, Definition and channels, with
+anything that changed from the card before in purple. Opening a card adds the
+Incarnation Cross, the centres and both placement tables, where a different gate
+takes a purple pill and a different line a gold underline.
+
+**Cast on first open, then kept.** `/api/variations` casts the day (about ten
+seconds, roughly eighty provider calls) and keeps the answer in storage beside the
+charts, recast only when the birth data behind the chart changes. The website form
+and republishing stay as fast as they were.
+
+**Only an exact chart marks its own card.** An unknown or approximate time has no
+"Your chart" to mark, because its recorded time is a placeholder.
+
+## 2026-09-20 — What holds all day is drawn as hers
+
+**Decision.** On a chart whose birth time is not exact, only what actually changes
+across the day is drawn as unfinished. Kaycee, on Sabrina Carpenter's 25 and 4:
+"I would expect to see that any defined elements that are consistent across the
+whole day would be defined on the working chart."
+
+Four rules, each of which was wrong before:
+- A planet that changes line has not changed gate. Design Earth reading 4.4 then
+  4.5 leaves gate 4 hers.
+- A gate a steady planet holds all day is hers even if a fast planet also wanders
+  through it.
+- Each leg is judged on its own side, so her design 25 is solid while her
+  personality 25 stays open.
+- A centre defined at every hour is defined even when a different channel does the
+  defining early and late, which is how her Ajna, wired by 23-43 throughout, was
+  being drawn open.
+- A channel with one certain end keeps that end: the 4 side of her 4-63 is red and
+  only the 63 side is open.
+
+## 2026-09-20 — Public figures' birth times, named without a new field
+
+**Decision.** A public figure's time comes from the astrology databases, and the
+funnel says so in the Birth Time column, derived from the chart being a public
+figure. An `astrodb` value was added to `time_accuracy` first and then reverted:
+Kaycee asked why a dashboard label needed a database change, and it did not. The
+charts table keeps its four answers.
+
+## 2026-09-28 — The daily transit report runs in the cloud
+
+**Decision.** Generation moves off her Mac to GitHub Actions, at six in the morning
+Mountain all year: both UTC hours are scheduled and the one that is not six in
+Denver stops at the first step. Vercel is not an option at about eighteen minutes a
+run, the same reasoning as the Notion sync.
+
+**Why.** The report only existed if the machine was awake, and it ran from whatever
+code that copy held. On 09-28 that copy was nine days old because the nightly pull
+had been refusing to run since the 17th.
+
+**Delivery, three ways.** Storage keeps the day; `/t/<date>` serves it behind a key
+held in the environment (`TRANSIT_LINK_KEY`), noindex, no-store; and a LaunchAgent
+on her Mac collects anything missing into HD Reports → Transits every hour, so
+Evening Echoes and the health check read the folder they always have. The run's own
+output is kept as a GitHub artifact for fourteen days.
+
+**This edition is private.** It names her roster and reads their charts. The public
+edition for the blog is the same day with the people taken out, a separate render,
+and is not built.
+
+**Blast radius noted at the time:** Evening Echoes and the 5 AM health check both
+read that folder and keep working through the collector; the report's own library
+now comes from the database into `.cache/chunks.json` on the runner; the brand logo
+lives in the repo so a cloud render is branded.
+
+## 2026-09-28 — A short answer from the model is a failure, not a result
+
+**Decision.** The transit report asks again for any synthesis that comes back
+empty, twice, and names what is still missing. On 09-28 the model returned 17 of 25
+and the published report carried three gate popups with nothing in them.
+
+## 2026-09-28 — The Stage switches are committed
+
+**Decision.** The workshop deck, the Stage, the Living Mandala tables, the light QR
+card, the worksheet and the chart builder's local-only Stage switches are in the
+repo. They had lived only on her Mac since the BFKI workshop, which is why the
+nightly pull had refused to run since the 17th. The switches still only wake on a
+`file:` page or on localhost, so a published chart behaves exactly as before.
