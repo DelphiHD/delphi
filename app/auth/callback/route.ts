@@ -13,6 +13,24 @@ export async function GET(request: NextRequest) {
       ? nextParam
       : "/portal";
 
+  // A link can arrive two ways. The code is the usual one and needs the
+  // verifier cookie this browser set when the link was asked for. A token hash
+  // needs nothing kept: it verifies here, which is what makes a link opened on
+  // another device, or from a mail app's own browser, work at all.
+  const tokenHash = url.searchParams.get("token_hash");
+  const type = (url.searchParams.get("type") ?? "magiclink") as
+    "magiclink" | "recovery" | "invite" | "signup" | "email_change";
+  if (!code && tokenHash) {
+    const supabase = await createClient();
+    const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
+    if (error) {
+      return NextResponse.redirect(
+        new URL(`/login?error=${encodeURIComponent(error.message)}`, url.origin),
+      );
+    }
+    return NextResponse.redirect(new URL(next, url.origin));
+  }
+
   if (!code) {
     return NextResponse.redirect(
       new URL("/login?error=Missing+auth+code", url.origin),

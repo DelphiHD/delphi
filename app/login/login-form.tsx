@@ -29,7 +29,8 @@ export function LoginForm() {
     setStatus(null);
 
     const supabase = createClient();
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin;
+    // the cookie belongs to this origin, so the link must come back to it
+    const siteUrl = window.location.origin;
 
     if (mode === "magic") {
       const { error } = await supabase.auth.signInWithOtp({

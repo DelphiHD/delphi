@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { siteUrl } from "@/lib/site-url";
 
 function safeNext(value: FormDataEntryValue | null): string {
   if (typeof value !== "string") return "/portal";
@@ -11,14 +12,7 @@ function safeNext(value: FormDataEntryValue | null): string {
     : "/portal";
 }
 
-function siteUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    (process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000")
-  );
-}
+
 
 export async function signInWithPassword(formData: FormData) {
   const email = String(formData.get("email") ?? "");
