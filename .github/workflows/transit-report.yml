@@ -64,6 +64,16 @@ jobs:
         if: steps.when.outputs.run == 'yes'
         run: npm ci
 
+      # The report grounds itself in her library from .cache/chunks.json, which
+      # exists on her Mac and nowhere else. A runner starts bare, so it is
+      # written from the database first.
+      - name: Bring her library down
+        if: steps.when.outputs.run == 'yes'
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npx tsx scripts/cache-library.ts
+
       - name: Write the report
         if: steps.when.outputs.run == 'yes'
         env:
