@@ -554,8 +554,8 @@ async function main() {
   // 5a2. Grounded one-line syntheses for the popups + shift-table columns.
   console.log(`Writing grounded syntheses for placements + shifts…`);
   const synthItems = buildSynthesisItems(now, phaseCharts.map((p) => p.positions), scan, library);
-  const ceiling = Number(process.env.HARD_COST_CEILING_CENTS ?? 80);
-  const syntheses = await buildSyntheses({ items: synthItems, identityMd, voiceMd, apiKey, hardCostCeilingCents: ceiling });
+  const synthCeiling = Number(process.env.HARD_COST_CEILING_CENTS ?? 80);
+  const syntheses = await buildSyntheses({ items: synthItems, identityMd, voiceMd, apiKey, hardCostCeilingCents: synthCeiling });
   console.log(`  ${Object.keys(syntheses).length}/${synthItems.length} syntheses returned`);
   // A short answer used to ship as empty popups: on 2026-09-28 the model
   // returned 17 of 25 and three gate popups on the published report said
@@ -566,7 +566,7 @@ async function main() {
     const missing = synthItems.filter((it) => !syntheses[it.key]);
     if (!missing.length) break;
     console.log(`  ${missing.length} came back empty; asking again (round ${round})…`);
-    const again = await buildSyntheses({ items: missing, identityMd, voiceMd, apiKey, hardCostCeilingCents: ceiling });
+    const again = await buildSyntheses({ items: missing, identityMd, voiceMd, apiKey, hardCostCeilingCents: synthCeiling });
     for (const [k, v] of Object.entries(again)) if (v) syntheses[k] = v;
   }
   const stillMissing = synthItems.filter((it) => !syntheses[it.key]);
