@@ -30,10 +30,26 @@ export function PasswordForm() {
     if (password.length < 12) { setSaid("A password needs at least twelve characters."); return; }
     if (password !== again) { setSaid("Those two did not match."); return; }
     setBusy(true);
-    const { error } = await createClient().auth.updateUser({ password });
+    const supabase = createClient();
+    // Whose account this is, before the change: Supabase ends the session when
+    // a password is set, which is why this page used to bounce to the sign-in
+    // screen and the new password looked wrong (Kaycee, 2026-09-28).
+    const { data: { user } } = await supabase.auth.getUser();
+    const email = user?.email ?? "";
+
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) { setBusy(false); setSaid(error.message); return; }
+
+    // Signed out by that change, so sign back in with what she just chose.
+    const back = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
-    if (error) { setSaid(error.message); return; }
+    if (back.error) {
+      setSaid("Your password is set. Sign in with it now.");
+      router.push("/login");
+      return;
+    }
     setSaid("Saved. Taking you to the dashboard.");
+    router.refresh();
     router.push("/portal/admin");
   }
 
