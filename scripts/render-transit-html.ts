@@ -26,7 +26,12 @@ export interface PhaseChart {
 import type { ClientImpact } from "@/lib/transit/impact";
 
 const BRAND_DIR = "/Users/dorothygale/Desktop/Delphi Brand Assets/brand";
-const LOGO_DELPHI_PATH = join(BRAND_DIR, "Delphi.png");
+// The logo lives in the repo as well as in her brand folder. The report is
+// written on a runner now, which has her code but not her Desktop, and the
+// first cloud report came out without a logo (Kaycee, 2026-09-28).
+const LOGO_DELPHI_PATH = existsSync(join("assets", "brand", "Delphi.png"))
+  ? join("assets", "brand", "Delphi.png")
+  : join(BRAND_DIR, "Delphi.png");
 
 // The 13 planets Genetic Matrix lists in its shorthand column (no Chiron/Lilith).
 const SHORTHAND_PLANETS = PLANET_ORDER.slice(0, 13);
