@@ -33,5 +33,5 @@ export async function setPassword(formData: FormData): Promise<void> {
   if (error) say(error.message);
 
   revalidatePath("/portal/password");
-  redirect("/portal/password?said=" + encodeURIComponent("Your password is set. You can sign in with it now."));
+  redirect("/portal/admin?set=1");
 }

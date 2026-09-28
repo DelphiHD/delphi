@@ -35,7 +35,11 @@ export default async function PasswordPage({ searchParams }: { searchParams: Pro
       <h1>Your password</h1>
       <p className="sub">Signed in as {user.email}. Setting one here does not switch off the email link; either will let you in.</p>
 
-      {said && <p className="said">{said}</p>}
+      {said && (
+        <p className="said">
+          {said} <a href="/portal/admin">Go to the dashboard</a>
+        </p>
+      )}
 
       <form action={setPassword}>
         <label htmlFor="password">New password</label>
