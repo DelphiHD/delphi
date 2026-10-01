@@ -34,6 +34,18 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // A redirect is a different response, and the refreshed cookies were set on
+  // this one. Carrying them across is the whole difference between staying
+  // signed in and being thrown out at the next click: without it the browser
+  // keeps a token that has already been rotated away, and the request after
+  // that has no session at all. Kaycee, 2026-10-01: "why do you keep signing
+  // me out?"
+  const redirectKeeping = (url: URL) => {
+    const res = NextResponse.redirect(url);
+    supabaseResponse.cookies.getAll().forEach((c) => res.cookies.set(c));
+    return res;
+  };
+
   const path = request.nextUrl.pathname;
   const isPortal = path.startsWith("/portal");
   const isAuthPage = path === "/login" || path === "/signup";
@@ -42,14 +54,14 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", path);
-    return NextResponse.redirect(url);
+    return redirectKeeping(url);
   }
 
   if (user && isAuthPage) {
     const url = request.nextUrl.clone();
     url.pathname = "/portal";
     url.search = "";
-    return NextResponse.redirect(url);
+    return redirectKeeping(url);
   }
 
   return supabaseResponse;
