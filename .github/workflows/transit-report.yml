@@ -19,6 +19,7 @@ on:
     # 6 AM in Denver stops at the first step.
     - cron: "0 12 * * *"   # 6 AM MDT, summer
     - cron: "0 13 * * *"   # 6 AM MST, winter
+    - cron: "0 17 * * *"   # a catch-up, in case the scheduler is hours late
   workflow_dispatch:
     inputs:
       date:
@@ -33,49 +34,60 @@ jobs:
       group: transit-report
       cancel-in-progress: false
     steps:
-      - name: Is it six in the morning in Denver?
+      # GitHub's scheduler is not punctual: on 09-29 and 09-30 it fired these
+      # crons around six hours late, at midday in Denver, and the old guard
+      # (which insisted the clock said six) threw both days away. So the
+      # question is no longer what time it is, it is whether today's report
+      # exists yet. Late is fine. Twice is not.
+      - name: Which day is this?
         id: when
         run: |
-          HOUR=$(TZ=America/Denver date +%H)
           DAY=$(TZ=America/Denver date +%F)
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "run=yes" >> "$GITHUB_OUTPUT"
-            echo "date=${{ inputs.date }}" >> "$GITHUB_OUTPUT"
-          elif [ "$HOUR" = "06" ]; then
-            echo "run=yes" >> "$GITHUB_OUTPUT"
-            echo "date=$DAY" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=no" >> "$GITHUB_OUTPUT"
-            echo "It is $HOUR:00 in Denver, not six. Leaving today to the other schedule."
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.date }}" ]; then
+            DAY="${{ inputs.date }}"
           fi
+          echo "date=$DAY" >> "$GITHUB_OUTPUT"
+          echo "Working on $DAY (Denver)."
 
       - name: Checkout
-        if: steps.when.outputs.run == 'yes'
         uses: actions/checkout@v4
 
       - name: Setup Node
-        if: steps.when.outputs.run == 'yes'
         uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: "npm"
 
       - name: Install deps
-        if: steps.when.outputs.run == 'yes'
         run: npm ci
+
+      # Already there? Then this is the second schedule of the day, or a rerun,
+      # and there is nothing to do.
+      - name: Is today's report already up?
+        id: done
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if npx tsx scripts/publish-transit.ts --check "${{ steps.when.outputs.date }}"; then
+            echo "already=yes" >> "$GITHUB_OUTPUT"
+            echo "${{ steps.when.outputs.date }} is already published. Nothing to do."
+          else
+            echo "already=no" >> "$GITHUB_OUTPUT"
+          fi
 
       # The report grounds itself in her library from .cache/chunks.json, which
       # exists on her Mac and nowhere else. A runner starts bare, so it is
       # written from the database first.
       - name: Bring her library down
-        if: steps.when.outputs.run == 'yes'
+        if: steps.done.outputs.already == 'no'
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: npx tsx scripts/cache-library.ts
 
       - name: Write the report
-        if: steps.when.outputs.run == 'yes'
+        if: steps.done.outputs.already == 'no'
         env:
           TRANSIT_DATE: ${{ steps.when.outputs.date }}
           TRANSIT_OUT_DIR: ${{ github.workspace }}/out
@@ -86,7 +98,7 @@ jobs:
         run: npx tsx scripts/transit-report.ts
 
       - name: Publish it
-        if: steps.when.outputs.run == 'yes'
+        if: steps.done.outputs.already == 'no'
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -95,7 +107,7 @@ jobs:
       # The report says so itself when something came out thin, and that has to
       # be visible rather than buried in a log nobody opens.
       - name: Keep the run's own verdict
-        if: steps.when.outputs.run == 'yes'
+        if: steps.done.outputs.already == 'no'
         uses: actions/upload-artifact@v4
         with:
           name: transit-${{ steps.when.outputs.date }}
