@@ -59,9 +59,14 @@ const R_DESIGN = 200;
  * wheel comparable, which is why it suits the personality-and-design overlay and
  * will suit a two-person composite. It also matches the HD mandala, which is
  * likewise fixed.
+ *
+ * Kaycee, 2026-10-03: "Can we adjust the astrology charts so that the ascendant
+ * is always at 9:00?" So ASCENDANT is the default everywhere now, overlays and
+ * two-person wheels included. The houses are the point of reading a wheel, and
+ * they are only in their familiar places when the rising degree is on the left.
  */
 export type WheelAnchor = "ascendant" | "aries";
-let ANCHOR: WheelAnchor = "aries";
+let ANCHOR: WheelAnchor = "ascendant";
 
 function pt(lon: number, asc: number, r: number): [number, number] {
   const deg = ANCHOR === "aries" ? 90 + lon : 180 + (lon - asc);
@@ -100,7 +105,7 @@ export interface WheelPartner {
 }
 
 export function renderWheel(chart: AstroChart, name: string, design?: AstroChart | null,
-  anchor: WheelAnchor = "aries", carriedGates: readonly number[] = [],
+  anchor: WheelAnchor = "ascendant", carriedGates: readonly number[] = [],
   personalityGates: readonly number[] = [], designGates: readonly number[] = [],
   partner?: WheelPartner | null, selfColour?: string,
   ringColours?: { a: string; b: string } | null): string {

@@ -9552,7 +9552,7 @@ export async function runBuilder(argv: string[] = process.argv.slice(2)): Promis
   }
 
   const astroHtml = astroChart
-    ? `<div class="astro">${renderWheel(astroChart, client!.name, astroDesign, "aries",
+    ? `<div class="astro">${renderWheel(astroChart, client!.name, astroDesign, "ascendant",
         [...new Set(client!.acts.map((a) => a.gate))],
         [...new Set(client!.acts.filter((a) => a.side === "personality").map((a) => a.gate))],
         [...new Set(client!.acts.filter((a) => a.side === "design").map((a) => a.gate))])}</div>`

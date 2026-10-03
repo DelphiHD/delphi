@@ -57,7 +57,7 @@ async function main() {
     console.log(`  design side unavailable (${(e as Error).message}); drawing the personality wheel alone`);
   }
 
-  let svg = renderWheel(astro, brief.name, design, "aries", carried, personality, designGates);
+  let svg = renderWheel(astro, brief.name, design, "ascendant", carried, personality, designGates);
 
   // Chiron and Lilith are not in Montserrat, and the renderer draws .notdef
   // boxes rather than reaching for another font on its own. Naming the symbol
