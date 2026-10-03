@@ -808,3 +808,27 @@ cast, which is what the chart would have cost from the terminal.
 
 **Blast radius.** New rows in `charts` and `client_charts` only. The scripts
 stay where they are; nothing was removed.
+
+## 2026-10-03 — Nothing asks her Desktop whether a report exists
+
+**Decision.** The Evening Echoes wrapper and the 5 AM health check read storage,
+not `~/Desktop/HD Reports`. `scripts/run-evening-echoes.sh` no longer gates on
+anything; `scripts/evening-echoes.ts` asks storage both questions (is today's
+Echoes already published, and is there a morning report to echo) and exits
+quietly on either. `lib/report/verify.ts` gained `verifyReportBody`, the same
+verdict from the report's text rather than from a file on disk.
+
+**Why.** Generation moved to the cloud on 09-28 and the Desktop collector was
+switched off on 10-02, because Kaycee: "I don't want it on my desktop, that was
+the whole damn point of moving it online." Three things were still looking
+there. Evening Echoes skipped every evening from 10-02 with "no morning report;
+nothing to echo" while the report sat in storage, and the health check reported
+the morning report missing every morning while it was complete. A check that
+cries wolf daily is worse than no check.
+
+**Also.** The LaunchAgent check no longer looks for `com.delphihd.transit-report`,
+which has been parked as `.plist.off` since the job moved to GitHub Actions.
+
+**Not backfilled.** Evening Echoes for 10-02 was not rebuilt: it searches the
+news of the last twenty hours, so a late run would file today's news under
+yesterday's date. The gap stands as a gap.

@@ -248,22 +248,42 @@ async function main() {
   const identityMd = readFileSync(resolve(root, "docs/IDENTITY.md"), "utf8");
   const voiceMd = readFileSync(resolve(root, "docs/VOICE.md"), "utf8");
 
+  // 0. already done, and whether there is anything to echo. Both questions used
+  // to be asked of her Desktop by the wrapper script, which is why Evening
+  // Echoes published nothing from 10-02 onwards: the morning report stopped
+  // landing there when generation moved to the cloud, so the wrapper decided
+  // every evening that there was nothing to echo. Both are asked of storage
+  // now, in the one place that knows.
+  const store = (() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) return null;
+    return { url, key };
+  })();
+
   // 1. the morning report is the source of the day's themes. It is written in
   // the cloud now and kept in storage, so that is where this reads it, rather
   // than from a copy on her Desktop. Kaycee, 2026-10-03: "I don't want it on my
   // desktop, that was the whole damn point of moving it online."
   const morning = await (async () => {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (url && key) {
+    if (store) {
       const { createClient } = await import("@supabase/supabase-js");
-      const db = createClient(url, key, { auth: { persistSession: false } });
+      const db = createClient(store.url, store.key, { auth: { persistSession: false } });
+      const done = await db.storage.from("charts").download(`echoes/${date}.html`);
+      if (done.data && (await done.data.text()).length > 500) {
+        console.log(`${date} already has its Evening Echoes. Nothing to do.`);
+        process.exit(0);
+      }
       const got = await db.storage.from("charts").download(`transits/${date}.md`);
       if (got.data) return await got.data.text();
     }
     // a local copy, if one happens to be around
     const old = resolve(homedir(), "Desktop", "HD Reports", "Transits", `${date} - Daily Transit Report.md`);
     if (existsSync(old)) return readFileSync(old, "utf8");
-    throw new Error(`the morning report for ${date} is not published yet; Evening Echoes reads the day's themes from it`);
+    // Not a failure worth waking anybody for: the morning report runs in the
+    // cloud and is sometimes hours late. The evening run simply has nothing to
+    // read yet, and the next one will.
+    console.log(`the morning report for ${date} is not published yet; nothing to echo.`);
+    process.exit(0);
   })();
   const narrative = extractNarrative(morning);
   console.log(`Read morning themes (${Math.round(narrative.length / 1000)}k chars).`);

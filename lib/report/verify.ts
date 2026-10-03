@@ -12,14 +12,21 @@ export interface ReportCheck { name: string; pass: boolean; detail: string; }
 export interface ReportVerdict { pass: boolean; checks: ReportCheck[]; summary: string; }
 
 export function verifyReportHtml(htmlPath: string, opts: { expectBabies?: boolean } = {}): ReportVerdict {
-  const checks: ReportCheck[] = [];
-  const add = (name: string, pass: boolean, detail: string) => checks.push({ name, pass, detail });
-
   if (!existsSync(htmlPath)) {
     return { pass: false, checks: [{ name: "Report file", pass: false, detail: "file missing" }], summary: "file missing" };
   }
-  const html = readFileSync(htmlPath, "utf8");
-  const kb = Math.round(statSync(htmlPath).size / 1024);
+  return verifyReportBody(readFileSync(htmlPath, "utf8"), Math.round(statSync(htmlPath).size / 1024), opts);
+}
+
+/**
+ * The same verdict from the report's text rather than from a file on disk. The
+ * report lives in storage now, so the 5 AM check reads it from there; nothing
+ * is written to a disk for it to look at. Kaycee, 2026-10-03: "I don't want it
+ * on my desktop, that was the whole damn point of moving it online."
+ */
+export function verifyReportBody(html: string, kb: number, opts: { expectBabies?: boolean } = {}): ReportVerdict {
+  const checks: ReportCheck[] = [];
+  const add = (name: string, pass: boolean, detail: string) => checks.push({ name, pass, detail });
   const count = (re: RegExp) => (html.match(re) ?? []).length;
 
   // A complete report is ~800KB+; a gutted one (no images) is ~380KB.

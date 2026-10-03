@@ -21,7 +21,7 @@ import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 import { notifyMac } from "@/lib/notify";
-import { verifyReportHtml } from "@/lib/report/verify";
+import { verifyReportBody } from "@/lib/report/verify";
 import { castTransitBodygraph } from "@/lib/transit/sky";
 import { invokeLLM } from "@/lib/llm/core";
 
@@ -167,40 +167,66 @@ async function checkCrossLibrary(): Promise<Check> {
   }
 }
 
-function checkYesterdayTransit(): Check {
+/**
+ * Both of these used to look on her Desktop. Nothing lands there any more: the
+ * morning report is generated in the cloud and Evening Echoes publishes beside
+ * it, so from 10-02 both checks failed every single morning while both things
+ * were, in the transit report's case, perfectly fine. A check that cries wolf
+ * daily is worse than no check. They read storage now, which is where the
+ * reports actually are.
+ */
+function yesterday(): string {
   const d = new Date();
   d.setDate(d.getDate() - 1);
-  const day = d.toISOString().slice(0, 10);
-  const path = resolve(homedir(), "Desktop", "HD Reports", "Transits", `${day} - Daily Transit Report.html`);
+  return d.toISOString().slice(0, 10);
+}
+
+async function published(path: string): Promise<string | null> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  const db = createClient(url, key, { auth: { persistSession: false } });
+  const got = await db.storage.from("charts").download(path);
+  return got.data ? await got.data.text() : null;
+}
+
+async function checkYesterdayTransit(): Promise<Check> {
+  const day = yesterday();
+  const name = `Yesterday's transit report (${day})`;
+  const fix = `gh workflow run transit-report.yml -f date=${day}   # rebuild ${day} in the cloud`;
+  const html = await published(`transits/${day}.html`);
+  if (html === null) return { name, pass: false, detail: "not published", fix };
   // Completeness, not just existence: catches a report that generated but came
   // out gutted (no images, empty gate popups, Chiron/Lilith, etc.).
-  const v = verifyReportHtml(path);
+  const v = verifyReportBody(html, Math.round(Buffer.byteLength(html, "utf8") / 1024));
   return {
-    name: `Yesterday's transit report (${day})`,
+    name,
     pass: v.pass,
     detail: v.pass ? "complete (images, babies, gate popups all present)" : v.summary,
-    fix: v.pass ? undefined : `TRANSIT_DATE=${day} ~/delphi/node_modules/.bin/tsx ~/delphi/scripts/transit-report.ts   # regenerate ${day}`,
+    fix: v.pass ? undefined : fix,
   };
 }
 
-function checkYesterdayEchoes(): Check {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  const day = d.toISOString().slice(0, 10);
-  const path = resolve(homedir(), "Desktop", "HD Reports", "Transits", `${day} - Evening Echoes.html`);
-  if (!existsSync(path)) {
+async function checkYesterdayEchoes(): Promise<Check> {
+  const day = yesterday();
+  const name = `Yesterday's Evening Echoes (${day})`;
+  const html = await published(`echoes/${day}.html`);
+  if (html === null || html.length < 500) {
     return {
-      name: `Yesterday's Evening Echoes (${day})`,
+      name,
       pass: false,
-      detail: "file missing",
-      fix: `bash ~/delphi/scripts/run-evening-echoes.sh   # regenerate for ${day}`,
+      detail: html === null ? "not published" : "published but empty",
+      fix: `TRANSIT_DATE=${day} ~/delphi/node_modules/.bin/tsx ~/delphi/scripts/evening-echoes.ts   # rebuild ${day}`,
     };
   }
-  return { name: `Yesterday's Evening Echoes (${day})`, pass: true, detail: "present" };
+  return { name, pass: true, detail: "published" };
 }
 
 function checkLaunchAgents(): Check {
-  const agents = ["com.delphihd.transit-report", "com.delphihd.evening-echoes", "com.delphihd.delphi-pull"];
+  // com.delphihd.transit-report is deliberately not here: the morning report
+  // runs on GitHub Actions since 09-28 and its agent is parked as .plist.off,
+  // so checking for it reported a failure every morning for a job that had
+  // been moved on purpose.
+  const agents = ["com.delphihd.evening-echoes", "com.delphihd.delphi-pull"];
   const failing: string[] = [];
   const details: string[] = [];
   for (const a of agents) {
@@ -261,8 +287,8 @@ async function main() {
     await checkMetadata(),
     await checkChartApis(),
     await checkCrossLibrary(),
-    checkYesterdayTransit(),
-    checkYesterdayEchoes(),
+    await checkYesterdayTransit(),
+    await checkYesterdayEchoes(),
     checkLaunchAgents(),
   ];
 
