@@ -104,6 +104,21 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: npx tsx scripts/publish-transit.ts --date "${{ steps.when.outputs.date }}" --dir "${{ github.workspace }}/out"
 
+      # Every client's own read, filed so their chart shows it without being
+      # rebuilt. This used to live in run-transit-report.sh, the wrapper the
+      # LaunchAgent ran, and was simply left behind when the job moved here on
+      # 09-28: the reports kept coming, the charts' transit view did not move.
+      # Kaycee, 2026-10-03: "I never said to stop publishing the syntheses."
+      #
+      # Runs even when the report was already published, because this pass may
+      # be the first since the push last worked, and --catch-up files any other
+      # published day that never got its reads. The push is idempotent.
+      - name: File every client's read
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npx tsx scripts/push-transit-reads.ts --from-storage --catch-up --date "${{ steps.when.outputs.date }}"
+
       # The report says so itself when something came out thin, and that has to
       # be visible rather than buried in a log nobody opens.
       - name: Keep the run's own verdict

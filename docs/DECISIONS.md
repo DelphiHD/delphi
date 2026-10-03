@@ -832,3 +832,31 @@ which has been parked as `.plist.off` since the job moved to GitHub Actions.
 **Not backfilled.** Evening Echoes for 10-02 was not rebuilt: it searches the
 news of the last twenty hours, so a late run would file today's news under
 yesterday's date. The gap stands as a gap.
+
+## 2026-10-03 — The client reads are filed by the cloud run, and catch themselves up
+
+**Decision.** `scripts/push-transit-reads.ts` runs as a step of the GitHub
+Actions workflow, reading the day's report out of storage (`--from-storage`)
+rather than off a disk, and `--catch-up` files any other published day whose
+reads were never filed. A new health check watches the gap: yesterday's reads
+for the whole roster, or a failure with the command that fixes it.
+
+**Why.** The push lived only in `scripts/run-transit-report.sh`, the wrapper the
+LaunchAgent ran, and was left behind when the job moved to the cloud on 09-28.
+The reports kept arriving and every chart's transit view kept showing the last
+read her laptop had filed. Kaycee, 2026-10-03: "everything should still function
+the same, all we did was move it from my laptop to online, I never said to stop
+publishing the syntheses."
+
+**The lesson, written down.** Moving a job is not moving a script, it is moving
+every step that script did. The wrapper had three jobs in it: generate, verify,
+push. Two came across. Nothing watched the third, which is why a missing step
+took five days to be noticed, by her.
+
+**Backfilled.** 10-01, 10-02 and 10-03, all 37 of the roster. 09-29 and 09-30
+have no reads because no report was published those days, the late-cron failure
+already recorded on 10-01.
+
+**Blast radius.** `lib/transit/reads.ts` gained an optional directory on both
+loaders and a `transitsDir()` that honours `TRANSIT_OUT_DIR`; the default is
+unchanged, so the chart builder on her Mac behaves exactly as before.

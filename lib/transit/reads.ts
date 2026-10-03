@@ -13,6 +13,19 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { CLIENTS } from "@/scripts/client-roster";
 
+/**
+ * Where the day's report markdown is. Her Desktop was the only answer until the
+ * report moved to the cloud; a runner has no Desktop, so the directory the run
+ * wrote into is honoured first. Callers that already hold a directory pass it.
+ */
+export function transitsDir(): string {
+  return process.env.TRANSIT_READS_DIR
+    ?? process.env.TRANSIT_OUT_DIR
+    ?? join(process.env.HOME ?? "", "Desktop", "HD Reports", "Transits");
+}
+
+/** @deprecated read once at import, so it cannot follow an environment that
+ *  changes. Kept for callers that only ever run on her Mac. */
 export const TRANSITS_DIR = join(process.env.HOME ?? "", "Desktop", "HD Reports", "Transits");
 
 export interface DayRead {
@@ -27,14 +40,13 @@ export interface DayRead {
 
 /** Every archived read for this client, keyed by date. Each morning's run adds
  *  one. */
-export function loadAllReads(clientName: string, clientId?: string): Record<string, DayRead> {
-  const dir = TRANSITS_DIR;
+export function loadAllReads(clientName: string, clientId?: string, dir = transitsDir()): Record<string, DayRead> {
   if (!existsSync(dir)) return {};
   const out: Record<string, DayRead> = {};
   for (const f of readdirSync(dir)) {
     const m = /^(\d{4}-\d{2}-\d{2}) - Daily Transit Report\.md$/.exec(f);
     if (!m) continue;
-    const r = loadDayRead(clientName, m[1], clientId);
+    const r = loadDayRead(clientName, m[1], clientId, dir);
     if (r) out[m[1]] = r;
   }
   return out;
@@ -65,8 +77,8 @@ export function headingByRename(
   return heads.find((h) => h[1].trim() === first);
 }
 
-export function loadDayRead(clientName: string, date: string, clientId?: string): DayRead | null {
-  const path = join(TRANSITS_DIR, `${date} - Daily Transit Report.md`);
+export function loadDayRead(clientName: string, date: string, clientId?: string, dir = transitsDir()): DayRead | null {
+  const path = join(dir, `${date} - Daily Transit Report.md`);
   if (!existsSync(path)) return null;
   const md = readFileSync(path, "utf8");
   const writtenAt = /generated_at:\s*(\S+)/.exec(md)?.[1] ?? "";

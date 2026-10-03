@@ -22,6 +22,7 @@ import { homedir } from "node:os";
 import { resolve } from "node:path";
 import { notifyMac } from "@/lib/notify";
 import { verifyReportBody } from "@/lib/report/verify";
+import { CLIENTS } from "./client-roster";
 import { castTransitBodygraph } from "@/lib/transit/sky";
 import { invokeLLM } from "@/lib/llm/core";
 
@@ -206,6 +207,35 @@ async function checkYesterdayTransit(): Promise<Check> {
   };
 }
 
+/**
+ * The reads are what each client sees on their own chart's transit view. They
+ * are filed by a separate step from the report itself, which is how they went
+ * unfiled from 09-28 to 10-03 while the reports kept arriving: nothing was
+ * watching the gap between the two.
+ */
+async function checkTransitReads(): Promise<Check> {
+  const day = yesterday();
+  const name = `Yesterday's client reads (${day})`;
+  const fix = `npx tsx ~/delphi/scripts/push-transit-reads.ts --from-storage --catch-up --date ${day}`;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return { name, pass: false, detail: "no database credentials", fix };
+  const db = createClient(url, key, { auth: { persistSession: false } });
+  // No report that day is not a reads failure; the report check says that.
+  const report = await db.storage.from("charts").list("transits", { limit: 400 });
+  const published = (report.data ?? []).some((f) => f.name === `${day}.md`);
+  if (!published) return { name, pass: true, detail: "no report that day, so no reads to file" };
+  const { count } = await db.from("transit_reads")
+    .select("client_slug", { count: "exact", head: true }).eq("date", day);
+  const roster = Object.keys(CLIENTS).length;
+  const filed = count ?? 0;
+  return {
+    name,
+    pass: filed >= roster,
+    detail: filed >= roster ? `${filed} of ${roster} on the roster` : `only ${filed} of ${roster} on the roster`,
+    fix: filed >= roster ? undefined : fix,
+  };
+}
+
 async function checkYesterdayEchoes(): Promise<Check> {
   const day = yesterday();
   const name = `Yesterday's Evening Echoes (${day})`;
@@ -288,6 +318,7 @@ async function main() {
     await checkChartApis(),
     await checkCrossLibrary(),
     await checkYesterdayTransit(),
+    await checkTransitReads(),
     await checkYesterdayEchoes(),
     checkLaunchAgents(),
   ];
