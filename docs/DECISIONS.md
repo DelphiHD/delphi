@@ -742,3 +742,69 @@ card, the worksheet and the chart builder's local-only Stage switches are in the
 repo. They had lived only on her Mac since the BFKI workshop, which is why the
 nightly pull had refused to run since the 17th. The switches still only wake on a
 `file:` page or on localhost, so a published chart behaves exactly as before.
+
+## 2026-10-03 — A chart with a section missing is not published at all
+
+**Decision.** The chart builder refuses to publish a page that is short a
+bodygraph, a mandala, an astrology wheel, placement tables or the panel, and a
+failed astrology cast throws rather than logging and carrying on.
+
+**Why.** Jim Jones' chart was wanted for its astrology and shipped without it:
+the provider does not know a place called Lynn, Indiana, the cast failed, and
+the build logged the failure and finished the page anyway. Kaycee: "DON'T EVER
+SERVE ME A CHART WITH A FUCKING SECTION MISSING AGAIN." A chart that is missing
+a section is worse than no chart, because it looks finished.
+
+**Blast radius.** Every path that builds a chart, which is all of them: her own
+publishes, the website form, the public-figure script and now the dashboard. A
+place the provider cannot resolve is now a refusal with a reason instead of a
+quiet hole.
+
+## 2026-10-03 — The Ascendant sits at nine o'clock on every astrology wheel
+
+**Decision.** `WheelAnchor` defaults to `ascendant` in `scripts/astro-wheel.ts`
+and at every call site: the chart page, the saved image, and both sides of the
+relationship wheel.
+
+**Why.** Kaycee: "Can we adjust the astrology charts so that the ascendant is
+always at 9:00?" The wheel could already do it. The default was the fixed-zodiac
+anchor, chosen so two sets of planets would land on comparable positions in an
+overlay. That reasoning was about overlays; reading houses is what the wheel is
+for, and the houses are only in their familiar places when the rising degree is
+on the left.
+
+**Blast radius.** Every astrology wheel drawn from now on. Charts published
+before today still carry the Aries-anchored wheel baked into their page and will
+show it until they are rebuilt, which is hers to say.
+
+## 2026-10-03 — Charts are made from the dashboard, not from a terminal
+
+**Decision.** `New chart` on the dashboard, posting to `/api/admin/chart`, which
+is gated on `public.delphi_admins`. Name, place from the provider's lookup, date
+and time, then the four funnel columns as selectors: how they got here, birth
+time accuracy, tier, and who can see it. Choosing who it is for pre-sets the
+usual tier and visibility for that kind of person; both stay editable.
+
+**Why.** Kaycee: "can you just make me a widget on the dashboard with a chart
+creator so I don't have to deal with this kind of bullshit every fucking time I
+need a chart?" A chart she wanted for herself meant a terminal:
+`add-public-figure` for a famous person, `make-sandbox-charts` for a test, a
+hand-written insert for anything else. None of it reachable from a phone, and
+none of it at all with the laptop shut.
+
+**What this is not.** It is not a replacement for `add-client.ts`. That script
+takes a real client the whole way: roster entry, folder, Foundation and
+Planetary Overview, chart, link, Notion row. The dashboard makes a chart and
+files it in the funnel, which is what she needed for a public figure, a test, or
+somebody who walked in at an event.
+
+**Not the public route.** `/api/chart` is the website form and carries rate
+limits, account creation and an email on the end. None of that belongs on a
+chart she is making deliberately, so this is its own route. Both call the same
+`runBuilder`, so a fix to one chart is a fix to every chart.
+
+**Cost.** No Claude call. One provider place lookup, cached a day, and one chart
+cast, which is what the chart would have cost from the terminal.
+
+**Blast radius.** New rows in `charts` and `client_charts` only. The scripts
+stay where they are; nothing was removed.

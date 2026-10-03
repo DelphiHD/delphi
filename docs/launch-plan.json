@@ -1,7 +1,7 @@
 {
  "project": "Client Portal",
  "goal": "Free chart is the hook. Account required. Reports, extra charts and a subscription are what sells.",
- "updated": "2026-09-28",
+ "updated": "2026-10-03",
  "event": {
   "label": "Kaycee's event",
   "date": "2026-09-16",
@@ -59,9 +59,9 @@
     {
      "id": "p1h",
      "title": "Reach the dashboard from anywhere, not just this Mac",
-     "status": "todo",
+     "status": "done",
      "priority": "low",
-     "note": "It runs on the laptop today, so it is only visible while that laptop is on. Lower priority than the launch itself: Kaycee, 9 September."
+     "note": "Done 28 September. /portal/admin is the whole dashboard online, behind her sign-in and public.delphi_admins: Everyone, New chart, Status, Transits, Changes, Accounts, Decided and Launch, sortable, with a find box, working on a phone. The 5 AM health check publishes status/health.json so Status is readable away from the Mac. Running a report from here is the piece still to come."
     },
     {
      "id": "p1i",
@@ -472,6 +472,18 @@
   {
    "on": "2026-09-28",
    "what": "The workshop deck, the Stage, the Living Mandala tables, the worksheet, the light QR card and the chart builder's local-only Stage switches are committed. They had lived only on her Mac since the BFKI workshop, which is why the nightly repo pull had refused to run since 09-17. docs/WORKSHOP_STAGE.md now records how to rebuild the tool for the next event."
+  },
+  {
+   "on": "2026-10-03",
+   "what": "A chart that is missing a section is not published at all. The builder refuses a page short a bodygraph, mandala, astrology wheel, placement tables or panel, and a failed astrology cast throws instead of logging and finishing the page. Jim Jones' chart was wanted for its astrology and shipped without it, because the provider does not know a place called Lynn, Indiana."
+  },
+  {
+   "on": "2026-10-03",
+   "what": "Every astrology wheel is anchored on the Ascendant, at nine o'clock: the chart page, the saved image and both sides of the relationship wheel. The fixed-zodiac anchor was chosen for overlays, but reading houses is what the wheel is for. Charts published before today keep the old orientation until they are rebuilt, which is Kaycee's call."
+  },
+  {
+   "on": "2026-10-03",
+   "what": "Charts are made from the dashboard. New chart posts to /api/admin/chart, gated on public.delphi_admins, with the four funnel columns as selectors: how they got here, birth time accuracy, tier, and who can see it. It retires the terminal for add-public-figure and make-sandbox-charts and uses the same runBuilder every other chart goes through. It does not replace add-client.ts, which takes a real client all the way through reports, folder and Notion row. Not /api/chart either, which is the public form and carries rate limits, account creation and an email."
   }
  ],
  "open": [

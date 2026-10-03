@@ -405,3 +405,39 @@ the funnel and left out of the people count. Ra Uru Hu, Ed Sheeran, Bob Dylan,
 Marilyn Monroe, Sabrina Carpenter, Macklemore, Janis Joplin. Their birth times
 come from the astrology databases, which the funnel says in the Birth Time
 column without storing a new value.
+
+### The Ascendant at nine o'clock (10-03)
+
+Every astrology wheel is anchored on the Ascendant now, with the rising degree
+on the left and the houses running counterclockwise from it: the chart page, the
+saved image, and both sides of the relationship wheel. The fixed-zodiac anchor
+is still in `scripts/astro-wheel.ts` as `WheelAnchor`, because an overlay of two
+sets of planets wants the same degree in the same place; it is no longer what
+anything calls. Charts published before 10-03 carry the old orientation in their
+page until they are rebuilt.
+
+### A chart has to have all of its sections (10-03)
+
+The builder refuses to publish a page that is short a bodygraph, a mandala, an
+astrology wheel, placement tables or the panel, and a failed astrology cast now
+throws instead of logging and finishing the page without it. The failure that
+caused this: the provider does not know a place called Lynn, Indiana, so Jim
+Jones' chart, wanted for its astrology, was published with no astrology at all.
+A place the provider cannot resolve is a refusal with a reason; the nearest town
+it does know (Richmond, Indiana, fifteen miles, same timezone) is what that
+chart is cast from.
+
+### Making a chart from the dashboard (10-03)
+
+`New chart`, the second tab of `/portal/admin`, posting to `/api/admin/chart`
+behind `public.delphi_admins`. Name, place from the provider's own lookup, date
+and time, then the four funnel columns as selectors: how they got here, birth
+time accuracy, tier, and who can see it. Choosing who the chart is for pre-sets
+the usual tier and visibility for that kind of person and both stay editable.
+Events already in the funnel are offered by name, and a new event can be named
+on the spot.
+
+Same `runBuilder` as every other chart, so the missing-section guard applies: a
+chart that cannot draw leaves no row, no link and no half-made page. It does not
+replace `scripts/add-client.ts`, which takes a real client all the way through
+reports, folder and Notion row.

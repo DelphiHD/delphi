@@ -156,7 +156,7 @@ export default async function AdminPage() {
   return (
     <main className="wrap">
       <style>{`
-        .wrap { max-width: 1040px; margin: 0 auto; padding: 20px 14px 56px; }
+        .wrap { width: 100%; max-width: 1040px; margin: 0 auto; padding: 20px 14px 56px; }
         h1 { font-size: 23px; margin: 0 0 2px; }
         .sub { color: var(--muted); font-size: 13px; margin: 0 0 16px; }
         .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 9px; margin-bottom: 18px; }
