@@ -34,8 +34,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ date
   const got = new URL(request.url).searchParams.get("k") ?? "";
   if (!want || got !== want) return away(404);
 
-  const md = new URL(request.url).searchParams.get("md") === "1";
-  const file = await admin().storage.from("charts").download(`transits/${date}${md ? ".md" : ".html"}`);
+  const q = new URL(request.url).searchParams;
+  const md = q.get("md") === "1";
+  // ?e=1 serves that evening's Echoes instead of the morning report.
+  const folder = q.get("e") === "1" ? "echoes" : "transits";
+  const file = await admin().storage.from("charts").download(`${folder}/${date}${md ? ".md" : ".html"}`);
   if (file.error || !file.data) return away(404);
 
   return new NextResponse(await file.data.arrayBuffer(), {

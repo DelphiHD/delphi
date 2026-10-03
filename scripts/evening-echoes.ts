@@ -299,15 +299,32 @@ async function main() {
   const total = results.reduce((n, r) => n + r.articles.length, 0);
   console.log(`  kept ${total} echoes across ${results.filter((r) => r.articles.length).length} themes`);
 
-  // 5. write md + html.
-  mkdirSync(outDir, { recursive: true });
+  // 5. publish md + html, beside the morning report. Nothing lands on her
+  // Desktop any more (Kaycee, 2026-10-03); ECHOES_OUT_DIR writes a copy
+  // somewhere if one is ever wanted.
   const md = renderMarkdown(date, results);
-  const mdPath = resolve(outDir, `${date} - Evening Echoes.md`);
-  writeFileSync(mdPath, md);
-  console.log(`\n✓ ${mdPath}`);
-  const htmlPath = resolve(outDir, `${date} - Evening Echoes.html`);
-  writeFileSync(htmlPath, renderHtml(date, results));
-  console.log(`✓ ${htmlPath}`);
+  const html = renderHtml(date, results);
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (url && key) {
+    const { createClient } = await import("@supabase/supabase-js");
+    const db = createClient(url, key, { auth: { persistSession: false } });
+    for (const [name, body, type] of [
+      [`echoes/${date}.md`, md, "text/markdown; charset=utf-8"],
+      [`echoes/${date}.html`, html, "text/html; charset=utf-8"],
+    ] as const) {
+      const up = await db.storage.from("charts").upload(name, Buffer.from(body, "utf8"),
+        { contentType: type, cacheControl: "0", upsert: true });
+      console.log(up.error ? `  ! ${name}: ${up.error.message}` : `  ✓ ${name}`);
+    }
+    console.log(`\n✓ ${process.env.CHART_SITE ?? "https://charts.delphihd.com"}/t/${date}?e=1`);
+  }
+  if (process.env.ECHOES_OUT_DIR) {
+    const dir = resolve(process.env.ECHOES_OUT_DIR);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(resolve(dir, `${date} - Evening Echoes.md`), md);
+    writeFileSync(resolve(dir, `${date} - Evening Echoes.html`), html);
+    console.log(`  ✓ copies in ${dir}`);
+  }
 
   // em-dash guard (fail loud, matching the morning report's discipline).
   const dashes = (md.match(/—/g) ?? []).length;
