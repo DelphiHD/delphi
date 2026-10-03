@@ -248,13 +248,24 @@ async function main() {
   const identityMd = readFileSync(resolve(root, "docs/IDENTITY.md"), "utf8");
   const voiceMd = readFileSync(resolve(root, "docs/VOICE.md"), "utf8");
 
-  // 1. the morning report is the source of the day's themes.
-  const outDir = resolve(homedir(), "Desktop", "HD Reports", "Transits");
-  const morningPath = resolve(outDir, `${date} - Daily Transit Report.md`);
-  if (!existsSync(morningPath)) {
-    throw new Error(`morning report not found: ${morningPath}\nEvening Echoes reads the day's themes from it. Run the 6 AM transit report first.`);
-  }
-  const narrative = extractNarrative(readFileSync(morningPath, "utf8"));
+  // 1. the morning report is the source of the day's themes. It is written in
+  // the cloud now and kept in storage, so that is where this reads it, rather
+  // than from a copy on her Desktop. Kaycee, 2026-10-03: "I don't want it on my
+  // desktop, that was the whole damn point of moving it online."
+  const morning = await (async () => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (url && key) {
+      const { createClient } = await import("@supabase/supabase-js");
+      const db = createClient(url, key, { auth: { persistSession: false } });
+      const got = await db.storage.from("charts").download(`transits/${date}.md`);
+      if (got.data) return await got.data.text();
+    }
+    // a local copy, if one happens to be around
+    const old = resolve(homedir(), "Desktop", "HD Reports", "Transits", `${date} - Daily Transit Report.md`);
+    if (existsSync(old)) return readFileSync(old, "utf8");
+    throw new Error(`the morning report for ${date} is not published yet; Evening Echoes reads the day's themes from it`);
+  })();
+  const narrative = extractNarrative(morning);
   console.log(`Read morning themes (${Math.round(narrative.length / 1000)}k chars).`);
 
   // 2. themes.
