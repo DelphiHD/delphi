@@ -8998,9 +8998,31 @@ function assertCrossTextBelongs(html: string, who: string): void {
   throw new Error(`${who}: the provider says "${value}" but the text under it is about the ${said[1]} Cross of ${said[2].trim()}. Nothing was published.`);
 }
 
+/**
+ * Every section a client chart is supposed to have, present on the page.
+ *
+ * Kaycee, 2026-10-03, after a chart went out without its astrology: that must
+ * not be possible. The page is read one last time before it goes anywhere, and
+ * a missing piece stops the publish instead of reaching her.
+ */
+function assertNothingMissing(html: string, who: string): void {
+  const wanted: [string, RegExp][] = [
+    ["the bodygraph", /class="canvas plain"/],
+    ["the mandala", /class="[^"]*mandala/],
+    ["the astrology wheel", /class="astro/],
+    ["the placement tables", /class="ptable"/],
+    ["the panel", /id="pmeta"|class="meta/],
+  ];
+  const missing = wanted.filter(([, re]) => !re.test(html)).map(([name]) => name);
+  if (missing.length) {
+    throw new Error(`${who}: the chart is missing ${missing.join(" and ")}. Nothing was published.`);
+  }
+}
+
 async function publishChart(client: ClientCtx, html: string): Promise<string> {
   assertPageScriptsParse(html);
   assertCrossTextBelongs(html, client.name);
+  assertNothingMissing(html, client.name);
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error("NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set to publish");
@@ -9465,7 +9487,14 @@ export async function runBuilder(argv: string[] = process.argv.slice(2)): Promis
         });
       }
     } catch (err) {
-      console.log(`  astrology unavailable: ${(err as Error).message}`);
+      // A chart with a section missing is not a chart. Kaycee, 2026-10-03:
+      // "DON'T EVER SERVE ME A CHART WITH A FUCKING SECTION MISSING AGAIN."
+      // Jim Jones built without his astrology because the provider's location
+      // list has no Lynn, Indiana, and the build carried on regardless.
+      throw new Error(
+        `astrology could not be cast: ${(err as Error).message} ` +
+        "(nothing published; the birth place must be one the provider knows)",
+      );
     }
   }
   // The pair, when the chart was built with one. Failing to reach the provider
