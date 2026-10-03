@@ -4,11 +4,15 @@
  * Kaycee, 2026-09-28: "I WANT THE DASHBOARD THAT WE ARE CURRENTLY WORKING FROM
  * TO EXIST ONLINE. EVERY FUCKING PART OF IT."
  *
- * Tabs, sortable tables, working links, a find box. Everyone, Status, Transits,
- * Changes, Accounts, Decided and Launch. Status used to exist only on her Mac;
- * the 5 AM health check now publishes its answer to storage as well, so it is
- * readable from anywhere. Adding a client and running a report are the pieces
- * still to come, because they take minutes and belong on the runner.
+ * Tabs, sortable tables, working links, a find box. Everyone, New chart,
+ * Status, Transits, Changes, Accounts, Decided and Launch. Status used to exist
+ * only on her Mac; the 5 AM health check now publishes its answer to storage as
+ * well, so it is readable from anywhere.
+ *
+ * New chart (2026-10-03) retires the three terminal scripts she used to reach
+ * for: a chart of anyone, filed anywhere in the funnel, from her phone. Running
+ * a report is the piece still to come, because it takes minutes and belongs on
+ * the runner.
  *
  * Who gets in: public.delphi_admins, the same table the chart policies use.
  */
@@ -20,6 +24,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import launchPlan from "@/docs/launch-plan.json";
 import { SortableTable, Tabs, type Row } from "./table";
+import { CreateChart } from "./create";
 
 export const metadata = { title: "Dashboard — Delphi Human Design" };
 export const dynamic = "force-dynamic";
@@ -89,6 +94,10 @@ export default async function AdminPage() {
   const people = rows.filter((r) => r.source !== "sandbox" && r.source !== "public-figure");
   const signups = people.filter((r) => r.tier !== "seed" && r.source !== "roster");
   const key = process.env.TRANSIT_LINK_KEY ?? "";
+  // Every event already in the funnel, so a second chart for one lands beside
+  // the first instead of starting a near-miss spelling of it.
+  const events = [...new Set(rows.map((r) => String(r.source ?? ""))
+    .filter((s) => s && s !== "sandbox" && s !== "public-figure" && s !== "signup" && s !== "roster"))].sort();
   const plan = launchPlan as Plan;
 
   const everyone: Row[] = rows.map((r) => ({
@@ -180,7 +189,7 @@ export default async function AdminPage() {
         ))}
       </div>
 
-      <Tabs names={["Everyone", "Status", "Transits", "Changes", "Accounts", "Decided", "Launch"]}>
+      <Tabs names={["Everyone", "New chart", "Status", "Transits", "Changes", "Accounts", "Decided", "Launch"]}>
         <SortableTable
           initial={{ key: "since", dir: -1 }}
           columns={[
@@ -193,6 +202,7 @@ export default async function AdminPage() {
           ]}
           rows={everyone}
         />
+        <CreateChart events={events} />
         <div>
           <p className="sub">
             {health.at
