@@ -344,7 +344,7 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
     const [x, y] = pt(lon, asc, R_PLANET - ring * 21);
     const [tx, ty] = pt(lon, asc, R_PLANET - ring * 21 - 13);
     s.push(`<text class="pglyph ${mainSide === "design" ? "dside" : "pside"}" ` +
-      `data-aplanet="${p.name}" data-side="${mainSide}" x="${f(x)}" y="${f(y + 8)}" ` +
+      `data-aplanet="${p.name}" data-side="${mainSide}" data-ring="main" x="${f(x)}" y="${f(y + 8)}" ` +
       `text-anchor="middle" font-size="21" fill="${mainSide === "design" ? DESIGN : INK}">` +
       `${GLYPH[p.name] ?? p.name.slice(0, 2)}</text>`);
     // The degree lives in the hover, not on the face. Twenty-six glyphs plus
@@ -402,7 +402,7 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
       const [tx, ty] = pt(lon, asc, R_DESIGN - ring * 20 - 12);
       const innerSide = mainSide === "design" ? "personality" : "design";
       s.push(`<text class="pglyph ${innerSide === "design" ? "dside" : "pside"}" ` +
-        `data-aplanet="${p.name}" data-side="${innerSide}" ` +
+        `data-aplanet="${p.name}" data-side="${innerSide}" data-ring="inner" ` +
         `x="${f(x)}" y="${f(y + 7)}" text-anchor="middle" font-size="19" ` +
         `fill="${innerSide === "design" ? DESIGN : INK}">` +
         `${GLYPH[p.name] ?? p.name.slice(0, 2)}</text>`);

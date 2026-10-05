@@ -3628,8 +3628,12 @@ body.off-s-personality .mandala [data-side="personality"] { display:none; }
 body.off-s-design .mandala [data-side="design"] { display:none; }
 /* the astrology wheel answers to the same two toggles: personality, design, or
    both at once, which is the overlay. Same person, two moments, one zodiac. */
-body.off-s-personality .astro [data-side="personality"] { display:none; }
-body.off-s-design .astro [data-side="design"] { display:none; }
+/* A side toggle hides the ring laid OVER the chart, never the chart itself.
+   Without the exemption, choosing the design chart and then hiding the design
+   side left an empty wheel, which is what it did: Kaycee, 2026-10-05, "Now the
+   design glyphs are gone entirely." */
+body.off-s-personality .astro [data-side="personality"]:not([data-ring="main"]) { display:none; }
+body.off-s-design .astro [data-side="design"]:not([data-ring="main"]) { display:none; }
 body.off-s-personality .prow[data-side="personality"],
 body.off-s-design .prow[data-side="design"] { opacity:.3; }
 /* the gate number follows whatever is still showing */
@@ -5969,6 +5973,16 @@ if (DATA.client) {
     if (sideDBtn) sideDBtn.classList.add('on');
     astroHidDesign = false;
   };
+  // Synastry is the one astrology view that exists to show both sides at once,
+  // so the opening-on-personality-alone rule above has to stand down for it.
+  // It was not standing down, which is why a synastry chart was drawing lines
+  // between a visible set and an invisible one. Kaycee, 2026-10-05: "The
+  // synastry charts still aren't working."
+  window.__astroBothSides = function (both) {
+    if (designHeld) return;
+    if (both) { leaveAstro(); astroHidDesign = false; }
+    else enterAstro();
+  };
 
   // Chart and view are two independent axes. The chart is whose reading this is:
   // this person alone, this person under today's sky, or this person with
@@ -7524,9 +7538,14 @@ if (DATA.client) {
           // Named rather than lumped. Kaycee, 2026-10-05: "what counts as
           // other?" Measured across three charts, the only minor aspect this
           // provider ever returns is the quintile, so a group called Other was
-          // hiding a single known thing behind a vague word.
-          (showAll && rest.length
-            ? sub(cap(rest[0].aspect) + ' <b>' + rest.length + '</b>', one(rest, null)) : '') +
+          // hiding a single known thing behind a vague word. She asked for
+          // them kept, and they are shown rather than held behind the classic
+          // set: every one measured came in under a degree, which is tighter
+          // than most of what the classic set does show.
+          (rest.length
+            ? sub(cap(rest[0].aspect) + ' <b>' + rest.length + '</b>',
+                one(rest, null).split('line pl-row extra').join('line pl-row core'))
+            : '') +
           sub('Unaspected <b>' + lone.length + '</b>',
             lone.length
               ? lone.map(function (n) {
@@ -7618,6 +7637,8 @@ if (DATA.client) {
           synOn = !synOn;
           bSyn.classList.toggle('on', synOn);
           body.classList.toggle('astro-syn', synOn);
+          // both sets visible, which is the whole point of the view
+          if (window.__astroBothSides) window.__astroBothSides(synOn);
           showSide(curSide);
         });
       } else if (bSyn) {
