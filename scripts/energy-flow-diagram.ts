@@ -4044,11 +4044,9 @@ body.off-p-lilith .astro [data-aplanet="Mean_Lilith"] { display:none; }
 #astrohome .pl-row { cursor:default; border-radius:5px; margin:0 -5px; padding:0 5px; }
 #astrohome .pl-row:hover { background:rgba(241,194,50,.16); }
 body:not(.astro-all) #astroaspects .line.extra { display:none; }
-/* The design chart standing on its own horizon. The renderer draws a chart's
-   own planets in ink and only an overlaid design ring in red, so the colour
-   is put back here rather than teaching the renderer a third kind of chart. */
-.astro.on-design .pglyph.pside { fill:#e06666; }
-.astro.on-design .spoke { stroke:#e06666; }
+/* The renderer colours each ring by the side it belongs to, so nothing is
+   repainted here. It used to be, which is how a design wheel carrying the
+   personality as its inner ring ended up with both rings in the design red. */
 body:not(.mod-self) #astrosiderow { display:none; }
 /* Kaycee's list, 2026-10-05. The marks that ride beside a coordinate: her
    subscript capital R for retrograde, a C for combustion, and dignity as a
@@ -6945,6 +6943,10 @@ if (DATA.client) {
   // the panel is talking about the same chart as the wheel beside it.
   if (DATA.astro) {
     var A = DATA.astro;
+    // The two sides, named once. Everything that looks a placement up has to
+    // ask for a side rather than assume the wheel on screen is the birth one,
+    // because it may be the design chart, with the personality as its ring.
+    var PERS = DATA.astro, DES = DATA.astro.design || null;
     var HOUSE_N = { First_House: 1, Second_House: 2, Third_House: 3, Fourth_House: 4,
       Fifth_House: 5, Sixth_House: 6, Seventh_House: 7, Eighth_House: 8,
       Ninth_House: 9, Tenth_House: 10, Eleventh_House: 11, Twelfth_House: 12 };
@@ -7029,7 +7031,7 @@ if (DATA.client) {
     var chartFor = function (who, side) {
       var C = DATA.connection;
       if (who === 'b' && C) return side === 'design' ? (C.astroDesign || {}) : (C.astro || {});
-      return side === 'design' ? (A.design || {}) : A;
+      return side === 'design' ? (DES || {}) : (PERS || {});
     };
     var byName = function (n, side, who) {
       var list = (chartFor(who, side).planets) || [];
@@ -7053,8 +7055,8 @@ if (DATA.client) {
     // and base, so its coordinate is read from that data rather than taken as
     // the Sun's opposite. It sits where Ra puts it, straight after the Sun.
     var planetsOf = function (side) {
-      var src = (side || curSide) === 'design' ? (A.design || A) : A;
-      return (src.planets || []);
+      var src = (side || curSide) === 'design' ? (DES || PERS) : PERS;
+      return ((src && src.planets) || []);
     };
 
     // The house a placement falls in, under whichever system is chosen. Whole
@@ -7211,7 +7213,7 @@ if (DATA.client) {
               '<div class="vl hn"' + pr + '>' + houseNumber(p, side) + '</div>';
           }).join('') + '</div>';
       };
-      var hasDes = !!(EX && EX.design && A.design);
+      var hasDes = !!(EX && EX.design && DES);
       document.getElementById('astroplanets').innerHTML = hasDes
         ? sub('Personality', sideRows('personality')) + sub('Design', sideRows('design'))
         : sideRows('personality');
@@ -7350,12 +7352,19 @@ if (DATA.client) {
               '<span class="pill house">orb ' + (Math.round(Math.abs(asp.orbit) * 10) / 10) + '\u00b0</span>' +
               (geo ? '<br><span style="opacity:.78">' + esc(geo) + '</span>' : ''));
           }
-          pair.forEach(function (nm) {
-            [].forEach.call(wheelEl.querySelectorAll('[data-aplanet="' + nm + '"][data-side="personality"]'),
+          // Which side these two belong to. On a synastry row the first body
+          // is the personality's and the second the design's; everywhere else
+          // both belong to whichever chart the row is listed under.
+          var rowSide = r.getAttribute('data-side');
+          var synRow = r.getAttribute('data-syn') === '1';
+          pair.forEach(function (nm, i) {
+            var sd = synRow ? (i === 0 ? 'personality' : 'design')
+              : (rowSide === 'design' ? 'design' : 'personality');
+            [].forEach.call(wheelEl.querySelectorAll('[data-aplanet="' + nm + '"][data-side="' + sd + '"]'),
               function (n) { n.classList.add('hov-glyph'); });
-            var sp = wheelEl.querySelector('[data-spoke="personality:' + nm + '"]');
+            var sp = wheelEl.querySelector('[data-spoke="' + sd + ':' + nm + '"]');
             if (sp) { sp.setAttribute('opacity', '.45'); sp.setAttribute('data-hov', '1'); }
-            lightGate(nm, 'personality');
+            lightGate(nm, sd);
           });
         });
         aRows.addEventListener('mouseleave', clearHover);
@@ -7363,7 +7372,7 @@ if (DATA.client) {
     }
 
     var houseRowsFor = function (side) {
-      var src = side === 'design' ? (A.design || null) : A;
+      var src = side === 'design' ? DES : PERS;
       if (!src) return '';
       var c = cuspsNow(side);
       var list = c
@@ -7382,7 +7391,7 @@ if (DATA.client) {
     var paintHouses = function () {
       var box = document.getElementById('astrohouses');
       if (!box) return;
-      var hasDesign = !!(EX && EX.design && A.design);
+      var hasDesign = !!(EX && EX.design && DES);
       box.innerHTML = hasDesign
         ? sub('Personality', houseRowsFor('personality')) + sub('Design', houseRowsFor('design'))
         : houseRowsFor('personality');
@@ -7416,7 +7425,7 @@ if (DATA.client) {
     var paintMode = function () {
       var box = document.getElementById('astromode');
       if (!box) return;
-      box.innerHTML = EX && EX.design && A.design
+      box.innerHTML = EX && EX.design && DES
         ? sub('Personality', modeBars('personality')) + sub('Design', modeBars('design'))
         : modeBars('personality');
     };
@@ -7446,6 +7455,7 @@ if (DATA.client) {
     var paintAspects = function () {
       var isPlanet = {};
       A.planets.forEach(function (p) { isPlanet[p.name] = 1; });
+      var sideTag = 'personality';
       var one = function (list, colour) {
         return (list || []).filter(function (x) {
           return isPlanet[x.p1_name] && isPlanet[x.p2_name];
@@ -7453,7 +7463,8 @@ if (DATA.client) {
           var core = CLASSIC[x.aspect] && !MINOR_PT[x.p1_name] && !MINOR_PT[x.p2_name] &&
             Math.abs(x.orbit) <= 6;
           return '<div class="line pl-row ' + (core ? 'core' : 'extra') +
-            '" data-arow="' + esc(x.p1_name) + '|' + esc(x.p2_name) + '"' +
+            '" data-side="' + (sideTag || 'personality') + '"' +
+            ' data-arow="' + esc(x.p1_name) + '|' + esc(x.p2_name) + '"' +
             (colour ? ' style="border-left:2px solid ' + colour + ';padding-left:6px"' : '') +
             '><i>' + esc(labelOf(x.p1_name)) +
             '</i><span>' + esc(x.aspect) + ' ' + esc(labelOf(x.p2_name)) + '</span><i>' +
@@ -7480,7 +7491,7 @@ if (DATA.client) {
       KINDS.forEach(function (k) { named[k] = 1; });
       var none = '<div class="line none"><i></i><span>0</span><i></i></div>';
       var kindsFor = function (side) {
-        var src = side === 'design' ? (A.design || null) : A;
+        var src = side === 'design' ? DES : PERS;
         if (!src) return '';
         var known = {};
         (src.planets || []).forEach(function (q) { known[q.name] = 1; });
@@ -7505,11 +7516,17 @@ if (DATA.client) {
             return !MINOR_PT[a.p1_name] && !MINOR_PT[a.p2_name] && Math.abs(a.orbit) <= 6;
           });
         };
+        sideTag = side;
         return KINDS.map(function (k) {
           var list = shown(usable.filter(function (a) { return a.aspect === k; }));
           return sub(cap(k) + ' <b>' + list.length + '</b>', list.length ? one(list, null) : none);
         }).join('') +
-          (showAll && rest.length ? sub('Other <b>' + rest.length + '</b>', one(rest, null)) : '') +
+          // Named rather than lumped. Kaycee, 2026-10-05: "what counts as
+          // other?" Measured across three charts, the only minor aspect this
+          // provider ever returns is the quintile, so a group called Other was
+          // hiding a single known thing behind a vague word.
+          (showAll && rest.length
+            ? sub(cap(rest[0].aspect) + ' <b>' + rest.length + '</b>', one(rest, null)) : '') +
           sub('Unaspected <b>' + lone.length + '</b>',
             lone.length
               ? lone.map(function (n) {
@@ -7538,7 +7555,7 @@ if (DATA.client) {
                   var MINORP = { Chiron: 1, Mean_Lilith: 1, Mean_Node: 1, True_Node: 1 };
                   var core = !MINORP[a.p1_name] && !MINORP[a.p2_name] && Math.abs(a.orbit) <= 6;
                   return '<div class="line pl-row ' + (core ? 'core' : 'extra') +
-                    '" data-arow="' + esc(a.p1_name) + '|' + esc(a.p2_name) + '">' +
+                    '" data-syn="1" data-arow="' + esc(a.p1_name) + '|' + esc(a.p2_name) + '">' +
                     '<i>' + esc(labelOf(a.p1_name)) + '</i><span>' + esc(a.aspect) +
                     ' <b class="dsidenm">' + esc(labelOf(a.p2_name)) + '</b></span><i>' +
                     (Math.round(Math.abs(a.orbit) * 10) / 10) + '\u00b0</i></div>';
@@ -7547,7 +7564,7 @@ if (DATA.client) {
         }).join('');
         return;
       }
-      box.innerHTML = (EX && EX.design && A.design)
+      box.innerHTML = (EX && EX.design && DES)
         ? sub('Personality', kindsFor('personality')) + sub('Design', kindsFor('design'))
         : kindsFor('personality');
     };
@@ -7560,7 +7577,6 @@ if (DATA.client) {
     // the chart on screen. Hidden when there is no design chart to show, which
     // is any chart cast without a birth time.
     var sideRow = document.getElementById('astrosiderow');
-    var PERS = A, DES = A.design || null;
     var designTpl = document.getElementById('aswheel-design');
     var liveAstro = document.querySelector('.astro');
     if (sideRow && liveAstro && designTpl && DES && DES.houses && DES.houses.length) {
@@ -7740,7 +7756,7 @@ if (DATA.client) {
         var already = g.classList.contains('lit-glyph');
         clearPicked();
         if (already) return;
-        var src = side === 'design' ? (A.design || {}) : A;
+        var src = chartFor(null, side);
         var pl = ((src.planets) || []).filter(function (x) { return x.name === name; })[0];
         if (!pl) return;
         var spoke = astroEl.querySelector('[data-spoke="' + side + ':' + name + '"]');
@@ -10047,15 +10063,15 @@ export async function runBuilder(argv: string[] = process.argv.slice(2)): Promis
         gateRings[0], gateRings[1], gateRings[2])}</div>` +
       (astroDesign
         ? `<template id="aswheel-design">${renderWheel(astroDesign, client!.name, null, "ascendant",
-            gateRings[0], gateRings[1], gateRings[2])}</template>` +
+            gateRings[0], gateRings[1], gateRings[2], null, undefined, null, "design")}</template>` +
           // The same two wheels with the aspects between the sides drawn on
           // them, which is what a synastry of one person is. Each side keeps
           // its own horizon, so reading it from the design is a different
           // chart rather than the same picture relabelled.
           `<template id="aswheel-personality-syn">${renderWheel(astroChart, client!.name, astroDesign,
-            "ascendant", gateRings[0], gateRings[1], gateRings[2], null, undefined, null, false, cross)}</template>` +
+            "ascendant", gateRings[0], gateRings[1], gateRings[2], null, undefined, null, "personality", cross)}</template>` +
           `<template id="aswheel-design-syn">${renderWheel(astroDesign, client!.name, astroChart,
-            "ascendant", gateRings[0], gateRings[1], gateRings[2], null, undefined, null, true, cross)}</template>`
+            "ascendant", gateRings[0], gateRings[1], gateRings[2], null, undefined, null, "design", cross)}</template>`
         : "")
     : "";
   const htmlPath = join(outDir, `${stem}.html`);

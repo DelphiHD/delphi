@@ -113,9 +113,14 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   personalityGates: readonly number[] = [], designGates: readonly number[] = [],
   partner?: WheelPartner | null, selfColour?: string,
   ringColours?: { a: string; b: string } | null,
-  /** True when this wheel's own chart IS the design side, so a cross aspect's
-   *  first body (always the personality's) belongs to the inner ring. */
-  crossFromDesign = false,
+  /** Which side this wheel's own chart is. Colour and identity follow the
+   *  SIDE, never the ring: on a design wheel carrying the personality as its
+   *  inner ring, both rings came out in the design red and read as one set.
+   *  Kaycee, 2026-10-05: "this synastry view would be much more useful if the
+   *  personality planets showed up on the chart." They were drawn; they were
+   *  painted the same colour as the design and tagged as the design too, so
+   *  nothing could tell them apart, including the hover. */
+  mainSide: "personality" | "design" = "personality",
   /** Aspects BETWEEN the two sets on this wheel, drawn as their own class so
    *  the page can show or hide them. The provider never returns these: it
    *  aspects within one chart only, which is why a synastry has to be worked
@@ -288,8 +293,9 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
     // on, so the line arrives at the glyph. The first body in a cross aspect is
     // always the personality's, which is the inner ring when the wheel itself
     // is the design side.
-    const rP = crossFromDesign ? R_DESIGN - 11 : R_PLANET - 13;
-    const rD = crossFromDesign ? R_PLANET - 13 : R_DESIGN - 11;
+    const fromDesign = mainSide === "design";
+    const rP = fromDesign ? R_DESIGN - 11 : R_PLANET - 13;
+    const rD = fromDesign ? R_PLANET - 13 : R_DESIGN - 11;
     const [x1, y1] = pt(a.p1_abs_pos, asc, rP);
     const [x2, y2] = pt(a.p2_abs_pos, asc, rD);
     s.push(`<line class="asp cross ${core ? "core" : "extra"}" x1="${f(x1)}" y1="${f(y1)}" ` +
@@ -337,8 +343,9 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
     placed.push({ lon, ring });
     const [x, y] = pt(lon, asc, R_PLANET - ring * 21);
     const [tx, ty] = pt(lon, asc, R_PLANET - ring * 21 - 13);
-    s.push(`<text class="pglyph pside" data-aplanet="${p.name}" data-side="personality" x="${f(x)}" y="${f(y + 8)}" ` +
-      `text-anchor="middle" font-size="21" fill="${INK}">` +
+    s.push(`<text class="pglyph ${mainSide === "design" ? "dside" : "pside"}" ` +
+      `data-aplanet="${p.name}" data-side="${mainSide}" x="${f(x)}" y="${f(y + 8)}" ` +
+      `text-anchor="middle" font-size="21" fill="${mainSide === "design" ? DESIGN : INK}">` +
       `${GLYPH[p.name] ?? p.name.slice(0, 2)}</text>`);
     // The degree lives in the hover, not on the face. Twenty-six glyphs plus
     // twenty-six numbers is more ink than the wheel can carry, and the number is
@@ -393,8 +400,11 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
       placedD.push({ lon, ring });
       const [x, y] = pt(lon, asc, R_DESIGN - ring * 19);
       const [tx, ty] = pt(lon, asc, R_DESIGN - ring * 20 - 12);
-      s.push(`<text class="pglyph dside" data-aplanet="${p.name}" data-side="design" ` +
-        `x="${f(x)}" y="${f(y + 7)}" text-anchor="middle" font-size="19" fill="${DESIGN}">` +
+      const innerSide = mainSide === "design" ? "personality" : "design";
+      s.push(`<text class="pglyph ${innerSide === "design" ? "dside" : "pside"}" ` +
+        `data-aplanet="${p.name}" data-side="${innerSide}" ` +
+        `x="${f(x)}" y="${f(y + 7)}" text-anchor="middle" font-size="19" ` +
+        `fill="${innerSide === "design" ? DESIGN : INK}">` +
         `${GLYPH[p.name] ?? p.name.slice(0, 2)}</text>`);
       // no degree label on the design ring: with 26 glyphs on two rings the
       // numbers collide into noise. The hover carries the exact degree.
@@ -416,8 +426,8 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
         `stroke-linecap="round" opacity="0"/>`);
     }
   };
-  spokeFor(chart.planets, "personality");
-  if (design) spokeFor(design.planets, "design");
+  spokeFor(chart.planets, mainSide);
+  if (design) spokeFor(design.planets, mainSide === "design" ? "personality" : "design");
 
   // the angles
   const angles: [string, number][] = [["As", asc], ["Ds", asc + 180], ["Mc", chart.mc], ["Ic", chart.mc + 180]];
