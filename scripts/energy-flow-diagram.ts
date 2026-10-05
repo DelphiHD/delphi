@@ -854,13 +854,15 @@ function transitInner(
   // which half is the sky's to paint.
   for (const g of natal) {
     const lit = transit.has(g);
-    const fill = lit ? TRANSIT_INK : CLIENT_TINT;
+    // Teal is the sky. A gate the client carries keeps its own side's colour
+    // until the sky arrives on it, and then that half reads teal.
     s = s.replace(
       new RegExp(`(<[a-z]+ [^>]*class="pleg"(?![^>]*data-full)[^>]*data-gate="${g}"[^>]*?)\\sfill="[^"]*"`),
-      (_m, head: string) => `${head} data-sky="1" fill="${fill}"`);
+      (_m, head: string) => `${head} data-sky="1" fill="${lit ? CLIENT_TINT : "#000000"}"`);
     s = s.replace(new RegExp(`(<[a-z]+ [^>]*?id="design-${g}"[^>]*?)\\sfill="[^"]*"`),
       (_m, head: string) =>
-        `${head.replace('id="', 'class="pleg" data-gate="' + g + '" data-sky="1" id="')} fill="${fill}"`);
+        `${head.replace('id="', 'class="pleg" data-gate="' + g + '" data-sky="1" id="')} ` +
+        `fill="${lit ? CLIENT_TINT : DESIGN_RED}"`);
   }
 
   for (const g of paintable) {
@@ -869,7 +871,7 @@ function transitInner(
     // rgba(0, 0, 0, 0). These gates are unactivated in the client's chart by
     // definition, so replace whatever fill is there rather than matching one
     // spelling of nothing.
-    const fill = lit ? TRANSIT_INK : "none";
+    const fill = lit ? CLIENT_TINT : "none";
     s = s.replace(new RegExp(`(<[a-z]+ id="personality-${g}"[^>]*?)fill="[^"]*"`),
       (_m, head: string) => `${head.replace('id="', 'class="tleg" data-gate="' + g + '" id="')}fill="${fill}"`);
     s = s.replace(new RegExp(`(<path id="_${g}"[^>]*?)fill="[^"]*"`),
@@ -3434,12 +3436,12 @@ body.view-transit .bridge, body.view-transit .halo { display:none; }
 /* The client tint is a light purple and the awareness centers are a mid purple,
    so a gate disc sitting on the spleen or the solar plexus disappears into it.
    A thin dark rim gives every disc an edge on any centre colour. */
-svg.canvas.transit .gdisc { stroke:#0a5f57; stroke-width:1.1; }
+svg.canvas.transit .gdisc { stroke:#101014; stroke-width:1.1; }
 svg.canvas.transit .pnum.on-disc, svg.canvas.transit .pnum.on-disc.off { fill:#ffffff !important; opacity:1 !important; }
 /* Only a disc with something in it gets a rim. Every gate the client does not
    carry is a paintable transit disc now, so rimming them all drew a black ring
    around every unactivated gate on the chart. */
-svg.canvas.transit .tdisc:not([fill="none"]) { stroke:#101014; stroke-width:1.1; }
+svg.canvas.transit .tdisc:not([fill="none"]) { stroke:#0a5f57; stroke-width:1.1; }
 /* a transit gate lit from its column or from the read */
 svg.canvas.transit .tleg.lit { fill:#f1c232 !important; }
 svg.canvas.transit .tdisc.lit { stroke:#f1c232 !important; stroke-width:3 !important; }
@@ -4628,6 +4630,7 @@ ${d.client ? "" : `<div class="readout" id="readout"></div>`}
 var DATA = ${JSON.stringify(payload)};
 var CLIENT_TINT_JS = ${JSON.stringify(CLIENT_TINT)};
 var TRANSIT_INK_JS = ${JSON.stringify(TRANSIT_INK)};
+var DESIGN_RED_JS = ${JSON.stringify(DESIGN_RED)};
 // The gates the sky holds at the moment currently on screen. Seeded from the
 // moment the chart was built and replaced every time the date picker moves, so
 // a gate the client also carries darkens on the days it is actually transited
@@ -5395,29 +5398,6 @@ if (DATA.client) {
         });
     });
 
-    // Twelve of the 384 gate-lines cross a sign boundary. Anything sitting on
-    // one is named, with the side its exact degree puts it on, because that is
-    // visible on the mandala and worth being able to check.
-    var onEdge = pick(function (p) { return !!p.onBoundary; });
-    var transHtml = '';
-    if (onEdge.length) {
-      // its own collapsed section, one placement per line, closed on opening:
-      // it is a footnote about twelve of the 384 gate-lines, not headline material
-      transHtml = '<details class="drop bdry"><summary>On a sign boundary &middot; ' +
-        onEdge.length + '</summary><div class="cyc" data-kind="trans" ' +
-        'data-key="On a sign boundary" data-pl="' +
-        onEdge.map(function (p) { return p.side + ':' + p.pid; }).join(',') + '">' +
-        '<ul class="bdrylist">' +
-        onEdge.map(function (p) {
-          return '<li>' + (p.side === 'design' ? 'D ' : 'P ') + esc(p.planet) + ' &middot; ' +
-            p.gate + '.' + p.line + ' &middot; ' + esc(p.onBoundary.join('/')) +
-            ' &middot; falls in ' + esc(p.sign) + ' at ' + Math.floor(p.signDeg) + '\u00b0</li>';
-        }).join('') + '</ul></div></details>';
-    }
-
-    // Conjunctions: two or more planets sharing a gate on the SAME side. The
-    // Replicated Gates section above counts a gate held on both sides; this is
-    // the tighter thing, planets sitting together within one side.
     var conj = [];
     ['personality', 'design'].forEach(function (side) {
       var bySideGate = {};
@@ -5453,7 +5433,7 @@ if (DATA.client) {
       table('Activations by Line', lineRows, 'line') +
       table('Activations by Circuit', groupRows, 'group') +
       table('Activations by Center', centerRows, 'center') +
-      table('Activations by Astrological Sign', signRows, 'sign').replace('</details>', transHtml + '</details>') +
+      table('Activations by Astrological Sign', signRows, 'sign') +
       repHtml +
       conjHtml;
     }
@@ -6009,7 +5989,8 @@ if (DATA.client) {
       SKY_LIT = lit;
       [].forEach.call(document.querySelectorAll('svg.canvas.transit .pleg[data-sky]'),
         function (el) {
-          el.setAttribute('fill', lit[el.dataset.gate] ? INK : CLIENT_TINT_JS);
+          el.setAttribute('fill', lit[el.dataset.gate] ? CLIENT_TINT_JS
+            : (el.dataset.fill === 'red' ? DESIGN_RED_JS : INK));
         });
       // a number is only white while there is a disc under it to sit on
       [].forEach.call(document.querySelectorAll('svg.canvas.transit .pnum[data-gate]'), function (n) {
@@ -8876,10 +8857,13 @@ function relight() {
     // load and on every toggle, and without this it puts the traditional black
     // and red straight back over the overlay's own fills.
     var sv = el.closest ? el.closest('svg.canvas') : null;
-    // the client is one colour on this overlay, except the half that is the
-    // sky's: a gate they both carry reads in both, the way a doubled placement does
+    // The chart keeps its own black and red here, and the SKY is the teal.
+    // Kaycee, 2026-10-05: "can we make the transits teal and retain the
+    // personality/design black and red? It's confusing that the transits are
+    // black in that view and the chart is teal." col already holds the
+    // traditional colour for this leg, so only the sky's half is overridden.
     if (sv && sv.classList.contains('transit')) {
-      col = (el.dataset.sky && SKY_LIT[el.dataset.gate]) ? TRANSIT_INK_JS : CLIENT_TINT_JS;
+      if (el.dataset.sky && SKY_LIT[el.dataset.gate]) col = CLIENT_TINT_JS;
     }
     // The pair's chart carries its own colours, one per person. This repaint knows
     // only the traditional black and red and would put them straight back over it,
