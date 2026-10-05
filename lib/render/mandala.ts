@@ -461,8 +461,9 @@ function activationLongitude(a: Activation): number {
   return (range.lines[a.line - 1] + LINE_ARC_DEGREES / 2) % 360;
 }
 
-function activationSpokes(g: Geometry, activations: readonly Activation[]): string {
-  const innerEnd = 0;
+function activationSpokes(
+  g: Geometry, activations: readonly Activation[], innerEnd = 0,
+): string {
   return activations
     .map((a) => {
       const lon = activationLongitude(a);
@@ -737,7 +738,12 @@ export function renderTransitLayer(
   const g = geometry(opts.size ?? 1600);
   const sky = activations.map((a) => ({ ...a, side: "transit" as const }));
   return `<g class="trlayer">` +
-    `<g opacity="0.5">${activationSpokes(g, sky)}</g>` +
+    // Stopping at the hub, because this layer is laid over a wheel whose
+    // bodygraph is already drawn: a spoke run to the centre crosses it.
+    // Kaycee, 2026-10-05: "the transit lines are covering the bodygraph on the
+    // wheel". The chart's own spokes do reach the centre and are covered by
+    // the bodygraph composited after them, which an overlay cannot rely on.
+    `<g opacity="0.5">${activationSpokes(g, sky, g.r.spokeInner)}</g>` +
     activationGlyphs(g, sky, opts.glyphScale ?? 1) +
     `</g>`;
 }
