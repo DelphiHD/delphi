@@ -894,3 +894,64 @@ instead of from an empty chart.
 be punctual to the minute, which this is not; it needs a GitHub token stored in
 Vercel, and this change needed no input from her. Worth revisiting if the ladder
 ever proves not to be enough.
+
+## 2026-10-05 — Five cross entries corrected in Notion
+
+**Decision.** `JC of Empowering` 14/8 | 59/5 becomes 59/55. `JC of Bargains`
+47/40 | 5/35 becomes 37/40. `LAC of Endeavor` 21/48 | 54/43 becomes 54/53.
+`JC of Possession` 45/25 | 36/6 becomes 45/26. `JC of Oppression` 47/22 | 12/22
+becomes 12/11. Each was a single mistyped digit.
+
+**How each was checked, not guessed.** Three independent tests. The two gates in
+a pair must be opposite each other on the mandala. The four gates must sit in
+the shape every other cross page has, which was measured across all 194 rows
+rather than assumed: two opposite pairs a quarter turn apart, 188 of them in one
+of two separations. And the page's own `Personality Sun Gate` relation must name
+the first gate.
+
+**Bargains was the one with a choice in it.** Its gates said 47 and its Sun said
+37, so one of them was wrong. 37 is right: 37 opposes 40, which is the gate
+already written beside it, the Sun relation says 37, and Bargains is gate 37's
+own keynote. Reading it the other way would mean two wrong fields and a name
+that fits neither.
+
+**Not touched.** `RAC of Planning 4` (9/16 | 64/63, an axis belonging to another
+cross), `RAC of the Maia 1` (blank, and the Maya family is already complete
+spelled Maya) and the duplicate `LAC of The Clarion 1`. Those two extras are
+exactly the difference between 194 pages and the 192 Kaycee expects. Hers to
+decide, and she has asked for nothing to be deleted.
+
+**The library still holds the old values** until the Notion sync runs, which is
+never run without asking her.
+
+## 2026-10-05 — The design chart is a chart, not a ring
+
+**Decision.** The Astrology view gets a Personality / Design switch. Design draws
+the design moment as a chart in its own right, on its own horizon, with its own
+Ascendant, Midheaven, house ring and aspects, and the panel's placements, houses
+and aspects all follow it.
+
+**Why.** Kaycee, 2026-10-05: "I thought we had created a feature in the
+astrology module that allowed someone to create a full astrology chart using
+their design date, am I crazy? Where did that go?" She was not crazy and it had
+not gone: the design chart has always been cast in full and shipped into the
+page. Only its planets were ever drawn, as an inner ring on the personality
+wheel, which is the bi-wheel convention. The view was the missing piece, not the
+data, so this costs no extra provider call.
+
+**How it is drawn.** The design wheel is rendered once at build time into an
+inert template and swapped into the live container on request. Every listener in
+the astrology view is bound to that container rather than to the glyphs inside
+it, so a swap needs no rewiring. Its planets are coloured in the design red the
+bodygraph uses, by CSS rather than by teaching the renderer a third kind of
+chart.
+
+**A bug this uncovered.** The unsettled marks on the angles and house ring were
+applied once at load. Any replacement of the drawn wheel dropped them, which was
+already true of the pair's wheel on a connection and would have been true of
+this. On a chart with no birth time that meant a horizon presented as fact. The
+marking is now re-runnable and runs after every swap, and the design horizon
+wears the same marks as the personality one, being exactly as unknown.
+
+**Not republished.** No live chart has been touched. Kaycee, 2026-10-05, on the
+Ascendant change: "hold off, we'll be making more adjustments to that section."

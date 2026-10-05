@@ -4018,6 +4018,12 @@ body.off-ap-Mean_Lilith .astro [data-aplanet="Mean_Lilith"] { display:none; }
 #astrohome .pl-row { cursor:default; border-radius:5px; margin:0 -5px; padding:0 5px; }
 #astrohome .pl-row:hover { background:rgba(241,194,50,.16); }
 body:not(.astro-all) #astroaspects .line.extra { display:none; }
+/* The design chart standing on its own horizon. The renderer draws a chart's
+   own planets in ink and only an overlaid design ring in red, so the colour
+   is put back here rather than teaching the renderer a third kind of chart. */
+.astro.on-design .pglyph.pside { fill:#e06666; }
+.astro.on-design .spoke { stroke:#e06666; }
+body:not(.mod-self) #astrosiderow { display:none; }
 /* this view's home tab is astrology, not Human Design */
 #astrohome { display:none; }
 body.view-astro #astrohome { display:block; }
@@ -4288,6 +4294,7 @@ ${d.client ? "" : viewControls}
 
 
     <div id="astrohome">
+      <div class="row" id="astrosiderow" hidden><button id="asPers" class="on">Personality</button><button id="asDes">Design</button></div>
       <div id="astrometa"></div>
       <div class="row" id="asprow"><button id="aspAll">Show Every Aspect</button></div>
       <details class="drop" open><summary>Placements</summary>
@@ -4637,18 +4644,29 @@ if (DATA.client) {
     // them are planet to planet. Kaycee, 2026-09-12: "1- yes, 2-let's handle it
     // the same." So the angles and the house ring are drawn open and everything
     // else on the wheel stays as it is.
-    var A = (DATA.client.time && DATA.client.time.astro) || null;
-    if (A && A.anglesUnsettled) {
-      [].forEach.call(document.querySelectorAll(
-        '.astro .angle[data-angle], .astro .hnum[data-house], .astro .cusp[data-cusp], .astro .housesector[data-hsector]'
-      ), function (el) { el.classList.add('pending'); });
-    }
-    // the Moon is the one planet that can change sign inside a window
-    if (A && A.moonSigns && A.moonSigns.length > 1) {
-      [].forEach.call(document.querySelectorAll('.astro [data-aplanet="Moon"]'), function (el) {
-        el.classList.add('pending');
-      });
-    }
+    //
+    // Named and re-runnable, because the drawn wheel is replaced at runtime: by
+    // the pair's wheel on a connection, and by the design chart when that side
+    // is asked for. A fresh wheel arrives with none of these marks on it, so
+    // running this once at load left an unsettled chart looking settled the
+    // moment she switched and came back. The design horizon is exactly as
+    // unknown as the personality one, so it wears the same marks.
+    var markAstroPending = function () {
+      var A = (DATA.client.time && DATA.client.time.astro) || null;
+      if (A && A.anglesUnsettled) {
+        [].forEach.call(document.querySelectorAll(
+          '.astro .angle[data-angle], .astro .hnum[data-house], .astro .cusp[data-cusp], .astro .housesector[data-hsector]'
+        ), function (el) { el.classList.add('pending'); });
+      }
+      // the Moon is the one planet that can change sign inside a window
+      if (A && A.moonSigns && A.moonSigns.length > 1) {
+        [].forEach.call(document.querySelectorAll('.astro [data-aplanet="Moon"]'), function (el) {
+          el.classList.add('pending');
+        });
+      }
+    };
+    window.__markAstroPending = markAstroPending;
+    markAstroPending();
 
     // and the placement rows, so a planet that lands on two different gates
     // across the window is not read as one answer
@@ -6048,11 +6066,15 @@ if (DATA.client) {
       } else if (window.__soloWheel && abox.innerHTML !== window.__soloWheel) {
         abox.innerHTML = window.__soloWheel;
       }
+      // a replaced wheel is a wheel with none of the unsettled marks on it
+      if (window.__markAstroPending) window.__markAstroPending();
     }
     // the astrology panel belongs to whichever chart is up: the pair on a
     // connection, this person alone anywhere else
+    if (id !== 'self' && window.__astroSide) window.__astroSide('personality');
     if (window.__paintAstroRows) window.__paintAstroRows();
     if (window.__paintAstroMeta) window.__paintAstroMeta();
+    if (window.__paintAstroHouses) window.__paintAstroHouses();
     if (window.__paintAspects) window.__paintAspects();
     // labels follow the chart, and both parties come back on when it changes
     if (typeof labelParties === 'function') labelParties();
@@ -6204,8 +6226,10 @@ if (DATA.client) {
     }
     paintRelationship();
     // the placements panel now has a second person to show
+    if (id !== 'self' && window.__astroSide) window.__astroSide('personality');
     if (window.__paintAstroRows) window.__paintAstroRows();
     if (window.__paintAstroMeta) window.__paintAstroMeta();
+    if (window.__paintAstroHouses) window.__paintAstroHouses();
     if (window.__paintAspects) window.__paintAspects();
     // the two buttons are named after who is on the chart, so they follow the pick
     if (typeof labelParties === 'function') labelParties();
@@ -6936,6 +6960,9 @@ if (DATA.client) {
     };
     var sun = byName('Sun'), moon = byName('Moon');
     var paintAstroMeta = function () {
+    // Read again on every paint: the view can switch to the design chart, and
+    // the Sun and Moon of that chart are different placements entirely.
+    sun = byName('Sun'); moon = byName('Moon');
     var relMeta = (body.classList.contains('mod-relation') && DATA.connection
       && DATA.connection.astro) ? DATA.connection : null;
     if (relMeta) {
@@ -7168,10 +7195,14 @@ if (DATA.client) {
       }
     }
 
-    document.getElementById('astrohouses').innerHTML = A.houses.map(function (h, i) {
-      return '<div class="line pl-row" data-hrow="' + (i + 1) + '"><i>House ' + (i + 1) +
-        '</i><span>' + esc(h.sign) + ' ' + dg(h.position) + '</span><i></i></div>';
-    }).join('');
+    var paintHouses = function () {
+      document.getElementById('astrohouses').innerHTML = (A.houses || []).map(function (h, i) {
+        return '<div class="line pl-row" data-hrow="' + (i + 1) + '"><i>House ' + (i + 1) +
+          '</i><span>' + esc(h.sign) + ' ' + dg(h.position) + '</span><i></i></div>';
+      }).join('');
+    };
+    window.__paintAstroHouses = paintHouses;
+    paintHouses();
 
     // Both people's aspects when there are two, each under their own name, the
     // same sets the wheel draws.
@@ -7204,6 +7235,40 @@ if (DATA.client) {
     };
     window.__paintAspects = paintAspects;
     paintAspects();
+
+    // Personality or design, as two whole charts rather than one chart wearing a
+    // second ring. Switching swaps the drawn wheel and repoints everything the
+    // panel reads, so the houses, angles, placements and aspects all belong to
+    // the chart on screen. Hidden when there is no design chart to show, which
+    // is any chart cast without a birth time.
+    var sideRow = document.getElementById('astrosiderow');
+    var PERS = A, DES = A.design || null;
+    var designTpl = document.getElementById('aswheel-design');
+    var liveAstro = document.querySelector('.astro');
+    if (sideRow && liveAstro && designTpl && DES && DES.houses && DES.houses.length) {
+      var drawn = { personality: liveAstro.innerHTML, design: designTpl.innerHTML };
+      var bPers = document.getElementById('asPers');
+      var bDes = document.getElementById('asDes');
+      var showSide = function (side) {
+        if (!drawn[side]) return;
+        A = side === 'design' ? DES : PERS;
+        liveAstro.innerHTML = drawn[side];
+        // setModule stashes the solo wheel when the pair takes the stage and
+        // puts it back afterwards. Keep it pointing at the side she chose, or
+        // coming back from a connection would restore the other chart under a
+        // panel still describing this one.
+        window.__soloWheel = drawn[side];
+        liveAstro.classList.toggle('on-design', side === 'design');
+        if (window.__markAstroPending) window.__markAstroPending();
+        bPers.classList.toggle('on', side !== 'design');
+        bDes.classList.toggle('on', side === 'design');
+        paintAstroMeta(); paintAstroRows(); paintHouses(); paintAspects();
+      };
+      bPers.addEventListener('click', function () { showSide('personality'); });
+      bDes.addEventListener('click', function () { showSide('design'); });
+      window.__astroSide = showSide;
+      sideRow.hidden = false;
+    }
 
     // Hovering the wheel. Element and modality belong to the sign itself, so
     // they are counted rather than asked for; the sentence is the provider's
@@ -9551,11 +9616,30 @@ export async function runBuilder(argv: string[] = process.argv.slice(2)): Promis
     }
   }
 
+  // The astrology view, both ways round. The personality wheel carries the design
+  // planets as an inner ring, which is the bi-wheel convention and all it can be:
+  // the design moment has its own horizon, so its houses and angles cannot be
+  // drawn on somebody else's. Kaycee, 2026-10-05: "I thought we had created a
+  // feature in the astrology module that allowed someone to create a full
+  // astrology chart using their design date." The chart was always cast; only the
+  // view was missing. So the design moment is drawn a second time as a chart in
+  // its own right, on its own horizon, with its own houses, angles and aspects.
+  //
+  // It ships inert in a template and is swapped into the live container on
+  // request. Every listener in the astrology view is bound to that container
+  // rather than to the glyphs inside it, so a swap costs nothing to rewire.
+  const gateRings = client
+    ? [[...new Set(client.acts.map((a) => a.gate))],
+       [...new Set(client.acts.filter((a) => a.side === "personality").map((a) => a.gate))],
+       [...new Set(client.acts.filter((a) => a.side === "design").map((a) => a.gate))]] as const
+    : [[], [], []] as const;
   const astroHtml = astroChart
     ? `<div class="astro">${renderWheel(astroChart, client!.name, astroDesign, "ascendant",
-        [...new Set(client!.acts.map((a) => a.gate))],
-        [...new Set(client!.acts.filter((a) => a.side === "personality").map((a) => a.gate))],
-        [...new Set(client!.acts.filter((a) => a.side === "design").map((a) => a.gate))])}</div>`
+        gateRings[0], gateRings[1], gateRings[2])}</div>` +
+      (astroDesign
+        ? `<template id="aswheel-design">${renderWheel(astroDesign, client!.name, null, "ascendant",
+            gateRings[0], gateRings[1], gateRings[2])}</template>`
+        : "")
     : "";
   if (astroChart) scene.astro = astroChart;
   if (astroDesign) scene.astroDesign = astroDesign;
