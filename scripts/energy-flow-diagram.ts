@@ -8170,7 +8170,10 @@ if (DATA.client) {
               if (!a) return '<td></td>';
               return '<td class="has ' + (ASPECT_CLASS[a.aspect] || 'min') +
                 (expectedPair(a) ? ' expected' : '') + '" data-cell="' +
-                esc(r.name) + '|' + esc(c.name) + '">' + (ASPECT_GLYPH[a.aspect] || '?') +
+                esc(r.name) + '|' + esc(c.name) + '" data-aspect="' + esc(a.aspect) +
+                '" data-orb="' + (Math.round(Math.abs(a.orbit) * 10) / 10) +
+                '" data-pairkind="design" data-expected="' + (expectedPair(a) ? '1' : '0') +
+                '">' + (ASPECT_GLYPH[a.aspect] || '?') +
                 '<span class="glab">' + (Math.round(Math.abs(a.orbit) * 10) / 10) + '</span></td>';
             }).join('') + '</tr>';
         }).join('');
@@ -8283,7 +8286,10 @@ if (DATA.client) {
                 var a = at[sd + ':' + r.name + '|' + c.name];
                 if (!a) return '<td></td>';
                 return '<td class="has ' + (ASPECT_CLASS[a.aspect] || 'min') +
-                  '" data-cell="' + esc(r.name) + '|' + esc(c.name) + '">' +
+                  '" data-cell="' + esc(r.name) + '|' + esc(c.name) +
+                  '" data-aspect="' + esc(a.aspect) +
+                  '" data-orb="' + (Math.round(Math.abs(a.orbit) * 10) / 10) +
+                  '" data-pairkind="transit" data-rowside="' + sd + '">' +
                   (ASPECT_GLYPH[a.aspect] || '?') + '<span class="glab">' +
                   (Math.round(Math.abs(a.orbit) * 10) / 10) + '</span></td>';
               }).join('') + '</tr>';
@@ -8350,19 +8356,30 @@ if (DATA.client) {
             return;
           }
           if (!c) { tip.hidden = true; return; }
+          // The cell carries its own aspect. This used to look the pair up in
+          // the chart's personality-to-design synastry whichever grid was on
+          // screen, so on a transit grid it found the natal pair of the same
+          // two names and reported THAT: Kaycee's cell said trine 0.1 and the
+          // tooltip said square 7.7, and her Uranus opposition read as a
+          // conjunction. Pairs with no natal aspect had nothing to find, which
+          // is why the rest came up blank. 2026-10-05.
           var pair = (c.getAttribute('data-cell') || '').split('|');
-          var a = (EX.synastry || []).filter(function (x) {
-            return x.p1_name === pair[0] && x.p2_name === pair[1];
-          })[0];
-          if (!a) { tip.hidden = true; return; }
+          var asp = c.getAttribute('data-aspect');
+          if (!asp) { tip.hidden = true; return; }
+          var kind = c.getAttribute('data-pairkind') || 'design';
+          var rowSide = c.getAttribute('data-rowside');
+          var firstNm = (rowSide === 'design' ? 'Design ' : '') + labelOf(pair[0]);
+          var secondNm = (kind === 'transit' ? 'Transit ' : '') + labelOf(pair[1]);
           // The page hides the tooltip for any pointer move it does not
           // recognise, and a grid cell is not something it knows about, so the
           // tip was being built and then hidden again in the same move.
           e.stopPropagation();
-          showTip(e, '<b><span style="color:#2f2a33">' + esc(labelOf(a.p1_name)) + '</span> ' +
-            esc(a.aspect) + ' <span style="color:#e06666">' + esc(labelOf(a.p2_name)) + '</span></b>' +
-            '<span class="pill house">orb ' + (Math.round(Math.abs(a.orbit) * 10) / 10) + '\u00b0</span>' +
-            (expectedPair(a) ? '<span class="pill">Expected over 88 days</span>' : ''));
+          showTip(e, '<b><span style="color:#2f2a33">' + esc(firstNm) + '</span> ' +
+            esc(asp) + ' <span style="color:' + (kind === 'transit' ? '#0d9488' : '#e06666') +
+            '">' + esc(secondNm) + '</span></b>' +
+            '<span class="pill house">orb ' + esc(c.getAttribute('data-orb')) + '\u00b0</span>' +
+            (c.getAttribute('data-expected') === '1'
+              ? '<span class="pill">Expected over 88 days</span>' : ''));
         });
         liveAstro.addEventListener('mouseleave', function () { if (gridOn) tip.hidden = true; });
       }
