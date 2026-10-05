@@ -38,7 +38,16 @@ export const maxDuration = 60;
 export const runtime = "nodejs";
 
 const TRANSIT_COLOUR = "#0d9488";
-const GREENWICH = { place: "Greenwich, England, United Kingdom", timezone: "Europe/London" };
+
+/**
+ * The default moment is Greenwich time, which is UTC, and that is not the
+ * same thing as London's clock: London runs an hour ahead of it all summer.
+ * So the hour is read as UTC outright rather than as a local time somewhere,
+ * and the only thing the place is used for is the horizon the houses hang
+ * off. The provider has no Greenwich of its own; London is eight kilometres
+ * away and is the nearest it knows.
+ */
+const GREENWICH_PLACE = "London, England, United Kingdom";
 
 /** Tight, because a transiting body is always in range of something. */
 const TRANSIT_ORBS: Record<string, number> = {
@@ -57,7 +66,11 @@ export async function GET(request: Request): Promise<Response> {
   const side = q.get("side") === "design" ? "design" : "personality";
   // "alone" draws the sky by itself; otherwise it rides over the named side.
   const mode = q.get("mode") === "alone" ? "alone" : "over";
-  const place = (q.get("place") ?? "").trim() || GREENWICH.place;
+  // A place sent from the form is a local clock somewhere. No place means
+  // Greenwich, and Greenwich time is UTC.
+  const asked = (q.get("place") ?? "").trim();
+  const place = asked || GREENWICH_PLACE;
+  const atUtc = asked ? undefined : `${date}T${time}:00+00:00`;
 
   if (!/^[0-9a-f]{32}$/.test(token)) return bad("that is not a chart");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return bad("a date is needed, as YYYY-MM-DD");
@@ -75,14 +88,14 @@ export async function GET(request: Request): Promise<Response> {
 
   try {
     // The sky itself, cast where the reader asked for it.
-    const sky = await getAstro({ birthDate: date, birthTime: time, place });
+    const sky = await getAstro({ birthDate: date, birthTime: time, place, atUtc });
 
     if (mode === "alone") {
       return NextResponse.json({
         ok: true,
         wheelSvg: renderWheel(sky, "Transit", null, "ascendant", [], [], []),
         aspects: [],
-        place,
+        place, utc: !asked,
       });
     }
 
@@ -115,7 +128,7 @@ export async function GET(request: Request): Promise<Response> {
         orbit: Math.round(Math.abs(a.orbit) * 10) / 10,
         moon: a.p2_name === "Moon",
       })),
-      place,
+      place, utc: !asked,
     });
   } catch (e) {
     const why = e instanceof Error ? e.message : String(e);
