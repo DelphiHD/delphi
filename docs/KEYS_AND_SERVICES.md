@@ -82,3 +82,32 @@ time somebody needs a migration.
   `/portal/admin` and the chart policies check.
 - `hello@delphihd.com` is marked admin on its profile but is not in that table,
   by her decision on 2026-09-28: it stays the business inbox, not a login.
+
+## Who can see what
+
+Three levels, and the dashboard's Accounts tab is where they are read and
+changed. Kaycee, 2026-10-05: "people will be making their own accounts from
+the website so I likely wont be involved most of the time."
+
+| Level | Sees | Granted by |
+|---|---|---|
+| An account | Only charts it owns | Made automatically when somebody gives an email on the website form |
+| A client of an analyst | Nothing extra; the analyst sees their charts | Kaycee, on the Accounts tab |
+| Admin | Everything, and can change permissions | Kaycee, on the Accounts tab |
+
+Admin is one row in `public.delphi_admins`. The table has row level security
+on, no policies, and no grants to `anon` or `authenticated`, so it can only be
+written by something holding the service key. The dashboard does that on her
+behalf after checking she is an admin herself.
+
+**The last admin cannot be removed.** There is no other way back in: an empty
+admin table would have to be repaired with a database client and the service
+key. The endpoint counts first and refuses.
+
+**A client link is always between the signed-in admin and one person.** The
+endpoint never lets an admin hand one analyst another analyst's client, which
+matters the day there is a second analyst.
+
+What is deliberately absent: a log of permission changes. With one admin and
+no way to write the table from outside, a log would be ceremony. Add one the
+day a second admin exists.

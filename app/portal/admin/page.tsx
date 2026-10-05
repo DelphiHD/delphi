@@ -24,6 +24,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import launchPlan from "@/docs/launch-plan.json";
 import { SortableTable, Tabs, type Row } from "./table";
+import { People, type Person } from "./people";
 import { CreateChart } from "./create";
 
 export const metadata = { title: "Dashboard — Delphi Human Design" };
@@ -59,11 +60,13 @@ export default async function AdminPage() {
   const { data: isAdmin } = await db.from("delphi_admins").select("user_id").eq("user_id", user.id).maybeSingle();
   if (!isAdmin) redirect("/portal");
 
-  const [{ data: charts }, { data: links }, { data: profiles }, transits] = await Promise.all([
-    db.from("charts").select("person_name, source, tier, time_accuracy, token, created_at, for_email").order("created_at", { ascending: false }),
+  const [{ data: charts }, { data: links }, { data: profiles }, transits, admins, mine] = await Promise.all([
+    db.from("charts").select("person_name, source, tier, time_accuracy, token, created_at, for_email, owner_id").order("created_at", { ascending: false }),
     db.from("client_charts").select("token, client_name, revoked_at"),
-    db.from("profiles").select("email, account_type, created_at"),
+    db.from("profiles").select("id, email, account_type, created_at"),
     db.storage.from("charts").list("transits", { limit: 90, sortBy: { column: "name", order: "desc" } }),
+    db.from("delphi_admins").select("user_id"),
+    db.from("analyst_clients").select("client_id").eq("analyst_id", user.id).is("ended_at", null),
   ]);
 
   // The 5 AM health check publishes its answer here, so Status is not a thing
@@ -115,10 +118,24 @@ export default async function AdminPage() {
     since: String(r.created_at ?? "").slice(0, 10),
   }));
 
-  const accounts: Row[] = (profiles ?? []).map((p, i) => ({
-    id: `a${i}`, email: String(p.email ?? ""), kind: String(p.account_type ?? ""),
+  // Every account, with what it can see. Accounts arrive on their own now, so
+  // this is where Kaycee finds out who turned up and the only place either
+  // permission can be granted without a database client.
+  const adminIds = new Set((admins.data ?? []).map((a) => String(a.user_id)));
+  const clientIds = new Set((mine.data ?? []).map((c) => String(c.client_id)));
+  const chartsPer = new Map<string, number>();
+  for (const c of rows) {
+    const o = (c as { owner_id?: string }).owner_id;
+    if (o) chartsPer.set(String(o), (chartsPer.get(String(o)) ?? 0) + 1);
+  }
+  const accountList: Person[] = (profiles ?? []).map((p) => ({
+    id: String(p.id),
+    email: String(p.email ?? ""),
+    charts: chartsPer.get(String(p.id)) ?? 0,
+    admin: adminIds.has(String(p.id)),
+    client: clientIds.has(String(p.id)),
     since: String(p.created_at ?? "").slice(0, 10),
-  }));
+  })).sort((a, b) => Number(b.admin) - Number(a.admin) || a.email.localeCompare(b.email));
 
   const days: Row[] = (transits.data ?? []).filter((f) => f.name.endsWith(".html")).map((f) => {
     const date = f.name.replace(/\.html$/, "");
@@ -147,7 +164,7 @@ export default async function AdminPage() {
   const cards: [string, number, string][] = [
     ["People", people.length, "charts that belong to somebody"],
     ["Signed up", signups.length, "through the website or an event"],
-    ["Accounts", accounts.length, "can sign in"],
+    ["Accounts", accountList.length, "can sign in"],
     ["Live links", live.size, "charts anyone can open"],
     ["Public figures", figures.length, "teaching charts"],
     ["Sandbox", sandbox.length, "not people"],
@@ -177,6 +194,14 @@ export default async function AdminPage() {
         .dim { color: var(--muted); }
         .count { font-size: 11px; color: var(--muted); margin: 8px 2px 0; }
         .note { font-size: 13px; color: var(--muted); background: rgba(132,80,149,.06); border-radius: 12px; padding: 12px 14px; }
+        .perm { font: inherit; font-size: 11.5px; padding: 4px 9px; border-radius: 999px; cursor: pointer;
+          border: 1px solid rgba(132,80,149,.28); background: #fff; color: var(--muted); white-space: nowrap; }
+        .perm.on { background: var(--purple); border-color: var(--purple); color: #fff; font-weight: 600; }
+        .perm[disabled] { opacity: .45; cursor: default; }
+        .tier { margin-left: 6px; font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase;
+          color: var(--purple); background: rgba(132,80,149,.1); padding: 2px 6px; border-radius: 999px; }
+        .note { font-size: 12.5px; color: #9c4a28; background: rgba(192,96,60,.09);
+          border-radius: 10px; padding: 9px 11px; margin: 0 0 10px; }
         @media (max-width: 620px) { .hide-sm { display: none; } }
       `}</style>
 
@@ -243,15 +268,7 @@ export default async function AdminPage() {
           rows={changes}
           empty="No chart publishes recorded."
         />
-        <SortableTable
-          initial={{ key: "since", dir: -1 }}
-          columns={[
-            { key: "email", label: "Email" },
-            { key: "kind", label: "Kind", small: true },
-            { key: "since", label: "Since" },
-          ]}
-          rows={accounts}
-        />
+        <People people={accountList} meId={user.id} />
         <SortableTable
           initial={{ key: "on", dir: -1 }}
           columns={[{ key: "on", label: "When" }, { key: "what", label: "What was decided" }]}
