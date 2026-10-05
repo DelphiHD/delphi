@@ -320,7 +320,13 @@ function checkLaunchAgents(): Check {
 }
 
 function checkEnv(): Check {
-  const required = ["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "MYBODYGRAPH_API_KEY", "NOTION_TOKEN"];
+  // SUPABASE_ACCESS_TOKEN is here because it went missing once without
+  // anyone noticing. Kaycee made one on 2026-09-13 and it was gone by
+  // 10-05, so she was walked through the same confusing permissions form
+  // a second time to unblock one migration. A key that is only noticed
+  // when it is needed is a key that costs her an evening.
+  const required = ["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY", "MYBODYGRAPH_API_KEY", "NOTION_TOKEN", "SUPABASE_ACCESS_TOKEN"];
   const missing = required.filter((k) => !process.env[k]);
   if (missing.length) {
     return {

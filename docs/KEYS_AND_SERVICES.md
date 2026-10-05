@@ -32,6 +32,18 @@ could ever arrive.
 | `RESEND_FROM_EMAIL` | yes | yes | | who mail comes from | the same |
 | `TRANSIT_LINK_KEY` | yes | yes | | the daily report's private link | `/t/<date>` answers 404 to everyone |
 | `SUPABASE_ACCESS_TOKEN` | yes | | | applying migrations without the dashboard | a migration needs SQL pasted by hand |
+
+`SUPABASE_ACCESS_TOKEN` is set in `~/delphi/.env.local` as of 2026-10-05. Scopes
+granted: read and write on the database group, nothing else, which is all
+`scripts/apply-migration.ts` needs (it posts to the management API's
+`/v1/projects/<ref>/database/query`). Revoke or replace it at
+supabase.com/dashboard/account/tokens.
+
+It has gone missing once already: Kaycee made one on 2026-09-13 and it was not
+there on 10-05, so she was sent back through the same permissions form to
+unblock one migration. The 5 AM health check now names it among the required
+keys, so its absence is reported the morning it happens rather than the next
+time somebody needs a migration.
 | `SUPABASE_PROJECT_REF` | yes | | | which project a migration goes to | the same |
 
 ## Known gaps, 2026-09-28
@@ -41,7 +53,7 @@ could ever arrive.
   email: not a chart, not a sign-in link, not a password reset. A key from
   resend.com fixes it in one step; the from address is the one already verified
   for chart mail on send.delphihd.com.
-- `SUPABASE_ACCESS_TOKEN` is not set anywhere, so a migration has to be pasted
+- ~~`SUPABASE_ACCESS_TOKEN` is not set anywhere, so a migration has to be pasted~~ Set 2026-10-05; see above. Old note:
   into the SQL editor by hand rather than applied by `scripts/apply-migration.ts`.
 - `NEXT_PUBLIC_SUPABASE_URL` is absent from the runner; the workflows pass
   `SUPABASE_URL` instead and map it, which works but means the same value is
