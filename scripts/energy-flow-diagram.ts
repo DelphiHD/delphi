@@ -9901,6 +9901,12 @@ function gatePills(L, here, withLine) {
 // and already knows whether this chart carries the gate. Every view's gate
 // hover comes through here: the bodygraph, the mandala, the astrology ring,
 // the placements list and the bridge chips.
+/** "north-node" as "North Node". The mandala tags its bodies by id. */
+function prettyPlanet(id) {
+  return String(id || '').split('-').map(function (w) {
+    return w.charAt(0).toUpperCase() + w.slice(1);
+  }).join(' ');
+}
 function gateTipHtml(g, only, extraPill, underPills) {
   var L = (DATA.gateLib || {})[g] || {};
   var here = only || byGate[g] || [];
@@ -10177,6 +10183,23 @@ document.addEventListener('mousemove', function (e) {
   }
   var mp = e.target.closest ? e.target.closest('.mandala [data-planet]') : null;
   if (mp) {
+    // A transiting body on the wheel is not in this chart's placements, so it
+    // answers from the transit the way it does in every other view. Kaycee,
+    // 2026-10-05: "Can we add the mouseovers to the transiting planet glyphs
+    // on the wheel view?" The layer tags them with the mandala's own planet
+    // id, which is the key the timings are already held under.
+    if (mp.dataset.side === 'transit') {
+      var tp = mp.dataset.planet;
+      var tt = (window.__transitTiming || {})[tp];
+      var tgate = tt ? tt.gate : +mp.dataset.gate;
+      hot(null); markRows(null); litGate(tgate);
+      showTip(e, '<b>Transit ' + esc(prettyPlanet(tp)) +
+        (tt ? ' ' + tt.gate + '.' + tt.line : '') + '</b>' +
+        gateTipHtml(tgate, null,
+          window.__trSignPill ? window.__trSignPill(tp) : '',
+          window.__trTimingHtml ? window.__trTimingHtml(tp) : ''));
+      return;
+    }
     var mpl = placeBy[mp.dataset.side + '|' + mp.dataset.planet];
     if (mpl) {
       hot(null); markRows(null); litGate(mpl.gate);
