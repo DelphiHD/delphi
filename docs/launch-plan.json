@@ -1,7 +1,7 @@
 {
  "project": "Client Portal",
  "goal": "Free chart is the hook. Account required. Reports, extra charts and a subscription are what sells.",
- "updated": "2026-10-03",
+ "updated": "2026-10-05",
  "event": {
   "label": "Kaycee's event",
   "date": "2026-09-16",
@@ -484,6 +484,10 @@
   {
    "on": "2026-10-03",
    "what": "Charts are made from the dashboard. New chart posts to /api/admin/chart, gated on public.delphi_admins, with the four funnel columns as selectors: how they got here, birth time accuracy, tier, and who can see it. It retires the terminal for add-public-figure and make-sandbox-charts and uses the same runBuilder every other chart goes through. It does not replace add-client.ts, which takes a real client all the way through reports, folder and Notion row. Not /api/chart either, which is the public form and carries rate limits, account creation and an email."
+  },
+  {
+   "on": "2026-10-05",
+   "what": "Astro-cartography is a planned module, not scheduled. Kaycee's requirements, recorded so they are not re-derived: it exists to compare the personality and design maps, each viewable on its own and both together, and it is offered only for known birth times. Groundwork already in place: birth coordinates are geocoded and cached for every chart, and astronomy-engine is already a dependency (lib/hd/ephemeris.ts), so the right ascension and declination the lines need are computable in house. The provider cannot supply them; its astrology endpoint returns ecliptic longitude only. An angular line moves about 15 degrees of longitude per hour of birth time, which is why rough and unknown times are excluded rather than drawn open."
   }
  ],
  "open": [
@@ -524,5 +528,6 @@
    "what": "Return charts, properly. Kaycee, 2026-09-12: 'we need to remove the return chart pills from the transit page, they still aren't entirely accurate and it will be important that they are for this part.' Three things a real return chart needs that a transit view cannot give it. The exact moment, not the date: 'The line on the sun/earth placements is incredibly important as it's a profile that sets the tone for the cycle', and a line is about a hundred minutes of solar travel. Its own design side, about 88 solar degrees before the return, exactly as a birth chart has. And probably its own drawing, closer to a relationship chart than a transit: the return laid over the natal, two states at once, which she first raised on 2026-09-10 about the Uranus Opposition cross. The moments are already computed to the second and verified against Swiss Ephemeris, so the arithmetic is done; the chart is not."
   }
  ],
- "brief": "https://claude.ai/code/artifact/3428e24e-262a-4fd7-86a6-93468244cb44"
+ "brief": "https://claude.ai/code/artifact/3428e24e-262a-4fd7-86a6-93468244cb44",
+ "deferred": []
 }
