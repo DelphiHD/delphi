@@ -39,6 +39,8 @@ const PALETTE = {
   inactiveSpoke: "#dedede",
   personality: "#000000",
   design: "#e06666",
+  /** The sky over a chart, the same teal it is drawn in everywhere else. */
+  transit: "#0d9488",
   quarter: {
     // Cardinal-sign anchored: each quarter starts at the cusp of its first sign.
     initiation: "#fbf7b2",     // Aries-Gemini    (0°–90°)
@@ -464,7 +466,8 @@ function activationSpokes(g: Geometry, activations: readonly Activation[]): stri
   return activations
     .map((a) => {
       const lon = activationLongitude(a);
-      const color = PALETTE.activeSpokeStroke[centerOf(a.gate)];
+      const color = a.side === "transit"
+        ? PALETTE.transit : PALETTE.activeSpokeStroke[centerOf(a.gate)];
       const top = pointAt(g, g.r.gateInner, lon);
       const bot = pointAt(g, innerEnd, lon);
       return (
@@ -545,7 +548,8 @@ function activationGlyphs(g: Geometry, activations: readonly Activation[], glyph
       const lon = activationLongitude(a);
       const p = pointAt(g, r, lon);
       const glyph = PLANET_GLYPH[a.planet] ?? "•";
-      const fill = a.side === "design" ? PALETTE.design : PALETTE.personality;
+      const fill = a.side === "transit" ? PALETTE.transit
+        : a.side === "design" ? PALETTE.design : PALETTE.personality;
       return (
         `<text data-side="${a.side}" data-planet="${a.planet}" data-gate="${a.gate}" ` +
         `x="${p.x.toFixed(2)}" y="${p.y.toFixed(2)}" ` +
@@ -714,6 +718,28 @@ export function renderFullMandala(
     bodygraphComposite(g, chart.bodygraphSvg),
   ];
   return svgShell(g, parts.join("\n"));
+}
+
+/**
+ * Just the sky's bodies, as a layer to lay over a mandala that is already
+ * drawn. The wheel is baked into the published chart with the client's own
+ * planets and a bodygraph in its hub, and re-rendering the whole thing for
+ * every moment would throw both away. This returns the transit's spokes and
+ * glyphs in the same geometry, for the page to drop in and take out again.
+ *
+ * Kaycee, 2026-10-05, on the transiting bodies here: "let's keep the teal
+ * color for the transit Glyphs."
+ */
+export function renderTransitLayer(
+  activations: readonly Activation[],
+  opts: RenderOptions = {},
+): string {
+  const g = geometry(opts.size ?? 1600);
+  const sky = activations.map((a) => ({ ...a, side: "transit" as const }));
+  return `<g class="trlayer">` +
+    `<g opacity="0.5">${activationSpokes(g, sky)}</g>` +
+    activationGlyphs(g, sky, opts.glyphScale ?? 1) +
+    `</g>`;
 }
 
 export function renderCrossMandala(

@@ -10,7 +10,8 @@
  * already have (mybodygraph response + parsed activations).
  */
 
-export type ChartSide = "personality" | "design";
+/** The two sides of a chart, and the sky when one is drawn over it. */
+export type ChartSide = "personality" | "design" | "transit";
 
 /** The 13 planets in the order Kaycee uses for the Planetary Overview. */
 export const PLANET_ORDER = [

@@ -3420,6 +3420,11 @@ body.view-transit.tr-circuits svg.canvas.transit:not(.plain) { display:block !im
    "Sometimes people just want to view the transit without interference."
    The person's own legs and discs come off exactly as the party control
    already takes them off, rather than by a second set of rules. */
+/* Transit Only on The Wheel: the client's own glyphs and spokes come off and
+   the sky's layer is what is left. The gate ring's shading is baked into the
+   wheel's structure and stays. */
+body.tr-alone .mandala [data-side="personality"],
+body.tr-alone .mandala [data-side="design"] { display:none; }
 body.tr-alone svg.canvas.transit .pleg,
 body.tr-alone svg.canvas.transit .gdisc,
 body.tr-alone svg.canvas.transit .ptable[data-side="merged"],
@@ -5367,6 +5372,37 @@ if (DATA.client) {
     };
   })();
 
+  // The Wheel under the Transit chart type. The mandala is baked once with the
+  // client's own planets and a bodygraph composited into its hub, so it is not
+  // re-rendered for each moment: the sky arrives as a layer that is dropped in
+  // and taken out again. Kaycee, 2026-10-05: "Oh yeah, I don't see it there."
+  (function () {
+    var seq = 0;
+    var wheel = function () { return document.querySelector('.mandala svg'); };
+    var clear = function () {
+      var svg = wheel();
+      if (!svg) return;
+      [].forEach.call(svg.querySelectorAll('.trlayer'), function (n) { n.remove(); });
+    };
+    window.__drawTransitMandala = function (on) {
+      if (!on) { clear(); return; }
+      var dEl = document.getElementById('dfield'), tEl = document.getElementById('tfield');
+      if (!dEl || !dEl.value) return;
+      var mine = ++seq;
+      fetch('/api/transit-mandala?date=' + encodeURIComponent(dEl.value) +
+        '&time=' + encodeURIComponent((tEl.value || '12:00').slice(0, 5)))
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          if (mine !== seq || !j || !j.ok) return;
+          var svg = wheel();
+          if (!svg) return;
+          clear();
+          svg.insertAdjacentHTML('beforeend', j.layer);
+        })
+        .catch(function () { /* the wheel simply stays as it was */ });
+    };
+  })();
+
   // stats tab
   (function () {
     // Chiron and Lilith stay out of every count; their switches still show and hide
@@ -6135,8 +6171,9 @@ if (DATA.client) {
       // function knowing anything about the stats.
       window.__skyPositions = positions;
       if (window.__renderStats) window.__renderStats();
-      if (body.classList.contains('mod-transit') && window.__drawTransitTimes) {
-        window.__drawTransitTimes();
+      if (body.classList.contains('mod-transit')) {
+        if (window.__drawTransitTimes) window.__drawTransitTimes();
+        if (window.__drawTransitMandala) window.__drawTransitMandala(true);
       }
       var lit = {};
       positions.forEach(function (p) { lit[p.gate] = 1; });
@@ -8305,6 +8342,7 @@ if (DATA.client) {
         if (window.__stampMoment) window.__stampMoment();
         if (window.__renderStats) window.__renderStats();
         if (on && window.__drawTransitTimes) window.__drawTransitTimes();
+        if (window.__drawTransitMandala) window.__drawTransitMandala(!!on);
       };
 
       window.__astroTransit = function (on) {
