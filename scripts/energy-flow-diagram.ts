@@ -5311,7 +5311,10 @@ if (DATA.client) {
      *  below." */
     window.__trSignPill = function (name) {
       var t = (window.__transitTiming || {})[tpid(name)];
-      return t && t.sign ? '<span class="pill">' + esc(t.sign) + '</span>' : '';
+      // The gate's own tags are tag, not pill, and the two do not sit on one
+      // line together: emitted as a pill the sign dropped onto a line of its
+      // own underneath them. Built by the same helper as the rest of the row.
+      return t && t.sign ? tags([{ text: t.sign }]) : '';
     };
 
     window.__drawTransitTimes = function () {
