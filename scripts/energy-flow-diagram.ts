@@ -3391,9 +3391,12 @@ body.skin-paper svg.canvas[data-skin="paper"] { display:block; }
 body.view-plain svg.canvas[data-skin="paper"] { display:none !important; }
 body.view-plain svg.canvas.plain:not(.transit) { display:block; }
 svg.canvas.transit { display:none; }
-body.view-transit svg.canvas[data-skin="paper"] { display:none !important; }
-body.view-transit svg.canvas.plain:not(.transit) { display:none !important; }
-body.view-transit svg.canvas.transit { display:block; }
+body.view-transit svg.canvas:not(.transit) { display:none !important; }
+/* Two transit drawings now: the plain body, and the circuit-coloured one. */
+body.view-transit svg.canvas.transit.plain { display:block; }
+body.view-transit svg.canvas.transit:not(.plain) { display:none !important; }
+body.view-transit.tr-circuits svg.canvas.transit.plain { display:none !important; }
+body.view-transit.tr-circuits svg.canvas.transit:not(.plain) { display:block; }
 body.view-transit { background:#ffffff; color:#1c1a2e; }
 body.view-transit .bridge, body.view-transit .halo { display:none; }
 /* The client tint is a light purple and the awareness centers are a mid purple,
@@ -4084,6 +4087,19 @@ body:not(.mod-self) #astrosiderow, body:not(.mod-self) #astrosynrow { display:no
 /* Which chart you are reading, then what is laid over it: two questions, so a
    line between them. Kaycee, 2026-10-05. */
 #astrosynrow { margin-top:7px; padding-top:7px; border-top:1px solid rgba(132,80,149,.16); }
+#astrotransitrow { margin-top:7px; padding-top:7px; border-top:1px solid rgba(132,80,149,.16); }
+#astrotransitwhen { margin-top:8px; }
+#astrotransitwhen .two { display:grid; grid-template-columns:1fr auto; gap:6px; }
+#astrotransitwhen input { width:100%; font:inherit; font-size:11.5px; padding:5px 8px; margin-top:6px;
+  border:1px solid rgba(132,80,149,.25); border-radius:8px; background:#fff; color:var(--ink); }
+#astrotransitwhen .two input { margin-top:0; }
+#trPlaceList { list-style:none; margin:4px 0 0; padding:0; border-radius:8px; overflow:hidden; }
+#trPlaceList button { width:100%; text-align:left; font:inherit; font-size:11.5px; padding:5px 8px;
+  border:0; background:rgba(132,80,149,.06); color:var(--ink); cursor:pointer; }
+#trPlaceList button:hover { background:rgba(132,80,149,.14); }
+.trnote { font-size:10.5px; opacity:.6; margin-top:5px; line-height:1.4; }
+.trnote.bad { color:#9c4a28; opacity:1; }
+.astro.loading { opacity:.45; }
 /* Kaycee's list, 2026-10-05. The marks that ride beside a coordinate: her
    subscript capital R for retrograde, a C for combustion, and dignity as a
    word because a glyph would collide with the bodygraph's filled and open. */
@@ -4098,6 +4114,7 @@ body:not(.mod-self) #astrosiderow, body:not(.mod-self) #astrosynrow { display:no
 /* On a synastry row the second body belongs to the design side, in the red
    the bodygraph and the wheel already use for it. */
 .dsidenm { color:#e06666; font-weight:600; }
+.tsidenm { color:#0d9488; font-weight:600; }
 .bar.tallybar { grid-template-columns:62px 1fr 22px; cursor:help; }
 .bar.tallybar .track { display:flex; }
 .bar.tallybar .pfill { background:#2f2a33; }
@@ -4452,7 +4469,6 @@ ${d.client ? "" : viewControls}
       </div>
       <div class="row" id="astrosiderow" hidden><button id="asPers" class="on">Personality</button><button id="asDes">Design</button></div>
       <div class="row" id="astrosynrow" hidden><button id="asSyn">Synastry</button><button id="asGrid">Aspect Grid</button></div>
-      <div class="row" id="astrotransitrow" hidden><button id="asTransit">Transit</button><button id="asTransitOnly">Transit Only</button></div>
       <details class="drop" id="apdrop"><summary>Placements</summary>
         <div id="astroplanets"></div>
       </details>
@@ -4469,6 +4485,17 @@ ${d.client ? "" : viewControls}
 
     <div class="datesec" id="datesec">
       <div class="todaylab">Date</div>
+      <div id="trwhere">
+        <input id="trPlace" type="text" autocomplete="off" placeholder="UTC">
+        <div id="trPlaceList"></div>
+        <select id="trAgainst">
+          <option value="">The sky alone</option>
+          <option value="whole">Over the whole chart</option>
+          <option value="personality">Over the personality</option>
+          <option value="design">Over the design</option>
+        </select>
+        <div class="trnote" id="trNote"></div>
+      </div>
       <div class="datepick">
         <button class="dstep" id="dprev" title="Previous day">&#8249;</button>
         <input class="dfield" id="dfield" type="date">
@@ -6195,7 +6222,10 @@ if (DATA.client) {
     var v = curView;
     // Circuits mean nothing over a transit: the button is disabled rather than
     // hidden, and the drawing falls back to the plain body.
-    if (curMod === 'transit' && v === 'body') v = 'plain';
+    // Bodygraph used to be swapped out from under the reader in transit,
+    // because only the plain canvas had a transit drawn on it. Both do now.
+    // Kaycee, 2026-10-05: "The bodygraph button shouldn't be disabled."
+
     if (v === 'astro') enterAstro(); else leaveAstro();
 
     // Circuits is signalled by the ABSENCE of a view class, which is how the
@@ -6206,13 +6236,14 @@ if (DATA.client) {
     body.classList.toggle('view-mandala', v === 'mandala');
     body.classList.toggle('view-plain', v === 'plain' && !transit);
     body.classList.toggle('view-transit', transit);
+    body.classList.toggle('tr-circuits', transit && v === 'body');
 
     [['plain', 'vPlain'], ['body', 'vBody'], ['mandala', 'vMandala'], ['astro', 'vAstro']]
       .forEach(function (pair) {
         var b = document.getElementById(pair[1]);
         if (!b) return;
         b.classList.toggle('on', pair[0] === curView);
-        var off = (curMod === 'transit' && pair[0] === 'body');
+        var off = false;
         b.disabled = off;
         b.classList.toggle('disabled', off);
       });
@@ -6253,10 +6284,13 @@ if (DATA.client) {
       partyBtns.forEach(function (x) { if (x) x.classList.add('on'); });
     }
     if (window.__variations) window.__variations(id === 'variations');
+    // The chart type is the hub: it says whether there is a transit at all,
+    // and every view then draws the same thing its own way.
+    if (window.__astroTransit) window.__astroTransit(id === 'transit');
   };
 
   var view = function (id) {
-    if (curMod === 'transit' && id === 'body') return;   // disabled, not silently switched
+
     curView = id;
     applyView();
   };
@@ -7783,6 +7817,127 @@ if (DATA.client) {
       }
       window.__astroSide = showSide;
       sideRow.hidden = false;
+
+      // ── the sky over this chart ──────────────────────────────────────────
+      // Kaycee, 2026-10-05: "We already have a Transit button on the left side
+      // control panel under Chart Type... I want that to be the hub for all
+      // transit work, not extra buttons on the astrology view." She is right,
+      // and it is what she asked for the first time. The chart type decides
+      // whether there is a transit at all; the view only decides how you are
+      // looking at it. So nothing here is a control. This listens.
+      // The date and the time are the picker's own, already on the left: a
+      // second pair would be two answers to one question.
+      var trPlace = document.getElementById('trPlace');
+      var trList = document.getElementById('trPlaceList');
+      var trAgainst = document.getElementById('trAgainst');
+      var trNote = document.getElementById('trNote');
+      var trChosen = null;      // a place the provider knows, or null for UTC
+      var trSeq = 0;
+      var trShowing = false;
+
+      var paintTransits = function (list) {
+        var none = '<div class="line none"><i></i><span>0</span><i></i></div>';
+        var row = function (a) {
+          return '<div class="line pl-row core"><i>' + esc(labelOf(a.natal)) + '</i><span>' +
+            esc(a.aspect) + ' <b class="tsidenm">' + esc(labelOf(a.transit)) + '</b></span><i>' +
+            a.orbit + '\u00b0</i></div>';
+        };
+        var slow = list.filter(function (a) { return !a.moon; });
+        var moon = list.filter(function (a) { return a.moon; });
+        // The Moon apart: thirteen degrees a day means its aspects last hours,
+        // and mixed in they drown the slow ones.
+        document.getElementById('astroaspects').innerHTML =
+          sub('Transit to chart <b>' + slow.length + '</b>', slow.length ? slow.map(row).join('') : none) +
+          sub('Moon <b>' + moon.length + '</b>', moon.length ? moon.map(row).join('') : none);
+      };
+
+      /** Draw the astrology view for whatever the chart type currently says. */
+      var drawTransit = function () {
+        if (!liveAstro) return;
+        var tok = chartToken();
+        if (!tok) {
+          if (trNote) { trNote.className = 'trnote bad'; trNote.textContent = 'open this chart by its link to cast a transit'; }
+          return;
+        }
+        var against = trAgainst ? trAgainst.value : '';
+        var mine = ++trSeq;
+        trShowing = true;
+        liveAstro.classList.add('loading');
+        if (trNote) { trNote.className = 'trnote'; trNote.textContent = 'Casting\u2026'; }
+        var dEl = document.getElementById('dfield');
+        var tEl = document.getElementById('tfield');
+        var q = '/api/transit-wheel?token=' + encodeURIComponent(tok) +
+          '&date=' + encodeURIComponent((dEl && dEl.value) || '') +
+          '&time=' + encodeURIComponent((tEl && tEl.value) || '12:00') +
+          '&mode=' + (against ? 'over' : 'alone') +
+          '&side=' + (against === 'design' ? 'design' : 'personality') +
+          (against === 'whole' ? '&whole=1' : '') +
+          (trChosen ? '&place=' + encodeURIComponent(trChosen) : '');
+        fetch(q).then(function (r) { return r.json(); }).then(function (j) {
+          if (mine !== trSeq) return;            // a newer change already won
+          liveAstro.classList.remove('loading');
+          if (!j.ok) {
+            trNote.className = 'trnote bad';
+            trNote.textContent = j.error || 'that could not be cast';
+            return;
+          }
+          liveAstro.innerHTML = j.wheelSvg;
+          if (window.__markAstroPending) window.__markAstroPending();
+          paintTransits(j.aspects || []);
+          trNote.className = 'trnote';
+          trNote.textContent = j.utc ? 'UTC' : ('Local time in ' + j.place);
+        }).catch(function () {
+          if (mine !== trSeq) return;
+          liveAstro.classList.remove('loading');
+          trNote.className = 'trnote bad';
+          trNote.textContent = 'that could not be cast';
+        });
+      };
+
+      // Called by setModule and by the date picker: the chart type and the
+      // moment are the only two things that decide what this view shows.
+      window.__astroTransit = function (on) {
+        if (on) { drawTransit(); return; }
+        if (!trShowing) return;
+        trShowing = false;
+        showSide(curSide);
+        paintAspects();
+      };
+      ['trAgainst', 'dfield', 'tfield'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('change', function () {
+          if (body.classList.contains('mod-transit')) drawTransit();
+        });
+      });
+
+      // The place, from the provider's own list, never a typed string: a
+      // timezone guessed from a place name is where wrong charts come from.
+      var trLookup = null;
+      if (trPlace) {
+        trPlace.addEventListener('input', function () {
+          trChosen = null;
+          var q = trPlace.value.trim();
+          if (trLookup) clearTimeout(trLookup);
+          if (q.length < 3) { trList.innerHTML = ''; return; }
+          trLookup = setTimeout(function () {
+            fetch('/api/places?q=' + encodeURIComponent(q)).then(function (r) { return r.json(); })
+              .then(function (j) {
+                trList.innerHTML = (j.places || []).slice(0, 5).map(function (o) {
+                  return '<li><button type="button" data-place="' + esc(o.value) + '">' +
+                    esc(o.value) + '</button></li>';
+                }).join('');
+              }).catch(function () { trList.innerHTML = ''; });
+          }, 300);
+        });
+        trList.addEventListener('click', function (e) {
+          var b = e.target.closest ? e.target.closest('[data-place]') : null;
+          if (!b) return;
+          trChosen = b.getAttribute('data-place');
+          trPlace.value = trChosen;
+          trList.innerHTML = '';
+          if (body.classList.contains('mod-transit')) drawTransit();
+        });
+      }
 
       // The grid: both sets of bodies on the two axes with the aspect where
       // they meet, which is how a synastry is actually read. It takes the
@@ -10479,9 +10634,9 @@ export async function runBuilder(argv: string[] = process.argv.slice(2)): Promis
           // its own horizon, so reading it from the design is a different
           // chart rather than the same picture relabelled.
           `<template id="aswheel-personality-syn">${renderWheel(astroChart, client!.name, astroDesign,
-            "ascendant", gateRings[0], gateRings[1], gateRings[2], null, undefined, null, null, "personality", cross)}</template>` +
+            "ascendant", gateRings[0], gateRings[1], gateRings[2], null, undefined, null, null, "personality", null, cross)}</template>` +
           `<template id="aswheel-design-syn">${renderWheel(astroDesign, client!.name, astroChart,
-            "ascendant", gateRings[0], gateRings[1], gateRings[2], null, undefined, null, null, "design", cross)}</template>`
+            "ascendant", gateRings[0], gateRings[1], gateRings[2], null, undefined, null, null, "design", null, cross)}</template>`
         : "")
     : "";
   const htmlPath = join(outDir, `${stem}.html`);
@@ -10489,7 +10644,12 @@ export async function runBuilder(argv: string[] = process.argv.slice(2)): Promis
     .map((sk) => buildCanvas(sk, scene, { animate: true, legend: false }))
     .join("\n") +
     (client ? "\n" + buildCanvas(PAPER, scene, { animate: false, legend: false, plain: true }) : "") +
-    (client ? "\n" + buildCanvas(PAPER, scene, { animate: false, legend: false, plain: true, transit: true }) : "")
+    (client ? "\n" + buildCanvas(PAPER, scene, { animate: false, legend: false, plain: true, transit: true }) : "") +
+    // Circuits over a transit. The button was disabled because this drawing
+    // did not exist and the view fell back to the plain one. Kaycee,
+    // 2026-10-05: "I think we disabled the Circuit button, but I think we
+    // could add it back here."
+    (client ? "\n" + buildCanvas(PAPER, scene, { animate: false, legend: false, transit: true }) : "")
       // the pair, drawn by the same builder as the chart above it
       + (scene.composite ? "\n" + buildCanvas(PAPER, scene, { animate: false, legend: false, plain: true, composite: true }) : "");
   const html = buildHtml(scene, canvases, mandalaView(scene), astroHtml, fonts);

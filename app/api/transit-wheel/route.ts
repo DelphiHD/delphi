@@ -65,6 +65,9 @@ export async function GET(request: Request): Promise<Response> {
   const date = (q.get("date") ?? "").trim();
   const time = (q.get("time") ?? "12:00").trim();
   const side = q.get("side") === "design" ? "design" : "personality";
+  // The whole chart means both of its sides at once, with the sky over the
+  // top: three rings. Kaycee, 2026-10-05.
+  const whole = q.get("whole") === "1";
   // "alone" draws the sky by itself; otherwise it rides over the named side.
   const mode = q.get("mode") === "alone" ? "alone" : "over";
   // A place sent from the form is a local clock somewhere. No place means
@@ -113,7 +116,7 @@ export async function GET(request: Request): Promise<Response> {
       place: String(chart.birth_place),
     };
     let designUtc: string | undefined;
-    if (side === "design") {
+    if (side === "design" || whole) {
       const hd = await getChart({
         birthDate: born.birthDate, birthTime: born.birthTime,
         timezone: String(chart.birth_timezone), locationQuery: born.place,
@@ -121,12 +124,22 @@ export async function GET(request: Request): Promise<Response> {
       designUtc = hd.birth.designUtcDate;
       if (!designUtc) return bad("that chart has no design moment to cast", 502);
     }
-    const natal = await getAstro({ ...born, atUtc: designUtc });
+    // For the whole chart the base stays the birth chart and the design side
+    // rides inside it, exactly as the chart's own page draws it.
+    const natal = await getAstro({ ...born, atUtc: whole ? undefined : designUtc });
+    const designChart = whole && designUtc
+      ? await getAstro({ ...born, atUtc: designUtc }) : null;
 
     // Transit to natal, which is the reading. Each aspect is measured against
     // the body doing the transiting, so the Sun and the Moon get their wider
     // orb wherever they appear.
-    const all = crossAspects(natal.planets, sky.planets, { ...TRANSIT_ORBS, quintile: 0 });
+    // Against the whole chart, a transit aspects both sides, so both are
+    // measured and the row says which side it landed on.
+    const against = designChart
+      ? [...natal.planets.map((p) => ({ ...p, name: p.name })),
+         ...designChart.planets.map((p) => ({ ...p, name: `design:${p.name}` }))]
+      : natal.planets;
+    const all = crossAspects(against, sky.planets, { ...TRANSIT_ORBS, quintile: 0 });
     const aspects = all.filter((a) => {
       const allowed = WIDE_FOR.has(a.p2_name) || WIDE_FOR.has(a.p1_name) ? WIDE : 1;
       return Math.abs(a.orbit) <= allowed;
@@ -134,13 +147,19 @@ export async function GET(request: Request): Promise<Response> {
 
     return NextResponse.json({
       ok: true,
-      wheelSvg: renderWheel(natal, String(chart.person_name), sky, "ascendant", [], [], [],
+      wheelSvg: renderWheel(natal, String(chart.person_name),
+        designChart ?? sky, "ascendant", [], [], [],
         null, undefined, null,
-        { side: "transit", outside: true, colour: TRANSIT_COLOUR },
-        side === "design" ? "design" : "personality",
+        designChart
+          ? { side: "design" }
+          : { side: "transit", outside: true, colour: TRANSIT_COLOUR },
+        whole ? "personality" : side,
+        designChart ? { chart: sky, side: "transit", colour: TRANSIT_COLOUR } : null,
         aspects),
       aspects: aspects.map((a) => ({
-        natal: a.p1_name, transit: a.p2_name, aspect: a.aspect,
+        natal: a.p1_name.replace(/^design:/, ""),
+        side: a.p1_name.startsWith("design:") ? "design" : "personality",
+        transit: a.p2_name, aspect: a.aspect,
         orbit: Math.round(Math.abs(a.orbit) * 10) / 10,
         moon: a.p2_name === "Moon",
       })),

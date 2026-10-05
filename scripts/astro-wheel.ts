@@ -161,6 +161,12 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
    *  painted the same colour as the design and tagged as the design too, so
    *  nothing could tell them apart, including the hover. */
   mainSide: "personality" | "design" = "personality",
+  /** A third set, always drawn outside the chart's own ring. The design side
+   *  sits inside and a transit arrives over the top, so reading a transit
+   *  against the WHOLE chart needs all three at once: Kaycee, 2026-10-05,
+   *  "There should be an option to cast it against the whole chart as well,
+   *  not just personality/design." */
+  outer: { chart: AstroChart; side: string; colour: string } | null = null,
   /** Aspects BETWEEN the two sets on this wheel, drawn as their own class so
    *  the page can show or hide them. The provider never returns these: it
    *  aspects within one chart only, which is why a synastry has to be worked
@@ -351,6 +357,22 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
       `x2="${f(x2)}" y2="${f(y2)}" stroke="${colour}" ` +
       `stroke-width="${HARD.has(a.aspect) ? 0.9 : 0.8}" opacity=".5"/>`);
   }
+  }
+
+  // A third ring, outside everything, for a transit over a whole chart.
+  if (outer) {
+    const placedO: { lon: number; ring: number }[] = [];
+    for (const p of [...outer.chart.planets].sort((a, b) => a.abs_pos - b.abs_pos)) {
+      const lon = p.abs_pos;
+      let ring = 0;
+      while (placedO.some((q) => q.ring === ring &&
+        Math.abs(((lon - q.lon + 540) % 360) - 180) < 6)) ring++;
+      placedO.push({ lon, ring });
+      const [x, y] = pt(lon, asc, R_OVERLAY + ring * 19);
+      s.push(`<text class="pglyph oside" data-aplanet="${p.name}" data-side="${outer.side}" ` +
+        `data-ring="outer" x="${f(x)}" y="${f(y + 7)}" text-anchor="middle" font-size="19" ` +
+        `fill="${outer.colour}">${GLYPH[p.name] ?? p.name.slice(0, 2)}</text>`);
+    }
   }
 
   // planets, nudged apart when they crowd
