@@ -33,7 +33,7 @@ const MINOR_POINT = new Set(["Chiron", "Mean_Lilith", "Mean_Node", "True_Node"])
 
 export const GLYPH: Record<string, string> = {
   Sun: "☉", Moon: "☽", Mercury: "☿", Venus: "♀", Mars: "♂",
-  Jupiter: "♃", Saturn: "♄", Uranus: "♅", Neptune: "♆", Pluto: "♇",
+  Jupiter: "♃", Saturn: "♄", Uranus: "⛢", Neptune: "♆", Pluto: "♇",
   True_Node: "☊", Mean_Node: "☋", Mean_Lilith: "⚸", Chiron: "⚷",
   // Earth belongs on an astrology wheel here because the Human Design side
   // of the chart reads it as a placement in its own right. Without this it
@@ -54,17 +54,28 @@ const R_GATE = 348, R_GATE_IN = 316;
    need is radial: the planet ring starts further out, the steps are wider, and
    the aspect circle moves in to make space for three levels of stagger on both
    rings without either crossing it. */
-const R_OUT = 310, R_SIGN = 272, R_TICK = 262, R_PLANET = 250, R_HOUSE = 214, R_ASPECT = 150;
-const R_PLANET_STEP = 23, R_DESIGN_STEP = 21;
+/* Kaycee, 2026-10-05: "I do think we need to move the ring and glyphs back to
+   the inside, there's room and it's easier to see. The House number ring is
+   taking up a ridiculous amount of space. We can add a ring for transits, and
+   later relationships when we do the synastry charts."
+
+   So the bodies live in concentric bands inside the zodiac, about 32 apart,
+   each with room to stagger a conjunction without reaching the next band in.
+   The house band used to run 214 down to 150, sixty-four pixels to carry
+   twelve small numbers; it is a third of that now, and the space it gave back
+   is what the transit band is standing in. A relationship band belongs
+   between the design and the houses when the synastry charts arrive. */
+const R_OUT = 310, R_SIGN = 272, R_TICK = 262;
+const R_TRANSIT = 244, R_PLANET = 212, R_HOUSE = 150, R_ASPECT = 132;
+const R_PLANET_STEP = 14, R_DESIGN_STEP = 14;
 /** Design planets sit just inside the personality ring, on the same zodiac. */
-const R_DESIGN = 194;
-/** A transit arrives over a chart, so it rides outside ALL of it: outside the
- *  gate ring, on clear paper. Set at 288 first, which is inside the coloured
- *  sign band (272-310), so the glyphs were drawn on top of a solid colour and
- *  Kaycee could not see them: "The outer ring is not at all outer and the
- *  transiting planets are impossible to see." The viewBox reaches 406 below
- *  centre, so three crowded rings at this step still fit on the paper. */
-const R_OVERLAY = 364;
+const R_DESIGN = 180;
+/** The transit band, inside the zodiac with the rest of the bodies. It sat
+ *  outside the gate ring for a while, which was legible but far from the
+ *  chart and left the aspect lines running right across it. Inside, it reads
+ *  with everything else and there is room, because the house band gave some
+ *  back. Crowded transits stagger inward, the same as every other band. */
+const R_OVERLAY = R_TRANSIT;
 const R_OVERLAY_STEP = 14;
 
 /** Retrograde, beside the glyph rather than in a table. Kaycee, 2026-10-05:
@@ -364,7 +375,7 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
     const p1Design = a.p1_name.startsWith("design:");
     const r1 = p1Design ? R_DESIGN - 11
       : (!transitSecond && fromDesign ? R_DESIGN - 11 : R_PLANET - 13);
-    const r2 = transitSecond ? R_OVERLAY - 10
+    const r2 = transitSecond ? R_TRANSIT - 11
       : (fromDesign ? R_PLANET - 13 : R_DESIGN - 11);
     const [x1, y1] = pt(a.p1_abs_pos, asc, r1);
     const [x2, y2] = pt(a.p2_abs_pos, asc, r2);
@@ -410,7 +421,7 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
 
   // A third ring, outside everything, for a transit over a whole chart.
   if (outer) {
-    s.push(`<circle cx="${CX}" cy="${CY}" r="${R_OVERLAY - 12}" fill="none" ` +
+    s.push(`<circle cx="${CX}" cy="${CY}" r="${R_OVERLAY + 14}" fill="none" ` +
       `stroke="${outer.colour}" stroke-width="1" opacity=".3"/>`);
     const placedO: { lon: number; ring: number }[] = [];
     for (const p of [...outer.chart.planets].sort((a, b) => a.abs_pos - b.abs_pos)) {
@@ -419,7 +430,7 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
       while (placedO.some((q) => q.ring === ring &&
         Math.abs(((lon - q.lon + 540) % 360) - 180) < 6)) ring++;
       placedO.push({ lon, ring });
-      const [x, y] = pt(lon, asc, R_OVERLAY + ring * R_OVERLAY_STEP);
+      const [x, y] = pt(lon, asc, R_OVERLAY - ring * R_OVERLAY_STEP);
       s.push(`<text class="pglyph oside" data-aplanet="${p.name}" data-side="${outer.side}" ` +
         `data-ring="outer" x="${f(x)}" y="${f(y + 7)}" text-anchor="middle" dominant-baseline="central" font-size="19" ` +
         `fill="${outer.colour}">${GLYPH[p.name] ?? p.name.slice(0, 2)}</text>`);
@@ -511,7 +522,7 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
       // Outside the chart's own ring for a transit, inside it for a design.
       const base = overlayAs?.outside ? R_OVERLAY : R_DESIGN;
       const [x, y] = pt(lon, asc, overlayAs?.outside
-        ? base + ring * R_OVERLAY_STEP : base - ring * R_DESIGN_STEP);
+        ? base - ring * R_OVERLAY_STEP : base - ring * R_DESIGN_STEP);
       const [tx, ty] = pt(lon, asc, base - ring * 20 - 12);
       const innerSide = overlayAs?.side ?? (mainSide === "design" ? "personality" : "design");
       const innerFill = overlayAs?.colour ?? (innerSide === "design" ? DESIGN : INK);
@@ -550,11 +561,9 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
 
   // the angles
   const angles: [string, number][] = [["As", asc], ["Ds", asc + 180], ["Mc", chart.mc], ["Ic", chart.mc + 180]];
-  // Outside the gate ring, and outside the transit ring too when there is one.
-  // At the usual 368 the angle labels sit right on top of a transit ring at
-  // 364, so any transiting body near an angle collides with its label.
-  const hasOuterRing = !!outer || !!(design && overlayAs?.outside);
-  const rAngle = R_GATE + (hasOuterRing ? 46 : 20);
+  // Outside the gate ring, not tucked underneath it. Nothing is drawn beyond
+  // the gates any more, so this is back where it belongs.
+  const rAngle = R_GATE + 20;
   for (const [label, lon] of angles) {
     const [x, y] = pt(lon, asc, rAngle);
     s.push(`<text class="angle" data-angle="${label}" x="${f(x)}" y="${f(y + 4)}" ` +

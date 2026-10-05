@@ -59,7 +59,7 @@ const PLANET_SYMBOL: Record<string, string> = {
   "Mars":        "♂",
   "Jupiter":     "♃",
   "Saturn":      "♄",
-  "Uranus":      "♅",
+  "Uranus":      "⛢",
   "Neptune":     "♆",
   "Pluto":       "♇",
   "Chiron":      "⚷",

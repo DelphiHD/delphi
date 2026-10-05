@@ -488,7 +488,7 @@ const PLANET_GLYPH: Record<string, string> = {
   mars: "♂",         // ♂
   jupiter: "♃",      // ♃
   saturn: "♄",       // ♄
-  uranus: "♅",       // ♅
+  uranus: "⛢",       // ⛢
   neptune: "♆",      // ♆
   pluto: "♇",        // ♇
 };

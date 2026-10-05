@@ -283,7 +283,7 @@ const ALL_PLANET_ROWS = [...PLANET_ROWS, ...PLANET_EXTRAS] as const;
 const PLANET_GLYPHS: Record<string, string> = {
   Sun: "\u2609", Earth: "\u2295", Moon: "\u263D", "North Node": "\u260A", "South Node": "\u260B",
   Mercury: "\u263F", Venus: "\u2640", Mars: "\u2642", Jupiter: "\u2643", Saturn: "\u2644",
-  Uranus: "", Neptune: "\u2646", Pluto: "\u2647",
+  Uranus: "⛢", Neptune: "\u2646", Pluto: "\u2647",
   Chiron: "\u26B7", Lilith: "\u26B8",
 };
 const PROFILE_LINES: Record<number, string> = {
@@ -3906,8 +3906,11 @@ body.mod-transit .datesec .todaylab { margin-bottom:8px; }
 body.mod-transit .datepick { gap:6px; }
 body.mod-transit #trwhere { margin-top:14px; }
 body.mod-transit #trAgainst { margin-top:10px; }
+/* The grid takes the wheel's place, so it only means anything where the wheel
+   is. Kaycee, 2026-10-05: "the aspect grid button is only relevant on the
+   astrology view." */
 .trgridbtn { display:none; width:100%; margin-top:10px; }
-body.mod-transit .trgridbtn { display:block; }
+body.mod-transit.view-astro .trgridbtn { display:block; }
 body.mod-transit .dfield,
 body.mod-transit #trPlace, body.mod-transit #trAgainst { padding:6px 8px; }
 .todaysec > summary { font-size:9.5px; letter-spacing:.18em; font-weight:600; opacity:.62; cursor:pointer;
@@ -8180,8 +8183,10 @@ if (DATA.client) {
         var ctx = cv.getContext('2d');
         if (!ctx) return;
         var BASE = 40;
+        // One ink height for every ring. Kaycee, 2026-10-05: "Transit glyphs
+        // should be the same size/weight as natal glyphs."
         [].forEach.call(root.querySelectorAll('.pglyph'), function (t) {
-          var target = t.getAttribute('data-ring') === 'main' ? 15 : 13.5;
+          var target = 15;
           ctx.font = '400 ' + BASE + 'px ' + getComputedStyle(t).fontFamily;
           var m = ctx.measureText(t.textContent || '');
           var h = (m.actualBoundingBoxAscent || 0) + (m.actualBoundingBoxDescent || 0);
@@ -8524,8 +8529,21 @@ if (DATA.client) {
         var already = g.classList.contains('lit-glyph');
         clearPicked();
         if (already) return;
-        var src = chartFor(null, side);
-        var pl = ((src.planets) || []).filter(function (x) { return x.name === name; })[0];
+        // A transiting body is not the chart's planet of the same name.
+        // Kaycee, 2026-10-05: "Why does this transiting pluto light up Leo
+        // when I click it?" Transit Pluto is in Aquarius; Leo is where her
+        // natal Pluto sits, which is what this was reading.
+        var isTrClick = side === 'transit';
+        var pl = null;
+        if (isTrClick) {
+          pl = ((window.__transitSet || []).filter(function (x) {
+            return x.name === name;
+          }))[0];
+        } else {
+          pl = ((chartFor(null, side).planets) || []).filter(function (x) {
+            return x.name === name;
+          })[0];
+        }
         if (!pl) return;
         var spoke = astroEl.querySelector('[data-spoke="' + side + ':' + name + '"]');
         if (spoke) spoke.setAttribute('opacity', '.85');
@@ -8538,7 +8556,11 @@ if (DATA.client) {
           var hEl = astroEl.querySelector('text.hnum[data-house="' + hn + '"]');
           if (hEl) hEl.classList.add('lit-band');
         }
-        var gate = gateForPlanet(name, side);
+        // The chart's gate for this body is not the transit's gate, and the
+        // two endpoints name their bodies differently, so a transit lights its
+        // sign and its house and leaves the gate ring alone rather than
+        // lighting somebody else's gate.
+        var gate = isTrClick ? 0 : gateForPlanet(name, side);
         if (gate) {
           [].forEach.call(astroEl.querySelectorAll('.gateband[data-gate="' + gate + '"]'),
             function (n) { n.classList.add('lit-band'); });
