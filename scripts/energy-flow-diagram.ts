@@ -7180,9 +7180,7 @@ if (DATA.client) {
       // transit Neptune on the grid and was given the chart's Neptune in
       // Libra, with its gate and a natal reading attached. 2026-10-05.
       var isTr = side === 'transit';
-      var pl = isTr
-        ? ((window.__transitSet || []).filter(function (x) { return x.name === nm; }))[0]
-        : byName(nm, side, who);
+      var pl = byName(nm, side, who);
       if (!pl) return '';
       var pill = function (w) {
         if (!w) return '';
@@ -7250,7 +7248,22 @@ if (DATA.client) {
       if (who === 'b' && C) return side === 'design' ? (C.astroDesign || {}) : (C.astro || {});
       return side === 'design' ? (DES || {}) : (PERS || {});
     };
+    // The ONE place that answers "a body of this name, on this side: which set
+    // does it come from?" Four surfaces used to decide this for themselves (the
+    // wheel's hover, its click, the grid's column headers, and the wheel's own
+    // main ring under Transit Only) and all four quietly treated an unknown
+    // side as the personality. So a transiting body was answered out of the
+    // birth chart: Kaycee was told transit Neptune was in Libra, which is where
+    // her chart's Neptune is, while the sky had it in Aries. Each of those was
+    // fixed on its own and the next surface still had it, which is why this
+    // lives in one function now. A side nobody recognises returns nothing
+    // rather than somebody else's placement. 2026-10-05.
     var byName = function (n, side, who) {
+      if (side === 'transit') {
+        var tl = window.__transitSet || [];
+        for (var t = 0; t < tl.length; t++) if (tl[t].name === n) return tl[t];
+        return null;
+      }
       var list = (chartFor(who, side).planets) || [];
       for (var i = 0; i < list.length; i++) if (list[i].name === n) return list[i];
       return null;
@@ -8468,19 +8481,10 @@ if (DATA.client) {
             (note.theme ? '<br><span style="opacity:.5">' + esc(note.element) +
               ' signs: ' + esc(note.theme.toLowerCase()) + '</span>' : '');
         } else {
-          var isTr = t.getAttribute('data-side') === 'transit';
-          var pl = null;
-          if (isTr && window.__transitSet) {
-            var tset = window.__transitSet, tnm = t.getAttribute('data-aplanet');
-            for (var ti = 0; ti < tset.length; ti++) {
-              if (tset[ti].name === tnm) { pl = tset[ti]; break; }
-            }
-          }
-          if (!pl) {
-            isTr = false;
-            pl = byName(t.getAttribute('data-aplanet'), t.getAttribute('data-side'),
-              t.getAttribute('data-person'));
-          }
+          var tside = t.getAttribute('data-side') || 'personality';
+          var isTr = tside === 'transit';
+          var pl = byName(t.getAttribute('data-aplanet'), tside,
+            t.getAttribute('data-person'));
           if (!pl) { tip.hidden = true; return; }
           var sideNm = isTr ? 'Transit ' : (t.getAttribute('data-side') === 'design' ? 'Design ' : '');
           // The house a planet sits in is the Ascendant's answer, so on a chart
@@ -8550,16 +8554,7 @@ if (DATA.client) {
         // when I click it?" Transit Pluto is in Aquarius; Leo is where her
         // natal Pluto sits, which is what this was reading.
         var isTrClick = side === 'transit';
-        var pl = null;
-        if (isTrClick) {
-          pl = ((window.__transitSet || []).filter(function (x) {
-            return x.name === name;
-          }))[0];
-        } else {
-          pl = ((chartFor(null, side).planets) || []).filter(function (x) {
-            return x.name === name;
-          })[0];
-        }
+        var pl = byName(name, side);
         if (!pl) return;
         var spoke = astroEl.querySelector('[data-spoke="' + side + ':' + name + '"]');
         if (spoke) spoke.setAttribute('opacity', '.85');
