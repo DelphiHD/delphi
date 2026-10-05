@@ -76,6 +76,8 @@ const R_DESIGN = 180;
  *  with everything else and there is room, because the house band gave some
  *  back. Crowded transits stagger inward, the same as every other band. */
 const R_OVERLAY = R_TRANSIT;
+/** The teal a transit is drawn in everywhere else in the chart. */
+const TRANSIT_TEAL = "#0d9488";
 const R_OVERLAY_STEP = 14;
 
 /** Retrograde, beside the glyph rather than in a table. Kaycee, 2026-10-05:
@@ -458,15 +460,20 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
     placed.push({ lon, ring });
     const [x, y] = pt(lon, asc, R_PLANET - ring * R_PLANET_STEP);
     const [tx, ty] = pt(lon, asc, R_PLANET - ring * R_PLANET_STEP - 13);
-    s.push(`<text class="pglyph ${mainSide === "design" ? "dside" : "pside"}" ` +
-      `data-aplanet="${p.name}" data-side="${mainSide}" data-ring="main" x="${f(x)}" y="${f(y + 8)}" ` +
-      `text-anchor="middle" dominant-baseline="central" font-size="21" fill="${mainSide === "design" ? DESIGN : INK}">` +
+    // Transit Only draws the sky as the chart's own ring. Tagged and coloured
+    // as the personality it was indistinguishable from a natal chart, so
+    // Kaycee read it as the natal placements refusing to go away, and every
+    // hover and click treated those bodies as hers. 2026-10-05.
+    const mSide = mainIsTransit ? "transit" : mainSide;
+    const mFill = mainIsTransit ? TRANSIT_TEAL : (mainSide === "design" ? DESIGN : INK);
+    s.push(`<text class="pglyph ${mainIsTransit ? "oside" : mainSide === "design" ? "dside" : "pside"}" ` +
+      `data-aplanet="${p.name}" data-side="${mSide}" data-ring="main" x="${f(x)}" y="${f(y + 8)}" ` +
+      `text-anchor="middle" dominant-baseline="central" font-size="21" fill="${mFill}">` +
       `${GLYPH[p.name] ?? p.name.slice(0, 2)}</text>`);
     // Transit Only draws the sky as the chart's own ring, so the retrograde
     // mark belongs here too. A natal wheel passes nothing and is unchanged.
     if (mainIsTransit && transitRetro?.[p.name]) {
-      s.push(retroMark(x, y + 8, 21, mainSide === "design" ? DESIGN : INK,
-        p.name, mainSide, "main"));
+      s.push(retroMark(x, y + 8, 21, mFill, p.name, mSide, "main"));
     }
     // The degree lives in the hover, not on the face. Twenty-six glyphs plus
     // twenty-six numbers is more ink than the wheel can carry, and the number is
@@ -554,7 +561,7 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
         `stroke-linecap="round" opacity="0"/>`);
     }
   };
-  spokeFor(chart.planets, mainSide);
+  spokeFor(chart.planets, mainIsTransit ? "transit" : mainSide);
   if (design) {
     spokeFor(design.planets, overlayAs?.side ?? (mainSide === "design" ? "personality" : "design"));
   }

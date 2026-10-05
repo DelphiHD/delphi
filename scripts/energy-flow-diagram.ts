@@ -3911,6 +3911,8 @@ body.mod-transit #trAgainst { margin-top:10px; }
    astrology view." */
 .trgridbtn { display:none; width:100%; margin-top:10px; }
 body.mod-transit.view-astro .trgridbtn { display:block; }
+/* The transit axis in the transit's own colour, matching its placements. */
+.agrid .tdax, .agrid th.tcolh { color:#0d9488; }
 body.mod-transit .dfield,
 body.mod-transit #trPlace, body.mod-transit #trAgainst { padding:6px 8px; }
 .todaysec > summary { font-size:9.5px; letter-spacing:.18em; font-weight:600; opacity:.62; cursor:pointer;
@@ -7172,21 +7174,29 @@ if (DATA.client) {
     // One tooltip for a planet, wherever it is hovered: the wheel, the summary
     // lines, or the placements list. Built once so the three cannot drift.
     var planetTip = function (nm, side, who) {
-      var pl = byName(nm, side, who);
+      // A transit column header is a transiting body. Kaycee hovered the
+      // transit Neptune on the grid and was given the chart's Neptune in
+      // Libra, with its gate and a natal reading attached. 2026-10-05.
+      var isTr = side === 'transit';
+      var pl = isTr
+        ? ((window.__transitSet || []).filter(function (x) { return x.name === nm; }))[0]
+        : byName(nm, side, who);
       if (!pl) return '';
       var pill = function (w) {
         if (!w) return '';
         return '<span class="pill ' + esc(String(w).toLowerCase()) + '">' + esc(w) + '</span>';
       };
-      var sideNm = side === 'design' ? 'Design ' : '';
-      var g = gateForPlanet(nm, side);
+      var sideNm = isTr ? 'Transit ' : (side === 'design' ? 'Design ' : '');
+      // The chart's gate for this body is not the transiting body's gate.
+      var g = isTr ? 0 : gateForPlanet(nm, side);
       return '<b>' + esc(sideNm + (pl.label || pretty(pl.name))) + ' in ' + esc(pl.sign) +
         ' ' + dg(pl.position) + '</b>' +
         pill(pl.quality) + pill(pl.element) +
         (HOUSE_N[pl.house] ? '<span class="pill house">House ' + HOUSE_N[pl.house] + '</span>' : '') +
         (g ? '<span class="pill house">Gate ' + g + '</span>' : '') +
-        (planetBasic(pl.label || pretty(pl.name)) ? '<br><span style="opacity:.78">' +
-          esc(planetBasic(pl.label || pretty(pl.name))) + '</span>' : '');
+        (!isTr && planetBasic(pl.label || pretty(pl.name))
+          ? '<br><span style="opacity:.78">' +
+            esc(planetBasic(pl.label || pretty(pl.name))) + '</span>' : '');
     };
 
     // The geometry of an aspect, which is fact rather than interpretation.
@@ -8003,6 +8013,8 @@ if (DATA.client) {
           // Leaving the transit type puts its grid away with it.
           if (window.__transitGridOn) {
             window.__transitGridOn = false;
+            var gb = document.getElementById('trGrid');
+            if (gb) { gb.classList.remove('on'); gb.textContent = 'Aspect Grid'; }
             if (window.__showAstroGrid) window.__showAstroGrid(false);
           }
         }
@@ -8042,6 +8054,7 @@ if (DATA.client) {
           var want = !body.classList.contains('astro-grid');
           window.__transitGridOn = want;
           trGridBtn.classList.toggle('on', want);
+          trGridBtn.textContent = want ? 'Chart' : 'Aspect Grid';
           if (want && !body.classList.contains('view-astro')) {
             var va = document.getElementById('vAstro');
             if (va) va.click();
@@ -8243,7 +8256,7 @@ if (DATA.client) {
           at[(a.side || 'personality') + ':' + a.natal + '|' + a.transit] = a;
         });
         var head = '<th class="corner"></th>' + tset.map(function (c) {
-          return '<th class="colh" data-head="' + esc(c.name) + '" data-hside="transit">' +
+          return '<th class="colh tcolh" data-head="' + esc(c.name) + '" data-hside="transit">' +
             esc(glyphFor(c)) + '</th>';
         }).join('');
         var bodyRows = '';
@@ -8268,7 +8281,7 @@ if (DATA.client) {
           return '<span class="ak ' + k[2] + '"><b>' + k[0] + '</b>' + k[1] + '</span>';
         }).join('') + '</div>';
         return '<div class="agrid">' +
-          '<div class="dax">Transit</div>' +
+          '<div class="dax tdax">Transit</div>' +
           '<div class="gwrap"><div class="pax">Chart</div>' +
           '<table><thead><tr>' + head + '</tr></thead><tbody>' +
           bodyRows + '</tbody></table></div>' + tkey + '</div>';
@@ -8316,8 +8329,9 @@ if (DATA.client) {
           var h = e.target.closest ? e.target.closest('th[data-head]') : null;
           if (h) {
             e.stopPropagation();
+            var hs = h.getAttribute('data-hside');
             showTip(e, planetTip(h.getAttribute('data-head'),
-              h.getAttribute('data-hside') === 'design' ? 'design' : 'personality'));
+              hs === 'design' || hs === 'transit' ? hs : 'personality'));
             return;
           }
           if (!c) { tip.hidden = true; return; }
