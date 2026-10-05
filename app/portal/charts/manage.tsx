@@ -12,6 +12,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { SortableTable, type Row } from "@/app/portal/admin/table";
 import { useRouter } from "next/navigation";
 
 interface Place { value: string; timezone: string }
@@ -131,30 +132,51 @@ export function AddChart() {
   );
 }
 
-export function MakePrimary(
-  { chartId, isPrimary, name }: { chartId: string; isPrimary: boolean; name?: string },
+/**
+ * The table of charts, with the one that is you chosen in it.
+ *
+ * It was a line of "X is mine" links under the table, one per chart, which on
+ * Kaycee's account was eighty-one of them: "This will work, but this looks
+ * terrible." She is right, and right about the fix too: "Can we just add a
+ * button or radio in the table?" The choice belongs on the row it is about.
+ */
+export function ChartTable(
+  { rows, picked }: { rows: Row[]; picked: string | null },
 ) {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
-  if (isPrimary) return <span className="tier">Your chart</span>;
+  const [choice, setChoice] = useState(picked);
+
+  async function pick(id: string) {
+    setChoice(id);
+    try {
+      await fetch("/api/portal/primary", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ chartId: id }),
+      });
+      router.refresh();
+    } catch { setChoice(picked); }
+  }
+
   return (
-    <button
-      className="linky small"
-      disabled={busy}
-      onClick={async (e) => {
-        e.preventDefault();
-        setBusy(true);
-        try {
-          await fetch("/api/portal/primary", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ chartId }),
-          });
-          router.refresh();
-        } finally { setBusy(false); }
-      }}
-    >
-      {name ? `${name} is mine` : "This one is mine"}
-    </button>
+    <SortableTable
+      initial={{ key: "name", dir: 1 }}
+      picked={choice}
+      onPick={pick}
+      pickName="whoami"
+      columns={[
+        { key: "mine", label: "You", radio: true },
+        { key: "name", label: "Name" },
+        { key: "chart", label: "Chart", link: "chartHref" },
+        { key: "profile", label: "Profile" },
+        { key: "type", label: "Type" },
+        { key: "authority", label: "Authority", small: true },
+        { key: "definition", label: "Definition", small: true },
+        { key: "sun", label: "Personality Sun", small: true },
+        { key: "born", label: "Birth data", small: true },
+      ]}
+      rows={rows}
+      empty="No charts on this account yet."
+    />
   );
 }

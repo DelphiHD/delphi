@@ -45,8 +45,9 @@ body {
 .wrap { max-width: 720px; margin: 0 auto; padding: 36px 20px 56px; }
 /* An account holding a family needs more than a reading column. */
 .wrap.wide { width: 100%; max-width: 1040px; }
-.mineline { margin-top: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
-.minepick { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+/* The radio that says which chart is you. */
+.tbl td.pickcell, .tbl th.pick { width: 34px; text-align: center; padding-right: 0; }
+.tbl td.pickcell input { accent-color: var(--purple); cursor: pointer; }
 .fine { font-size: 12.5px; color: var(--muted); margin: 0; }
 
 /* The sortable table, shared with the dashboard. It lived only in the

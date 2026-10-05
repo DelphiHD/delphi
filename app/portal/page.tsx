@@ -21,8 +21,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { claimChartsFor } from "@/lib/claim-charts";
-import { SortableTable, type Row } from "@/app/portal/admin/table";
-import { AddChart, MakePrimary } from "./charts/manage";
+import { type Row } from "@/app/portal/admin/table";
+import { AddChart, ChartTable } from "./charts/manage";
 
 export const metadata = { title: "Your charts — Delphi Human Design" };
 export const dynamic = "force-dynamic";
@@ -63,9 +63,14 @@ export default async function PortalPage() {
   // family arrives whole. Idempotent: a second visit claims nothing.
   if (user) await claimChartsFor(user.id, user.email);
 
+  // Scoped to the owner on purpose, not left to the policies. An admin's
+  // policy returns every chart in the database, which turned Kaycee's own
+  // portal into all 81 of them. This page is "Your charts"; the dashboard is
+  // where she sees everybody's.
   const { data: charts, error } = await supabase
     .from("charts")
     .select("id, person_name, birth_date, birth_time, birth_place, time_accuracy, tier, token, summary, created_at")
+    .eq("owner_id", user?.id ?? "")
     .order("person_name");
 
   const { data: me } = await supabase
@@ -90,9 +95,6 @@ export default async function PortalPage() {
     };
   });
 
-  // Theirs first, whatever the table is sorted by when it opens.
-  const mine = all.find((c) => c.id === primaryId);
-
   return (
     <main className="wrap wide">
       <h1>Your charts</h1>
@@ -113,39 +115,8 @@ export default async function PortalPage() {
         </div>
       )}
 
-      {rows.length > 0 && (
-        <SortableTable
-          initial={{ key: "name", dir: 1 }}
-          columns={[
-            { key: "name", label: "Name" },
-            { key: "chart", label: "Chart", link: "chartHref" },
-            { key: "profile", label: "Profile" },
-            { key: "type", label: "Type" },
-            { key: "authority", label: "Authority", small: true },
-            { key: "definition", label: "Definition", small: true },
-            { key: "sun", label: "Personality Sun", small: true },
-            { key: "born", label: "Birth data", small: true },
-          ]}
-          rows={rows}
-          empty="No charts on this account yet."
-        />
-      )}
+      {rows.length > 0 && <ChartTable rows={rows} picked={primaryId} />}
 
-      {rows.length > 0 && (
-        <div className="mineline">
-          {mine
-            ? <span className="tier">{String(mine.person_name)} is your chart</span>
-            : <span className="fine">None of these is marked as yours yet.</span>}
-          <div className="minepick">
-            {all.filter((c) => c.id !== primaryId).map((c) => (
-              <MakePrimary key={String(c.id)} chartId={String(c.id)} isPrimary={false}
-                name={String(c.person_name)} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      <p className="know">Know thyself.</p>
     </main>
   );
 }

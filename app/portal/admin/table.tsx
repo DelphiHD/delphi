@@ -19,15 +19,21 @@ export interface Column {
   small?: boolean;
   /** sort as a number rather than as words */
   numeric?: boolean;
+  /** a radio in each cell, for choosing one row out of the table */
+  radio?: boolean;
 }
 
 export type Row = Record<string, string | number | null>;
 
-export function SortableTable({ columns, rows, initial, empty }: {
+export function SortableTable({ columns, rows, initial, empty, picked, onPick, pickName }: {
   columns: Column[];
   rows: Row[];
   initial?: { key: string; dir: 1 | -1 };
   empty?: string;
+  /** the id of the row whose radio is on, when a column asks for radios */
+  picked?: string | null;
+  onPick?: (id: string) => void;
+  pickName?: string;
 }) {
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>(
     initial ?? { key: columns[0].key, dir: 1 },
@@ -65,9 +71,9 @@ export function SortableTable({ columns, rows, initial, empty }: {
                 <th
                   key={c.key}
                   className={(c.small ? "hide-sm " : "") + (sort.key === c.key ? "on" : "")}
-                  onClick={() => setSort((s) => ({ key: c.key, dir: s.key === c.key ? (s.dir === 1 ? -1 : 1) : 1 }))}
+                  onClick={() => { if (!c.radio) setSort((s) => ({ key: c.key, dir: s.key === c.key ? (s.dir === 1 ? -1 : 1) : 1 })); }}
                 >
-                  {c.label}{sort.key === c.key ? (sort.dir === 1 ? " ↑" : " ↓") : ""}
+                  {c.label}{!c.radio && sort.key === c.key ? (sort.dir === 1 ? " ↑" : " ↓") : ""}
                 </th>
               ))}
             </tr>
@@ -81,11 +87,20 @@ export function SortableTable({ columns, rows, initial, empty }: {
                 {columns.map((c) => {
                   const v = r[c.key];
                   const href = c.link ? String(r[c.link] ?? "") : "";
+                  const id = String(r.id ?? i);
                   return (
-                    <td key={c.key} className={c.small ? "hide-sm" : ""}>
-                      {href
-                        ? <a href={href} target="_blank" rel="noreferrer">{String(v ?? "open")}</a>
-                        : (v === null || v === undefined || v === "" ? <span className="dim">—</span> : String(v))}
+                    <td key={c.key} className={(c.small ? "hide-sm " : "") + (c.radio ? "pickcell" : "")}>
+                      {c.radio
+                        ? <input
+                            type="radio"
+                            name={pickName ?? "pick"}
+                            checked={picked === id}
+                            onChange={() => onPick?.(id)}
+                            aria-label={String(r.name ?? id)}
+                          />
+                        : href
+                          ? <a href={href} target="_blank" rel="noreferrer">{String(v ?? "open")}</a>
+                          : (v === null || v === undefined || v === "" ? <span className="dim">—</span> : String(v))}
                     </td>
                   );
                 })}
