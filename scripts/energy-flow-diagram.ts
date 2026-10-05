@@ -4111,10 +4111,15 @@ body:not(.mod-self) #astrosiderow { display:none; }
    column. It clears the dock's 154 pixels and centres in what is left. */
 body.view-astro .astro .agrid { max-height:calc(100vh - 36px); margin-left:164px; }
 @media (max-width: 760px) { body.view-astro .astro .agrid { margin-left:0; } }
-.agrid .axlab { display:flex; justify-content:center; gap:14px; margin-bottom:6px;
+.agrid .dax { text-align:center; margin-bottom:6px; color:#e06666;
   font-size:10px; letter-spacing:.14em; text-transform:uppercase; font-weight:600; }
-.agrid .axlab .pax { color:#2f2a33; }
-.agrid .axlab .dax { color:#e06666; }
+.agrid .gwrap { display:flex; align-items:center; justify-content:center; gap:4px; }
+/* Personality labels the rows, so it reads up the side of them. */
+.agrid .pax { writing-mode:vertical-rl; transform:rotate(180deg); color:#2f2a33;
+  font-size:10px; letter-spacing:.14em; text-transform:uppercase; font-weight:600; }
+/* A body conjunct its own design position, where that was never in doubt. */
+.agrid td.expected { opacity:.3; }
+.agrid td.expected:hover { opacity:1; }
 .agrid .akey { display:flex; flex-wrap:wrap; justify-content:center; gap:4px 10px; margin-top:10px; }
 .agrid .ak { display:inline-flex; align-items:center; gap:4px; font-size:10px;
   letter-spacing:.04em; opacity:.72; }
@@ -7787,22 +7792,43 @@ if (DATA.client) {
       var gridRow = document.getElementById('astrogridrow');
       var bGrid = document.getElementById('asGrid');
       var gridOn = false, wheelHeld = '';
+      /**
+       * A body conjunct its own design position is only news for some of them.
+       * Measured across sixty births spread over forty years: Uranus, Neptune
+       * and Pluto land within ten degrees of themselves every single time,
+       * Chiron 95 per cent, Saturn 87, and the nodes creep about five degrees
+       * in the whole 88 days. Mars manages it 7 per cent of the time and only
+       * when it turns retrograde, Jupiter about half. The Sun, Moon, Mercury
+       * and Venus cannot do it at all.
+       *
+       * So the slow ones are muted rather than hidden: Kaycee wants to see an
+       * unexpected one, 2026-10-05, and the expected ones were shouting. This
+       * only holds because the two charts are a fixed 88 days apart. A
+       * synastry between two people has no such gap and nothing is muted
+       * there, which was her own point.
+       */
+      var EXPECTED_SAME = { Saturn: 1, Uranus: 1, Neptune: 1, Pluto: 1,
+        Chiron: 1, True_Node: 1, Mean_Node: 1 };
+      var expectedPair = function (a) {
+        return a.p1_name === a.p2_name && a.aspect === 'conjunction' && !!EXPECTED_SAME[a.p1_name];
+      };
       var buildGrid = function () {
         var rows = planetsOf('personality').filter(on);
         var cols = planetsOf('design').filter(on);
         var at = {};
         (EX.synastry || []).forEach(function (a) { at[a.p1_name + '|' + a.p2_name] = a; });
         var head = '<th class="corner"></th>' + cols.map(function (c) {
-          return '<th class="colh" title="' + esc(c.label || pretty(c.name)) + '">' +
+          return '<th class="colh" data-head="' + esc(c.name) + '" data-side="design">' +
             esc(glyphFor(c)) + '</th>';
         }).join('');
         var bodyRows = rows.map(function (r) {
-          return '<tr><th class="rowh" title="' + esc(r.label || pretty(r.name)) + '">' +
+          return '<tr><th class="rowh" data-head="' + esc(r.name) + '" data-side="personality">' +
             esc(glyphFor(r)) + '</th>' +
             cols.map(function (c) {
               var a = at[r.name + '|' + c.name];
               if (!a) return '<td></td>';
-              return '<td class="has ' + (ASPECT_CLASS[a.aspect] || 'min') + '" data-cell="' +
+              return '<td class="has ' + (ASPECT_CLASS[a.aspect] || 'min') +
+                (expectedPair(a) ? ' expected' : '') + '" data-cell="' +
                 esc(r.name) + '|' + esc(c.name) + '">' + (ASPECT_GLYPH[a.aspect] || '?') +
                 '<span class="glab">' + (Math.round(Math.abs(a.orbit) * 10) / 10) + '</span></td>';
             }).join('') + '</tr>';
@@ -7813,10 +7839,11 @@ if (DATA.client) {
         var key = '<div class="akey">' + KEY.map(function (k) {
           return '<span class="ak ' + k[2] + '"><b>' + k[0] + '</b>' + k[1] + '</span>';
         }).join('') + '</div>';
-        return '<div class="agrid"><div class="axlab">' +
-          '<span class="pax">Personality</span><span class="dax">Design</span></div>' +
+        return '<div class="agrid">' +
+          '<div class="dax">Design</div>' +
+          '<div class="gwrap"><div class="pax">Personality</div>' +
           '<table><thead><tr>' + head + '</tr></thead><tbody>' +
-          bodyRows + '</tbody></table>' + key + '</div>';
+          bodyRows + '</tbody></table></div>' + key + '</div>';
       };
       var showGrid = function (want) {
         gridOn = want;
@@ -7840,6 +7867,14 @@ if (DATA.client) {
         liveAstro.addEventListener('mousemove', function (e) {
           if (!gridOn) return;
           var c = e.target.closest ? e.target.closest('td.has') : null;
+          // a header glyph reads as its placement, the same words the wheel gives
+          var h = e.target.closest ? e.target.closest('th[data-head]') : null;
+          if (h) {
+            e.stopPropagation();
+            showTip(e, planetTip(h.getAttribute('data-head'),
+              h.getAttribute('data-side') === 'design' ? 'design' : 'personality'));
+            return;
+          }
           if (!c) { tip.hidden = true; return; }
           var pair = (c.getAttribute('data-cell') || '').split('|');
           var a = (EX.synastry || []).filter(function (x) {
@@ -7852,7 +7887,8 @@ if (DATA.client) {
           e.stopPropagation();
           showTip(e, '<b><span style="color:#2f2a33">' + esc(labelOf(a.p1_name)) + '</span> ' +
             esc(a.aspect) + ' <span style="color:#e06666">' + esc(labelOf(a.p2_name)) + '</span></b>' +
-            '<span class="pill house">orb ' + (Math.round(Math.abs(a.orbit) * 10) / 10) + '\u00b0</span>');
+            '<span class="pill house">orb ' + (Math.round(Math.abs(a.orbit) * 10) / 10) + '\u00b0</span>' +
+            (expectedPair(a) ? '<span class="pill">Expected over 88 days</span>' : ''));
         });
         liveAstro.addEventListener('mouseleave', function () { if (gridOn) tip.hidden = true; });
       }
