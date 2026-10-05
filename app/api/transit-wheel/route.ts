@@ -30,6 +30,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getAstro } from "@/lib/astro";
+import { getChart } from "@/lib/mybodygraph";
 import { renderWheel } from "@/scripts/astro-wheel";
 import { crossAspects } from "@/lib/astro-extras";
 
@@ -82,7 +83,7 @@ export async function GET(request: Request): Promise<Response> {
   const db = createClient(url, key, { auth: { persistSession: false } });
 
   const { data: chart } = await db.from("charts")
-    .select("person_name, birth_date, birth_time, birth_place, time_accuracy")
+    .select("person_name, birth_date, birth_time, birth_place, birth_timezone, time_accuracy")
     .eq("token", token).maybeSingle();
   if (!chart) return bad("no chart with that link", 404);
 
@@ -101,11 +102,26 @@ export async function GET(request: Request): Promise<Response> {
 
     // The chart it is arriving over. A chart with no birth time is cast at
     // noon, exactly as its own page was, so the two agree.
-    const natal = await getAstro({
+    //
+    // The design side is a different moment, not the same chart relabelled.
+    // Asking only for the birth chart and calling it the design was the first
+    // version of this and it answered with identical aspects for both sides,
+    // which is how it was caught.
+    const born = {
       birthDate: String(chart.birth_date),
       birthTime: String(chart.birth_time ?? "12:00").slice(0, 5),
       place: String(chart.birth_place),
-    });
+    };
+    let designUtc: string | undefined;
+    if (side === "design") {
+      const hd = await getChart({
+        birthDate: born.birthDate, birthTime: born.birthTime,
+        timezone: String(chart.birth_timezone), locationQuery: born.place,
+      });
+      designUtc = hd.birth.designUtcDate;
+      if (!designUtc) return bad("that chart has no design moment to cast", 502);
+    }
+    const natal = await getAstro({ ...born, atUtc: designUtc });
 
     // Transit to natal, which is the reading. Each aspect is measured against
     // the body doing the transiting, so the Sun and the Moon get their wider
