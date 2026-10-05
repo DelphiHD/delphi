@@ -9927,6 +9927,31 @@ async function publishChart(client: ClientCtx, html: string): Promise<string> {
     : await db.from("client_charts").insert(row);
   if (saved.error) throw new Error(`link record failed: ${saved.error.message}`);
 
+  // The handful of facts a list of charts needs, written by the same publish
+  // that drew the page so the two can never disagree. Kaycee, 2026-10-05, on
+  // the portal: "Let's make the column headers profile, type, authority,
+  // definition, personality Sun." None of them are stored on the row and all
+  // of them cost a cast, which is not a thing to do twenty times to draw a
+  // list. A failure here must not cost her the publish: the chart is the
+  // deliverable and this is a convenience on top of it.
+  try {
+    const say = (label: string) => client.meta.find((m) => m.label === label)?.value ?? "";
+    const sun = client.acts.find((a) => a.side === "personality" && a.planet === "Sun");
+    await db.from("charts").update({
+      summary: {
+        profile: say("Profile"),
+        type: say("Type"),
+        authority: say("Authority"),
+        definition: say("Definition"),
+        personalitySun: sun ? `${sun.gate}.${sun.line}` : "",
+        cross: say("Incarnation Cross"),
+        at: new Date().toISOString(),
+      },
+    }).eq("token", token);
+  } catch (e) {
+    console.warn(`  ! summary not written: ${e instanceof Error ? e.message : e}`);
+  }
+
   recordChange(client, { previousHtml, nextHtml: html, rolledFrom });
 
   return `${SITE}/c/${token}`;

@@ -43,6 +43,29 @@ body {
 .signout:hover { color: var(--purple); }
 
 .wrap { max-width: 720px; margin: 0 auto; padding: 36px 20px 56px; }
+/* An account holding a family needs more than a reading column. */
+.wrap.wide { width: 100%; max-width: 1040px; }
+.mineline { margin-top: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.minepick { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.fine { font-size: 12.5px; color: var(--muted); margin: 0; }
+
+/* The sortable table, shared with the dashboard. It lived only in the
+   dashboard's own page, so the first thing the portal drew with it came out
+   bare. One copy, in the layout both pages sit inside. */
+.find { width: 100%; font: inherit; font-size: 14px; padding: 9px 12px; margin-bottom: 10px;
+  border: 1px solid rgba(132, 80, 149, 0.25); border-radius: 10px; }
+.tbl { overflow-x: auto; -webkit-overflow-scrolling: touch;
+  border: 1px solid rgba(132, 80, 149, 0.14); border-radius: 12px; }
+.tbl table { width: 100%; border-collapse: collapse; font-size: 13px; background: #fff; }
+.tbl th { text-align: left; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--muted); font-weight: 600; padding: 9px 10px; cursor: pointer;
+  white-space: nowrap; user-select: none; }
+.tbl th.on { color: var(--purple); }
+.tbl td { padding: 8px 10px; border-top: 1px solid rgba(132, 80, 149, 0.10); vertical-align: top; }
+.tbl td a { color: var(--purple); font-weight: 600; }
+.tbl .dim { color: var(--muted); }
+.count { font-size: 11px; color: var(--muted); margin: 8px 2px 0; }
+@media (max-width: 620px) { .hide-sm { display: none; } }
 h1 { font-weight: 400; font-size: clamp(22px, 4vw, 28px); letter-spacing: 0.02em;
   margin: 0 0 8px; text-wrap: balance; }
 .sub { margin: 0 0 26px; font-size: 13.5px; line-height: 1.6; color: var(--muted); }

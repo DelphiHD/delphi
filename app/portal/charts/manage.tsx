@@ -131,7 +131,9 @@ export function AddChart() {
   );
 }
 
-export function MakePrimary({ chartId, isPrimary }: { chartId: string; isPrimary: boolean }) {
+export function MakePrimary(
+  { chartId, isPrimary, name }: { chartId: string; isPrimary: boolean; name?: string },
+) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   if (isPrimary) return <span className="tier">Your chart</span>;
@@ -152,7 +154,7 @@ export function MakePrimary({ chartId, isPrimary }: { chartId: string; isPrimary
         } finally { setBusy(false); }
       }}
     >
-      This one is mine
+      {name ? `${name} is mine` : "This one is mine"}
     </button>
   );
 }
