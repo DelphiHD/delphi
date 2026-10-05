@@ -42,7 +42,9 @@
 import {
   Body, GeoVector, Ecliptic, EclipticGeoMoon,
 } from "astronomy-engine";
-import { GATE_ARC_DEGREES, LINE_ARC_DEGREES } from "@/lib/hd/gate-longitude";
+import {
+  GATE_ARC_DEGREES, LINE_ARC_DEGREES, WHEEL_ANCHOR_LONGITUDE,
+} from "@/lib/hd/gate-longitude";
 import { tabledLongitudeAt } from "@/lib/hd/slow-table";
 
 /** The rungs of the wheel, coarse to fine. Base is deliberately absent. */
@@ -158,4 +160,109 @@ export function crossingsIn(args: {
 
   out.sort((a, b) => a.mins - b.mins);
   return out;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Ingress: when a body entered the sign or gate it is in, and when it leaves.
+ *
+ * crossingsIn above samples every minute, which is right for a birth-time
+ * window of a few hours and hopeless here: Pluto holds a sign for twenty
+ * years. This walks outward from the moment in growing steps and then bisects
+ * the step that straddles the boundary, so it costs a few dozen position
+ * calculations per answer instead of ten million.
+ *
+ * Retrograde is handled by not assuming direction: "entered" is the most
+ * recent crossing INTO the band the body is in now, which is the ingress an
+ * astrologer means when a planet has retrograded back over a cusp and
+ * returned. "leaves" is the next crossing out, forwards or backwards.
+ *
+ * Kaycee, 2026-10-05: "We want to know, when this planet entered this sign and
+ * gate and when it moves to the next sign and gate."
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+export type Band = "sign" | "gate";
+
+const DAY_MS = 86_400_000;
+/** Pluto can hold one sign for a little over twenty years. */
+const MAX_SEARCH_DAYS = 40 * 365;
+
+const norm360 = (d: number) => ((d % 360) + 360) % 360;
+
+/** Which band a longitude falls in. Both are monotonic in longitude, so a
+ *  change of index is a boundary crossing and nothing else. */
+function cellOf(lon: number, band: Band): number {
+  return band === "sign"
+    ? Math.floor(norm360(lon) / 30)
+    : Math.floor(norm360(lon - WHEEL_ANCHOR_LONGITUDE) / GATE_ARC_DEGREES);
+}
+
+/** Degrees per day, signed magnitude, measured either side of the moment. */
+function speedOf(planet: string, when: Date): number {
+  const a = longitudeAt(planet, new Date(when.getTime() - DAY_MS / 2));
+  const b = longitudeAt(planet, new Date(when.getTime() + DAY_MS / 2));
+  if (a === null || b === null) return 1;
+  return Math.abs(((b - a + 540) % 360) - 180);
+}
+
+/**
+ * The instant the body crosses out of the band it occupies at `from`, looking
+ * forwards (dir 1) or backwards (dir -1). Returns the first instant on the far
+ * side going forwards, and the first instant INSIDE the band going backwards,
+ * which is the ingress.
+ */
+function edgeOf(planet: string, from: Date, band: Band, dir: 1 | -1): Date | null {
+  const lon0 = longitudeAt(planet, from);
+  if (lon0 === null) return null;
+  const base = cellOf(lon0, band);
+  const arc = band === "sign" ? 30 : GATE_ARC_DEGREES;
+  // Never step so far that a whole stay in the band could fall between two
+  // samples. A quarter of the time this body takes to cross one band.
+  const maxStep = Math.max(0.02, Math.min(arc / Math.max(speedOf(planet, from), 1e-4) / 4, 20));
+
+  let step = Math.min(0.25, maxStep);
+  let elapsed = 0;
+  let inside = from;
+  while (elapsed < MAX_SEARCH_DAYS) {
+    const t = elapsed + step;
+    const probe = new Date(from.getTime() + dir * t * DAY_MS);
+    const lon = longitudeAt(planet, probe);
+    if (lon === null) return null;
+    if (cellOf(lon, band) !== base) {
+      // bisect to the minute between the last sample inside and this one out
+      let lo = inside, hi = probe;
+      while (Math.abs(hi.getTime() - lo.getTime()) > 60_000) {
+        const mid = new Date((lo.getTime() + hi.getTime()) / 2);
+        const lm = longitudeAt(planet, mid);
+        if (lm === null) break;
+        if (cellOf(lm, band) === base) lo = mid; else hi = mid;
+      }
+      return dir === 1 ? hi : lo;
+    }
+    inside = probe;
+    elapsed = t;
+    step = Math.min(step * 1.6, maxStep);
+  }
+  return null;
+}
+
+export interface BandStay {
+  planet: string;
+  band: Band;
+  /** Sign name or gate number, whichever band this is. */
+  index: number;
+  enteredUtc: string | null;
+  leavesUtc: string | null;
+}
+
+/** Where a body sits in this band right now, and the span it is inside. */
+export function bandStay(planet: string, when: Date, band: Band): BandStay | null {
+  const lon = longitudeAt(planet, when);
+  if (lon === null) return null;
+  const entered = edgeOf(planet, when, band, -1);
+  const leaves = edgeOf(planet, when, band, 1);
+  return {
+    planet, band, index: cellOf(lon, band),
+    enteredUtc: entered ? entered.toISOString() : null,
+    leavesUtc: leaves ? leaves.toISOString() : null,
+  };
 }

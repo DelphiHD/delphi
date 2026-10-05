@@ -3921,6 +3921,22 @@ body.mod-transit #trAgainst { margin-top:10px; }
    is. Kaycee, 2026-10-05: "the aspect grid button is only relevant on the
    astrology view." */
 .trgridbtn { display:none; width:100%; margin-top:10px; }
+.trtimes { display:none; margin-top:12px; }
+body.mod-transit .trtimes { display:block; }
+.trbody { padding:7px 0; border-top:1px solid rgba(132,80,149,.12); }
+.trbody:first-child { border-top:0; }
+.trhead { display:flex; justify-content:space-between; align-items:baseline; gap:8px;
+  font-size:11.5px; margin-bottom:4px; }
+.trhead i { font-style:normal; font-weight:600; }
+.trhead span { opacity:.72; }
+.trspan { display:grid; grid-template-columns:30px 1fr 54px; gap:6px; align-items:center;
+  font-size:10px; margin-top:3px; }
+.trspan i { font-style:normal; opacity:.55; letter-spacing:.08em; text-transform:uppercase; }
+.trspan > span { opacity:.78; white-space:nowrap; }
+.trspan .track { grid-column:1 / -1; height:5px; border-radius:3px;
+  background:rgba(132,80,149,.14); overflow:hidden; }
+.trspan .track .fill { height:100%; background:#0d9488; border-radius:3px; }
+.trspan b { font-weight:600; opacity:.6; text-align:right; white-space:nowrap; }
 body.mod-transit.view-astro .trgridbtn { display:block; }
 body.mod-transit .dfield,
 body.mod-transit #trPlace, body.mod-transit #trAgainst { padding:6px 8px; }
@@ -4512,6 +4528,10 @@ ${d.client ? "" : viewControls}
         <button id="trGrid" class="trgridbtn">Aspect Grid</button>
         <div class="trnote" id="trNote"></div>
       </div>
+      <details class="drop trtimes" id="trTimes">
+        <summary>Transit Placements</summary>
+        <div id="trTimesBody"></div>
+      </details>
     </div>
     <div id="tab-home" class="pane">
     <div id="relhome">
@@ -5205,6 +5225,88 @@ if (DATA.client) {
     openCard(el, '<b>' + esc(c.label) + '</b><span class="kn">' + esc(c.date) + '</span>' +
       tags([{ text: c.status }]) + prose(c.text));
   });
+
+  // When each transiting body entered the sign and the gate it is in, and when
+  // it leaves. Kaycee, 2026-10-05: "We want to know, when this planet entered
+  // this sign and gate and when it moves to the next sign and gate. Organize
+  // it by sign, then gate." The bar is how far through the stay the chosen
+  // moment is: "maybe some kind of bar for each planet that shows how much
+  // time is left on the transit."
+  (function () {
+    var host = document.getElementById('trTimesBody');
+    var seq = 0;
+    var TPID = { True_Node: 'north-node', Mean_Node: 'south-node', Mean_Lilith: 'lilith' };
+    var tpid = function (n) { return TPID[n] || String(n).toLowerCase().replace(/[_\s]+/g, '-'); };
+
+    var fmtDay = function (iso) {
+      if (!iso) return '—';
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return '—';
+      return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+    };
+    var through = function (a, b, nowMs) {
+      if (!a || !b) return 0;
+      var x = Date.parse(a), y = Date.parse(b);
+      if (!(y > x)) return 0;
+      return Math.max(0, Math.min(1, (nowMs - x) / (y - x)));
+    };
+    var leftOf = function (b, nowMs) {
+      if (!b) return '';
+      var ms = Date.parse(b) - nowMs;
+      if (!(ms > 0)) return '';
+      var d = ms / 86400000;
+      if (d < 1) return Math.max(1, Math.round(ms / 3600000)) + 'h left';
+      if (d < 60) return Math.round(d) + 'd left';
+      if (d < 730) return Math.round(d / 30.44) + 'mo left';
+      return (Math.round(d / 36.525) / 10) + 'y left';
+    };
+
+    // The same two lines wherever a transiting body is described.
+    window.__trTimingHtml = function (name) {
+      var t = (window.__transitTiming || {})[tpid(name)];
+      if (!t) return '';
+      var now = window.__transitTimingAt || Date.now();
+      var line = function (label, what, a, b) {
+        if (!a && !b) return '';
+        return '<br><span style="opacity:.72">' + label + ' <b>' + esc(what) + '</b> &middot; ' +
+          esc(fmtDay(a)) + ' → ' + esc(fmtDay(b)) +
+          (leftOf(b, now) ? ' &middot; ' + esc(leftOf(b, now)) : '') + '</span>';
+      };
+      return line('Sign', t.sign, t.signEntered, t.signLeaves) +
+        line('Gate', t.gate + '.' + t.line, t.gateEntered, t.gateLeaves);
+    };
+
+    window.__drawTransitTimes = function () {
+      var dEl = document.getElementById('dfield'), tEl = document.getElementById('tfield');
+      if (!dEl || !tEl || !dEl.value) return;
+      var mine = ++seq;
+      fetch('/api/transit-timing?date=' + encodeURIComponent(dEl.value) +
+        '&time=' + encodeURIComponent((tEl.value || '12:00').slice(0, 5)))
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          if (mine !== seq || !j || !j.ok) return;
+          var nowMs = Date.parse(j.date + 'T' + j.time + ':00Z');
+          window.__transitTimingAt = nowMs;
+          var by = {};
+          j.bodies.forEach(function (b) { if (b.computable) by[tpid(b.planet)] = b; });
+          window.__transitTiming = by;
+          if (!host) return;
+          host.innerHTML = j.bodies.filter(function (b) { return b.computable; })
+            .map(function (b) {
+              var span = function (label, what, a, c) {
+                return '<div class="trspan"><i>' + label + '</i><span>' + esc(what) + ' &middot; ' +
+                  esc(fmtDay(a)) + ' → ' + esc(fmtDay(c)) + '</span><b>' +
+                  esc(leftOf(c, nowMs)) + '</b><div class="track"><div class="fill" style="width:' +
+                  Math.round(through(a, c, nowMs) * 100) + '%"></div></div></div>';
+              };
+              return '<div class="trbody"><div class="trhead"><i>' + esc(b.planet) +
+                '</i><span>' + esc(b.sign) + ' &middot; ' + b.gate + '.' + b.line +
+                '</span></div>' + span('Sign', b.sign, b.signEntered, b.signLeaves) +
+                span('Gate', b.gate + '.' + b.line, b.gateEntered, b.gateLeaves) + '</div>';
+            }).join('');
+        }).catch(function () { /* the section simply stays as it was */ });
+    };
+  })();
 
   // stats tab
   (function () {
@@ -5974,6 +6076,9 @@ if (DATA.client) {
       // function knowing anything about the stats.
       window.__skyPositions = positions;
       if (window.__renderStats) window.__renderStats();
+      if (body.classList.contains('mod-transit') && window.__drawTransitTimes) {
+        window.__drawTransitTimes();
+      }
       var lit = {};
       positions.forEach(function (p) { lit[p.gate] = 1; });
 
@@ -7279,7 +7384,8 @@ if (DATA.client) {
         (g ? '<span class="pill house">Gate ' + g + '</span>' : '') +
         (!isTr && planetBasic(pl.label || pretty(pl.name))
           ? '<br><span style="opacity:.78">' +
-            esc(planetBasic(pl.label || pretty(pl.name))) + '</span>' : '');
+            esc(planetBasic(pl.label || pretty(pl.name))) + '</span>' : '') +
+        (isTr && window.__trTimingHtml ? window.__trTimingHtml(nm) : '');
     };
 
     // The geometry of an aspect, which is fact rather than interpretation.
@@ -8139,6 +8245,7 @@ if (DATA.client) {
         if (typeof relight === 'function') relight();
         if (window.__stampMoment) window.__stampMoment();
         if (window.__renderStats) window.__renderStats();
+        if (on && window.__drawTransitTimes) window.__drawTransitTimes();
       };
 
       window.__astroTransit = function (on) {
@@ -8638,7 +8745,9 @@ if (DATA.client) {
             // states its facts and keeps quiet.
             (!isTr && planetBasic(pl.label || pretty(pl.name))
               ? '<br><span style="opacity:.72">' +
-                esc(planetBasic(pl.label || pretty(pl.name))) + '</span>' : '');
+                esc(planetBasic(pl.label || pretty(pl.name))) + '</span>' : '') +
+            // When it entered this sign and this gate, and when it leaves.
+            (isTr && window.__trTimingHtml ? window.__trTimingHtml(pl.name) : '');
         }
         showTip(e, html);
       });
@@ -10013,6 +10122,7 @@ document.addEventListener('mousemove', function (e) {
     var tg = +trow.dataset.gate;
     hot(null); markRows(null); litGate(tg);
     showTip(e, '<b>Transit ' + esc(trow.dataset.planet) + ' ' + esc(tg + '.' + trow.dataset.line) + '</b>' +
+      (window.__trTimingHtml ? window.__trTimingHtml(trow.dataset.planet) : '') +
       gateTipHtml(tg));
     return;
   }
