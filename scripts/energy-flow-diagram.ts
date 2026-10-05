@@ -7207,9 +7207,12 @@ if (DATA.client) {
     };
 
     var paintAstroMeta = function () {
-    // Read again on every paint: the view can switch to the design chart, and
-    // the Sun and Moon of that chart are different placements entirely.
-    sun = byName('Sun'); moon = byName('Moon');
+    // Read again on every paint, FOR THE SIDE ON SCREEN. Without the side the
+    // lookup answers with the personality every time, so these two lines sat
+    // on the birth chart while the four angles under them followed the switch:
+    // Kaycee, 2026-10-05, "The Sun and Moon info in the control panel need to
+    // change with the personality/design buttons like the others do."
+    sun = byName('Sun', curSide); moon = byName('Moon', curSide);
     var relMeta = (body.classList.contains('mod-relation') && DATA.connection
       && DATA.connection.astro) ? DATA.connection : null;
     if (relMeta) {
@@ -7249,9 +7252,16 @@ if (DATA.client) {
         sgn + ' ' + dg(d % 30) +
         (RULER.sign[sgn] ? '<i class="rul">' + esc(RULER.sign[sgn]) + '</i>' : '') + '</div>';
     };
+    // Both of these carry the ruler of their sign, the same as the angles.
+    var lumRow = function (p, label) {
+      if (!p) return '';
+      var r = RULER.sign[p.sign];
+      return '<div class="line pl-row" data-prow="' + label + '" data-side="' + curSide + '">' +
+        '<span>' + label + '</span> ' + esc(p.sign) + ' ' + dg(p.position) +
+        (r ? '<i class="rul">' + esc(r) + '</i>' : '') + '</div>';
+    };
     document.getElementById('astrometa').innerHTML =
-      (sun ? '<div class="line pl-row" data-prow="Sun"><span>Sun</span> ' + sun.sign + ' ' + dg(sun.position) + '</div>' : '') +
-      (moon ? '<div class="line pl-row" data-prow="Moon"><span>Moon</span> ' + moon.sign + ' ' + dg(moon.position) + '</div>' : '') +
+      lumRow(sun, 'Sun') + lumRow(moon, 'Moon') +
       angleRow('As', 'Ascendant', A.ascendant) +
       angleRow('Ds', 'Descendant', A.ascendant + 180) +
       angleRow('Mc', 'Midheaven', A.mc) +
@@ -7401,12 +7411,14 @@ if (DATA.client) {
           if (!r) return;
           var nm = r.getAttribute('data-prow');
           if (nm) {
-            showTip(e, planetTip(nm, 'personality'));
-            [].forEach.call(wheelEl.querySelectorAll('[data-aplanet="' + nm + '"][data-side="personality"]'),
+            // the same side the row is describing, not always the birth one
+            var ms = r.getAttribute('data-side') === 'design' ? 'design' : 'personality';
+            showTip(e, planetTip(nm, ms));
+            [].forEach.call(wheelEl.querySelectorAll('[data-aplanet="' + nm + '"][data-side="' + ms + '"]'),
               function (n) { n.classList.add('hov-glyph'); });
-            var sp = wheelEl.querySelector('[data-spoke="personality:' + nm + '"]');
+            var sp = wheelEl.querySelector('[data-spoke="' + ms + ':' + nm + '"]');
             if (sp) { sp.setAttribute('opacity', '.5'); sp.setAttribute('data-hov', '1'); }
-            lightGate(nm, 'personality');
+            lightGate(nm, ms);
             return;
           }
           // an angle: light it and its opposite, since they are one axis
