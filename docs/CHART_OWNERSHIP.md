@@ -66,3 +66,36 @@ her own, her chart does not leave Paul; she is given access to it. The
 exactly this, put there in the September migration so these charts would not
 need a backfill. What is still missing is the table of who shared what with
 whom, and that is the next piece rather than a question.
+
+
+## Who can make an admin
+
+Asked by Kaycee, 2026-10-05: "how do we prevent someone from being created as
+an admin?"
+
+Membership is one row in `public.delphi_admins`, and today only
+kayceejv@gmail.com is in it. Four things stand between a stranger and a second
+row:
+
+1. **No code writes to it.** Nothing in the app inserts, updates or deletes a
+   row in that table, so there is no endpoint to trick into doing it.
+2. **Row level security is on and there is not one policy.** A table with
+   security on and no policy refuses every read and every write to anybody who
+   is not the service role.
+3. **No grants.** As of 2026-10-05 `anon` and `authenticated`, the only two
+   roles a browser can ever speak as, have no privileges on that table at all.
+   Before that they held INSERT, UPDATE, DELETE and TRUNCATE, left over from
+   Supabase's defaults for the public schema, and only the policy check stood
+   in the way. One migration with security briefly off, or a restore of a
+   backup taken with it off, and the key that ships inside every browser could
+   have added its holder. `analyst_clients` was in the same state and is now
+   SELECT only, which is what its policy needs.
+4. **The service key is the only way in**, and it lives in three places:
+   Vercel's environment, the GitHub repository secrets, and `.env.local` on
+   her Mac. Anybody holding it can make an admin, and that is unavoidable: it
+   is the key that bypasses every rule by design. Guard it the way the keys
+   doc says.
+
+What is deliberately not solved: there is no audit trail of admin changes. For
+a table with one row in it and no way to write to it from the outside, a log
+would be ceremony. Worth revisiting the day a second person is added.
