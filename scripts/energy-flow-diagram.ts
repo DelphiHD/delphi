@@ -7606,15 +7606,20 @@ if (DATA.client) {
           var r = e.target.closest ? e.target.closest('[data-arow]') : null;
           clearHover();
           if (!r) return;
+          // The row carries the aspect it was drawn with. Searching A.aspects
+          // for the pair by name reported a DIFFERENT measurement between the
+          // same two bodies, which is the same fault the grid cells had: the
+          // natal Venus-Saturn and the transiting one are unrelated and rarely
+          // agree. Transit rows were not in that set at all, so they had no
+          // tooltip. 2026-10-05.
           var pair = r.getAttribute('data-arow').split('|');
-          var asp = (A.aspects || []).filter(function (x) {
-            return x.p1_name === pair[0] && x.p2_name === pair[1];
-          })[0];
-          if (asp) {
-            var geo = ASPECT_GEOMETRY[asp.aspect] || '';
-            showTip(e, '<b>' + esc(labelOf(asp.p1_name)) + ' ' + esc(asp.aspect) + ' ' +
-              esc(labelOf(asp.p2_name)) + '</b>' +
-              '<span class="pill house">orb ' + (Math.round(Math.abs(asp.orbit) * 10) / 10) + '\u00b0</span>' +
+          var rAsp = r.getAttribute('data-aspect');
+          var isTrRow = r.getAttribute('data-pairkind') === 'transit';
+          if (rAsp) {
+            var geo = ASPECT_GEOMETRY[rAsp] || '';
+            showTip(e, '<b>' + esc(labelOf(pair[0])) + ' ' + esc(rAsp) + ' ' +
+              (isTrRow ? 'Transit ' : '') + esc(labelOf(pair[1])) + '</b>' +
+              '<span class="pill house">orb ' + esc(r.getAttribute('data-orb')) + '\u00b0</span>' +
               (geo ? '<br><span style="opacity:.78">' + esc(geo) + '</span>' : ''));
           }
           // Which side these two belong to. On a synastry row the first body
@@ -7624,7 +7629,8 @@ if (DATA.client) {
           var synRow = r.getAttribute('data-syn') === '1';
           if (synRow) litCrossPair(pair[0], pair[1]);
           pair.forEach(function (nm, i) {
-            var sd = synRow ? (i === 0 ? 'personality' : 'design')
+            var sd = isTrRow ? (i === 0 ? (rowSide === 'design' ? 'design' : 'personality') : 'transit')
+              : synRow ? (i === 0 ? 'personality' : 'design')
               : (rowSide === 'design' ? 'design' : 'personality');
             [].forEach.call(wheelEl.querySelectorAll('[data-aplanet="' + nm + '"][data-side="' + sd + '"]'),
               function (n) { n.classList.add('hov-glyph'); });
@@ -7751,6 +7757,8 @@ if (DATA.client) {
           return '<div class="line pl-row ' + (core ? 'core' : 'extra') +
             '" data-side="' + (sideTag || 'personality') + '"' +
             ' data-arow="' + esc(x.p1_name) + '|' + esc(x.p2_name) + '"' +
+            ' data-aspect="' + esc(x.aspect) + '" data-orb="' +
+            (Math.round(Math.abs(x.orbit) * 10) / 10) + '"' +
             (colour ? ' style="border-left:2px solid ' + colour + ';padding-left:6px"' : '') +
             '><i>' + esc(labelOf(x.p1_name)) +
             '</i><span>' + esc(x.aspect) + ' ' + esc(labelOf(x.p2_name)) + '</span><i>' +
@@ -7846,7 +7854,9 @@ if (DATA.client) {
                   var MINORP = { Chiron: 1, Mean_Lilith: 1, Mean_Node: 1, True_Node: 1 };
                   var core = !MINORP[a.p1_name] && !MINORP[a.p2_name] && Math.abs(a.orbit) <= 6;
                   return '<div class="line pl-row ' + (core ? 'core' : 'extra') +
-                    '" data-syn="1" data-arow="' + esc(a.p1_name) + '|' + esc(a.p2_name) + '">' +
+                    '" data-syn="1" data-arow="' + esc(a.p1_name) + '|' + esc(a.p2_name) +
+                    '" data-aspect="' + esc(a.aspect) + '" data-orb="' +
+                    (Math.round(Math.abs(a.orbit) * 10) / 10) + '">' +
                     '<i>' + esc(labelOf(a.p1_name)) + '</i><span>' + esc(a.aspect) +
                     ' <b class="dsidenm">' + esc(labelOf(a.p2_name)) + '</b></span><i>' +
                     (Math.round(Math.abs(a.orbit) * 10) / 10) + '\u00b0</i></div>';
@@ -7940,7 +7950,10 @@ if (DATA.client) {
       var paintTransits = function (list) {
         var none = '<div class="line none"><i></i><span>0</span><i></i></div>';
         var row = function (a) {
-          return '<div class="line pl-row core"><i>' + esc(labelOf(a.natal)) + '</i><span>' +
+          return '<div class="line pl-row core" data-arow="' + esc(a.natal) + '|' +
+            esc(a.transit) + '" data-aspect="' + esc(a.aspect) + '" data-orb="' +
+            a.orbit + '" data-pairkind="transit" data-side="' + esc(a.side || 'personality') +
+            '"><i>' + esc(labelOf(a.natal)) + '</i><span>' +
             esc(a.aspect) + ' <b class="tsidenm">' + esc(labelOf(a.transit)) + '</b></span><i>' +
             a.orbit + '\u00b0</i></div>';
         };
