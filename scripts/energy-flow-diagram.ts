@@ -3906,6 +3906,8 @@ body.mod-transit .datesec .todaylab { margin-bottom:8px; }
 body.mod-transit .datepick { gap:6px; }
 body.mod-transit #trwhere { margin-top:14px; }
 body.mod-transit #trAgainst { margin-top:10px; }
+.trgridbtn { display:none; width:100%; margin-top:10px; }
+body.mod-transit .trgridbtn { display:block; }
 body.mod-transit .dfield,
 body.mod-transit #trPlace, body.mod-transit #trAgainst { padding:6px 8px; }
 .todaysec > summary { font-size:9.5px; letter-spacing:.18em; font-weight:600; opacity:.62; cursor:pointer;
@@ -4485,6 +4487,7 @@ ${d.client ? "" : viewControls}
           <option value="personality">Over the personality</option>
           <option value="design">Over the design</option>
         </select>
+        <button id="trGrid" class="trgridbtn">Aspect Grid</button>
         <div class="trnote" id="trNote"></div>
       </div>
     </div>
@@ -7959,6 +7962,8 @@ if (DATA.client) {
           // answered from the transit and not from the birth chart.
           window.__transitSet = j.transitPlanets || null;
           window.__transitRetro = j.transitRetro || null;
+          window.__transitAspects = j.aspects || [];
+          if (window.__transitGridOn && window.__showAstroGrid) window.__showAstroGrid(true);
           if (window.__evenWheelGlyphs) window.__evenWheelGlyphs(liveAstro);
           if (window.__markAstroPending) window.__markAstroPending();
           paintTransits(j.aspects || []);
@@ -7991,7 +7996,14 @@ if (DATA.client) {
         if (on) {
           body.classList.toggle('off-s-personality', v === 'design');
           body.classList.toggle('off-s-design', v === 'personality');
-        } else if (savedSides) {
+        } else {
+          // Leaving the transit type puts its grid away with it.
+          if (window.__transitGridOn) {
+            window.__transitGridOn = false;
+            if (window.__showAstroGrid) window.__showAstroGrid(false);
+          }
+        }
+        if (!on && savedSides) {
           // Leaving the transit type hands the side toggles back exactly as
           // they were, rather than as the transit left them.
           body.classList.toggle('off-s-personality', savedSides.p);
@@ -8017,6 +8029,25 @@ if (DATA.client) {
           drawTransit();
         });
       });
+
+      // The grid control lives with the moment, under the picker, because it
+      // is another way of reading the same cast rather than a property of the
+      // wheel. It takes the astrology view over, so it switches there first.
+      var trGridBtn = document.getElementById('trGrid');
+      if (trGridBtn) {
+        trGridBtn.addEventListener('click', function () {
+          var want = !body.classList.contains('astro-grid');
+          window.__transitGridOn = want;
+          trGridBtn.classList.toggle('on', want);
+          if (want && !body.classList.contains('view-astro')) {
+            var va = document.getElementById('vAstro');
+            if (va) va.click();
+            setTimeout(function () { if (window.__showAstroGrid) window.__showAstroGrid(true); }, 450);
+            return;
+          }
+          if (window.__showAstroGrid) window.__showAstroGrid(want);
+        });
+      }
 
       // The place, from the provider's own list, never a typed string: a
       // timezone guessed from a place name is where wrong charts come from.
@@ -8193,6 +8224,51 @@ if (DATA.client) {
         });
       };
 
+      // The same grid, with the sky on one axis instead of the design side.
+      // Kaycee, 2026-10-05: "And the Aspect Grid view under the date picker."
+      var buildTransitGrid = function () {
+        var tset = (window.__transitSet || []).filter(on);
+        var asp = window.__transitAspects || [];
+        var selEl = document.getElementById('trAgainst');
+        var mode = selEl ? selEl.value : '';
+        var sides = mode === 'whole' ? ['personality', 'design']
+          : [mode === 'design' ? 'design' : 'personality'];
+        var at = {};
+        asp.forEach(function (a) {
+          at[(a.side || 'personality') + ':' + a.natal + '|' + a.transit] = a;
+        });
+        var head = '<th class="corner"></th>' + tset.map(function (c) {
+          return '<th class="colh" data-head="' + esc(c.name) + '" data-hside="transit">' +
+            esc(glyphFor(c)) + '</th>';
+        }).join('');
+        var bodyRows = '';
+        sides.forEach(function (sd) {
+          planetsOf(sd).filter(on).forEach(function (r) {
+            bodyRows += '<tr><th class="rowh" data-head="' + esc(r.name) +
+              '" data-hside="' + sd + '">' + esc(glyphFor(r)) + '</th>' +
+              tset.map(function (c) {
+                var a = at[sd + ':' + r.name + '|' + c.name];
+                if (!a) return '<td></td>';
+                return '<td class="has ' + (ASPECT_CLASS[a.aspect] || 'min') +
+                  '" data-cell="' + esc(r.name) + '|' + esc(c.name) + '">' +
+                  (ASPECT_GLYPH[a.aspect] || '?') + '<span class="glab">' +
+                  (Math.round(Math.abs(a.orbit) * 10) / 10) + '</span></td>';
+              }).join('') + '</tr>';
+          });
+        });
+        var TKEY = [['C', 'conjunction', 'conj'], ['O', 'opposition', 'hard'],
+          ['S', 'square', 'hard'], ['T', 'trine', 'soft'],
+          ['X', 'sextile', 'soft'], ['Q', 'quintile', 'min']];
+        var tkey = '<div class="akey">' + TKEY.map(function (k) {
+          return '<span class="ak ' + k[2] + '"><b>' + k[0] + '</b>' + k[1] + '</span>';
+        }).join('') + '</div>';
+        return '<div class="agrid">' +
+          '<div class="dax">Transit</div>' +
+          '<div class="gwrap"><div class="pax">Chart</div>' +
+          '<table><thead><tr>' + head + '</tr></thead><tbody>' +
+          bodyRows + '</tbody></table></div>' + tkey + '</div>';
+      };
+
       var showGrid = function (want) {
         gridOn = want;
         bGrid.classList.toggle('on', gridOn);
@@ -8207,14 +8283,23 @@ if (DATA.client) {
         // had just shown.
         body.classList.toggle('astro-grid', gridOn);
         if (gridOn) {
-          wheelHeld = liveAstro.innerHTML;
-          liveAstro.innerHTML = buildGrid();
+          // Hold the wheel only if a grid is not already standing in for it,
+          // or reopening would stash the grid and have nothing to go back to.
+          if (!body.classList.contains('astro-grid-held')) {
+            wheelHeld = liveAstro.innerHTML;
+            body.classList.add('astro-grid-held');
+          }
+          liveAstro.innerHTML = body.classList.contains('mod-transit')
+            ? buildTransitGrid() : buildGrid();
           evenGlyphs(liveAstro);
         } else {
+          body.classList.remove('astro-grid-held');
           liveAstro.innerHTML = wheelHeld || drawn[curSide];
+          if (window.__evenWheelGlyphs) window.__evenWheelGlyphs(liveAstro);
           if (window.__markAstroPending) window.__markAstroPending();
         }
       };
+      window.__showAstroGrid = showGrid;
       if (bGrid && EX && EX.synastry && EX.synastry.length) {
         gridRow.hidden = false;
         bGrid.addEventListener('click', function () { showGrid(!gridOn); });
