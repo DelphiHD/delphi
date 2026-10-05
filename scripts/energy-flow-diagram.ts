@@ -7818,11 +7818,11 @@ if (DATA.client) {
         var at = {};
         (EX.synastry || []).forEach(function (a) { at[a.p1_name + '|' + a.p2_name] = a; });
         var head = '<th class="corner"></th>' + cols.map(function (c) {
-          return '<th class="colh" data-head="' + esc(c.name) + '" data-side="design">' +
+          return '<th class="colh" data-head="' + esc(c.name) + '" data-hside="design">' +
             esc(glyphFor(c)) + '</th>';
         }).join('');
         var bodyRows = rows.map(function (r) {
-          return '<tr><th class="rowh" data-head="' + esc(r.name) + '" data-side="personality">' +
+          return '<tr><th class="rowh" data-head="' + esc(r.name) + '" data-hside="personality">' +
             esc(glyphFor(r)) + '</th>' +
             cols.map(function (c) {
               var a = at[r.name + '|' + c.name];
@@ -7848,6 +7848,12 @@ if (DATA.client) {
       var showGrid = function (want) {
         gridOn = want;
         bGrid.classList.toggle('on', gridOn);
+        // The grid is a synastry whether or not the pill is lit, so both sides
+        // are in play while it is open. Without this, opening the grid from the
+        // personality view left the design column headers hidden by the rule
+        // that hides an overlaid ring: Kaycee, 2026-10-05, "Where did the
+        // design headers go?"
+        if (window.__astroBothSides) window.__astroBothSides(gridOn || synOn);
         // The wheel's own hover handler is bound to this same container and
         // runs after the grid's, so without this it hid every tooltip the grid
         // had just shown.
@@ -7872,7 +7878,7 @@ if (DATA.client) {
           if (h) {
             e.stopPropagation();
             showTip(e, planetTip(h.getAttribute('data-head'),
-              h.getAttribute('data-side') === 'design' ? 'design' : 'personality'));
+              h.getAttribute('data-hside') === 'design' ? 'design' : 'personality'));
             return;
           }
           if (!c) { tip.hidden = true; return; }
