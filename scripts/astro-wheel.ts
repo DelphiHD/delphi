@@ -35,6 +35,10 @@ const GLYPH: Record<string, string> = {
   Sun: "☉", Moon: "☽", Mercury: "☿", Venus: "♀", Mars: "♂",
   Jupiter: "♃", Saturn: "♄", Uranus: "♅", Neptune: "♆", Pluto: "♇",
   True_Node: "☊", Mean_Node: "☋", Mean_Lilith: "⚸", Chiron: "⚷",
+  // Earth belongs on an astrology wheel here because the Human Design side
+  // of the chart reads it as a placement in its own right. Without this it
+  // fell through to the two-letter fallback and the wheel said "Ea".
+  Earth: "⊕",
 };
 
 const DESIGN = "#e06666";   // the same red the bodygraph uses for the design side
@@ -109,6 +113,9 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   personalityGates: readonly number[] = [], designGates: readonly number[] = [],
   partner?: WheelPartner | null, selfColour?: string,
   ringColours?: { a: string; b: string } | null,
+  /** True when this wheel's own chart IS the design side, so a cross aspect's
+   *  first body (always the personality's) belongs to the inner ring. */
+  crossFromDesign = false,
   /** Aspects BETWEEN the two sets on this wheel, drawn as their own class so
    *  the page can show or hide them. The provider never returns these: it
    *  aspects within one chart only, which is why a synastry has to be worked
@@ -276,8 +283,15 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
     // hundred lines on sight.
     const core = MAJOR.has(a.aspect) && !MINOR_POINT.has(a.p1_name) &&
       !MINOR_POINT.has(a.p2_name) && Math.abs(a.orbit) <= 6;
-    const [x1, y1] = pt(a.p1_abs_pos, asc, R_ASPECT);
-    const [x2, y2] = pt(a.p2_abs_pos, asc, R_ASPECT);
+    // A chord drawn in the middle of the wheel says two bodies are in aspect
+    // without saying which. These reach the ring each body is actually drawn
+    // on, so the line arrives at the glyph. The first body in a cross aspect is
+    // always the personality's, which is the inner ring when the wheel itself
+    // is the design side.
+    const rP = crossFromDesign ? R_DESIGN - 11 : R_PLANET - 13;
+    const rD = crossFromDesign ? R_PLANET - 13 : R_DESIGN - 11;
+    const [x1, y1] = pt(a.p1_abs_pos, asc, rP);
+    const [x2, y2] = pt(a.p2_abs_pos, asc, rD);
     s.push(`<line class="asp cross ${core ? "core" : "extra"}" x1="${f(x1)}" y1="${f(y1)}" ` +
       `x2="${f(x2)}" y2="${f(y2)}" stroke="#c9a227" ` +
       `stroke-width="${HARD.has(a.aspect) ? 0.9 : 0.8}" opacity=".55"/>`);

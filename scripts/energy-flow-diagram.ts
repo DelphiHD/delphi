@@ -4064,15 +4064,24 @@ body:not(.mod-self) #astrosiderow { display:none; }
 /* On a synastry row the second body belongs to the design side, in the red
    the bodygraph and the wheel already use for it. */
 .dsidenm { color:#e06666; font-weight:600; }
+.bar.modebar { grid-template-columns:62px 1fr 22px; cursor:help; }
 /* Variables belongs to the Human Design views. Kaycee, 2026-10-05: remove it
    from the astrology home page, but it "still needs to be viewable for the
    human design modules". */
 body.view-astro #vardrop { display:none; }
-/* A section inside a section, all of them closed until asked for. */
-.drop.sub { margin:4px 0 0; }
-.drop.sub > summary { font-size:10.5px; letter-spacing:.08em; text-transform:uppercase;
-  opacity:.72; padding:3px 0; }
-.drop.sub > summary b { font-weight:600; opacity:.6; }
+/* A section inside a section: the same header the parent uses, stepped in so
+   the nesting is visible. Kaycee, 2026-10-05: "indent ... and make the font the
+   same style/color as the rest of the toggle headers". */
+.drop.sub { margin:2px 0 0 12px; }
+.drop.sub > summary { font-size:9.5px; letter-spacing:.18em; font-weight:600; opacity:.62;
+  text-transform:uppercase; padding:3px 0; }
+.drop.sub > summary b { font-weight:600; opacity:.55; letter-spacing:0; }
+.drop.sub .drop.sub { margin-left:12px; }
+/* The house system picker, labelled in the same hand as the lines above it. */
+#astrohsrow { align-items:center; gap:8px; }
+.hslab { font-size:11px; opacity:.62; white-space:nowrap; }
+#astroHouseSystem { flex:1; font:inherit; font-size:11px; padding:3px 6px;
+  border:1px solid rgba(132,80,149,.25); border-radius:7px; background:#fff; color:var(--ink); }
 .line.none span { opacity:.4; }
 #astrohouses .rul, #astrometa .rul { margin-left:6px; }
 /* Both sides of a placement on one line. */
@@ -4350,10 +4359,9 @@ ${d.client ? "" : viewControls}
 
 
     <div id="astrohome">
-      <div class="row" id="astrosiderow" hidden><button id="asPers" class="on">Personality</button><button id="asDes">Design</button><button id="asSyn">Synastry</button></div>
-      <div class="row" id="astrotransitrow" hidden><button id="asTransit">Transit</button><button id="asTransitOnly">Transit Only</button></div>
       <div id="astrometa"></div>
       <div class="row" id="astrohsrow" hidden>
+        <span class="hslab">House System</span>
         <select id="astroHouseSystem">
           <option value="placidus">Placidus</option>
           <option value="whole">Whole Sign</option>
@@ -4361,6 +4369,8 @@ ${d.client ? "" : viewControls}
           <option value="porphyry">Porphyry</option>
         </select>
       </div>
+      <div class="row" id="astrosiderow" hidden><button id="asPers" class="on">Personality</button><button id="asDes">Design</button><button id="asSyn">Synastry</button></div>
+      <div class="row" id="astrotransitrow" hidden><button id="asTransit">Transit</button><button id="asTransitOnly">Transit Only</button></div>
       <details class="drop" id="apdrop"><summary>Placements</summary>
         <div id="astroplanets"></div>
       </details>
@@ -7192,9 +7202,11 @@ if (DATA.client) {
       var sideRows = function (side) {
         return '<div class="ptbl aptbl">' +
           planetsOf(side).map(function (p) {
-            var pr = ' data-prow="' + esc(p.name) + '"';
+            // Every cell carries the side, not just the coordinate: the hover
+            // reads it off whichever one the pointer is over.
+            var pr = ' data-prow="' + esc(p.name) + '" data-side="' + side + '"';
             return '<div class="lb"' + pr + '>' + esc(p.label || pretty(p.name)) + '</div>' +
-              '<div class="vl"' + pr + ' data-side="' + side + '">' + esc(p.sign) + ' ' +
+              '<div class="vl"' + pr + '>' + esc(p.sign) + ' ' +
               dg(p.position) + marks(p.name, side) + '</div>' +
               '<div class="vl hn"' + pr + '>' + houseNumber(p, side) + '</div>';
           }).join('') + '</div>';
@@ -7245,15 +7257,21 @@ if (DATA.client) {
         // A cell belongs to one person, so it lights only theirs. The label at
         // the head of the row belongs to both, so it lights both.
         var who = r.getAttribute('data-person');
-        showTip(e, planetTip(nm, 'personality', who));
+        // Which side this row belongs to. It used to be hard-coded to the
+        // personality, so hovering a design placement answered with the
+        // personality's sign, house and dignity: Kaycee, 2026-10-05, "Why is
+        // the design mars in house 12 Aquarius showing an in domicile tag?"
+        // Her design Mars is in neither.
+        var rside = r.getAttribute('data-side') === 'design' ? 'design' : 'personality';
+        showTip(e, planetTip(nm, rside, who));
         var only = who ? '[data-person="' + who + '"]' : '';
         [].forEach.call(
-          wheelEl.querySelectorAll('[data-aplanet="' + nm + '"][data-side="personality"]' + only),
+          wheelEl.querySelectorAll('[data-aplanet="' + nm + '"][data-side="' + rside + '"]' + only),
           function (n) { n.classList.add('hov-glyph'); });
-        var sp = wheelEl.querySelector('[data-spoke="personality:' + nm + '"]');
+        var sp = wheelEl.querySelector('[data-spoke="' + rside + ':' + nm + '"]');
         if (sp) { sp.setAttribute('opacity', '.5'); sp.setAttribute('data-hov', '1'); }
-        lightGate(nm, 'personality', who);
-        lightSign(nm, 'personality', who);
+        lightGate(nm, rside, who);
+        lightSign(nm, rside, who);
       });
       rowsEl.addEventListener('mouseleave', clearHover);
 
@@ -7377,32 +7395,51 @@ if (DATA.client) {
     // it is empty, so a chart with nothing cardinal says so rather than hiding
     // the fact.
     var MODES = ['Cardinal', 'Fixed', 'Mutable'];
+    /**
+     * A tally, the same shape as Activations by Astrological Sign on the Stats
+     * tab: a label, a bar and a count, with the placements themselves on the
+     * mouseover. Kaycee, 2026-10-05: "I expected to see a tally kind of like
+     * what we did with the astrological placements by sign section, the actual
+     * placements can show on mouseover, we don't need to list them out again."
+     */
+    var modeBars = function (side) {
+      var rows = MODES.map(function (m) {
+        return [m, planetsOf(side).filter(function (p) { return p.quality === m; })];
+      });
+      var max = Math.max.apply(null, rows.map(function (r) { return r[1].length; }).concat([1]));
+      return rows.map(function (r) {
+        return '<div class="bar modebar" data-mode="' + r[0] + '" data-side="' + side + '">' +
+          '<i>' + r[0] + '</i><div class="track"><div class="fill" style="width:' +
+          Math.round((r[1].length / max) * 100) + '%"></div></div><b>' + r[1].length + '</b></div>';
+      }).join('');
+    };
     var paintMode = function () {
       var box = document.getElementById('astromode');
       if (!box) return;
-      var sides = EX && EX.design && A.design
-        ? [['Personality', 'personality'], ['Design', 'design']]
-        : [['', 'personality']];
-      box.innerHTML = MODES.map(function (m) {
-        var inner = sides.map(function (pair) {
-          var rows = planetsOf(pair[1]).filter(function (p) { return p.quality === m; });
-          var body = rows.length
-            ? rows.map(function (p) {
-                return '<div class="line pl-row" data-prow="' + esc(p.name) + '"><i>' +
-                  esc(p.label || pretty(p.name)) + '</i><span>' + esc(p.sign) + ' ' + dg(p.position) +
-                  marks(p.name, pair[1]) + '</span><i></i></div>';
-              }).join('')
-            : '<div class="line none"><i></i><span>0</span><i></i></div>';
-          return pair[0] ? '<div class="relsub">' + pair[0] + '</div>' + body : body;
-        }).join('');
-        var n = sides.reduce(function (t, pair) {
-          return t + planetsOf(pair[1]).filter(function (p) { return p.quality === m; }).length;
-        }, 0);
-        return sub(m + ' <b>' + n + '</b>', inner);
-      }).join('');
+      box.innerHTML = EX && EX.design && A.design
+        ? sub('Personality', modeBars('personality')) + sub('Design', modeBars('design'))
+        : modeBars('personality');
     };
     window.__paintAstroMode = paintMode;
     paintMode();
+
+    // The placements behind a tally row, on hover.
+    var modeBox = document.getElementById('astromode');
+    if (modeBox) {
+      modeBox.addEventListener('mousemove', function (e) {
+        var b = e.target.closest ? e.target.closest('.modebar') : null;
+        if (!b) { tip.hidden = true; return; }
+        var m = b.getAttribute('data-mode'), sd = b.getAttribute('data-side');
+        var list = planetsOf(sd).filter(function (p) { return p.quality === m; });
+        showTip(e, '<b>' + esc(m) + '</b>' +
+          (list.length
+            ? '<br><span style="opacity:.78">' + list.map(function (p) {
+                return esc((p.label || pretty(p.name)) + ' ' + p.sign + ' ' + dg(p.position));
+              }).join('<br>') + '</span>'
+            : ''));
+      });
+      modeBox.addEventListener('mouseleave', function () { tip.hidden = true; });
+    }
 
     // Both people's aspects when there are two, each under their own name, the
     // same sets the wheel draws.
@@ -7436,21 +7473,61 @@ if (DATA.client) {
           one(C.astro.aspects, '#0d9488');
         return;
       }
-      // One sub-toggle per kind, so the list reads as five short lists rather
-      // than one long one, and the bodies touching nothing at all get a
-      // section of their own. Kaycee, 2026-10-05.
-      var all = (A.aspects || []);
+      // One sub-toggle per kind inside one per side, so every count belongs to
+      // a named chart. Kaycee, 2026-10-05: "Can we separate this section out by
+      // personality and design as well?"
       var named = {};
       KINDS.forEach(function (k) { named[k] = 1; });
-      var rest = all.filter(function (x) { return !named[x.aspect]; });
-      var x = extras();
-      var lone = (x && x.unaspected) || [];
+      var none = '<div class="line none"><i></i><span>0</span><i></i></div>';
+      var kindsFor = function (side) {
+        var src = side === 'design' ? (A.design || null) : A;
+        if (!src) return '';
+        var known = {};
+        (src.planets || []).forEach(function (q) { known[q.name] = 1; });
+        // Counted after the same filter the list uses. Other said two and
+        // showed nothing, because both were aspects to a house cusp and those
+        // are dropped as meaningless chords. A count that disagrees with its
+        // own list is worse than no count. Kaycee found it, 2026-10-05.
+        var usable = (src.aspects || []).filter(function (a) {
+          return known[a.p1_name] && known[a.p2_name];
+        });
+        var rest = usable.filter(function (a) { return !named[a.aspect]; });
+        var lone = (extras(side) || {}).unaspected || [];
+        // A count has to agree with the list under it. The classic set hides
+        // the wide and the minor, so counting everything gave a heading that
+        // promised rows the panel was busy hiding, and the Other group, which
+        // is nothing but minor aspects, read "2" over an empty box. Count what
+        // is actually on screen, and let Other appear only when it has
+        // something to show. Kaycee found it, 2026-10-05.
+        var showAll = body.classList.contains('astro-all');
+        var shown = function (list) {
+          return showAll ? list : list.filter(function (a) {
+            return !MINOR_PT[a.p1_name] && !MINOR_PT[a.p2_name] && Math.abs(a.orbit) <= 6;
+          });
+        };
+        return KINDS.map(function (k) {
+          var list = shown(usable.filter(function (a) { return a.aspect === k; }));
+          return sub(cap(k) + ' <b>' + list.length + '</b>', list.length ? one(list, null) : none);
+        }).join('') +
+          (showAll && rest.length ? sub('Other <b>' + rest.length + '</b>', one(rest, null)) : '') +
+          sub('Unaspected <b>' + lone.length + '</b>',
+            lone.length
+              ? lone.map(function (n) {
+                  return '<div class="line pl-row" data-prow="' + esc(n) + '" data-side="' + side +
+                    '"><i>' + esc(labelOf(n)) + '</i><span></span><i></i></div>';
+                }).join('')
+              : none);
+      };
       // With synastry on, the list is the aspects between the two sides, which
       // is the only thing on this page the provider does not supply.
       if (body.classList.contains('astro-syn') && EX && EX.synastry) {
         var syn = EX.synastry;
+        var synAll = body.classList.contains('astro-all');
         box.innerHTML = KINDS.map(function (k) {
-          var list = syn.filter(function (a) { return a.aspect === k; });
+          var list = syn.filter(function (a) {
+            if (a.aspect !== k) return false;
+            return synAll || (!MINOR_PT[a.p1_name] && !MINOR_PT[a.p2_name] && Math.abs(a.orbit) <= 6);
+          });
           return sub(cap(k) + ' <b>' + list.length + '</b>',
             list.length
               ? list.map(function (a) {
@@ -7466,24 +7543,13 @@ if (DATA.client) {
                     ' <b class="dsidenm">' + esc(labelOf(a.p2_name)) + '</b></span><i>' +
                     (Math.round(Math.abs(a.orbit) * 10) / 10) + '\u00b0</i></div>';
                 }).join('')
-              : '<div class="line none"><i></i><span>0</span><i></i></div>');
+              : none);
         }).join('');
         return;
       }
-      box.innerHTML =
-        KINDS.map(function (k) {
-          var list = all.filter(function (a) { return a.aspect === k; });
-          return sub(cap(k) + ' <b>' + list.length + '</b>',
-            list.length ? one(list, null) : '<div class="line none"><i></i><span>0</span><i></i></div>');
-        }).join('') +
-        (rest.length ? sub('Other <b>' + rest.length + '</b>', one(rest, null)) : '') +
-        sub('Unaspected <b>' + lone.length + '</b>',
-          lone.length
-            ? lone.map(function (n) {
-                return '<div class="line pl-row" data-prow="' + esc(n) + '"><i>' +
-                  esc(labelOf(n)) + '</i><span></span><i></i></div>';
-              }).join('')
-            : '<div class="line none"><i></i><span>0</span><i></i></div>');
+      box.innerHTML = (EX && EX.design && A.design)
+        ? sub('Personality', kindsFor('personality')) + sub('Design', kindsFor('design'))
+        : kindsFor('personality');
     };
     window.__paintAspects = paintAspects;
     paintAspects();
@@ -7701,6 +7767,8 @@ if (DATA.client) {
       var on = body.classList.toggle('astro-all');
       ab.classList.toggle('on', on);
       ab.textContent = on ? 'Show the Classic Set' : 'Show Every Aspect';
+      // the counts belong to the set on screen, so they are written again
+      if (window.__paintAspects) window.__paintAspects();
     };
   } else {
     var vaGone = document.getElementById('vAstro');
@@ -9985,9 +10053,9 @@ export async function runBuilder(argv: string[] = process.argv.slice(2)): Promis
           // its own horizon, so reading it from the design is a different
           // chart rather than the same picture relabelled.
           `<template id="aswheel-personality-syn">${renderWheel(astroChart, client!.name, astroDesign,
-            "ascendant", gateRings[0], gateRings[1], gateRings[2], null, undefined, null, cross)}</template>` +
+            "ascendant", gateRings[0], gateRings[1], gateRings[2], null, undefined, null, false, cross)}</template>` +
           `<template id="aswheel-design-syn">${renderWheel(astroDesign, client!.name, astroChart,
-            "ascendant", gateRings[0], gateRings[1], gateRings[2], null, undefined, null, cross)}</template>`
+            "ascendant", gateRings[0], gateRings[1], gateRings[2], null, undefined, null, true, cross)}</template>`
         : "")
     : "";
   const htmlPath = join(outDir, `${stem}.html`);
