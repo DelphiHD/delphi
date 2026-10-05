@@ -521,9 +521,13 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
 
   // the angles
   const angles: [string, number][] = [["As", asc], ["Ds", asc + 180], ["Mc", chart.mc], ["Ic", chart.mc + 180]];
+  // Outside the gate ring, and outside the transit ring too when there is one.
+  // At the usual 368 the angle labels sit right on top of a transit ring at
+  // 364, so any transiting body near an angle collides with its label.
+  const hasOuterRing = !!outer || !!(design && overlayAs?.outside);
+  const rAngle = R_GATE + (hasOuterRing ? 46 : 20);
   for (const [label, lon] of angles) {
-    // outside the gate ring, not tucked underneath it
-    const [x, y] = pt(lon, asc, R_GATE + 20);
+    const [x, y] = pt(lon, asc, rAngle);
     s.push(`<text class="angle" data-angle="${label}" x="${f(x)}" y="${f(y + 4)}" ` +
       `text-anchor="middle" font-size="12" font-weight="600" fill="${PURPLE}" ` +
       `letter-spacing=".06em">${label}</text>`);
