@@ -52,6 +52,9 @@ const R_GATE = 348, R_GATE_IN = 316;
 const R_OUT = 310, R_SIGN = 272, R_TICK = 262, R_PLANET = 244, R_HOUSE = 214, R_ASPECT = 168;
 /** Design planets sit just inside the personality ring, on the same zodiac. */
 const R_DESIGN = 200;
+/** A transit arrives over a chart, so it rides outside it, clear of the ticks
+ *  and inside the gate ring. */
+const R_OVERLAY = 288;
 
 /**
  * Screen angle for a zodiac longitude.
@@ -144,6 +147,12 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   personalityGates: readonly number[] = [], designGates: readonly number[] = [],
   partner?: WheelPartner | null, selfColour?: string,
   ringColours?: { a: string; b: string } | null,
+  /** How the second set of bodies is drawn. A design side sits inside the
+   *  chart's own ring, which is the bi-wheel convention for two readings of
+   *  one person. A transit sits OUTSIDE it, which is the convention for the
+   *  sky arriving over a chart that was already there. Defaults to the design
+   *  behaviour so every existing caller is unchanged. */
+  overlayAs: { side: string; outside?: boolean; colour?: string } | null = null,
   /** Which side this wheel's own chart is. Colour and identity follow the
    *  SIDE, never the ring: on a design wheel carrying the personality as its
    *  inner ring, both rings came out in the design red and read as one set.
@@ -417,13 +426,16 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
       while (placedD.some((q) => q.ring === ring &&
         Math.abs(((lon - q.lon + 540) % 360) - 180) < 6)) ring++;
       placedD.push({ lon, ring });
-      const [x, y] = pt(lon, asc, R_DESIGN - ring * 19);
-      const [tx, ty] = pt(lon, asc, R_DESIGN - ring * 20 - 12);
-      const innerSide = mainSide === "design" ? "personality" : "design";
+      // Outside the chart's own ring for a transit, inside it for a design.
+      const base = overlayAs?.outside ? R_OVERLAY : R_DESIGN;
+      const [x, y] = pt(lon, asc, overlayAs?.outside ? base + ring * 19 : base - ring * 19);
+      const [tx, ty] = pt(lon, asc, base - ring * 20 - 12);
+      const innerSide = overlayAs?.side ?? (mainSide === "design" ? "personality" : "design");
+      const innerFill = overlayAs?.colour ?? (innerSide === "design" ? DESIGN : INK);
       s.push(`<text class="pglyph ${innerSide === "design" ? "dside" : "pside"}" ` +
         `data-aplanet="${p.name}" data-side="${innerSide}" data-ring="inner" ` +
         `x="${f(x)}" y="${f(y + 7)}" text-anchor="middle" font-size="19" ` +
-        `fill="${innerSide === "design" ? DESIGN : INK}">` +
+        `fill="${innerFill}">` +
         `${GLYPH[p.name] ?? p.name.slice(0, 2)}</text>`);
       // no degree label on the design ring: with 26 glyphs on two rings the
       // numbers collide into noise. The hover carries the exact degree.
@@ -446,7 +458,9 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
     }
   };
   spokeFor(chart.planets, mainSide);
-  if (design) spokeFor(design.planets, mainSide === "design" ? "personality" : "design");
+  if (design) {
+    spokeFor(design.planets, overlayAs?.side ?? (mainSide === "design" ? "personality" : "design"));
+  }
 
   // the angles
   const angles: [string, number][] = [["As", asc], ["Ds", asc + 180], ["Mc", chart.mc], ["Ic", chart.mc + 180]];

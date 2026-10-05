@@ -10473,15 +10473,15 @@ export async function runBuilder(argv: string[] = process.argv.slice(2)): Promis
         gateRings[0], gateRings[1], gateRings[2])}</div>` +
       (astroDesign
         ? `<template id="aswheel-design">${renderWheel(astroDesign, client!.name, null, "ascendant",
-            gateRings[0], gateRings[1], gateRings[2], null, undefined, null, "design")}</template>` +
+            gateRings[0], gateRings[1], gateRings[2], null, undefined, null, null, "design")}</template>` +
           // The same two wheels with the aspects between the sides drawn on
           // them, which is what a synastry of one person is. Each side keeps
           // its own horizon, so reading it from the design is a different
           // chart rather than the same picture relabelled.
           `<template id="aswheel-personality-syn">${renderWheel(astroChart, client!.name, astroDesign,
-            "ascendant", gateRings[0], gateRings[1], gateRings[2], null, undefined, null, "personality", cross)}</template>` +
+            "ascendant", gateRings[0], gateRings[1], gateRings[2], null, undefined, null, null, "personality", cross)}</template>` +
           `<template id="aswheel-design-syn">${renderWheel(astroDesign, client!.name, astroChart,
-            "ascendant", gateRings[0], gateRings[1], gateRings[2], null, undefined, null, "design", cross)}</template>`
+            "ascendant", gateRings[0], gateRings[1], gateRings[2], null, undefined, null, null, "design", cross)}</template>`
         : "")
     : "";
   const htmlPath = join(outDir, `${stem}.html`);
