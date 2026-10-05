@@ -3423,6 +3423,9 @@ body.view-transit.tr-circuits svg.canvas.transit:not(.plain) { display:block !im
 /* Transit Only on The Wheel: the client's own glyphs and spokes come off and
    the sky's layer is what is left. The gate ring's shading is baked into the
    wheel's structure and stays. */
+/* Two colours on The Wheel as well: the person's bodies are black whichever
+   side they are, and the sky's layer is the teal. */
+body.mod-transit .mandala [data-side="design"] { fill:#000000; stroke:#000000; }
 body.tr-alone .mandala [data-side="personality"],
 body.tr-alone .mandala [data-side="design"] { display:none; }
 body.tr-alone svg.canvas.transit .pleg,
@@ -9085,13 +9088,26 @@ function relight() {
     // personality/design black and red? It's confusing that the transits are
     // black in that view and the chart is teal." col already holds the
     // traditional colour for this leg, so only the sky's half is overridden.
-    if (sv && sv.classList.contains('transit')) {
-      if (el.dataset.sky && SKY_LIT[el.dataset.gate]) col = CLIENT_TINT_JS;
+    // A transit bodygraph is two colours and no more. Three things can land
+    // on one gate and a leg has two halves, so there is nowhere honest to put
+    // a third: an outline on a four-pixel leg eats forty per cent of it, and
+    // nobody reads gate discs for this. Kaycee, 2026-10-05: "On transit
+    // bodygraphs, let's go back to two colors. Transit in teal, person in
+    // black. If they want to dig into all of the sides they can do it in the
+    // individual view."
+    //
+    // The sky is teal, the person is black, and a gate they both carry reads
+    // teal, because the sky arriving on a gate somebody already holds is the
+    // thing a transit chart exists to show. The same holds on The Wheel:
+    // "make sure that decision carries on both the bodygraph and wheel views."
+    var onTransitChart = (sv && sv.classList.contains('transit')) ||
+      (!sv && body.classList.contains('mod-transit'));
+    if (onTransitChart) {
+      var skyHere = sv && sv.classList.contains('transit')
+        ? !!(el.dataset.sky && SKY_LIT[g])
+        : !!liveT[g];
+      col = skyHere ? CLIENT_TINT_JS : '#000000';
     }
-    // The bodygraph in the mandala's hub is not an svg.canvas, and under a
-    // transit it carries the sky as well: a gate the sky alone lights reads
-    // in the sky's teal there, the same as everywhere else.
-    if (!sv && liveT[g] && !liveP[g] && !liveD[g]) col = CLIENT_TINT_JS;
     // The pair's chart carries its own colours, one per person. This repaint knows
     // only the traditional black and red and would put them straight back over it,
     // which is what made the connection chart look like a single chart after load.

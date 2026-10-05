@@ -911,3 +911,11 @@ was kept and can be restored.
 | 2026-10-05 23:43 | Bob Dylan | page only | yes |
 | 2026-10-05 23:43 | Marilyn Monroe | page only | yes |
 | 2026-10-05 23:43 | Sabrina Carpenter | page only | yes |
+| 2026-10-05 23:43 | Macklemore | page only | yes |
+| 2026-10-05 23:44 | Andy Gibson | page only | yes |
+| 2026-10-05 23:44 | Janis Joplin | page only | yes |
+| 2026-10-05 23:44 | Jim Jones | page only | yes |
+| 2026-10-05 23:44 | Jessi Bostic | page only | yes |
+| 2026-10-05 23:45 | Sandbox Generator Single | page only | yes |
+| 2026-10-05 23:47 | Sandbox Generator Single | page only | yes |
+| 2026-10-05 23:49 | Sandbox Generator Single | page only | yes |
