@@ -8296,10 +8296,16 @@ if (DATA.client) {
         // a glyph lights every synastry line it is one end of
         var gp = t && t.getAttribute('data-aplanet');
         if (gp) {
-          var gs = t.getAttribute('data-side') === 'design' ? 1 : 0;
+          // Each line says which set each of its ends belongs to, so a glyph
+          // lights the lines it is genuinely an end of. Keyed on position
+          // alone, a transit Mars lit natal Mars's lines and none of its own.
+          var gsd = t.getAttribute('data-side') || 'personality';
           [].forEach.call(astroEl.querySelectorAll('.asp.cross'), function (l) {
             var pr = (l.getAttribute('data-cross') || '').split('|');
-            if (pr[gs] === gp) l.classList.add('lit');
+            if ((pr[0] === gp && (l.getAttribute('data-c1side') || 'personality') === gsd) ||
+                (pr[1] === gp && (l.getAttribute('data-c2side') || 'design') === gsd)) {
+              l.classList.add('lit');
+            }
           });
         }
         if (!t) { tip.hidden = true; return; }

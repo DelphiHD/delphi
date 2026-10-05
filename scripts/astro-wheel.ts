@@ -355,15 +355,33 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
     // always the personality's, which is the inner ring when the wheel itself
     // is the design side.
     const fromDesign = mainSide === "design";
-    const rP = fromDesign ? R_DESIGN - 11 : R_PLANET - 13;
-    const rD = fromDesign ? R_PLANET - 13 : R_DESIGN - 11;
-    const [x1, y1] = pt(a.p1_abs_pos, asc, rP);
-    const [x2, y2] = pt(a.p2_abs_pos, asc, rD);
+    // Where each end actually sits. A transit is drawn on the ring outside the
+    // chart, so a line to it has to reach THAT ring: drawn to the design ring
+    // instead, a transit aspect ends in empty space short of its own glyph.
+    // Kaycee, 2026-10-05: "how do we see the aspects of the transiting
+    // planets? CAn you add those mouseover lines here as well?"
+    const transitSecond = !!outer || !!overlayAs?.outside;
+    const p1Design = a.p1_name.startsWith("design:");
+    const r1 = p1Design ? R_DESIGN - 11
+      : (!transitSecond && fromDesign ? R_DESIGN - 11 : R_PLANET - 13);
+    const r2 = transitSecond ? R_OVERLAY - 10
+      : (fromDesign ? R_PLANET - 13 : R_DESIGN - 11);
+    const [x1, y1] = pt(a.p1_abs_pos, asc, r1);
+    const [x2, y2] = pt(a.p2_abs_pos, asc, r2);
+    // Which set each end belongs to, so a hover can tell whether the glyph
+    // under the pointer is this line's first end or its second. Matching on
+    // name alone lit a natal planet's lines when a transit of the same name
+    // was hovered, and missed the transit's own.
+    const c1side = p1Design ? "design" : (transitSecond ? mainSide : "personality");
+    const c2side = outer ? outer.side
+      : (overlayAs?.side ?? (mainSide === "design" ? "personality" : "design"));
+    const bare1 = a.p1_name.replace(/^design:/, "");
     // Named, because these are shown one at a time on hover rather than all at
     // once. Kaycee, 2026-10-05: "The lines to nowhere are kind of meaningless
     // to me." A line you asked for is an answer; thirty you did not is noise.
     s.push(`<line class="asp cross ${core ? "core" : "extra"}" ` +
-      `data-cross="${a.p1_name}|${a.p2_name}" x1="${f(x1)}" y1="${f(y1)}" ` +
+      `data-cross="${bare1}|${a.p2_name}" data-c1side="${c1side}" data-c2side="${c2side}" ` +
+      `x1="${f(x1)}" y1="${f(y1)}" ` +
       `x2="${f(x2)}" y2="${f(y2)}" stroke="#c9a227" ` +
       `stroke-width="${HARD.has(a.aspect) ? 1.3 : 1.1}" opacity="0"/>`);
   }
