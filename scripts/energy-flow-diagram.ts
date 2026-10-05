@@ -3393,10 +3393,20 @@ body.view-plain svg.canvas.plain:not(.transit) { display:block; }
 svg.canvas.transit { display:none; }
 body.view-transit svg.canvas:not(.transit) { display:none !important; }
 /* Two transit drawings now: the plain body, and the circuit-coloured one. */
-body.view-transit svg.canvas.transit.plain { display:block; }
-body.view-transit svg.canvas.transit:not(.plain) { display:none !important; }
+/* Both directions have to shout, because each is overriding the other's
+   !important. Written once without it, the hide won unconditionally and the
+   Circuits view under a transit drew nothing at all. */
+body.view-transit:not(.tr-circuits) svg.canvas.transit.plain { display:block !important; }
+body.view-transit:not(.tr-circuits) svg.canvas.transit:not(.plain) { display:none !important; }
 body.view-transit.tr-circuits svg.canvas.transit.plain { display:none !important; }
-body.view-transit.tr-circuits svg.canvas.transit:not(.plain) { display:block; }
+body.view-transit.tr-circuits svg.canvas.transit:not(.plain) { display:block !important; }
+
+/* Transit Only is the sky with nothing underneath it. Kaycee, 2026-10-05:
+   "Sometimes people just want to view the transit without interference."
+   The person's own legs and discs come off exactly as the party control
+   already takes them off, rather than by a second set of rules. */
+body.tr-alone svg.canvas.transit .pleg,
+body.tr-alone svg.canvas.transit .gdisc { display:none; }
 body.view-transit { background:#ffffff; color:#1c1a2e; }
 body.view-transit .bridge, body.view-transit .halo { display:none; }
 /* The client tint is a light purple and the awareness centers are a mid purple,
@@ -3422,7 +3432,7 @@ body.view-transit .card, body.view-plain .card { background:rgba(255,255,255,.98
 body.view-transit .tip, body.view-plain .tip { background:rgba(255,255,255,.98); color:#1c1a2e; border-color:rgba(132,80,149,.25); }
 /* Circuitry works on the bodygraph and the mandala too. Kaycee, 2026-09-13:
    "Can we add the circuitry toggle to the bodygraph and mandala views as well?" */
-body.view-transit #circdrop { display:none; }
+body.view-transit:not(.tr-circuits) #circdrop { display:none; }
 /* a gate number sitting on a hidden disc has to come back to dark */
 .pnum.off { fill:#1c1a2e !important; }
 /* the traditional chart carries its own coloring: leave the gate numbers alone */
@@ -3871,6 +3881,13 @@ button.gold { background:#c79a2e; color:#fff; }
 button.gold:hover { background:#b0871f; }
 .todaysec, .datesec { display:none; margin-top:10px; border-top:1px solid rgba(132,80,149,.18); padding-top:9px; }
 body.view-transit .todaysec, body.view-transit .datesec { display:block; }
+/* Under the Transit chart type the moment IS the control, so it sits at the top
+   of the panel and stays there whichever view is open. Kaycee, 2026-10-05:
+   "bump everything in the right side control panel down and put the date/time
+   picker at the top on all views... So it stays visible." */
+body.mod-transit .panel { display:flex; flex-direction:column; }
+body.mod-transit .datesec { display:block !important; order:-1; margin-top:0;
+  border-top:none; padding-top:0; }
 .todaysec > summary { font-size:9.5px; letter-spacing:.18em; font-weight:600; opacity:.62; cursor:pointer;
   text-transform:uppercase; padding:3px 0; list-style:none; }
 .todaysec > summary::-webkit-details-marker { display:none; }
@@ -4097,8 +4114,17 @@ body:not(.mod-self) #astrosiderow, body:not(.mod-self) #astrosynrow { display:no
 #trPlaceList button { width:100%; text-align:left; font:inherit; font-size:11.5px; padding:5px 8px;
   border:0; background:rgba(132,80,149,.06); color:var(--ink); cursor:pointer; }
 #trPlaceList button:hover { background:rgba(132,80,149,.14); }
-.trnote { font-size:10.5px; opacity:.6; margin-top:5px; line-height:1.4; }
-.trnote.bad { color:#9c4a28; opacity:1; }
+/* A bare native select renders in the browser's own near-black. Matched to the
+   house-system select so the panel reads as one set of controls. */
+#trPlace, #trAgainst { width:100%; box-sizing:border-box; font:inherit; font-size:11px;
+  padding:3px 6px; border:1px solid rgba(132,80,149,.25); border-radius:7px;
+  background:#fff; color:var(--ink); }
+#trAgainst { margin-top:6px; }
+/* The UTC label is gone: the place field says UTC itself. A failure still has
+   to be loud, so the note survives for that alone. */
+.trnote { display:none; font-size:10.5px; margin-top:5px; line-height:1.4; }
+.trnote.bad { display:block; color:#9c4a28; opacity:1; }
+.trnote.said { display:block; opacity:.6; }
 .astro.loading { opacity:.45; }
 /* Kaycee's list, 2026-10-05. The marks that ride beside a coordinate: her
    subscript capital R for retrograde, a C for combustion, and dignity as a
@@ -4314,8 +4340,12 @@ body.mod-relation #pmeta, body.mod-relation #chandrop,
 body.mod-relation #defdrop, body.mod-relation #circdrop { display:none !important; }
 body.mod-relation #datesec, body.mod-relation #todaysec { display:none !important; }
 body.view-astro #pmeta, body.view-astro #circdrop,
-body.view-astro #datesec, body.view-astro #todaysec, body.view-astro #chandrop,
+body.view-astro #todaysec, body.view-astro #chandrop,
 body.view-astro #defdrop { display:none !important; }
+/* The astrology view hands the panel to its own sections, but the moment being
+   cast is not one of them: it decides which chart the view is drawing. Hidden
+   here it took the picker away in exactly the view Kaycee was working in. */
+body.view-astro:not(.mod-transit) #datesec { display:none !important; }
 /* The astrology view is an astrology panel. The pair's HD drawers belong to the
    bodygraph views; the picker and the two party buttons stay, because changing
    who the chart is of is not a view. */
@@ -4411,6 +4441,33 @@ ${d.client ? "" : viewControls}
     <div id="tab-dates" class="pane" hidden></div>
     <div id="tab-stats" class="pane" hidden></div>
 
+    <!-- Outside the tabs on purpose. Nested in the Home tab it vanished the
+         moment another view took the panel over, which is what Kaycee hit:
+         "the picker disappears so I couldn't swith from personality and design
+         anyways." As a direct child of the panel it survives every view, and
+         order:-1 puts it at the top under the Transit chart type. -->
+    <div class="datesec" id="datesec">
+      <div class="todaylab">Date</div>
+      <div class="datepick">
+        <button class="dstep" id="dprev" title="Previous day">&#8249;</button>
+        <input class="dfield" id="dfield" type="date">
+        <button class="dstep" id="dnext" title="Next day">&#8250;</button>
+        <input class="dfield tfield" id="tfield" type="time" step="60">
+        <button class="dtoday" id="dtoday" title="Jump to right now">Now</button>
+      </div>
+      <div id="trwhere">
+        <div class="todaylab">Location</div>
+        <input id="trPlace" type="text" autocomplete="off" placeholder="UTC">
+        <div id="trPlaceList"></div>
+        <select id="trAgainst">
+          <option value="">Transit Only</option>
+          <option value="whole">Over the whole chart</option>
+          <option value="personality">Over the personality</option>
+          <option value="design">Over the design</option>
+        </select>
+        <div class="trnote" id="trNote"></div>
+      </div>
+    </div>
     <div id="tab-home" class="pane">
     <div id="relhome">
       <div id="relpick">
@@ -4483,27 +4540,6 @@ ${d.client ? "" : viewControls}
       </details>
     </div>
 
-    <div class="datesec" id="datesec">
-      <div class="todaylab">Date</div>
-      <div id="trwhere">
-        <input id="trPlace" type="text" autocomplete="off" placeholder="UTC">
-        <div id="trPlaceList"></div>
-        <select id="trAgainst">
-          <option value="">The sky alone</option>
-          <option value="whole">Over the whole chart</option>
-          <option value="personality">Over the personality</option>
-          <option value="design">Over the design</option>
-        </select>
-        <div class="trnote" id="trNote"></div>
-      </div>
-      <div class="datepick">
-        <button class="dstep" id="dprev" title="Previous day">&#8249;</button>
-        <input class="dfield" id="dfield" type="date">
-        <button class="dstep" id="dnext" title="Next day">&#8250;</button>
-        <input class="dfield tfield" id="tfield" type="time" step="60">
-        <button class="dtoday" id="dtoday" title="Jump to right now">Now</button>
-      </div>
-    </div>
     <details class="todaysec drop" id="todaysec" open>
       <summary id="todaylab">TODAY</summary>
       <div class="todayread" id="todayread"></div>
@@ -6286,6 +6322,8 @@ if (DATA.client) {
     if (window.__variations) window.__variations(id === 'variations');
     // The chart type is the hub: it says whether there is a transit at all,
     // and every view then draws the same thing its own way.
+    var trSel = document.getElementById('trAgainst');
+    body.classList.toggle('tr-alone', id === 'transit' && !(trSel && trSel.value));
     if (window.__astroTransit) window.__astroTransit(id === 'transit');
   };
 
@@ -7854,19 +7892,21 @@ if (DATA.client) {
       /** Draw the astrology view for whatever the chart type currently says. */
       var drawTransit = function () {
         if (!liveAstro) return;
+        var against = trAgainst ? trAgainst.value : '';
         var tok = chartToken();
-        if (!tok) {
+        // Transit Only is the sky by itself and needs no chart at all. Only
+        // casting it OVER something does.
+        if (!tok && against) {
           if (trNote) { trNote.className = 'trnote bad'; trNote.textContent = 'open this chart by its link to cast a transit'; }
           return;
         }
-        var against = trAgainst ? trAgainst.value : '';
         var mine = ++trSeq;
         trShowing = true;
         liveAstro.classList.add('loading');
-        if (trNote) { trNote.className = 'trnote'; trNote.textContent = 'Casting\u2026'; }
+        if (trNote) { trNote.className = 'trnote said'; trNote.textContent = 'Casting\u2026'; }
         var dEl = document.getElementById('dfield');
         var tEl = document.getElementById('tfield');
-        var q = '/api/transit-wheel?token=' + encodeURIComponent(tok) +
+        var q = '/api/transit-wheel?token=' + encodeURIComponent(tok || '') +
           '&date=' + encodeURIComponent((dEl && dEl.value) || '') +
           '&time=' + encodeURIComponent((tEl && tEl.value) || '12:00') +
           '&mode=' + (against ? 'over' : 'alone') +
@@ -7884,8 +7924,10 @@ if (DATA.client) {
           liveAstro.innerHTML = j.wheelSvg;
           if (window.__markAstroPending) window.__markAstroPending();
           paintTransits(j.aspects || []);
-          trNote.className = 'trnote';
-          trNote.textContent = j.utc ? 'UTC' : ('Local time in ' + j.place);
+          // UTC needs no label: the place field says UTC itself. A real place
+          // still gets confirmed, because that one changes what was cast.
+          trNote.className = j.utc ? 'trnote' : 'trnote said';
+          trNote.textContent = j.utc ? '' : ('Local time in ' + j.place);
         }).catch(function () {
           if (mine !== trSeq) return;
           liveAstro.classList.remove('loading');
@@ -7906,7 +7948,9 @@ if (DATA.client) {
       ['trAgainst', 'dfield', 'tfield'].forEach(function (id) {
         var el = document.getElementById(id);
         if (el) el.addEventListener('change', function () {
-          if (body.classList.contains('mod-transit')) drawTransit();
+          if (!body.classList.contains('mod-transit')) return;
+          body.classList.toggle('tr-alone', !(trAgainst && trAgainst.value));
+          drawTransit();
         });
       });
 

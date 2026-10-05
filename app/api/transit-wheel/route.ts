@@ -32,7 +32,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getAstro } from "@/lib/astro";
 import { getChart } from "@/lib/mybodygraph";
 import { renderWheel } from "@/scripts/astro-wheel";
-import { crossAspects } from "@/lib/astro-extras";
+import { crossAspects, retrogradeAt } from "@/lib/astro-extras";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -57,6 +57,16 @@ const TRANSIT_ORBS: Record<string, number> = {
 const WIDE_FOR = new Set(["Sun", "Moon"]);
 const WIDE = 3;
 
+/** Which of the transiting bodies are retrograde at this moment. Ours, because
+ *  the provider sends no retrograde flag on either endpoint. Kaycee asked for
+ *  the mark on the glyphs themselves, 2026-10-05. */
+function retroFor(planets: readonly { name: string }[], date: string, time: string) {
+  const when = new Date(`${date}T${time}:00Z`);
+  const out: Record<string, boolean | null> = {};
+  for (const p of planets) out[p.name] = retrogradeAt(p.name, when);
+  return out;
+}
+
 const bad = (m: string, code = 400) => NextResponse.json({ ok: false, error: m }, { status: code });
 
 export async function GET(request: Request): Promise<Response> {
@@ -76,9 +86,31 @@ export async function GET(request: Request): Promise<Response> {
   const place = asked || GREENWICH_PLACE;
   const atUtc = asked ? undefined : `${date}T${time}:00+00:00`;
 
-  if (!/^[0-9a-f]{32}$/.test(token)) return bad("that is not a chart");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return bad("a date is needed, as YYYY-MM-DD");
   if (!/^\d{2}:\d{2}$/.test(time)) return bad("a time is needed, as HH:MM");
+
+  // Transit Only is the sky by itself, with no chart under it and nothing to
+  // look up. Kaycee, 2026-10-05: "Sometimes people just want to view the
+  // transit without interference." Demanding a chart link here refused the one
+  // setting that needs no chart, and it is the DEFAULT setting, so the view
+  // opened on a 400.
+  if (mode === "alone" && !whole) {
+    try {
+      const sky = await getAstro({ birthDate: date, birthTime: time, place, atUtc });
+      return NextResponse.json({
+        ok: true,
+        wheelSvg: renderWheel(sky, "Transit", null, "ascendant", [], [], [],
+          null, undefined, null, null, "personality", null, null,
+          retroFor(sky.planets, date, time), true),
+        aspects: [], place, utc: !asked,
+      });
+    } catch (e) {
+      console.error(`transit wheel alone ${date}: ${e instanceof Error ? e.message : String(e)}`);
+      return bad("that could not be cast", 502);
+    }
+  }
+
+  if (!/^[0-9a-f]{32}$/.test(token)) return bad("that is not a chart");
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -93,15 +125,6 @@ export async function GET(request: Request): Promise<Response> {
   try {
     // The sky itself, cast where the reader asked for it.
     const sky = await getAstro({ birthDate: date, birthTime: time, place, atUtc });
-
-    if (mode === "alone") {
-      return NextResponse.json({
-        ok: true,
-        wheelSvg: renderWheel(sky, "Transit", null, "ascendant", [], [], []),
-        aspects: [],
-        place, utc: !asked,
-      });
-    }
 
     // The chart it is arriving over. A chart with no birth time is cast at
     // noon, exactly as its own page was, so the two agree.
@@ -155,7 +178,7 @@ export async function GET(request: Request): Promise<Response> {
           : { side: "transit", outside: true, colour: TRANSIT_COLOUR },
         whole ? "personality" : side,
         designChart ? { chart: sky, side: "transit", colour: TRANSIT_COLOUR } : null,
-        aspects),
+        aspects, retroFor(sky.planets, date, time)),
       aspects: aspects.map((a) => ({
         natal: a.p1_name.replace(/^design:/, ""),
         side: a.p1_name.startsWith("design:") ? "design" : "personality",
