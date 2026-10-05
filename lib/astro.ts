@@ -248,10 +248,51 @@ export async function getAstro(args: {
     };
   });
 
+  const planets = Object.values(j.Planets ?? {}).map(clean);
+  const houses = (j.Houses ?? []).map(clean);
+
+  /* The South Node, held exactly opposite the North.
+   *
+   * The provider's Mean_Node comes back on an exact whole degree every time:
+   * 149.000, 158.000, 169.000, 199.000. That is a rounded field, not a mean
+   * node, and it is up to a degree away from the true node's opposite. Across
+   * 36 of Kaycee's charts it put the South Node on the WRONG LINE in 16 of
+   * them, which is 44 per cent, worst case 0.972 degrees against a line of
+   * 0.9375.
+   *
+   * The provider's own Human Design endpoint has the nodes exactly opposite on
+   * every chart checked, including one where this field disagrees by a whole
+   * gate, so this is that one field rather than the provider's method.
+   * Kaycee, 2026-10-05: "as far as I know the nodes are exactly opposite
+   * eachother... if it's more accurate then I think we need to change them."
+   *
+   * Only the position is corrected. The provider's aspect list still measures
+   * the node from the rounded value; she does not report on nodal aspects and
+   * recomputing the whole set is a bigger change than this one is worth. */
+  const north = planets.find((x) => x.name === "True_Node");
+  const south = planets.find((x) => x.name === "Mean_Node");
+  if (north && south) {
+    const abs = (north.abs_pos + 180) % 360;
+    const n = Math.floor(abs / 30);
+    const sector = houses.findIndex((h: AstroPoint, i: number) => {
+      const a = h.abs_pos, b = houses[(i + 1) % houses.length].abs_pos;
+      return a <= b ? abs >= a && abs < b : abs >= a || abs < b;
+    });
+    south.abs_pos = abs;
+    south.sign_num = n;
+    south.sign = ZODIAC[n];
+    south.position = abs % 30;
+    south.element = ELEMENTS[n % 4];
+    south.quality = QUALITIES[n % 3];
+    const sameSign = planets.find((x) => x.sign === ZODIAC[n] && x.emoji);
+    if (sameSign) south.emoji = sameSign.emoji;
+    if (sector >= 0 && houses[sector]) south.house = houses[sector].name;
+  }
+
   return {
-    planets: Object.values(j.Planets ?? {}).map(clean),
+    planets,
     signs,
-    houses: (j.Houses ?? []).map(clean),
+    houses,
     aspects: Object.values(j.Aspects ?? {}) as AstroAspect[],
     ascendant: j.ASCMC?.[0] ?? 0,
     mc: j.ASCMC?.[1] ?? 0,
