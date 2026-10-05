@@ -3911,8 +3911,6 @@ body.mod-transit #trAgainst { margin-top:10px; }
    astrology view." */
 .trgridbtn { display:none; width:100%; margin-top:10px; }
 body.mod-transit.view-astro .trgridbtn { display:block; }
-/* The transit axis in the transit's own colour, matching its placements. */
-.agrid .tdax, .agrid th.tcolh { color:#0d9488; }
 body.mod-transit .dfield,
 body.mod-transit #trPlace, body.mod-transit #trAgainst { padding:6px 8px; }
 .todaysec > summary { font-size:9.5px; letter-spacing:.18em; font-weight:600; opacity:.62; cursor:pointer;
@@ -4208,6 +4206,10 @@ body.view-astro .astro .agrid { max-height:calc(100vh - 36px); margin-left:164px
 .agrid th { font-weight:600; font-size:15px; line-height:1; }
 .agrid th.rowh { color:#2f2a33; }
 .agrid th.colh { color:#e06666; }
+/* The transit axis in the transit's own teal, matching its placements. Same
+   specificity as the two rules above, so it has to come after them. */
+.agrid .tdax { color:#0d9488; }
+.agrid th.tcolh { color:#0d9488; }
 .agrid th.corner { border:0; }
 .agrid td.has { cursor:help; font-size:14px; }
 .agrid td.hard { background:rgba(192,96,60,.13); color:#9c4a28; }
