@@ -6174,6 +6174,9 @@ if (DATA.client) {
       if (body.classList.contains('mod-transit')) {
         if (window.__drawTransitTimes) window.__drawTransitTimes();
         if (window.__drawTransitMandala) window.__drawTransitMandala(true);
+        // A new sky changes which gates are lit, so the hub's bodygraph and
+        // its defined centres are worked out again from it.
+        if (typeof relight === 'function') relight();
       }
       var lit = {};
       positions.forEach(function (p) { lit[p.gate] = 1; });
@@ -8996,12 +8999,26 @@ function relight() {
   offS.personality = body.classList.contains('off-s-personality');
   offS.design = body.classList.contains('off-s-design');
 
-  var live = {}, liveP = {}, liveD = {};
+  var live = {}, liveP = {}, liveD = {}, liveT = {};
   (DATA.placements || []).forEach(function (p) {
     if (offP[p.pid] || offS[p.side]) return;
     live[p.gate] = 1;
     if (p.side === 'personality') liveP[p.gate] = 1; else liveD[p.gate] = 1;
   });
+  // Under the Transit chart type the sky is on the stage too, so it counts
+  // towards what is lit and therefore towards which channels stand and which
+  // centres are defined. Under Transit Only the chart is not on the stage at
+  // all and the sky is the whole of it. Kaycee, 2026-10-05: "It would be nice
+  // to at least see the transits represented on the bodygraph too... under
+  // transit only it would show only the transits."
+  if (body.classList.contains('mod-transit')) {
+    var trSel = document.getElementById('trAgainst');
+    if (!(trSel && trSel.value)) { live = {}; liveP = {}; liveD = {}; }
+    (window.__skyPositions || []).forEach(function (sp) {
+      live[sp.gate] = 1;
+      liveT[sp.gate] = 1;
+    });
+  }
 
   [].forEach.call(document.querySelectorAll('svg.canvas .gnum'), function (t) {
     t.classList.toggle('lit', !!live[t.dataset.gate]);
@@ -9071,6 +9088,10 @@ function relight() {
     if (sv && sv.classList.contains('transit')) {
       if (el.dataset.sky && SKY_LIT[el.dataset.gate]) col = CLIENT_TINT_JS;
     }
+    // The bodygraph in the mandala's hub is not an svg.canvas, and under a
+    // transit it carries the sky as well: a gate the sky alone lights reads
+    // in the sky's teal there, the same as everywhere else.
+    if (!sv && liveT[g] && !liveP[g] && !liveD[g]) col = CLIENT_TINT_JS;
     // The pair's chart carries its own colours, one per person. This repaint knows
     // only the traditional black and red and would put them straight back over it,
     // which is what made the connection chart look like a single chart after load.

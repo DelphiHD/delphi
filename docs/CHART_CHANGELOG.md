@@ -875,3 +875,39 @@ was kept and can be restored.
 | 2026-10-05 23:36 | Sandbox Generator Single | page only | yes |
 | 2026-10-05 23:36 | Sandbox Generator Triple Split | page only | yes |
 | 2026-10-05 23:36 | Sandbox Generator Wide Split | page only | yes |
+| 2026-10-05 23:37 | Sandbox MG Simple Split | page only | yes |
+| 2026-10-05 23:37 | Sandbox MG Single | page only | yes |
+| 2026-10-05 23:37 | Sandbox Manifestor Simple Split | page only | yes |
+| 2026-10-05 23:37 | Sandbox Manifestor Single | page only | yes |
+| 2026-10-05 23:37 | Sandbox Manifestor Triple Split | page only | yes |
+| 2026-10-05 23:38 | Sandbox Projector Simple Split | page only | yes |
+| 2026-10-05 23:38 | Sandbox Projector Single | page only | yes |
+| 2026-10-05 23:38 | Sandbox Projector Triple Split | page only | yes |
+| 2026-10-05 23:38 | Sandbox Reflector No Definition | page only | yes |
+| 2026-10-05 23:38 | Brittany Kelly | page only | yes |
+| 2026-10-05 23:39 | Jennifer Thomas | page only | yes |
+| 2026-10-05 23:39 | Ra Uru Hu | page only | yes |
+| 2026-10-05 23:39 | Kaycee Vandenberg | page only | yes |
+| 2026-10-05 23:39 | Anna | page only | yes |
+| 2026-10-05 23:39 | Sandbox Generator Single | page only | yes |
+| 2026-10-05 23:40 | Lettie Crausby | page only | yes |
+| 2026-10-05 23:40 | Max Zen Jones | page only | yes |
+| 2026-10-05 23:40 | Patrick | page only | yes |
+| 2026-10-05 23:40 | Zackery Larsen | page only | yes |
+| 2026-10-05 23:40 | Lucas Rafferty Shane | page only | yes |
+| 2026-10-05 23:41 | Patrick | page only | yes |
+| 2026-10-05 23:41 | Robert Carriker | page only | yes |
+| 2026-10-05 23:41 | Ticon | page only | yes |
+| 2026-10-05 23:41 | Meadow | page only | yes |
+| 2026-10-05 23:41 | Patrick | page only | yes |
+| 2026-10-05 23:42 | Michael Porfilio | page only | yes |
+| 2026-10-05 23:42 | Arza Helm | page only | yes |
+| 2026-10-05 23:42 | Zachary Mitchell | page only | yes |
+| 2026-10-05 23:42 | Zachariah | page only | yes |
+| 2026-10-05 23:42 | Tsarin Crowther | page only | yes |
+| 2026-10-05 23:42 | Sandbox Generator Single | page only | yes |
+| 2026-10-05 23:43 | Magalita green | page only | yes |
+| 2026-10-05 23:43 | Ed Sheeran | page only | yes |
+| 2026-10-05 23:43 | Bob Dylan | page only | yes |
+| 2026-10-05 23:43 | Marilyn Monroe | page only | yes |
+| 2026-10-05 23:43 | Sabrina Carpenter | page only | yes |

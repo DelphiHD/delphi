@@ -126,15 +126,19 @@ function geometry(size: number): Geometry {
     cy,
     r: {
       outer: size * 0.495,
-      quarterInner: size * 0.455,
-      hexagramOuter: size * 0.450,
-      hexagramInner: size * 0.410,
-      gateOuter: size * 0.405,
-      gateInner: size * 0.365,
-      // Zodiac now sits INSIDE the gate ring with small gaps either side.
-      zodiacOuter: size * 0.358,
-      zodiacInner: size * 0.342,
-      spokeOuter: size * 0.335,
+      quarterInner: size * 0.452,
+      // The zodiac sits between the hexagrams and the quarters, and is given
+      // a band deep enough to hold a sign name. Kaycee, 2026-10-05: "I think
+      // it should be between the hexagrams and quarters rings and use the
+      // same coloring as the astrology view." It used to be a thin strip
+      // inside the gate ring, which is why the names were cramped.
+      zodiacOuter: size * 0.448,
+      zodiacInner: size * 0.418,
+      hexagramOuter: size * 0.414,
+      hexagramInner: size * 0.378,
+      gateOuter: size * 0.374,
+      gateInner: size * 0.336,
+      spokeOuter: size * 0.330,
       spokeInner: size * 0.180,
       bodygraph: size * 0.180,
     },
@@ -201,11 +205,14 @@ function quarterHalo(g: Geometry): string {
 
   const bandRadius = (g.r.outer + g.r.quarterInner) / 2;
   const fontSize = (g.r.outer - g.r.quarterInner) * 0.42;
-  // Compensate for renderers that ignore dominant-baseline="central" on
-  // textPath (Quartz/qlmanage, used in docx PNG rasterization). The
-  // glyph baseline sits ON the path with letters extending outward; pull
-  // the path inward by ~half the cap height so the glyph mass ends up
-  // visually centered on bandRadius.
+  // The glyph baseline sits ON the path with letters extending outward, so
+  // the path is pulled inward by about half the cap height and the glyph mass
+  // lands centred on bandRadius. This used to be paired with
+  // dominant-baseline="central", which browsers honour and the docx
+  // rasteriser ignores, so the text was corrected twice in one and once in
+  // the other and sat off-centre in both. The shift alone is right everywhere.
+  // Kaycee, 2026-10-05: "is it possible to center the sign and quarter text in
+  // the ring band? Right now they are misaligned."
   const baselineShift = fontSize * 0.35;
   const textPathRadius = bandRadius - baselineShift;
 
@@ -239,7 +246,7 @@ function quarterHalo(g: Geometry): string {
     labels.push(
       `<text class="q-label" data-quarter="${i}" font-family="Montserrat, 'Helvetica Neue', sans-serif" ` +
         `font-size="${fontSize.toFixed(1)}" letter-spacing="6" font-weight="300" ` +
-        `fill="${q.labelColor}" dominant-baseline="central">` +
+        `fill="${q.labelColor}">` +
         `<textPath href="#${pathId}" startOffset="50%" text-anchor="middle">${q.label}</textPath>` +
         `</text>`,
     );
@@ -329,16 +336,17 @@ const ZODIAC_SIGNS: { name: string; glyph: string; start: number }[] = [
 function zodiacRing(g: Geometry): string {
   const bandRadius = (g.r.zodiacOuter + g.r.zodiacInner) / 2;
   const fontSize = (g.r.zodiacOuter - g.r.zodiacInner) * 0.60;
-  // Same baseline-shift compensation as the quarter labels.
+  // The same single correction the quarter labels use, and for the same
+  // reason: the baseline sits on the path and the glyphs extend outward.
   const textPathRadius = bandRadius - fontSize * 0.35;
 
-  // Alternating muted grey / light blue fills per sign.
-  const fillA = "#f1f1f3";
-  const fillB = "#e6ecf3";
+  // The four element colours the astrology view uses, so a sign reads the
+  // same on both wheels: fire, earth, air, water, repeating round the zodiac.
+  const ELEMENT_FILL = ["#845095", "#9b9aa0", "#5f5a66", "#c9a7d4"];
 
   const cells = ZODIAC_SIGNS.map((s, i) => {
     const path = annulusSector(g, g.r.zodiacOuter, g.r.zodiacInner, s.start, s.start + 30);
-    const fill = i % 2 === 0 ? fillA : fillB;
+    const fill = ELEMENT_FILL[i % 4];
     return `<path class="z-cell" data-sign="${i}" d="${path}" fill="${fill}" stroke="#cccccc" stroke-width="0.4" />`;
   }).join("\n");
 
@@ -360,8 +368,7 @@ function zodiacRing(g: Geometry): string {
     );
     labels.push(
       `<text class="z-label" data-sign="${i}" font-family="Montserrat, 'Helvetica Neue', sans-serif" ` +
-        `font-size="${fontSize.toFixed(1)}" letter-spacing="1.5" font-weight="300" fill="#555555" ` +
-        `dominant-baseline="central">` +
+        `font-size="${fontSize.toFixed(1)}" letter-spacing="1.5" font-weight="500" fill="#ffffff">` +
         `<textPath href="#${pathId}" startOffset="50%" text-anchor="middle">${s.name}</textPath>` +
         `</text>`,
     );
