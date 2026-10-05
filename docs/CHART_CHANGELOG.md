@@ -718,3 +718,5 @@ was kept and can be restored.
 | 2026-10-03 14:02 | Jim Jones | page only | yes |
 | 2026-10-03 14:04 | Jim Jones | page only | yes |
 | 2026-10-03 14:18 | Dashboard Creator Test (made and removed, proving the dashboard creator) | first publish | none |
+| 2026-10-05 18:11 | Kaycee Vandenberg | first publish | none |
+| 2026-10-05 18:14 | Kaycee Vandenberg | page only | yes |

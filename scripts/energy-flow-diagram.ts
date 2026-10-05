@@ -9853,11 +9853,30 @@ async function publishChart(client: ClientCtx, html: string): Promise<string> {
   const db = createSupabase(url, key, { auth: { persistSession: false } });
 
   const slug = client.slug;
-  const { data: existing } = await db
-    .from("client_charts")
-    .select("token, storage_path")
-    .eq("client_slug", slug)
-    .maybeSingle();
+  // Two shapes of link row, and this only ever looked for one of them.
+  //
+  // A chart made by the website, a public figure or a sandbox carries its own
+  // token as its client_slug, so a lookup by slug finds it. A chart from
+  // Kaycee's roster carries a human slug, "kaycee", and a build from --token
+  // arrives here with the TOKEN in client.slug. The slug lookup missed, so
+  // instead of republishing her chart this minted a second link beside it, on
+  // 2026-10-05, the first time a roster chart was rebuilt by token. Her real
+  // link was left showing the old chart and a stray one pointed at the new.
+  //
+  // So the token is looked up too, and a chart that exists in the database is
+  // never given a second link: if its row cannot be found, that is a fault to
+  // stop on, not a reason to make one up.
+  type LinkField = "client_slug" | "token";
+  const byField = async (field: LinkField) => (await db
+    .from("client_charts").select("token, storage_path").eq(field, slug).maybeSingle()).data;
+  let existing = await byField("client_slug");
+  if (!existing) existing = await byField("token");
+  if (!existing) {
+    const known = await db.from("charts").select("token").eq("token", slug).maybeSingle();
+    if (known.data) {
+      throw new Error(`${client.name}: chart ${slug} is in the database but has no link row, so nothing was published and no second link was made.`);
+    }
+  }
 
   const token = existing?.token ?? randomBytes(16).toString("hex");
   const path = existing?.storage_path ?? `${slug}/${token}.html`;
