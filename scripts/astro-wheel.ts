@@ -108,6 +108,37 @@ export interface WheelPartner {
   name: string;
 }
 
+/**
+ * The twelve houses: an invisible sector each for highlighting, the cusp
+ * lines, and the numbers between the house ring and the aspect circle.
+ *
+ * Separate from the wheel so a page already built can be handed the same ring
+ * cast under another house system. The anchor has to match the wheel it goes
+ * into, which is why the Ascendant is passed rather than read.
+ */
+export function renderHouseLayer(cusps: readonly number[], asc: number): string {
+  const s: string[] = [];
+  cusps.forEach((lon, i) => {
+    const next = cusps[(i + 1) % 12];
+    s.push(`<path class="housesector" data-hsector="${i + 1}" ` +
+      `d="${arc(lon, next, asc, R_SIGN, R_ASPECT)}" fill="${HILITE}" fill-opacity="0"/>`);
+  });
+  cusps.forEach((lon, i) => {
+    const angular = i % 3 === 0;
+    const [x1, y1] = pt(lon, asc, R_SIGN);
+    const [x2, y2] = pt(lon, asc, R_ASPECT);
+    s.push(`<line class="cusp" data-cusp="${i + 1}" x1="${f(x1)}" y1="${f(y1)}" ` +
+      `x2="${f(x2)}" y2="${f(y2)}" stroke="${INK}" ` +
+      `stroke-width="${angular ? 1.6 : 0.7}" opacity="${angular ? 0.6 : 0.3}"/>`);
+    const next = cusps[(i + 1) % 12];
+    const mid = lon + (((next - lon) % 360) + 360) % 360 / 2;
+    const [nx, ny] = pt(mid, asc, (R_HOUSE + R_ASPECT) / 2);
+    s.push(`<text class="hnum" data-house="${i + 1}" x="${f(nx)}" y="${f(ny + 4)}" ` +
+      `text-anchor="middle" font-size="11" fill="${INK}" opacity=".55">${i + 1}</text>`);
+  });
+  return s.join("");
+}
+
 export function renderWheel(chart: AstroChart, name: string, design?: AstroChart | null,
   anchor: WheelAnchor = "ascendant", carriedGates: readonly number[] = [],
   personalityGates: readonly number[] = [], designGates: readonly number[] = [],
@@ -237,28 +268,12 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   s.push(`<circle cx="${CX}" cy="${CY}" r="${R_HOUSE}" fill="none" stroke="${INK}" stroke-width="1" opacity=".35"/>`);
   s.push(`<circle cx="${CX}" cy="${CY}" r="${R_ASPECT}" fill="none" stroke="${INK}" stroke-width="1" opacity=".2"/>`);
 
-  // A sector per house, invisible until highlighted. Lighting a line is too
-  // quiet to find on a wheel this busy; lighting the slice is not.
-  chart.houses.forEach((h, i) => {
-    const next = chart.houses[(i + 1) % 12].abs_pos;
-    s.push(`<path class="housesector" data-hsector="${i + 1}" ` +
-      `d="${arc(h.abs_pos, next, asc, R_SIGN, R_ASPECT)}" fill="${HILITE}" fill-opacity="0"/>`);
-  });
-
-  // house cusps, numbered in the space between the house ring and the aspect circle
-  chart.houses.forEach((h, i) => {
-    const angular = i % 3 === 0;
-    const [x1, y1] = pt(h.abs_pos, asc, R_SIGN);
-    const [x2, y2] = pt(h.abs_pos, asc, R_ASPECT);
-    s.push(`<line class="cusp" data-cusp="${i + 1}" x1="${f(x1)}" y1="${f(y1)}" ` +
-      `x2="${f(x2)}" y2="${f(y2)}" stroke="${INK}" ` +
-      `stroke-width="${angular ? 1.6 : 0.7}" opacity="${angular ? 0.6 : 0.3}"/>`);
-    const next = chart.houses[(i + 1) % 12].abs_pos;
-    const mid = h.abs_pos + (((next - h.abs_pos) % 360) + 360) % 360 / 2;
-    const [nx, ny] = pt(mid, asc, (R_HOUSE + R_ASPECT) / 2);
-    s.push(`<text class="hnum" data-house="${i + 1}" x="${f(nx)}" y="${f(ny + 4)}" ` +
-      `text-anchor="middle" font-size="11" fill="${INK}" opacity=".55">${i + 1}</text>`);
-  });
+  // The house layer, in a group of its own so the page can swap it when the
+  // reader picks a different house system. Kaycee, 2026-10-05: "the house
+  // picker doesn't actually do anything yet, is that on purpose?" It was
+  // changing the numbers in the panel and leaving the drawn ring on Placidus,
+  // which with those sections closed looks like a control that does nothing.
+  s.push(`<g class="houselayer">${renderHouseLayer(chart.houses.map((h) => h.abs_pos), asc)}</g>`);
 
   // Aspects, drawn as chords inside. Two things get left out. Conjunctions,
   // because a chord between two points in the same place is a dot. And anything

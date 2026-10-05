@@ -125,7 +125,7 @@ import { getAstro, type AstroChart } from "@/lib/astro";
 import { enrichChart, crossAspects, SIGN_RULER, HOUSE_RULER, rulerLabel,
   type ChartExtras } from "@/lib/astro-extras";
 import { HOUSES, HOUSES_INTRO } from "@/lib/hd/houses";
-import { renderWheel, GLYPH as ASTRO_GLYPH } from "./astro-wheel";
+import { renderWheel, renderHouseLayer, GLYPH as ASTRO_GLYPH } from "./astro-wheel";
 import { getConnectionChart } from "@/lib/hd/relationship";
 import type { ChartSide, Planet } from "@/lib/render/mandala.types";
 import { getChart, getTimezoneForLocation } from "@/lib/mybodygraph";
@@ -3057,6 +3057,16 @@ function mergedCycles(d: SceneData): { label: string; date: string; status: stri
 }
 
 // ── interactive page ────────────────────────────────────────────────────────
+/** Every derivable house system drawn for one chart, keyed by name. */
+function houseLayersFor(chart: AstroChart, extra: ChartExtras): Record<string, string> {
+  return {
+    placidus: renderHouseLayer(chart.houses.map((h) => h.abs_pos), chart.ascendant),
+    whole: renderHouseLayer(extra.cusps.whole, chart.ascendant),
+    equal: renderHouseLayer(extra.cusps.equal, chart.ascendant),
+    porphyry: renderHouseLayer(extra.cusps.porphyry, chart.ascendant),
+  };
+}
+
 function buildHtml(d: SceneData, canvases: string, mandala: string, astro: string,
   fonts: Map<number, Buffer>): string {
   const logoSrc = brandMark("Delphi Logo.svg");
@@ -3135,6 +3145,15 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
     // keyed by display name and is missing Uranus, which is how the grid came
     // to print "Ur".
     astroGlyphs: ASTRO_GLYPH,
+    // The same house ring cast under each system the Ascendant can give us,
+    // so picking one redraws the wheel and not just the panel's numbers.
+    astroHouseLayers: d.astroExtras && d.astro
+      ? {
+          personality: houseLayersFor(d.astro, d.astroExtras.personality),
+          design: d.astroDesign && d.astroExtras.design
+            ? houseLayersFor(d.astroDesign, d.astroExtras.design) : null,
+        }
+      : null,
     // Kaycee's rulership table, 2026-10-05, modern with the traditional ruler
     // in parentheses. Sent rather than repeated inside the page script, so
     // there is one copy of it and lib/astro-extras.ts is where it lives.
@@ -3986,7 +4005,12 @@ body.view-mandala .mandala { display:block; }
 body.view-astro .astro { display:block; }
 body.view-astro svg.canvas, body.view-astro .mandala { display:none !important; }
 body.view-astro { background:#ffffff; color:#1c1a2e; }
-body.view-astro .astro { display:flex; align-items:center; justify-content:center; width:100%; }
+body.view-astro .astro { display:flex; align-items:center; justify-content:center; width:100%;
+  /* The same box whatever is inside it. The grid is shorter than the wheel, so
+     without this the chart area collapsed around it and the dock and the mark,
+     both pinned to the bottom of that area, rode up and clipped. Kaycee,
+     2026-10-05: "can they stay in the same place as the wheel view?" */
+  height:calc(100vh - 36px); }
 body.view-astro .astro svg { height:calc(100vh - 36px); width:auto; max-width:100%; display:block; }
 /* the classic set on opening; the rest is a click away rather than a deletion */
 body:not(.astro-all) .astro .asp.extra { display:none; }
@@ -4091,6 +4115,15 @@ body.view-astro .astro .agrid { max-height:calc(100vh - 36px); margin-left:164px
   font-size:10px; letter-spacing:.14em; text-transform:uppercase; font-weight:600; }
 .agrid .axlab .pax { color:#2f2a33; }
 .agrid .axlab .dax { color:#e06666; }
+.agrid .akey { display:flex; flex-wrap:wrap; justify-content:center; gap:4px 10px; margin-top:10px; }
+.agrid .ak { display:inline-flex; align-items:center; gap:4px; font-size:10px;
+  letter-spacing:.04em; opacity:.72; }
+.agrid .ak b { display:inline-flex; align-items:center; justify-content:center;
+  width:17px; height:17px; border-radius:4px; font-size:11px; }
+.agrid .ak.hard b { background:rgba(192,96,60,.13); color:#9c4a28; }
+.agrid .ak.soft b { background:rgba(132,80,149,.13); color:var(--purple); }
+.agrid .ak.conj b { background:rgba(201,162,39,.18); color:#7a5c07; }
+.agrid .ak.min b  { background:rgba(120,120,130,.10); color:#6f6880; }
 .agrid table { border-collapse:collapse; margin:0 auto; font-size:12px; }
 .agrid th, .agrid td { width:30px; height:30px; text-align:center; vertical-align:middle;
   border:1px solid rgba(132,80,149,.12); padding:0; }
@@ -7774,14 +7807,24 @@ if (DATA.client) {
                 '<span class="glab">' + (Math.round(Math.abs(a.orbit) * 10) / 10) + '</span></td>';
             }).join('') + '</tr>';
         }).join('');
+        var KEY = [['C', 'conjunction', 'conj'], ['O', 'opposition', 'hard'],
+          ['S', 'square', 'hard'], ['T', 'trine', 'soft'],
+          ['X', 'sextile', 'soft'], ['Q', 'quintile', 'min']];
+        var key = '<div class="akey">' + KEY.map(function (k) {
+          return '<span class="ak ' + k[2] + '"><b>' + k[0] + '</b>' + k[1] + '</span>';
+        }).join('') + '</div>';
         return '<div class="agrid"><div class="axlab">' +
           '<span class="pax">Personality</span><span class="dax">Design</span></div>' +
           '<table><thead><tr>' + head + '</tr></thead><tbody>' +
-          bodyRows + '</tbody></table></div>';
+          bodyRows + '</tbody></table>' + key + '</div>';
       };
       var showGrid = function (want) {
         gridOn = want;
         bGrid.classList.toggle('on', gridOn);
+        // The wheel's own hover handler is bound to this same container and
+        // runs after the grid's, so without this it hid every tooltip the grid
+        // had just shown.
+        body.classList.toggle('astro-grid', gridOn);
         if (gridOn) {
           wheelHeld = liveAstro.innerHTML;
           liveAstro.innerHTML = buildGrid();
@@ -7803,6 +7846,10 @@ if (DATA.client) {
             return x.p1_name === pair[0] && x.p2_name === pair[1];
           })[0];
           if (!a) { tip.hidden = true; return; }
+          // The page hides the tooltip for any pointer move it does not
+          // recognise, and a grid cell is not something it knows about, so the
+          // tip was being built and then hidden again in the same move.
+          e.stopPropagation();
           showTip(e, '<b><span style="color:#2f2a33">' + esc(labelOf(a.p1_name)) + '</span> ' +
             esc(a.aspect) + ' <span style="color:#e06666">' + esc(labelOf(a.p2_name)) + '</span></b>' +
             '<span class="pill house">orb ' + (Math.round(Math.abs(a.orbit) * 10) / 10) + '\u00b0</span>');
@@ -7824,10 +7871,20 @@ if (DATA.client) {
     var hsSel = document.getElementById('astroHouseSystem');
     if (hsRow && hsSel && EX) {
       hsRow.hidden = false;
+      var drawHouses = function () {
+        var layers = DATA.astroHouseLayers;
+        if (!layers) return;
+        var set = curSide === 'design' ? layers.design : layers.personality;
+        var g = document.querySelector('.astro .houselayer');
+        if (!g || !set || !set[houseSystem]) return;
+        g.innerHTML = set[houseSystem];
+        if (window.__markAstroPending) window.__markAstroPending();
+      };
+      window.__drawAstroHouses = drawHouses;
       hsSel.addEventListener('change', function () {
         houseSystem = hsSel.value;
         body.classList.toggle('hs-other', houseSystem !== 'placidus');
-        paintAstroRows(); paintHouses();
+        paintAstroRows(); paintHouses(); drawHouses();
       });
     }
 
@@ -7841,6 +7898,7 @@ if (DATA.client) {
           function (l) { l.classList.remove('lit'); });
       };
       astroEl.addEventListener('mousemove', function (e) {
+        if (body.classList.contains('astro-grid')) return;   // the grid answers for itself
         var t = e.target.closest
           ? e.target.closest('[data-asign],[data-aplanet],[data-house],[data-angle]') : null;
         clearWheelCross();
