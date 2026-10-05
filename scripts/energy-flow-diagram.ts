@@ -3307,6 +3307,15 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
         basic: d.gateInfo[g]?.basic ?? "",
         bridge: d.gateInfo[g]?.bridge ?? "",
         center: CENTER_DISPLAY[centerOf(g)], cid: centerOf(g),
+        // The sign of each of the six lines. Kaycee, 2026-10-05: "The database
+        // should have the sign for every gate... Some are on sign boundaries
+        // though so you have to look at the lines." A gate spans 5.625 degrees
+        // so twelve gates straddle a boundary, but at line level only twelve
+        // of the 384 gate-lines do, and those are flagged: on one of those the
+        // full fixing decides it, and anything reading this without a fixing
+        // is taking the line's midpoint.
+        signs: [1, 2, 3, 4, 5, 6].map((ln) => signOf(g, ln, 3, 3, 3).sign),
+        bdry: [1, 2, 3, 4, 5, 6].map((ln) => lineOnBoundary(g, ln)),
       }]),
     ),
     sky: d.sky ? { date: d.sky.date, time: d.sky.time, positions: d.sky.positions.map((p) => ({
@@ -4167,9 +4176,13 @@ body:not(.mod-self) #astrosiderow, body:not(.mod-self) #astrosynrow { display:no
 .dsidenm { color:#e06666; font-weight:600; }
 .tsidenm { color:#0d9488; font-weight:600; }
 .bar.tallybar { grid-template-columns:62px 1fr 22px; cursor:help; }
-.bar.tallybar .track { display:flex; }
-.bar.tallybar .pfill { background:#2f2a33; }
-.bar.tallybar .dfill { background:#e06666; }
+.bar.tallybar .track, .bar.split .track { display:flex; }
+.bar.tallybar .pfill, .bar.split .pfill { background:#2f2a33; }
+.bar.tallybar .dfill, .bar.split .dfill { background:#e06666; }
+/* A transit on the stage is counted in the teal it is drawn in. */
+.bar.tallybar .tfill, .bar.split .tfill { background:#0d9488; }
+.bar .fill:first-child { border-radius:4px 0 0 4px; }
+.bar .fill:last-child { border-radius:0 4px 4px 0; }
 /* A synastry line appears for the body or the row you are pointing at. */
 .astro .asp.cross { opacity:0; transition:opacity .12s; }
 .astro .asp.cross.lit { opacity:.85; }
@@ -5195,7 +5208,64 @@ if (DATA.client) {
     // Chiron and Lilith stay out of every count; their switches still show and hide
     // them on the chart. Kaycee, 2026-09-14: "they should be off by default and
     // shouldn't show up on stats".
-    var P = (DATA.placements || []).filter(function (p) { return p.core !== false; }), L = DATA.gateLib || {};
+    var L = DATA.gateLib || {};
+
+    // The provider names three bodies differently on its astrology endpoint
+    // than the sky endpoint does, so the two are joined on the id both agree
+    // on rather than on the name.
+    var ASTRO_PID = { True_Node: 'north-node', Mean_Node: 'south-node', Mean_Lilith: 'lilith' };
+    var pidOf = function (n) { return String(n).toLowerCase().replace(/[_\s]+/g, '-'); };
+
+    /** The sky's activations in the same shape as the chart's own, so the
+     *  counts below do not care which they are looking at. Gate and line come
+     *  from the sky endpoint; the sign comes from the astrology one, which is
+     *  the only place it exists. */
+    var transitPlacements = function () {
+      // The provider's own answer where we have it, because it is cast from
+      // the exact degree. The gate library's per-line sign otherwise, which is
+      // the same mapping the chart's own placements use.
+      var signBy = {};
+      (window.__transitSet || []).forEach(function (a) {
+        signBy[ASTRO_PID[a.name] || pidOf(a.name)] = a.sign;
+      });
+      return (window.__skyPositions || []).map(function (sp) {
+        var pid = pidOf(sp.planet);
+        var lib = L[sp.gate] || {};
+        return { side: 'transit', planet: sp.planet, pid: pid, core: true,
+          gate: sp.gate, line: sp.line,
+          sign: signBy[pid] || (lib.signs || [])[sp.line - 1] || '',
+          onBoundary: !!(lib.bdry || [])[sp.line - 1] };
+      }).filter(function (x) {
+        // Chiron and Lilith stay out of every count, the same as the chart's.
+        return x.pid !== 'chiron' && x.pid !== 'lilith' &&
+          !document.body.classList.contains('off-p-' + x.pid);
+      });
+    };
+
+    /** What is actually on the stage. Kaycee, 2026-10-05: "I want it to be
+     *  reflective of what's actually on the stage across all views." The tab
+     *  used to be built once from the chart's own activations and never looked
+     *  again, so under a transit it was counting the wrong chart entirely. */
+    var onStage = function () {
+      var b = document.body;
+      var mine = (DATA.placements || []).filter(function (x) {
+        if (x.core === false) return false;
+        if (b.classList.contains('off-p-' + x.pid)) return false;
+        if (b.classList.contains('off-s-personality') && x.side === 'personality') return false;
+        if (b.classList.contains('off-s-design') && x.side === 'design') return false;
+        return true;
+      });
+      if (!b.classList.contains('mod-transit')) return mine;
+      // Transit Only puts nobody's chart on the stage, only the sky.
+      var sel = document.getElementById('trAgainst');
+      return ((sel && sel.value) ? mine : []).concat(transitPlacements());
+    };
+
+    if (!window.__skyPositions) {
+      window.__skyPositions = (DATA.sky && DATA.sky.positions) || [];
+    }
+
+    function renderStats(P) {
     var tally = function (keyFn) {
       var o = {};
       P.forEach(function (p) { var k = keyFn(p); if (k) o[k] = (o[k] || 0) + 1; });
@@ -5216,10 +5286,26 @@ if (DATA.client) {
         (note ? ' data-help="' + esc(note) + '" data-help-label="' + esc(title) + '"' : '') +
         '>' + title + '</summary>' + rows.map(function (r) {
         var pl = (r[2] || []).map(function (p) { return p.side + ':' + p.pid; }).join(',');
-        return '<div class="bar' + (r[3] ? ' ' + r[3] : '') + '" data-kind="' + kind +
+        // One bar per row with the sides as segments, the same treatment the
+        // Elements and Modes bars already use. Kaycee, 2026-10-05: "Can we
+        // give all of the tally bars the same personality/design treatment we
+        // gave the astrology specific ones? It's helpful to see the
+        // design/personality spread visually." A transit on the stage is a
+        // third segment, in the teal it is drawn in everywhere else.
+        var c = { personality: 0, design: 0, transit: 0 };
+        (r[2] || []).forEach(function (x) {
+          if (c[x.side] !== undefined) c[x.side]++;
+        });
+        var wide = function (n) { return Math.round((n / max) * 100); };
+        var segs = '';
+        if (c.personality) segs += '<div class="fill pfill" style="width:' + wide(c.personality) + '%"></div>';
+        if (c.design) segs += '<div class="fill dfill" style="width:' + wide(c.design) + '%"></div>';
+        if (c.transit) segs += '<div class="fill tfill" style="width:' + wide(c.transit) + '%"></div>';
+        if (!segs) segs = '<div class="fill" style="width:0%"></div>';
+        return '<div class="bar split' + (r[3] ? ' ' + r[3] : '') + '" data-kind="' + kind +
           '" data-key="' + esc(r[0]) + '" data-pl="' + pl + '">' +
-          '<i>' + esc(r[0]) + '</i><div class="track"><div class="fill" style="width:' +
-          Math.round((r[1] / max) * 100) + '%"></div></div><b>' + r[1] + '</b></div>';
+          '<i>' + esc(r[0]) + '</i><div class="track">' + segs +
+          '</div><b>' + r[1] + '</b></div>';
       }).join('') + '</details>';
     };
     var pick = function (fn) { return P.filter(fn); };
@@ -5370,6 +5456,11 @@ if (DATA.client) {
       table('Activations by Astrological Sign', signRows, 'sign').replace('</details>', transHtml + '</details>') +
       repHtml +
       conjHtml;
+    }
+
+    renderStats(onStage());
+    window.__renderStats = function () { renderStats(onStage()); };
+
     document.getElementById('tab-stats').addEventListener('click', function (e) {
       var el = e.target.closest ? e.target.closest('[data-gate]') : null;
       if (!el) return;
@@ -5898,6 +5989,11 @@ if (DATA.client) {
 
     // ── painting one moment onto the chart ───────────────────────────────────
     function repaint(d, t, positions) {
+      // The stats count whatever is on the stage, and this is the sky that is
+      // on it. Kept on the window so the stats tab can read it without this
+      // function knowing anything about the stats.
+      window.__skyPositions = positions;
+      if (window.__renderStats) window.__renderStats();
       var lit = {};
       positions.forEach(function (p) { lit[p.gate] = 1; });
 
@@ -6085,7 +6181,13 @@ if (DATA.client) {
 
   var toggleBtn = function (id, cls) {
     var b = document.getElementById(id);
-    b.onclick = function () { b.classList.toggle('on', !body.classList.toggle(cls)); relight(); offCount(); };
+    b.onclick = function () {
+      b.classList.toggle('on', !body.classList.toggle(cls));
+      relight(); offCount();
+      // Turning a side or a body off takes it off the stage, so the counts
+      // that describe the stage have to follow it.
+      if (window.__renderStats) window.__renderStats();
+    };
   };
   toggleBtn('defined', 'nodefined');
   toggleBtn('hang', 'nohang');
@@ -8055,6 +8157,7 @@ if (DATA.client) {
         }
         if (typeof relight === 'function') relight();
         if (window.__stampMoment) window.__stampMoment();
+        if (window.__renderStats) window.__renderStats();
       };
 
       window.__astroTransit = function (on) {
