@@ -125,7 +125,7 @@ import { getAstro, type AstroChart } from "@/lib/astro";
 import { enrichChart, crossAspects, SIGN_RULER, HOUSE_RULER, rulerLabel,
   type ChartExtras } from "@/lib/astro-extras";
 import { HOUSES, HOUSES_INTRO } from "@/lib/hd/houses";
-import { renderWheel } from "./astro-wheel";
+import { renderWheel, GLYPH as ASTRO_GLYPH } from "./astro-wheel";
 import { getConnectionChart } from "@/lib/hd/relationship";
 import type { ChartSide, Planet } from "@/lib/render/mandala.types";
 import { getChart, getTimezoneForLocation } from "@/lib/mybodygraph";
@@ -3130,6 +3130,11 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
     centerRows: (Object.keys(CENTER_GATES) as Center[]).map((k) => ({ key: k, label: CENTER_LABEL[k] })),
     astro: d.astro ? { ...d.astro, design: d.astroDesign ?? null } : null,
     astroExtras: d.astroExtras ?? null,
+    // The wheel's own glyph table, keyed by the provider's names, so the grid
+    // draws each body exactly as the wheel does. The chart's other table is
+    // keyed by display name and is missing Uranus, which is how the grid came
+    // to print "Ur".
+    astroGlyphs: ASTRO_GLYPH,
     // Kaycee's rulership table, 2026-10-05, modern with the traditional ruler
     // in parentheses. Sent rather than repeated inside the page script, so
     // there is one copy of it and lib/astro-extras.ts is where it lives.
@@ -4066,7 +4071,40 @@ body:not(.mod-self) #astrosiderow { display:none; }
 /* On a synastry row the second body belongs to the design side, in the red
    the bodygraph and the wheel already use for it. */
 .dsidenm { color:#e06666; font-weight:600; }
-.bar.modebar { grid-template-columns:62px 1fr 22px; cursor:help; }
+.bar.tallybar { grid-template-columns:62px 1fr 22px; cursor:help; }
+.bar.tallybar .track { display:flex; }
+.bar.tallybar .pfill { background:#2f2a33; }
+.bar.tallybar .dfill { background:#e06666; }
+/* A synastry line appears for the body or the row you are pointing at. */
+.astro .asp.cross { opacity:0; transition:opacity .12s; }
+.astro .asp.cross.lit { opacity:.85; }
+/* The aspect grid, in the space the wheel uses: two sets of bodies on the two
+   axes and the aspect where they meet, which is how a synastry is actually
+   read. Kaycee asked for it, 2026-10-05. */
+.agrid { overflow:auto; padding:6px 2px 10px; max-width:100%; }
+/* The grid is a rectangle where the wheel is a circle, so the floating dock,
+   which only ever overlapped the wheel's empty corner, sat on top of the first
+   column. It clears the dock's 154 pixels and centres in what is left. */
+body.view-astro .astro .agrid { max-height:calc(100vh - 36px); margin-left:164px; }
+@media (max-width: 760px) { body.view-astro .astro .agrid { margin-left:0; } }
+.agrid .axlab { display:flex; justify-content:center; gap:14px; margin-bottom:6px;
+  font-size:10px; letter-spacing:.14em; text-transform:uppercase; font-weight:600; }
+.agrid .axlab .pax { color:#2f2a33; }
+.agrid .axlab .dax { color:#e06666; }
+.agrid table { border-collapse:collapse; margin:0 auto; font-size:12px; }
+.agrid th, .agrid td { width:30px; height:30px; text-align:center; vertical-align:middle;
+  border:1px solid rgba(132,80,149,.12); padding:0; }
+.agrid th { font-weight:600; font-size:15px; }
+.agrid th.rowh { color:#2f2a33; }
+.agrid th.colh { color:#e06666; }
+.agrid th.corner { border:0; }
+.agrid td.has { cursor:help; font-size:14px; }
+.agrid td.hard { background:rgba(192,96,60,.13); color:#9c4a28; }
+.agrid td.soft { background:rgba(132,80,149,.13); color:var(--purple); }
+.agrid td.conj { background:rgba(201,162,39,.18); color:#7a5c07; }
+.agrid td.min  { background:rgba(120,120,130,.10); color:#6f6880; font-size:12px; }
+.agrid .glab { display:block; font-size:8.5px; letter-spacing:.04em; opacity:.5; }
+#astrogridrow { margin-top:4px; }
 /* Variables belongs to the Human Design views. Kaycee, 2026-10-05: remove it
    from the astrology home page, but it "still needs to be viewable for the
    human design modules". */
@@ -4372,6 +4410,7 @@ ${d.client ? "" : viewControls}
         </select>
       </div>
       <div class="row" id="astrosiderow" hidden><button id="asPers" class="on">Personality</button><button id="asDes">Design</button><button id="asSyn">Synastry</button></div>
+      <div class="row" id="astrogridrow" hidden><button id="asGrid">Aspect Grid</button></div>
       <div class="row" id="astrotransitrow" hidden><button id="asTransit">Transit</button><button id="asTransitOnly">Transit Only</button></div>
       <details class="drop" id="apdrop"><summary>Placements</summary>
         <div id="astroplanets"></div>
@@ -4379,7 +4418,8 @@ ${d.client ? "" : viewControls}
       <details class="drop"><summary>Houses</summary>
         <div id="astrohouses"></div>
       </details>
-      <details class="drop"><summary>Mode</summary><div id="astromode"></div></details>
+      <details class="drop"><summary>Elements</summary><div id="astroelements"></div></details>
+      <details class="drop"><summary>Modes</summary><div id="astromode"></div></details>
       <details class="drop"><summary>Aspects</summary>
         <div class="row" id="asprow"><button id="aspAll">Show Every Aspect</button></div>
         <div id="astroaspects"></div>
@@ -7254,7 +7294,29 @@ if (DATA.client) {
         [].forEach.call(wheelEl.querySelectorAll('.gateband[data-gate="' + g + '"]'),
           function (n) { n.classList.add('hov-band'); });
       };
+      // Kaycee, 2026-10-05: "Yes to the Hover Only lines." A synastry line
+      // shows for the body or the row being pointed at and for nothing else,
+      // so every line on screen is an answer to a question just asked.
+      var litCross = function (name, side) {
+        [].forEach.call(wheelEl.querySelectorAll('.asp.cross'), function (l) {
+          var pair = (l.getAttribute('data-cross') || '').split('|');
+          var mine = side === 'design' ? pair[1] === name
+            : side === 'personality' ? pair[0] === name
+            : (pair[0] === name || pair[1] === name);
+          l.classList.toggle('lit', !!mine);
+        });
+      };
+      var litCrossPair = function (p1, p2) {
+        [].forEach.call(wheelEl.querySelectorAll('.asp.cross'), function (l) {
+          l.classList.toggle('lit', l.getAttribute('data-cross') === p1 + '|' + p2);
+        });
+      };
+      var clearCross = function () {
+        [].forEach.call(wheelEl.querySelectorAll('.asp.cross.lit'),
+          function (l) { l.classList.remove('lit'); });
+      };
       var clearHover = function () {
+        clearCross();
         tip.hidden = true;
         [].forEach.call(wheelEl.querySelectorAll('.hov-band'), function (n) { n.classList.remove('hov-band'); });
         [].forEach.call(wheelEl.querySelectorAll('.hov-cusp'), function (n) { n.classList.remove('hov-cusp'); });
@@ -7279,6 +7341,7 @@ if (DATA.client) {
         // the design mars in house 12 Aquarius showing an in domicile tag?"
         // Her design Mars is in neither.
         var rside = r.getAttribute('data-side') === 'design' ? 'design' : 'personality';
+        litCross(nm, rside);
         showTip(e, planetTip(nm, rside, who));
         var only = who ? '[data-person="' + who + '"]' : '';
         [].forEach.call(
@@ -7371,6 +7434,7 @@ if (DATA.client) {
           // both belong to whichever chart the row is listed under.
           var rowSide = r.getAttribute('data-side');
           var synRow = r.getAttribute('data-syn') === '1';
+          if (synRow) litCrossPair(pair[0], pair[1]);
           pair.forEach(function (nm, i) {
             var sd = synRow ? (i === 0 ? 'personality' : 'design')
               : (rowSide === 'design' ? 'design' : 'personality');
@@ -7418,51 +7482,71 @@ if (DATA.client) {
     // it is empty, so a chart with nothing cardinal says so rather than hiding
     // the fact.
     var MODES = ['Cardinal', 'Fixed', 'Mutable'];
+    var ELEMENTS = ['Fire', 'Earth', 'Air', 'Water'];
     /**
      * A tally, the same shape as Activations by Astrological Sign on the Stats
      * tab: a label, a bar and a count, with the placements themselves on the
-     * mouseover. Kaycee, 2026-10-05: "I expected to see a tally kind of like
-     * what we did with the astrological placements by sign section, the actual
-     * placements can show on mouseover, we don't need to list them out again."
+     * mouseover rather than listed out again.
+     *
+     * One bar per category, not one per side. Kaycee, 2026-10-05: "can we
+     * still have these on one bar, but use red to indicate design and purple
+     * for personality?" So the track carries two segments and the count is the
+     * two sides added together, with the split in the colours and the hover.
      */
-    var modeBars = function (side) {
-      var rows = MODES.map(function (m) {
-        return [m, planetsOf(side).filter(function (p) { return p.quality === m; })];
+    var FIELD = { mode: 'quality', element: 'element' };
+    var tallyBars = function (kind) {
+      var keys = kind === 'mode' ? MODES : ELEMENTS;
+      var field = FIELD[kind];
+      var rows = keys.map(function (k) {
+        return {
+          key: k,
+          p: planetsOf('personality').filter(function (x) { return x[field] === k; }),
+          d: DES ? planetsOf('design').filter(function (x) { return x[field] === k; }) : [],
+        };
       });
-      var max = Math.max.apply(null, rows.map(function (r) { return r[1].length; }).concat([1]));
+      var max = Math.max.apply(null, rows.map(function (r) { return r.p.length + r.d.length; }).concat([1]));
       return rows.map(function (r) {
-        return '<div class="bar modebar" data-mode="' + r[0] + '" data-side="' + side + '">' +
-          '<i>' + r[0] + '</i><div class="track"><div class="fill" style="width:' +
-          Math.round((r[1].length / max) * 100) + '%"></div></div><b>' + r[1].length + '</b></div>';
+        var tot = r.p.length + r.d.length;
+        return '<div class="bar tallybar" data-kind="' + kind + '" data-key="' + esc(r.key) + '">' +
+          '<i>' + esc(r.key) + '</i><div class="track">' +
+          '<div class="fill pfill" style="width:' + Math.round((r.p.length / max) * 100) + '%"></div>' +
+          '<div class="fill dfill" style="width:' + Math.round((r.d.length / max) * 100) + '%"></div>' +
+          '</div><b>' + tot + '</b></div>';
       }).join('');
     };
     var paintMode = function () {
-      var box = document.getElementById('astromode');
-      if (!box) return;
-      box.innerHTML = EX && EX.design && DES
-        ? sub('Personality', modeBars('personality')) + sub('Design', modeBars('design'))
-        : modeBars('personality');
+      var m = document.getElementById('astromode');
+      if (m) m.innerHTML = tallyBars('mode');
+      var el = document.getElementById('astroelements');
+      if (el) el.innerHTML = tallyBars('element');
     };
     window.__paintAstroMode = paintMode;
     paintMode();
 
-    // The placements behind a tally row, on hover.
-    var modeBox = document.getElementById('astromode');
-    if (modeBox) {
-      modeBox.addEventListener('mousemove', function (e) {
-        var b = e.target.closest ? e.target.closest('.modebar') : null;
-        if (!b) { tip.hidden = true; return; }
-        var m = b.getAttribute('data-mode'), sd = b.getAttribute('data-side');
-        var list = planetsOf(sd).filter(function (p) { return p.quality === m; });
-        showTip(e, '<b>' + esc(m) + '</b>' +
-          (list.length
-            ? '<br><span style="opacity:.78">' + list.map(function (p) {
-                return esc((p.label || pretty(p.name)) + ' ' + p.sign + ' ' + dg(p.position));
-              }).join('<br>') + '</span>'
-            : ''));
-      });
-      modeBox.addEventListener('mouseleave', function () { tip.hidden = true; });
-    }
+    // The placements behind a bar, sorted by side and saying which.
+    var tallyTip = function (e) {
+      var b = e.target.closest ? e.target.closest('.tallybar') : null;
+      if (!b) { tip.hidden = true; return; }
+      var kind = b.getAttribute('data-kind'), key = b.getAttribute('data-key');
+      var field = FIELD[kind];
+      var block = function (label, side, colour) {
+        var list = planetsOf(side).filter(function (x) { return x[field] === key; });
+        if (!list.length) return '';
+        return '<br><span style="color:' + colour + ';font-weight:600">' + label + '</span>' +
+          '<br><span style="opacity:.78">' + list.map(function (p) {
+            return esc((p.label || pretty(p.name)) + ' ' + p.sign + ' ' + dg(p.position));
+          }).join('<br>') + '</span>';
+      };
+      showTip(e, '<b>' + esc(key) + '</b>' +
+        block('Personality', 'personality', '#2f2a33') +
+        (DES ? block('Design', 'design', '#e06666') : ''));
+    };
+    ['astromode', 'astroelements'].forEach(function (id) {
+      var box = document.getElementById(id);
+      if (!box) return;
+      box.addEventListener('mousemove', tallyTip);
+      box.addEventListener('mouseleave', function () { tip.hidden = true; });
+    });
 
     // Both people's aspects when there are two, each under their own name, the
     // same sets the wheel draws.
@@ -7646,6 +7730,89 @@ if (DATA.client) {
       }
       window.__astroSide = showSide;
       sideRow.hidden = false;
+
+      // The grid: both sets of bodies on the two axes with the aspect where
+      // they meet, which is how a synastry is actually read. It takes the
+      // wheel's place rather than a panel slot, because it needs the width and
+      // because it is the same relationship drawn another way. Kaycee asked
+      // for it below the pills, 2026-10-05, and only in this view.
+      var ASTRO_ID = { Sun: 'sun', Earth: 'earth', Moon: 'moon', Mercury: 'mercury',
+        Venus: 'venus', Mars: 'mars', Jupiter: 'jupiter', Saturn: 'saturn',
+        Uranus: 'uranus', Neptune: 'neptune', Pluto: 'pluto', True_Node: 'north-node',
+        Mean_Node: 'south-node', Chiron: 'chiron', Mean_Lilith: 'lilith' };
+      var ASPECT_GLYPH = { conjunction: 'C', opposition: 'O', square: 'S',
+        trine: 'T', sextile: 'X', quintile: 'Q' };
+      var ASPECT_CLASS = { conjunction: 'conj', opposition: 'hard', square: 'hard',
+        trine: 'soft', sextile: 'soft', quintile: 'min' };
+      var on = function (p) { return !body.classList.contains('off-p-' + (ASTRO_ID[p.name] || '')); };
+      // The chart's own glyph table, keyed the way it is keyed everywhere else:
+      // by the name on screen, not the provider's.
+      var glyphFor = function (p) {
+        var nm = p.label || pretty(p.name);
+        return (DATA.astroGlyphs || {})[p.name] || (DATA.planetGlyphs || {})[nm] || nm.slice(0, 2);
+      };
+      var gridRow = document.getElementById('astrogridrow');
+      var bGrid = document.getElementById('asGrid');
+      var gridOn = false, wheelHeld = '';
+      var buildGrid = function () {
+        var rows = planetsOf('personality').filter(on);
+        var cols = planetsOf('design').filter(on);
+        var at = {};
+        (EX.synastry || []).forEach(function (a) { at[a.p1_name + '|' + a.p2_name] = a; });
+        var head = '<th class="corner"></th>' + cols.map(function (c) {
+          return '<th class="colh" title="' + esc(c.label || pretty(c.name)) + '">' +
+            esc(glyphFor(c)) + '</th>';
+        }).join('');
+        var bodyRows = rows.map(function (r) {
+          return '<tr><th class="rowh" title="' + esc(r.label || pretty(r.name)) + '">' +
+            esc(glyphFor(r)) + '</th>' +
+            cols.map(function (c) {
+              var a = at[r.name + '|' + c.name];
+              if (!a) return '<td></td>';
+              return '<td class="has ' + (ASPECT_CLASS[a.aspect] || 'min') + '" data-cell="' +
+                esc(r.name) + '|' + esc(c.name) + '">' + (ASPECT_GLYPH[a.aspect] || '?') +
+                '<span class="glab">' + (Math.round(Math.abs(a.orbit) * 10) / 10) + '</span></td>';
+            }).join('') + '</tr>';
+        }).join('');
+        return '<div class="agrid"><div class="axlab">' +
+          '<span class="pax">Personality</span><span class="dax">Design</span></div>' +
+          '<table><thead><tr>' + head + '</tr></thead><tbody>' +
+          bodyRows + '</tbody></table></div>';
+      };
+      var showGrid = function (want) {
+        gridOn = want;
+        bGrid.classList.toggle('on', gridOn);
+        if (gridOn) {
+          wheelHeld = liveAstro.innerHTML;
+          liveAstro.innerHTML = buildGrid();
+        } else {
+          liveAstro.innerHTML = wheelHeld || drawn[curSide];
+          if (window.__markAstroPending) window.__markAstroPending();
+        }
+      };
+      if (bGrid && EX && EX.synastry && EX.synastry.length) {
+        gridRow.hidden = false;
+        bGrid.addEventListener('click', function () { showGrid(!gridOn); });
+        // A cell says it in words, so the letter never has to be decoded.
+        liveAstro.addEventListener('mousemove', function (e) {
+          if (!gridOn) return;
+          var c = e.target.closest ? e.target.closest('td.has') : null;
+          if (!c) { tip.hidden = true; return; }
+          var pair = (c.getAttribute('data-cell') || '').split('|');
+          var a = (EX.synastry || []).filter(function (x) {
+            return x.p1_name === pair[0] && x.p2_name === pair[1];
+          })[0];
+          if (!a) { tip.hidden = true; return; }
+          showTip(e, '<b><span style="color:#2f2a33">' + esc(labelOf(a.p1_name)) + '</span> ' +
+            esc(a.aspect) + ' <span style="color:#e06666">' + esc(labelOf(a.p2_name)) + '</span></b>' +
+            '<span class="pill house">orb ' + (Math.round(Math.abs(a.orbit) * 10) / 10) + '\u00b0</span>');
+        });
+        liveAstro.addEventListener('mouseleave', function () { if (gridOn) tip.hidden = true; });
+      }
+      // the grid belongs to synastry, so leaving synastry puts the wheel back
+      var wasSyn = showSide;
+      showSide = function (side) { if (gridOn) showGrid(false); wasSyn(side); };
+      window.__astroSide = showSide;
     }
 
     // Placidus is what the provider returns and what the wheel is drawn from.
@@ -7669,9 +7836,23 @@ if (DATA.client) {
     // own, cut to one line. Nothing here is written by us.
     var astroEl = document.querySelector('.astro');
     if (astroEl) {
+      var clearWheelCross = function () {
+        [].forEach.call(astroEl.querySelectorAll('.asp.cross.lit'),
+          function (l) { l.classList.remove('lit'); });
+      };
       astroEl.addEventListener('mousemove', function (e) {
         var t = e.target.closest
           ? e.target.closest('[data-asign],[data-aplanet],[data-house],[data-angle]') : null;
+        clearWheelCross();
+        // a glyph lights every synastry line it is one end of
+        var gp = t && t.getAttribute('data-aplanet');
+        if (gp) {
+          var gs = t.getAttribute('data-side') === 'design' ? 1 : 0;
+          [].forEach.call(astroEl.querySelectorAll('.asp.cross'), function (l) {
+            var pr = (l.getAttribute('data-cross') || '').split('|');
+            if (pr[gs] === gp) l.classList.add('lit');
+          });
+        }
         if (!t) { tip.hidden = true; return; }
         // a house number, and one of the four angles
         var hn = t.getAttribute('data-house');
@@ -7759,7 +7940,10 @@ if (DATA.client) {
         }
         showTip(e, html);
       });
-      astroEl.addEventListener('mouseleave', function () { tip.hidden = true; });
+      astroEl.addEventListener('mouseleave', function () {
+        tip.hidden = true;
+        clearWheelCross();
+      });
 
       // Click a planet: light the spoke from its gate through its sign to its
       // house, and mark the three bands it crosses. Everything already knows

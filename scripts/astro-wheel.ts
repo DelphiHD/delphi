@@ -31,7 +31,7 @@ const MAJOR = new Set(["opposition", "square", "trine", "sextile"]);
 /** Real points, but not what a classic wheel draws aspect lines to. */
 const MINOR_POINT = new Set(["Chiron", "Mean_Lilith", "Mean_Node", "True_Node"]);
 
-const GLYPH: Record<string, string> = {
+export const GLYPH: Record<string, string> = {
   Sun: "☉", Moon: "☽", Mercury: "☿", Venus: "♀", Mars: "♂",
   Jupiter: "♃", Saturn: "♄", Uranus: "♅", Neptune: "♆", Pluto: "♇",
   True_Node: "☊", Mean_Node: "☋", Mean_Lilith: "⚸", Chiron: "⚷",
@@ -298,9 +298,13 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
     const rD = fromDesign ? R_PLANET - 13 : R_DESIGN - 11;
     const [x1, y1] = pt(a.p1_abs_pos, asc, rP);
     const [x2, y2] = pt(a.p2_abs_pos, asc, rD);
-    s.push(`<line class="asp cross ${core ? "core" : "extra"}" x1="${f(x1)}" y1="${f(y1)}" ` +
+    // Named, because these are shown one at a time on hover rather than all at
+    // once. Kaycee, 2026-10-05: "The lines to nowhere are kind of meaningless
+    // to me." A line you asked for is an answer; thirty you did not is noise.
+    s.push(`<line class="asp cross ${core ? "core" : "extra"}" ` +
+      `data-cross="${a.p1_name}|${a.p2_name}" x1="${f(x1)}" y1="${f(y1)}" ` +
       `x2="${f(x2)}" y2="${f(y2)}" stroke="#c9a227" ` +
-      `stroke-width="${HARD.has(a.aspect) ? 0.9 : 0.8}" opacity=".55"/>`);
+      `stroke-width="${HARD.has(a.aspect) ? 1.3 : 1.1}" opacity="0"/>`);
   }
 
   for (const set of aspectSets) {
