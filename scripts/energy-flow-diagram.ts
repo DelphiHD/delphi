@@ -5313,8 +5313,14 @@ if (DATA.client) {
       var t = (window.__transitTiming || {})[tpid(name)];
       // The gate's own tags are tag, not pill, and the two do not sit on one
       // line together: emitted as a pill the sign dropped onto a line of its
-      // own underneath them. Built by the same helper as the rest of the row.
-      return t && t.sign ? tags([{ text: t.sign }]) : '';
+      // own underneath them. Built by the same helper as the rest of the row,
+      // and tinted by element with the colours the Elements section uses, so
+      // the tag says fire or water without spending a word on it.
+      if (!t || !t.sign) return '';
+      var ZOD = (DATA.zodiac || []).map(function (z) { return z.name; });
+      var ELEM_BG = ['#845095', '#9b9aa0', '#5f5a66', '#c9a7d4'];
+      var zi = ZOD.indexOf(t.sign);
+      return tags([{ text: t.sign, bg: zi < 0 ? '' : ELEM_BG[zi % 4] }]);
     };
 
     window.__drawTransitTimes = function () {
