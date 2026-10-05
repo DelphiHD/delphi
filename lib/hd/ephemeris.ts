@@ -66,7 +66,35 @@ const COMPUTABLE: Record<string, Body | "earth"> = {
   // Moon is handled separately: astronomy-engine has a dedicated, faster path.
 };
 
-export const COMPUTABLE_BODIES = ["Moon", ...Object.keys(COMPUTABLE)];
+export const COMPUTABLE_BODIES = ["Moon", ...Object.keys(COMPUTABLE),
+  "North Node", "South Node"];
+
+/**
+ * The Moon's ascending node, as a longitude.
+ *
+ * The nodes carry real weight in Human Design, so leaving them out of the
+ * timings was not good enough: Kaycee, 2026-10-05, "I do want to try to
+ * calculate the nodal transit times, it's important for human design."
+ *
+ * This is the TRUE node, taken from the Moon's own angular momentum rather
+ * than from the mean-node polynomial. The true node wanders about a degree
+ * and a half either side of the mean one, and a gate is 5.625 degrees wide
+ * against a nodal motion near 0.05 degrees a day, so the mean node would put
+ * an ingress the better part of a month out.
+ *
+ * The orbital plane is normal to h = r x v. The ascending node lies along
+ * z x h, which is (-h.y, h.x, 0), so its longitude is atan2(h.x, -h.y).
+ */
+function nodeLongitude(when: Date): number {
+  const HOUR = 3_600_000;
+  const before = Ecliptic(GeoVector(Body.Moon, new Date(when.getTime() - HOUR), true)).vec;
+  const after = Ecliptic(GeoVector(Body.Moon, new Date(when.getTime() + HOUR), true)).vec;
+  const r = { x: (before.x + after.x) / 2, y: (before.y + after.y) / 2, z: (before.z + after.z) / 2 };
+  const v = { x: after.x - before.x, y: after.y - before.y, z: after.z - before.z };
+  const hx = r.y * v.z - r.z * v.y;
+  const hy = r.z * v.x - r.x * v.z;
+  return ((Math.atan2(hx, -hy) * (180 / Math.PI)) % 360 + 360) % 360;
+}
 
 /**
  * Ecliptic longitude of one body at one instant, in degrees.
@@ -77,6 +105,12 @@ export const COMPUTABLE_BODIES = ["Moon", ...Object.keys(COMPUTABLE)];
  */
 export function longitudeAt(planet: string, when: Date): number | null {
   if (planet === "Moon") return EclipticGeoMoon(when).lon;
+  // The provider calls these True_Node and Mean_Node; the chart calls them the
+  // North and South Node, and they are one axis read from its two ends.
+  if (planet === "North Node" || planet === "True_Node") return nodeLongitude(when);
+  if (planet === "South Node" || planet === "Mean_Node") {
+    return (nodeLongitude(when) + 180) % 360;
+  }
   // The slow bodies come from a Swiss Ephemeris table first, because a return
   // is cast for the moment it happens and half an arcminute of disagreement is
   // tens of minutes on the clock. Kiron is only there at all. Outside the

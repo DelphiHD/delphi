@@ -5238,11 +5238,29 @@ if (DATA.client) {
     var TPID = { True_Node: 'north-node', Mean_Node: 'south-node', Mean_Lilith: 'lilith' };
     var tpid = function (n) { return TPID[n] || String(n).toLowerCase().replace(/[_\s]+/g, '-'); };
 
-    var fmtDay = function (iso) {
-      if (!iso) return '—';
-      var d = new Date(iso);
-      if (isNaN(d.getTime())) return '—';
+    // A stay of a few hours written as two identical dates says nothing: the
+    // Moon crosses a gate in about five hours. Kaycee, 2026-10-05: "For the
+    // moon, can we just list the time?" So a span that begins and ends on one
+    // day is written as two times, and any other short span carries both.
+    var DAY_MS_T = 86400000;
+    var asDay = function (d) {
       return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+    };
+    var asClock = function (d) {
+      return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    };
+    /** Both ends of a span, written at whatever resolution tells them apart. */
+    var fmtSpan = function (a, b) {
+      var da = a ? new Date(a) : null, db = b ? new Date(b) : null;
+      var ok = function (d) { return d && !isNaN(d.getTime()); };
+      if (!ok(da) && !ok(db)) return '—';
+      if (!ok(da)) return '— → ' + asDay(db);
+      if (!ok(db)) return asDay(da) + ' → —';
+      var short = (db - da) > 0 && (db - da) < 2 * DAY_MS_T;
+      if (!short) return asDay(da) + ' → ' + asDay(db);
+      var sameDay = da.toDateString() === db.toDateString();
+      if (sameDay) return asDay(da) + ' · ' + asClock(da) + ' → ' + asClock(db);
+      return asDay(da) + ' ' + asClock(da) + ' → ' + asDay(db) + ' ' + asClock(db);
     };
     var through = function (a, b, nowMs) {
       if (!a || !b) return 0;
@@ -5269,7 +5287,7 @@ if (DATA.client) {
       var line = function (label, what, a, b) {
         if (!a && !b) return '';
         return '<br><span style="opacity:.72">' + label + ' <b>' + esc(what) + '</b> &middot; ' +
-          esc(fmtDay(a)) + ' → ' + esc(fmtDay(b)) +
+          esc(fmtSpan(a, b)) +
           (leftOf(b, now) ? ' &middot; ' + esc(leftOf(b, now)) : '') + '</span>';
       };
       return line('Sign', t.sign, t.signEntered, t.signLeaves) +
@@ -5295,7 +5313,7 @@ if (DATA.client) {
             .map(function (b) {
               var span = function (label, what, a, c) {
                 return '<div class="trspan"><i>' + label + '</i><span>' + esc(what) + ' &middot; ' +
-                  esc(fmtDay(a)) + ' → ' + esc(fmtDay(c)) + '</span><b>' +
+                  esc(fmtSpan(a, c)) + '</span><b>' +
                   esc(leftOf(c, nowMs)) + '</b><div class="track"><div class="fill" style="width:' +
                   Math.round(through(a, c, nowMs) * 100) + '%"></div></div></div>';
               };
