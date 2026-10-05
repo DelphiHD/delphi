@@ -8377,11 +8377,14 @@ if (DATA.client) {
           // a birth window and says which ones it could be.
           var TW = DATA.client && DATA.client.time;
           var AST = TW && TW.astro;
-          var housePill = (AST && AST.anglesUnsettled)
+          // A transit is cast at an hour the reader chose, so it has none of
+          // the birth-time doubt the chart carries: its house is settled and
+          // its Moon is not spread across a birth window.
+          var housePill = (AST && AST.anglesUnsettled && !isTr)
             ? '<span class="pill house">House needs an exact time</span>'
             : (HOUSE_N[pl.house] ? '<span class="pill house">House ' + HOUSE_N[pl.house] + '</span>' : '');
           var moonNote = '';
-          if (pl.name === 'Moon' && AST && AST.moonSigns && AST.moonSigns.length > 1) {
+          if (!isTr && pl.name === 'Moon' && AST && AST.moonSigns && AST.moonSigns.length > 1) {
             moonNote = '<span style="color:#845095">Could be ' +
               AST.moonSigns.map(function (m) { return esc(m.value); }).join(' or ') + '</span>';
           }
@@ -8398,8 +8401,14 @@ if (DATA.client) {
             (dgY ? '<span class="pill">' + (dgY === 'domicile' ? 'In domicile' : 'In detriment') + '</span>' : '') +
             (cb ? '<span class="pill house">Combust ' +
               (Math.round(cb.separation * 10) / 10) + '\u00b0</span>' : '') +
-            (planetBasic(pl.label || pretty(pl.name)) ? '<br><span style="opacity:.72">' +
-              esc(planetBasic(pl.label || pretty(pl.name))) + '</span>' : '');
+            // The planet blurb describes a natal placement: what this body
+            // means in somebody's chart. A transiting Mars is not that, and
+            // Kaycee is right that recycling it says something false. Until
+            // there is transit-specific wording of hers to show, a transit
+            // states its facts and keeps quiet.
+            (!isTr && planetBasic(pl.label || pretty(pl.name))
+              ? '<br><span style="opacity:.72">' +
+                esc(planetBasic(pl.label || pretty(pl.name))) + '</span>' : '');
         }
         showTip(e, html);
       });
