@@ -2939,8 +2939,12 @@ function buildCanvas(
           `<tspan fill="${skin.muted}" font-weight="400"> and </tspan>` +
           `<tspan fill="${personInk(PERSON_B, "personality")}">${esc(d.connection.b.name)}</tspan>` +
           `</text>`
-        : `<text x="${r2(OX + LY.coreW / 2)}" y="58" text-anchor="middle" font-size="27" font-weight="600" ` +
-          `letter-spacing=".02em" fill="${skin.ink}">${esc(d.client.name)}</text>` +
+        : `<text class="cname" x="${r2(OX + LY.coreW / 2)}" y="58" text-anchor="middle" font-size="27" ` +
+          `font-weight="600" letter-spacing=".02em" fill="${skin.ink}">${esc(d.client.name)}</text>` +
+          // Filled in by the page, because the moment changes after the file is
+          // baked. Empty and hidden on every chart that is not a transit.
+          `<text class="tname" x="${r2(OX + LY.coreW / 2)}" y="58" text-anchor="middle" font-size="27" ` +
+          `font-weight="600" letter-spacing=".02em" fill="${skin.ink}"></text>` +
           // Kaycee, 2026-09-12: "We should also make it clear what time we are
           // using for the estimate for each day segment." One line, clickable
           // for the rest, so the chart says it without explaining itself.
@@ -3406,7 +3410,16 @@ body.view-transit.tr-circuits svg.canvas.transit:not(.plain) { display:block !im
    The person's own legs and discs come off exactly as the party control
    already takes them off, rather than by a second set of rules. */
 body.tr-alone svg.canvas.transit .pleg,
-body.tr-alone svg.canvas.transit .gdisc { display:none; }
+body.tr-alone svg.canvas.transit .gdisc,
+body.tr-alone svg.canvas.transit .ptable[data-side="merged"],
+body.tr-alone svg.canvas.transit .castline { display:none; }
+/* Transit Only is nobody's chart, so it carries the moment instead of a name.
+   Kaycee, 2026-10-05: "if transit only is selected can we remove the name at
+   the top and only put the date, time and location? Add the name back if
+   anything else is selected." */
+.tname { display:none; }
+body.tr-alone svg.canvas.transit .cname { display:none; }
+body.tr-alone svg.canvas.transit .tname { display:block; }
 body.view-transit { background:#ffffff; color:#1c1a2e; }
 body.view-transit .bridge, body.view-transit .halo { display:none; }
 /* The client tint is a light purple and the awareness centers are a mid purple,
@@ -3887,7 +3900,14 @@ body.view-transit .todaysec, body.view-transit .datesec { display:block; }
    picker at the top on all views... So it stays visible." */
 body.mod-transit .panel { display:flex; flex-direction:column; }
 body.mod-transit .datesec { display:block !important; order:-1; margin-top:0;
-  border-top:none; padding-top:0; }
+  border-top:none; padding-top:0; padding-bottom:13px; margin-bottom:13px;
+  border-bottom:1px solid rgba(132,80,149,.18); }
+body.mod-transit .datesec .todaylab { margin-bottom:8px; }
+body.mod-transit .datepick { gap:6px; }
+body.mod-transit #trwhere { margin-top:14px; }
+body.mod-transit #trAgainst { margin-top:10px; }
+body.mod-transit .dfield,
+body.mod-transit #trPlace, body.mod-transit #trAgainst { padding:6px 8px; }
 .todaysec > summary { font-size:9.5px; letter-spacing:.18em; font-weight:600; opacity:.62; cursor:pointer;
   text-transform:uppercase; padding:3px 0; list-style:none; }
 .todaysec > summary::-webkit-details-marker { display:none; }
@@ -5909,8 +5929,18 @@ if (DATA.client) {
         if (p) t.textContent = p.fixingState === 'Exalted' ? UP : p.fixingState === 'Detriment' ? DOWN : '';
       });
       [].forEach.call(document.querySelectorAll('.tdate'), function (e) { e.textContent = shortDate(d); });
+      // Transit Only carries the moment instead of a name. The place is
+      // whatever the panel says, which is UTC until somebody changes it.
+      var plEl = document.getElementById('trPlace');
+      var where = (plEl && plEl.value.trim()) || 'UTC';
+      [].forEach.call(document.querySelectorAll('.tname'), function (e) {
+        e.textContent = shortDate(d) + '  \u00b7  ' + clock12(t) + '  \u00b7  ' + where;
+      });
       [].forEach.call(document.querySelectorAll('.ttime'), function (e) {
-        e.textContent = clock12(t) + (TZ ? ' ' + TZ : '');
+        // Under the Transit chart type the hour is the one the panel cast, so
+        // it is labelled with that place. Elsewhere it is the reader's own.
+        e.textContent = clock12(t) + (body.classList.contains('mod-transit')
+          ? ' ' + where : (TZ ? ' ' + TZ : ''));
       });
 
       // and the words, which belong to the calendar day rather than the hour
@@ -6322,8 +6352,7 @@ if (DATA.client) {
     if (window.__variations) window.__variations(id === 'variations');
     // The chart type is the hub: it says whether there is a transit at all,
     // and every view then draws the same thing its own way.
-    var trSel = document.getElementById('trAgainst');
-    body.classList.toggle('tr-alone', id === 'transit' && !(trSel && trSel.value));
+    if (window.__applyAgainst) window.__applyAgainst(id === 'transit');
     if (window.__astroTransit) window.__astroTransit(id === 'transit');
   };
 
@@ -7938,6 +7967,31 @@ if (DATA.client) {
 
       // Called by setModule and by the date picker: the chart type and the
       // moment are the only two things that decide what this view shows.
+      // The selector is the control for the whole chart type, not just this
+      // view. Kaycee, 2026-10-05: "the personality and design selections don't
+      // do anything." They drive the same side toggles the view section already
+      // uses, so the bodygraph and the mandala answer to them too.
+      var savedSides = null;
+      window.__applyAgainst = function (on) {
+        if (on && !savedSides) {
+          savedSides = { p: body.classList.contains('off-s-personality'),
+            d: body.classList.contains('off-s-design') };
+        }
+        var v = on && trAgainst ? trAgainst.value : '';
+        body.classList.toggle('tr-alone', !!on && !v);
+        if (on) {
+          body.classList.toggle('off-s-personality', v === 'design');
+          body.classList.toggle('off-s-design', v === 'personality');
+        } else if (savedSides) {
+          // Leaving the transit type hands the side toggles back exactly as
+          // they were, rather than as the transit left them.
+          body.classList.toggle('off-s-personality', savedSides.p);
+          body.classList.toggle('off-s-design', savedSides.d);
+          savedSides = null;
+        }
+        if (typeof relight === 'function') relight();
+      };
+
       window.__astroTransit = function (on) {
         if (on) { drawTransit(); return; }
         if (!trShowing) return;
@@ -7949,7 +8003,7 @@ if (DATA.client) {
         var el = document.getElementById(id);
         if (el) el.addEventListener('change', function () {
           if (!body.classList.contains('mod-transit')) return;
-          body.classList.toggle('tr-alone', !(trAgainst && trAgainst.value));
+          window.__applyAgainst(true);
           drawTransit();
         });
       });
