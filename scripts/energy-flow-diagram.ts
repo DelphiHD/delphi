@@ -4133,7 +4133,6 @@ body.view-astro .astro .agrid { max-height:calc(100vh - 36px); margin-left:164px
 .agrid th, .agrid td { width:30px; height:30px; text-align:center; vertical-align:middle;
   border:1px solid rgba(132,80,149,.12); padding:0; }
 .agrid th { font-weight:600; font-size:15px; line-height:1; }
-.agrid th[data-head] { -webkit-text-stroke:.35px currentColor; }
 .agrid th.rowh { color:#2f2a33; }
 .agrid th.colh { color:#e06666; }
 .agrid th.corner { border:0; }
@@ -7864,13 +7863,30 @@ if (DATA.client) {
         var cx = cv.getContext('2d');
         if (!cx) return;
         var BASE = 15, TARGET = 10.5;
-        [].forEach.call(root.querySelectorAll('th[data-head]'), function (th) {
+        var cells = [].slice.call(root.querySelectorAll('th[data-head]'));
+        var sized = [];
+        cells.forEach(function (th) {
           var cs = getComputedStyle(th);
           cx.font = '600 ' + BASE + 'px ' + cs.fontFamily;
           var m = cx.measureText(th.textContent || '');
           var h = (m.actualBoundingBoxAscent || 0) + (m.actualBoundingBoxDescent || 0);
           if (!h) return;
-          th.style.fontSize = Math.max(11, Math.min(26, BASE * TARGET / h)).toFixed(1) + 'px';
+          var px = Math.max(11, Math.min(26, BASE * TARGET / h));
+          th.style.fontSize = px.toFixed(1) + 'px';
+          sized.push({ el: th, px: px });
+        });
+        // Equal height is not equal weight. A face draws its strokes in
+        // proportion to the size it is asked for, so the tall glyphs, which
+        // had to shrink most to match the others, came out as hairlines:
+        // Kaycee, 2026-10-05, "now venus and mars are too thin haha". Venus
+        // lands at about 11 pixels where the Sun needs 23, so it is drawn at
+        // half the weight. The stroke added back is proportional to how far
+        // each one had to shrink, which puts them all at the same apparent
+        // thickness without touching their shape.
+        var biggest = sized.reduce(function (n, x) { return Math.max(n, x.px); }, 0);
+        sized.forEach(function (x) {
+          var add = 0.15 + 0.05 * (biggest - x.px);
+          x.el.style.webkitTextStroke = Math.min(0.8, add).toFixed(2) + 'px currentColor';
         });
       };
 
