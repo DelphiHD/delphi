@@ -4080,7 +4080,10 @@ body:not(.astro-all) #astroaspects .line.extra { display:none; }
 /* The renderer colours each ring by the side it belongs to, so nothing is
    repainted here. It used to be, which is how a design wheel carrying the
    personality as its inner ring ended up with both rings in the design red. */
-body:not(.mod-self) #astrosiderow { display:none; }
+body:not(.mod-self) #astrosiderow, body:not(.mod-self) #astrosynrow { display:none; }
+/* Which chart you are reading, then what is laid over it: two questions, so a
+   line between them. Kaycee, 2026-10-05. */
+#astrosynrow { margin-top:7px; padding-top:7px; border-top:1px solid rgba(132,80,149,.16); }
 /* Kaycee's list, 2026-10-05. The marks that ride beside a coordinate: her
    subscript capital R for retrograde, a C for combustion, and dignity as a
    word because a glyph would collide with the bodygraph's filled and open. */
@@ -4447,8 +4450,8 @@ ${d.client ? "" : viewControls}
           <option value="porphyry">Porphyry</option>
         </select>
       </div>
-      <div class="row" id="astrosiderow" hidden><button id="asPers" class="on">Personality</button><button id="asDes">Design</button><button id="asSyn">Synastry</button></div>
-      <div class="row" id="astrogridrow" hidden><button id="asGrid">Aspect Grid</button></div>
+      <div class="row" id="astrosiderow" hidden><button id="asPers" class="on">Personality</button><button id="asDes">Design</button></div>
+      <div class="row" id="astrosynrow" hidden><button id="asSyn">Synastry</button><button id="asGrid">Aspect Grid</button></div>
       <div class="row" id="astrotransitrow" hidden><button id="asTransit">Transit</button><button id="asTransitOnly">Transit Only</button></div>
       <details class="drop" id="apdrop"><summary>Placements</summary>
         <div id="astroplanets"></div>
@@ -7801,7 +7804,7 @@ if (DATA.client) {
         var nm = p.label || pretty(p.name);
         return (DATA.astroGlyphs || {})[p.name] || (DATA.planetGlyphs || {})[nm] || nm.slice(0, 2);
       };
-      var gridRow = document.getElementById('astrogridrow');
+      var gridRow = document.getElementById('astrosynrow');
       var bGrid = document.getElementById('asGrid');
       var gridOn = false, wheelHeld = '';
       /**
