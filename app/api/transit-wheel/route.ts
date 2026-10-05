@@ -103,6 +103,7 @@ export async function GET(request: Request): Promise<Response> {
           null, undefined, null, null, "personality", null, null,
           retroFor(sky.planets, date, time), true),
         aspects: [], place, utc: !asked,
+        transitPlanets: sky.planets, transitRetro: retroFor(sky.planets, date, time),
       });
     } catch (e) {
       console.error(`transit wheel alone ${date}: ${e instanceof Error ? e.message : String(e)}`);
@@ -179,6 +180,12 @@ export async function GET(request: Request): Promise<Response> {
         whole ? "personality" : side,
         designChart ? { chart: sky, side: "transit", colour: TRANSIT_COLOUR } : null,
         aspects, retroFor(sky.planets, date, time)),
+      // The sky's OWN placements. Without these the page had nothing to say
+      // about a transiting body and answered out of the birth chart instead:
+      // Kaycee hovered a transit Mars sitting in Leo and was told "Mars in
+      // Aries", which is where her natal Mars is. 2026-10-05.
+      transitPlanets: sky.planets,
+      transitRetro: retroFor(sky.planets, date, time),
       aspects: aspects.map((a) => ({
         natal: a.p1_name.replace(/^design:/, ""),
         side: a.p1_name.startsWith("design:") ? "design" : "personality",

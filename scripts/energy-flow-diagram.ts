@@ -7864,6 +7864,7 @@ if (DATA.client) {
         // panel still describing this one.
         window.__soloWheel = drawn[side];
         liveAstro.classList.toggle('on-design', side === 'design');
+        if (window.__evenWheelGlyphs) window.__evenWheelGlyphs(liveAstro);
         if (window.__markAstroPending) window.__markAstroPending();
         bPers.classList.toggle('on', side !== 'design');
         bDes.classList.toggle('on', side === 'design');
@@ -7954,6 +7955,11 @@ if (DATA.client) {
             return;
           }
           liveAstro.innerHTML = j.wheelSvg;
+          // The sky's own placements, so a hover over a transiting body is
+          // answered from the transit and not from the birth chart.
+          window.__transitSet = j.transitPlanets || null;
+          window.__transitRetro = j.transitRetro || null;
+          if (window.__evenWheelGlyphs) window.__evenWheelGlyphs(liveAstro);
           if (window.__markAstroPending) window.__markAstroPending();
           paintTransits(j.aspects || []);
           // UTC needs no label: the place field says UTC itself. A real place
@@ -8131,6 +8137,30 @@ if (DATA.client) {
        * height, which comes out even everywhere. A hair of stroke evens the
        * weight between the solid glyphs and the outlined ones.
        */
+      // The wheel's glyphs come from whichever font has them, and their ink
+      // heights are nothing like each other at one font-size: Venus reads huge
+      // beside Saturn, Uranus and Neptune. Kaycee, 2026-10-05: "Why is venus so
+      // giant and uranus, saturn and neptune are so small? Can we equalize the
+      // sizes?" Each is measured and scaled to the same ink height. They are
+      // centred on their ring, so resizing them does not walk them off it.
+      var evenWheelGlyphs = function (root) {
+        if (!root) return;
+        var cv = document.createElement('canvas');
+        var ctx = cv.getContext('2d');
+        if (!ctx) return;
+        var BASE = 40;
+        [].forEach.call(root.querySelectorAll('.pglyph'), function (t) {
+          var target = t.getAttribute('data-ring') === 'main' ? 15 : 13.5;
+          ctx.font = '400 ' + BASE + 'px ' + getComputedStyle(t).fontFamily;
+          var m = ctx.measureText(t.textContent || '');
+          var h = (m.actualBoundingBoxAscent || 0) + (m.actualBoundingBoxDescent || 0);
+          if (!h) return;
+          t.setAttribute('font-size',
+            Math.max(12, Math.min(30, BASE * target / h)).toFixed(1));
+        });
+      };
+      window.__evenWheelGlyphs = evenWheelGlyphs;
+
       var evenGlyphs = function (root) {
         var cv = document.createElement('canvas');
         var cx = cv.getContext('2d');
@@ -8326,10 +8356,21 @@ if (DATA.client) {
             (note.theme ? '<br><span style="opacity:.5">' + esc(note.element) +
               ' signs: ' + esc(note.theme.toLowerCase()) + '</span>' : '');
         } else {
-          var pl = byName(t.getAttribute('data-aplanet'), t.getAttribute('data-side'),
-            t.getAttribute('data-person'));
+          var isTr = t.getAttribute('data-side') === 'transit';
+          var pl = null;
+          if (isTr && window.__transitSet) {
+            var tset = window.__transitSet, tnm = t.getAttribute('data-aplanet');
+            for (var ti = 0; ti < tset.length; ti++) {
+              if (tset[ti].name === tnm) { pl = tset[ti]; break; }
+            }
+          }
+          if (!pl) {
+            isTr = false;
+            pl = byName(t.getAttribute('data-aplanet'), t.getAttribute('data-side'),
+              t.getAttribute('data-person'));
+          }
           if (!pl) { tip.hidden = true; return; }
-          var sideNm = t.getAttribute('data-side') === 'design' ? 'Design ' : '';
+          var sideNm = isTr ? 'Transit ' : (t.getAttribute('data-side') === 'design' ? 'Design ' : '');
           // The house a planet sits in is the Ascendant's answer, so on a chart
           // whose hour is a guess it is not the planet's to give. The sign and
           // the degree are, except for the Moon, which can cross a sign inside
@@ -8345,12 +8386,15 @@ if (DATA.client) {
               AST.moonSigns.map(function (m) { return esc(m.value); }).join(' or ') + '</span>';
           }
           var side2 = t.getAttribute('data-side') === 'design' ? 'design' : 'personality';
-          var cb = combustOf(pl.name, side2);
-          var dgY = dignityOf(pl.name, side2);
+          // Dignity and combustion are worked out for the chart's own sides, so
+          // they are not the transit's to borrow. Better silent than wrong.
+          var cb = isTr ? null : combustOf(pl.name, side2);
+          var dgY = isTr ? null : dignityOf(pl.name, side2);
           html = '<b>' + esc(sideNm + (pl.label || pretty(pl.name))) + ' in ' + esc(pl.sign) +
             ' ' + dg(pl.position) + '</b>' + moonNote +
             pill(pl.quality) + pill(pl.element) + housePill +
-            (retroOf(pl.name, side2) ? '<span class="pill">Retrograde</span>' : '') +
+            ((isTr ? (window.__transitRetro || {})[pl.name] === true : retroOf(pl.name, side2))
+              ? '<span class="pill">Retrograde</span>' : '') +
             (dgY ? '<span class="pill">' + (dgY === 'domicile' ? 'In domicile' : 'In detriment') + '</span>' : '') +
             (cb ? '<span class="pill house">Combust ' +
               (Math.round(cb.separation * 10) / 10) + '\u00b0</span>' : '') +

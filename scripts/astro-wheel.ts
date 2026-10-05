@@ -49,9 +49,15 @@ const CX = 360, CY = 360;
  *  longitudes: the Rave mandala and the zodiac are one circle, anchored at
  *  Gate 41 line 1 = 2 Aquarius = 302 degrees. */
 const R_GATE = 348, R_GATE_IN = 316;
-const R_OUT = 310, R_SIGN = 272, R_TICK = 262, R_PLANET = 244, R_HOUSE = 214, R_ASPECT = 168;
+/* Kaycee, 2026-10-05: "We're going to have to make the inner rings bigger to
+   allow for conjunctions." Conjunct bodies stagger inward, so the room they
+   need is radial: the planet ring starts further out, the steps are wider, and
+   the aspect circle moves in to make space for three levels of stagger on both
+   rings without either crossing it. */
+const R_OUT = 310, R_SIGN = 272, R_TICK = 262, R_PLANET = 250, R_HOUSE = 214, R_ASPECT = 150;
+const R_PLANET_STEP = 23, R_DESIGN_STEP = 21;
 /** Design planets sit just inside the personality ring, on the same zodiac. */
-const R_DESIGN = 200;
+const R_DESIGN = 194;
 /** A transit arrives over a chart, so it rides outside ALL of it: outside the
  *  gate ring, on clear paper. Set at 288 first, which is inside the coloured
  *  sign band (272-310), so the glyphs were drawn on top of a solid colour and
@@ -66,8 +72,10 @@ const R_OVERLAY_STEP = 14;
  *  retrograde... on the glyphs I mean." The provider sends no retrograde flag,
  *  so the caller works it out from our own ephemeris, the same source the
  *  placements rows already use. */
-const retroMark = (x: number, y: number, size: number, colour: string) =>
-  `<text class="rmark" x="${f(x + size * 0.5)}" y="${f(y + size * 0.16)}" ` +
+const retroMark = (x: number, y: number, size: number, colour: string,
+  planet: string, side: string, ring: string) =>
+  `<text class="rmark" data-aplanet="${planet}" data-side="${side}" data-ring="${ring}" ` +
+  `x="${f(x + size * 0.5)}" y="${f(y + size * 0.16)}" ` +
   `text-anchor="middle" font-size="${f(size * 0.55)}" fill="${colour}">\u211e</text>`;
 
 /**
@@ -395,9 +403,11 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
       placedO.push({ lon, ring });
       const [x, y] = pt(lon, asc, R_OVERLAY + ring * R_OVERLAY_STEP);
       s.push(`<text class="pglyph oside" data-aplanet="${p.name}" data-side="${outer.side}" ` +
-        `data-ring="outer" x="${f(x)}" y="${f(y + 7)}" text-anchor="middle" font-size="19" ` +
+        `data-ring="outer" x="${f(x)}" y="${f(y + 7)}" text-anchor="middle" dominant-baseline="central" font-size="19" ` +
         `fill="${outer.colour}">${GLYPH[p.name] ?? p.name.slice(0, 2)}</text>`);
-      if (transitRetro?.[p.name]) s.push(retroMark(x, y + 7, 19, outer.colour));
+      if (transitRetro?.[p.name]) {
+        s.push(retroMark(x, y + 7, 19, outer.colour, p.name, outer.side, "outer"));
+      }
     }
   }
 
@@ -417,16 +427,17 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
     while (placed.some((q) => q.ring === ring &&
       Math.abs(((lon - q.lon + 540) % 360) - 180) < 6)) ring++;
     placed.push({ lon, ring });
-    const [x, y] = pt(lon, asc, R_PLANET - ring * 21);
-    const [tx, ty] = pt(lon, asc, R_PLANET - ring * 21 - 13);
+    const [x, y] = pt(lon, asc, R_PLANET - ring * R_PLANET_STEP);
+    const [tx, ty] = pt(lon, asc, R_PLANET - ring * R_PLANET_STEP - 13);
     s.push(`<text class="pglyph ${mainSide === "design" ? "dside" : "pside"}" ` +
       `data-aplanet="${p.name}" data-side="${mainSide}" data-ring="main" x="${f(x)}" y="${f(y + 8)}" ` +
-      `text-anchor="middle" font-size="21" fill="${mainSide === "design" ? DESIGN : INK}">` +
+      `text-anchor="middle" dominant-baseline="central" font-size="21" fill="${mainSide === "design" ? DESIGN : INK}">` +
       `${GLYPH[p.name] ?? p.name.slice(0, 2)}</text>`);
     // Transit Only draws the sky as the chart's own ring, so the retrograde
     // mark belongs here too. A natal wheel passes nothing and is unchanged.
     if (mainIsTransit && transitRetro?.[p.name]) {
-      s.push(retroMark(x, y + 8, 21, mainSide === "design" ? DESIGN : INK));
+      s.push(retroMark(x, y + 8, 21, mainSide === "design" ? DESIGN : INK,
+        p.name, mainSide, "main"));
     }
     // The degree lives in the hover, not on the face. Twenty-six glyphs plus
     // twenty-six numbers is more ink than the wheel can carry, and the number is
@@ -482,16 +493,16 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
       // Outside the chart's own ring for a transit, inside it for a design.
       const base = overlayAs?.outside ? R_OVERLAY : R_DESIGN;
       const [x, y] = pt(lon, asc, overlayAs?.outside
-        ? base + ring * R_OVERLAY_STEP : base - ring * 19);
+        ? base + ring * R_OVERLAY_STEP : base - ring * R_DESIGN_STEP);
       const [tx, ty] = pt(lon, asc, base - ring * 20 - 12);
       const innerSide = overlayAs?.side ?? (mainSide === "design" ? "personality" : "design");
       const innerFill = overlayAs?.colour ?? (innerSide === "design" ? DESIGN : INK);
       if (overlayAs?.outside && transitRetro?.[p.name]) {
-        s.push(retroMark(x, y + 7, 19, innerFill));
+        s.push(retroMark(x, y + 7, 19, innerFill, p.name, innerSide, "inner"));
       }
       s.push(`<text class="pglyph ${innerSide === "design" ? "dside" : "pside"}" ` +
         `data-aplanet="${p.name}" data-side="${innerSide}" data-ring="inner" ` +
-        `x="${f(x)}" y="${f(y + 7)}" text-anchor="middle" font-size="19" ` +
+        `x="${f(x)}" y="${f(y + 7)}" text-anchor="middle" dominant-baseline="central" font-size="19" ` +
         `fill="${innerFill}">` +
         `${GLYPH[p.name] ?? p.name.slice(0, 2)}</text>`);
       // no degree label on the design ring: with 26 glyphs on two rings the
