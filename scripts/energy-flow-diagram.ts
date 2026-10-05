@@ -122,6 +122,8 @@ function variableRows(parts: { text: string; key?: string }[]) {
 import { loadLibraryNames } from "@/lib/hd/library-names";
 import { renderFullMandala } from "@/lib/render/mandala";
 import { getAstro, type AstroChart } from "@/lib/astro";
+import { enrichChart, crossAspects, SIGN_RULER, HOUSE_RULER, rulerLabel,
+  type ChartExtras } from "@/lib/astro-extras";
 import { HOUSES, HOUSES_INTRO } from "@/lib/hd/houses";
 import { renderWheel } from "./astro-wheel";
 import { getConnectionChart } from "@/lib/hd/relationship";
@@ -924,6 +926,9 @@ const CENTER_FROM_API: Record<CenterName, Center> = {
 interface ClientCtx {
   /** the raw design instant, for reading the design side's astrology */
   designUtc: string;
+  /** the birth instant, for anything read at the moment itself: retrograde,
+   *  and so the two sides are each measured at their own moment */
+  birthUtc: string;
   slug: string;
   name: string;
   svg: string;                  // their branded SVG, activations and all
@@ -1197,6 +1202,7 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
     },
       /** the raw design instant, for reading the design side's astrology */
       designUtc: chart.birth.designUtcDate,
+      birthUtc: chart.birth.utcDate,
     channels: settledChannels,
     centers: settledCenters,
     gates,
@@ -2353,6 +2359,11 @@ interface SceneData {
   astro?: AstroChart;
   /** the design side, read at the design instant */
   astroDesign?: AstroChart;
+  /** what the provider does not send: Earth, retrograde, combustion, dignity,
+   *  unaspected bodies and the derivable house systems, per side, plus the
+   *  aspects between the two charts. */
+  astroExtras?: { personality: ChartExtras; design: ChartExtras | null;
+    synastry: ReturnType<typeof crossAspects> };
   client?: ClientCtx;                       // set when rendering a real chart
   inner: Record<string, string>;            // skin id -> neutralized bodygraph markup
   plain?: string;                           // the chart as the design draws it
@@ -3118,6 +3129,14 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
     centerGates: CENTER_GATES,
     centerRows: (Object.keys(CENTER_GATES) as Center[]).map((k) => ({ key: k, label: CENTER_LABEL[k] })),
     astro: d.astro ? { ...d.astro, design: d.astroDesign ?? null } : null,
+    astroExtras: d.astroExtras ?? null,
+    // Kaycee's rulership table, 2026-10-05, modern with the traditional ruler
+    // in parentheses. Sent rather than repeated inside the page script, so
+    // there is one copy of it and lib/astro-extras.ts is where it lives.
+    astroRulers: {
+      sign: Object.fromEntries(Object.entries(SIGN_RULER).map(([k, v]) => [k, rulerLabel(v)])),
+      house: Object.fromEntries(Object.entries(HOUSE_RULER).map(([k, v]) => [k, rulerLabel(v)])),
+    },
     read: d.read ?? null,
     cycles: d.client ? mergedCycles(d) : [],
     client: d.client
@@ -4000,20 +4019,27 @@ body:not(.astro-all) .astro .asp.extra { display:none; }
 .astro line.hov-cusp { stroke:#f1c232 !important; stroke-width:2.4 !important; opacity:1 !important; }
 /* per-planet toggles for the wheel, keyed on the astronomical name because the
    chart and the astrology endpoint name the nodes differently */
-body.off-ap-Sun .astro [data-aplanet="Sun"] { display:none; }
-body.off-ap-Moon .astro [data-aplanet="Moon"] { display:none; }
-body.off-ap-Mercury .astro [data-aplanet="Mercury"] { display:none; }
-body.off-ap-Venus .astro [data-aplanet="Venus"] { display:none; }
-body.off-ap-Mars .astro [data-aplanet="Mars"] { display:none; }
-body.off-ap-Jupiter .astro [data-aplanet="Jupiter"] { display:none; }
-body.off-ap-Saturn .astro [data-aplanet="Saturn"] { display:none; }
-body.off-ap-Uranus .astro [data-aplanet="Uranus"] { display:none; }
-body.off-ap-Neptune .astro [data-aplanet="Neptune"] { display:none; }
-body.off-ap-Pluto .astro [data-aplanet="Pluto"] { display:none; }
-body.off-ap-True_Node .astro [data-aplanet="True_Node"] { display:none; }
-body.off-ap-Mean_Node .astro [data-aplanet="Mean_Node"] { display:none; }
-body.off-ap-Chiron .astro [data-aplanet="Chiron"] { display:none; }
-body.off-ap-Mean_Lilith .astro [data-aplanet="Mean_Lilith"] { display:none; }
+/* One set of planet toggles for the whole chart. The astrology view used to
+   carry its own grid in the Placements section, so a planet switched off on
+   the bodygraph was still on the wheel. Kaycee, 2026-10-05: "Remove the
+   individual planet radio buttons, this functionality needs to be built into
+   the show section." These map the Show section's ids onto the provider's
+   own names for the same bodies. */
+body.off-p-sun .astro [data-aplanet="Sun"] { display:none; }
+body.off-p-earth .astro [data-aplanet="Earth"] { display:none; }
+body.off-p-moon .astro [data-aplanet="Moon"] { display:none; }
+body.off-p-mercury .astro [data-aplanet="Mercury"] { display:none; }
+body.off-p-venus .astro [data-aplanet="Venus"] { display:none; }
+body.off-p-mars .astro [data-aplanet="Mars"] { display:none; }
+body.off-p-jupiter .astro [data-aplanet="Jupiter"] { display:none; }
+body.off-p-saturn .astro [data-aplanet="Saturn"] { display:none; }
+body.off-p-uranus .astro [data-aplanet="Uranus"] { display:none; }
+body.off-p-neptune .astro [data-aplanet="Neptune"] { display:none; }
+body.off-p-pluto .astro [data-aplanet="Pluto"] { display:none; }
+body.off-p-north-node .astro [data-aplanet="True_Node"] { display:none; }
+body.off-p-south-node .astro [data-aplanet="Mean_Node"] { display:none; }
+body.off-p-chiron .astro [data-aplanet="Chiron"] { display:none; }
+body.off-p-lilith .astro [data-aplanet="Mean_Lilith"] { display:none; }
 .astro text.hov-band { fill:#845095 !important; opacity:1 !important; }
 #astrohome .pl-row { cursor:default; border-radius:5px; margin:0 -5px; padding:0 5px; }
 #astrohome .pl-row:hover { background:rgba(241,194,50,.16); }
@@ -4024,6 +4050,36 @@ body:not(.astro-all) #astroaspects .line.extra { display:none; }
 .astro.on-design .pglyph.pside { fill:#e06666; }
 .astro.on-design .spoke { stroke:#e06666; }
 body:not(.mod-self) #astrosiderow { display:none; }
+/* Kaycee's list, 2026-10-05. The marks that ride beside a coordinate: her
+   subscript capital R for retrograde, a C for combustion, and dignity as a
+   word because a glyph would collide with the bodygraph's filled and open. */
+.retro { font-size:8.5px; font-weight:700; vertical-align:sub; margin-left:2px; opacity:.75; }
+.cbst { display:inline-block; margin-left:3px; font-size:8.5px; font-weight:700; line-height:1;
+  padding:1px 3px; border-radius:3px; background:rgba(241,194,50,.3); color:#7a5c07; cursor:help; }
+.dgn { display:inline-block; margin-left:3px; font-size:8px; letter-spacing:.04em; line-height:1;
+  padding:1px 3px; border-radius:3px; text-transform:uppercase; }
+.dgn.domicile { background:rgba(132,80,149,.16); color:#845095; }
+.dgn.detriment { background:rgba(132,80,149,.07); color:var(--muted); }
+.rul { font-style:normal; opacity:.5; font-size:10px; }
+/* On a synastry row the second body belongs to the design side, in the red
+   the bodygraph and the wheel already use for it. */
+.dsidenm { color:#e06666; font-weight:600; }
+/* Variables belongs to the Human Design views. Kaycee, 2026-10-05: remove it
+   from the astrology home page, but it "still needs to be viewable for the
+   human design modules". */
+body.view-astro #vardrop { display:none; }
+/* A section inside a section, all of them closed until asked for. */
+.drop.sub { margin:4px 0 0; }
+.drop.sub > summary { font-size:10.5px; letter-spacing:.08em; text-transform:uppercase;
+  opacity:.72; padding:3px 0; }
+.drop.sub > summary b { font-weight:600; opacity:.6; }
+.line.none span { opacity:.4; }
+#astrohouses .rul, #astrometa .rul { margin-left:6px; }
+/* Both sides of a placement on one line. */
+#astroplanets .aptbl { grid-template-columns:auto 1fr auto; }
+#astroplanets .aptbl .hn { opacity:.45; text-align:right; }
+#astroplanets .aptbl .vl { white-space:nowrap; }
+body.hs-other #astrohouses::before { content:''; }
 /* this view's home tab is astrology, not Human Design */
 #astrohome { display:none; }
 body.view-astro #astrohome { display:block; }
@@ -4294,16 +4350,28 @@ ${d.client ? "" : viewControls}
 
 
     <div id="astrohome">
-      <div class="row" id="astrosiderow" hidden><button id="asPers" class="on">Personality</button><button id="asDes">Design</button></div>
+      <div class="row" id="astrosiderow" hidden><button id="asPers" class="on">Personality</button><button id="asDes">Design</button><button id="asSyn">Synastry</button></div>
+      <div class="row" id="astrotransitrow" hidden><button id="asTransit">Transit</button><button id="asTransitOnly">Transit Only</button></div>
       <div id="astrometa"></div>
-      <div class="row" id="asprow"><button id="aspAll">Show Every Aspect</button></div>
-      <details class="drop" open><summary>Placements</summary>
+      <div class="row" id="astrohsrow" hidden>
+        <select id="astroHouseSystem">
+          <option value="placidus">Placidus</option>
+          <option value="whole">Whole Sign</option>
+          <option value="equal">Equal</option>
+          <option value="porphyry">Porphyry</option>
+        </select>
+      </div>
+      <details class="drop" id="apdrop"><summary>Placements</summary>
         <div id="astroplanets"></div>
-        <div class="pgrid" id="astroplanetbx"></div>
-        <div class="row"><button id="apAll">All</button><button id="apNone">None</button></div>
       </details>
-      <details class="drop"><summary>Houses</summary><div id="astrohouses"></div></details>
-      <details class="drop"><summary>Aspects</summary><div id="astroaspects"></div></details>
+      <details class="drop"><summary>Houses</summary>
+        <div id="astrohouses"></div>
+      </details>
+      <details class="drop"><summary>Mode</summary><div id="astromode"></div></details>
+      <details class="drop"><summary>Aspects</summary>
+        <div class="row" id="asprow"><button id="aspAll">Show Every Aspect</button></div>
+        <div id="astroaspects"></div>
+      </details>
     </div>
 
     <div class="datesec" id="datesec">
@@ -6959,6 +7027,81 @@ if (DATA.client) {
       return null;
     };
     var sun = byName('Sun'), moon = byName('Moon');
+
+    // Which side the panel is describing, and the facts the provider does not
+    // send for it. Kaycee's list, 2026-10-05.
+    var EX = DATA.astroExtras || null;
+    var curSide = 'personality';
+    var extras = function (side) {
+      if (!EX) return null;
+      return (side || curSide) === 'design' ? EX.design : EX.personality;
+    };
+    var RULER = (DATA.astroRulers || { sign: {}, house: {} });
+    var houseSystem = 'placidus';
+
+    // Earth is a Human Design placement with its own gate, line, colour, tone
+    // and base, so its coordinate is read from that data rather than taken as
+    // the Sun's opposite. It sits where Ra puts it, straight after the Sun.
+    var planetsOf = function (side) {
+      var src = (side || curSide) === 'design' ? (A.design || A) : A;
+      return (src.planets || []);
+    };
+
+    // The house a placement falls in, under whichever system is chosen. Whole
+    // Sign, Equal and Porphyry are arithmetic on an Ascendant already in hand,
+    // so they switch on a page that has already been built; Placidus is the
+    // provider's own answer and is left exactly as it came.
+    var cuspsNow = function (side) {
+      var x = extras(side);
+      if (!x || houseSystem === 'placidus') return null;
+      return x.cusps[houseSystem] || null;
+    };
+    var houseNumber = function (pl, side) {
+      var c = cuspsNow(side);
+      if (!c) return HOUSE_N[pl.house] || '';
+      var norm = function (d) { return ((d % 360) + 360) % 360; };
+      for (var i = 0; i < 12; i++) {
+        var span = norm(c[(i + 1) % 12] - c[i]);
+        if (norm(pl.abs_pos - c[i]) < span) return i + 1;
+      }
+      return 1;
+    };
+
+    var retroOf = function (name, side) {
+      var x = extras(side);
+      return !!(x && x.retrograde && x.retrograde[name] === true);
+    };
+    var combustOf = function (name, side) {
+      var x = extras(side);
+      if (!x) return null;
+      var hit = (x.combust || []).filter(function (c) { return c.planet === name && c.combust; })[0];
+      return hit || null;
+    };
+    var dignityOf = function (name, side) {
+      var x = extras(side);
+      return (x && x.dignity && x.dignity[name]) || '';
+    };
+    /** The small subscript capital R Kaycee asked for, 2026-10-05. */
+    var retroMark = function (name, side) {
+      return retroOf(name, side) ? '<sub class="retro">R</sub>' : '';
+    };
+    var marks = function (name, side) {
+      var out = retroMark(name, side);
+      var c = combustOf(name, side);
+      if (c) out += '<span class="cbst" data-cbst="' + esc(String(Math.round(c.separation * 100) / 100)) +
+        '|' + esc(String(c.limit)) + '">C</span>';
+      // A glyph here would collide with the bodygraph's own filled and open
+      // vocabulary, so dignity is a word, short enough to sit in the row.
+      var d = dignityOf(name, side);
+      if (d) out += '<span class="dgn ' + esc(d) + '">' + (d === 'domicile' ? 'dom' : 'det') + '</span>';
+      return out;
+    };
+
+    /** A collapsed section inside a section. Both sides, each closed. */
+    var sub = function (label, inner) {
+      return '<details class="drop sub"><summary>' + label + '</summary>' + inner + '</details>';
+    };
+
     var paintAstroMeta = function () {
     // Read again on every paint: the view can switch to the design chart, and
     // the Sun and Moon of that chart are different placements entirely.
@@ -6992,13 +7135,23 @@ if (DATA.client) {
         '</div>';
       return;
     }
+    // All four angles, not two. Kaycee, 2026-10-05: "Add IC and Descendant."
+    // The Descendant and IC are the exact opposites of the Ascendant and
+    // Midheaven, so they are read from them rather than asked for.
+    var angleRow = function (mark, label, deg) {
+      var d = ((deg % 360) + 360) % 360;
+      var sgn = ZSIGN[Math.floor(d / 30) % 12];
+      return '<div class="line pl-row" data-angrow="' + mark + '"><span>' + label + '</span> ' +
+        sgn + ' ' + dg(d % 30) +
+        (RULER.sign[sgn] ? '<i class="rul">' + esc(RULER.sign[sgn]) + '</i>' : '') + '</div>';
+    };
     document.getElementById('astrometa').innerHTML =
       (sun ? '<div class="line pl-row" data-prow="Sun"><span>Sun</span> ' + sun.sign + ' ' + dg(sun.position) + '</div>' : '') +
       (moon ? '<div class="line pl-row" data-prow="Moon"><span>Moon</span> ' + moon.sign + ' ' + dg(moon.position) + '</div>' : '') +
-      '<div class="line pl-row" data-angrow="As"><span>Ascendant</span> ' + ZSIGN[Math.floor(A.ascendant / 30) % 12] +
-      ' ' + dg(A.ascendant % 30) + '</div>' +
-      '<div class="line pl-row" data-angrow="Mc"><span>Midheaven</span> ' + ZSIGN[Math.floor(A.mc / 30) % 12] +
-      ' ' + dg(A.mc % 30) + '</div>';
+      angleRow('As', 'Ascendant', A.ascendant) +
+      angleRow('Ds', 'Descendant', A.ascendant + 180) +
+      angleRow('Mc', 'Midheaven', A.mc) +
+      angleRow('Ic', 'Imum Coeli', A.mc + 180);
     };
     window.__paintAstroMeta = paintAstroMeta;
     paintAstroMeta();
@@ -7027,11 +7180,29 @@ if (DATA.client) {
             (q ? esc(q.sign) + ' ' + dg(q.position) : '\u2014') + '</div>';
         }).join('') + '</div>';
     } else {
-      document.getElementById('astroplanets').innerHTML = A.planets.map(function (p) {
-        return '<div class="line pl-row" data-prow="' + esc(p.name) + '"><i>' +
-          esc(p.label || pretty(p.name)) + '</i><span>' + esc(p.sign) +
-          ' ' + dg(p.position) + '</span><i>' + (HOUSE_N[p.house] || '') + '</i></div>';
-      }).join('');
+      // Kaycee, 2026-10-05: "if they can be on the same table without looking
+      // crowded then put them on one table, if they look crowded put them in
+      // two tables in sub-toggles, I'm worried that the house number will make
+      // it too crowded."
+      //
+      // Built both ways and measured at the panel's real width. One table
+      // overflowed at 315 pixels against 272 available, and the design column
+      // clipped, exactly the worry she named. So it is two, each side in its
+      // own sub-toggle, with the coordinate and the house as columns inside.
+      var sideRows = function (side) {
+        return '<div class="ptbl aptbl">' +
+          planetsOf(side).map(function (p) {
+            var pr = ' data-prow="' + esc(p.name) + '"';
+            return '<div class="lb"' + pr + '>' + esc(p.label || pretty(p.name)) + '</div>' +
+              '<div class="vl"' + pr + ' data-side="' + side + '">' + esc(p.sign) + ' ' +
+              dg(p.position) + marks(p.name, side) + '</div>' +
+              '<div class="vl hn"' + pr + '>' + houseNumber(p, side) + '</div>';
+          }).join('') + '</div>';
+      };
+      var hasDes = !!(EX && EX.design && A.design);
+      document.getElementById('astroplanets').innerHTML = hasDes
+        ? sub('Personality', sideRows('personality')) + sub('Design', sideRows('design'))
+        : sideRows('personality');
     }
     };
     window.__paintAstroRows = paintAstroRows;
@@ -7085,28 +7256,6 @@ if (DATA.client) {
         lightSign(nm, 'personality', who);
       });
       rowsEl.addEventListener('mouseleave', clearHover);
-
-      // Per-planet toggles for the wheel, the same idea as the bodygraph's.
-      var bxWrap = document.getElementById('astroplanetbx');
-      if (bxWrap) {
-        bxWrap.innerHTML = (A.planets || []).map(function (p) {
-          return '<label class="cc"><input type="checkbox" class="apbx" data-ap="' +
-            esc(p.name) + '" checked>' + esc(p.label || pretty(p.name)) + '</label>';
-        }).join('');
-        var applyAp = function () {
-          [].forEach.call(document.querySelectorAll('.apbx'), function (b) {
-            body.classList.toggle('off-ap-' + b.getAttribute('data-ap'), !b.checked);
-          });
-        };
-        bxWrap.addEventListener('change', applyAp);
-        var setAllAp = function (on) {
-          [].forEach.call(document.querySelectorAll('.apbx'), function (b) { b.checked = on; });
-          applyAp();
-        };
-        var aA = document.getElementById('apAll'), aN = document.getElementById('apNone');
-        if (aA) aA.onclick = function () { setAllAp(true); };
-        if (aN) aN.onclick = function () { setAllAp(false); };
-      }
 
       // the four summary lines at the top: Sun, Moon, Ascendant, Midheaven
       var metaRows = document.getElementById('astrometa');
@@ -7195,14 +7344,65 @@ if (DATA.client) {
       }
     }
 
-    var paintHouses = function () {
-      document.getElementById('astrohouses').innerHTML = (A.houses || []).map(function (h, i) {
+    var houseRowsFor = function (side) {
+      var src = side === 'design' ? (A.design || null) : A;
+      if (!src) return '';
+      var c = cuspsNow(side);
+      var list = c
+        ? c.map(function (lon) {
+            var d = ((lon % 360) + 360) % 360;
+            return { sign: ZSIGN[Math.floor(d / 30) % 12], position: d % 30 };
+          })
+        : (src.houses || []);
+      return list.map(function (h, i) {
+        var r = RULER.sign[h.sign] || '';
         return '<div class="line pl-row" data-hrow="' + (i + 1) + '"><i>House ' + (i + 1) +
-          '</i><span>' + esc(h.sign) + ' ' + dg(h.position) + '</span><i></i></div>';
+          '</i><span>' + esc(h.sign) + ' ' + dg(h.position) + '</span><i class="rul">' + esc(r) + '</i></div>';
       }).join('');
+    };
+
+    var paintHouses = function () {
+      var box = document.getElementById('astrohouses');
+      if (!box) return;
+      var hasDesign = !!(EX && EX.design && A.design);
+      box.innerHTML = hasDesign
+        ? sub('Personality', houseRowsFor('personality')) + sub('Design', houseRowsFor('design'))
+        : houseRowsFor('personality');
     };
     window.__paintAstroHouses = paintHouses;
     paintHouses();
+
+    // Mode. Kaycee, 2026-10-05: Variables comes off this page and the
+    // placements are grouped by modality instead, every mode listed even when
+    // it is empty, so a chart with nothing cardinal says so rather than hiding
+    // the fact.
+    var MODES = ['Cardinal', 'Fixed', 'Mutable'];
+    var paintMode = function () {
+      var box = document.getElementById('astromode');
+      if (!box) return;
+      var sides = EX && EX.design && A.design
+        ? [['Personality', 'personality'], ['Design', 'design']]
+        : [['', 'personality']];
+      box.innerHTML = MODES.map(function (m) {
+        var inner = sides.map(function (pair) {
+          var rows = planetsOf(pair[1]).filter(function (p) { return p.quality === m; });
+          var body = rows.length
+            ? rows.map(function (p) {
+                return '<div class="line pl-row" data-prow="' + esc(p.name) + '"><i>' +
+                  esc(p.label || pretty(p.name)) + '</i><span>' + esc(p.sign) + ' ' + dg(p.position) +
+                  marks(p.name, pair[1]) + '</span><i></i></div>';
+              }).join('')
+            : '<div class="line none"><i></i><span>0</span><i></i></div>';
+          return pair[0] ? '<div class="relsub">' + pair[0] + '</div>' + body : body;
+        }).join('');
+        var n = sides.reduce(function (t, pair) {
+          return t + planetsOf(pair[1]).filter(function (p) { return p.quality === m; }).length;
+        }, 0);
+        return sub(m + ' <b>' + n + '</b>', inner);
+      }).join('');
+    };
+    window.__paintAstroMode = paintMode;
+    paintMode();
 
     // Both people's aspects when there are two, each under their own name, the
     // same sets the wheel draws.
@@ -7223,15 +7423,67 @@ if (DATA.client) {
             (Math.round(Math.abs(x.orbit) * 10) / 10) + '\u00b0</i></div>';
         }).join('');
       };
+      var KINDS = ['conjunction', 'opposition', 'square', 'trine', 'sextile'];
+      var cap = function (w) { return w.charAt(0).toUpperCase() + w.slice(1); };
       var C = (body.classList.contains('mod-relation') && DATA.connection
         && DATA.connection.astro) ? DATA.connection : null;
       var box = document.getElementById('astroaspects');
-      if (!C) { box.innerHTML = one(A.aspects, null); return; }
+      if (C) {
+        box.innerHTML =
+          '<div class="relsub" style="color:#845095">' + esc(C.a.name) + '</div>' +
+          one(A.aspects, '#845095') +
+          '<div class="relsub" style="color:#0d9488">' + esc(C.b.name) + '</div>' +
+          one(C.astro.aspects, '#0d9488');
+        return;
+      }
+      // One sub-toggle per kind, so the list reads as five short lists rather
+      // than one long one, and the bodies touching nothing at all get a
+      // section of their own. Kaycee, 2026-10-05.
+      var all = (A.aspects || []);
+      var named = {};
+      KINDS.forEach(function (k) { named[k] = 1; });
+      var rest = all.filter(function (x) { return !named[x.aspect]; });
+      var x = extras();
+      var lone = (x && x.unaspected) || [];
+      // With synastry on, the list is the aspects between the two sides, which
+      // is the only thing on this page the provider does not supply.
+      if (body.classList.contains('astro-syn') && EX && EX.synastry) {
+        var syn = EX.synastry;
+        box.innerHTML = KINDS.map(function (k) {
+          var list = syn.filter(function (a) { return a.aspect === k; });
+          return sub(cap(k) + ' <b>' + list.length + '</b>',
+            list.length
+              ? list.map(function (a) {
+                  // The first body is the personality's, the second the
+                  // design's. The design one is written in the design red
+                  // rather than labelled, which is the colour the whole chart
+                  // already uses for that side and costs no extra words.
+                  var MINORP = { Chiron: 1, Mean_Lilith: 1, Mean_Node: 1, True_Node: 1 };
+                  var core = !MINORP[a.p1_name] && !MINORP[a.p2_name] && Math.abs(a.orbit) <= 6;
+                  return '<div class="line pl-row ' + (core ? 'core' : 'extra') +
+                    '" data-arow="' + esc(a.p1_name) + '|' + esc(a.p2_name) + '">' +
+                    '<i>' + esc(labelOf(a.p1_name)) + '</i><span>' + esc(a.aspect) +
+                    ' <b class="dsidenm">' + esc(labelOf(a.p2_name)) + '</b></span><i>' +
+                    (Math.round(Math.abs(a.orbit) * 10) / 10) + '\u00b0</i></div>';
+                }).join('')
+              : '<div class="line none"><i></i><span>0</span><i></i></div>');
+        }).join('');
+        return;
+      }
       box.innerHTML =
-        '<div class="relsub" style="color:#845095">' + esc(C.a.name) + '</div>' +
-        one(A.aspects, '#845095') +
-        '<div class="relsub" style="color:#0d9488">' + esc(C.b.name) + '</div>' +
-        one(C.astro.aspects, '#0d9488');
+        KINDS.map(function (k) {
+          var list = all.filter(function (a) { return a.aspect === k; });
+          return sub(cap(k) + ' <b>' + list.length + '</b>',
+            list.length ? one(list, null) : '<div class="line none"><i></i><span>0</span><i></i></div>');
+        }).join('') +
+        (rest.length ? sub('Other <b>' + rest.length + '</b>', one(rest, null)) : '') +
+        sub('Unaspected <b>' + lone.length + '</b>',
+          lone.length
+            ? lone.map(function (n) {
+                return '<div class="line pl-row" data-prow="' + esc(n) + '"><i>' +
+                  esc(labelOf(n)) + '</i><span></span><i></i></div>';
+              }).join('')
+            : '<div class="line none"><i></i><span>0</span><i></i></div>');
     };
     window.__paintAspects = paintAspects;
     paintAspects();
@@ -7246,13 +7498,24 @@ if (DATA.client) {
     var designTpl = document.getElementById('aswheel-design');
     var liveAstro = document.querySelector('.astro');
     if (sideRow && liveAstro && designTpl && DES && DES.houses && DES.houses.length) {
-      var drawn = { personality: liveAstro.innerHTML, design: designTpl.innerHTML };
+      var tplOf = function (id) {
+        var t = document.getElementById(id);
+        return t ? t.innerHTML : '';
+      };
+      var drawn = {
+        personality: liveAstro.innerHTML, design: designTpl.innerHTML,
+        'personality-syn': tplOf('aswheel-personality-syn'),
+        'design-syn': tplOf('aswheel-design-syn'),
+      };
+      var synOn = false;
       var bPers = document.getElementById('asPers');
       var bDes = document.getElementById('asDes');
+      var bSyn = document.getElementById('asSyn');
       var showSide = function (side) {
         if (!drawn[side]) return;
+        curSide = side;
         A = side === 'design' ? DES : PERS;
-        liveAstro.innerHTML = drawn[side];
+        liveAstro.innerHTML = synOn && drawn[side + '-syn'] ? drawn[side + '-syn'] : drawn[side];
         // setModule stashes the solo wheel when the pair takes the stage and
         // puts it back afterwards. Keep it pointing at the side she chose, or
         // coming back from a connection would restore the other chart under a
@@ -7262,12 +7525,40 @@ if (DATA.client) {
         if (window.__markAstroPending) window.__markAstroPending();
         bPers.classList.toggle('on', side !== 'design');
         bDes.classList.toggle('on', side === 'design');
-        paintAstroMeta(); paintAstroRows(); paintHouses(); paintAspects();
+        paintAstroMeta(); paintAstroRows(); paintHouses(); paintMode(); paintAspects();
       };
       bPers.addEventListener('click', function () { showSide('personality'); });
       bDes.addEventListener('click', function () { showSide('design'); });
+      // Synastry rides on whichever side is up, so it reads from the
+      // personality's horizon or the design's, which is the "and vice versa".
+      if (bSyn && drawn['personality-syn']) {
+        bSyn.addEventListener('click', function () {
+          synOn = !synOn;
+          bSyn.classList.toggle('on', synOn);
+          body.classList.toggle('astro-syn', synOn);
+          showSide(curSide);
+        });
+      } else if (bSyn) {
+        bSyn.hidden = true;
+      }
       window.__astroSide = showSide;
       sideRow.hidden = false;
+    }
+
+    // Placidus is what the provider returns and what the wheel is drawn from.
+    // Whole Sign, Equal and Porphyry are arithmetic on an Ascendant already in
+    // hand, so they change the numbers in the panel on a page that has already
+    // been built. The drawn house ring stays Placidus and says so, rather than
+    // showing one system and listing another.
+    var hsRow = document.getElementById('astrohsrow');
+    var hsSel = document.getElementById('astroHouseSystem');
+    if (hsRow && hsSel && EX) {
+      hsRow.hidden = false;
+      hsSel.addEventListener('change', function () {
+        houseSystem = hsSel.value;
+        body.classList.toggle('hs-other', houseSystem !== 'placidus');
+        paintAstroRows(); paintHouses();
+      });
     }
 
     // Hovering the wheel. Element and modality belong to the sign itself, so
@@ -7287,6 +7578,7 @@ if (DATA.client) {
           if (!hh) { tip.hidden = true; return; }
           showTip(e, '<b>' + esc(hh.name) + '</b>' +
             '<span class="pill house">' + esc(hh.group) + '</span>' +
+            (RULER.house[hn] ? '<span class="pill">Ruled by ' + esc(RULER.house[hn]) + '</span>' : '') +
             (t.classList.contains('pending')
               ? '<span style="color:#845095">Exact Birth Time Required</span>'
               : '') +
@@ -7298,7 +7590,15 @@ if (DATA.client) {
           e.stopPropagation();
           var aa = (DATA.angles || {})[an];
           if (!aa) { tip.hidden = true; return; }
-          showTip(e, '<b>' + esc(aa[0]) + '</b>' +
+          // Kaycee, 2026-10-05: "Angles: Include coordinate, sign and
+          // planetary ruler." All four are read off the Ascendant and the
+          // Midheaven, which the chart already holds.
+          var adeg = an === 'As' ? A.ascendant : an === 'Ds' ? A.ascendant + 180
+            : an === 'Mc' ? A.mc : A.mc + 180;
+          adeg = ((adeg % 360) + 360) % 360;
+          var asgn = ZSIGN[Math.floor(adeg / 30) % 12];
+          showTip(e, '<b>' + esc(aa[0]) + ' ' + esc(asgn) + ' ' + dg(adeg % 30) + '</b>' +
+            (RULER.sign[asgn] ? '<span class="pill">Ruled by ' + esc(RULER.sign[asgn]) + '</span>' : '') +
             (t.classList.contains('pending')
               ? '<span style="color:#845095">Exact Birth Time Required</span>'
               : '') +
@@ -7318,6 +7618,7 @@ if (DATA.client) {
           var note = (A.signs || {})[nm] || {};
           html = '<b>' + esc(nm) + (note.symbol ? ' &middot; ' + esc(note.symbol) : '') + '</b>' +
             pill(note.quality) + pill(note.element) +
+            (RULER.sign[nm] ? '<span class="pill">Ruled by ' + esc(RULER.sign[nm]) + '</span>' : '') +
             (note.blurb ? '<br><span style="opacity:.78">' + esc(note.blurb) + '</span>' : '') +
             (note.theme ? '<br><span style="opacity:.5">' + esc(note.element) +
               ' signs: ' + esc(note.theme.toLowerCase()) + '</span>' : '');
@@ -7340,9 +7641,16 @@ if (DATA.client) {
             moonNote = '<span style="color:#845095">Could be ' +
               AST.moonSigns.map(function (m) { return esc(m.value); }).join(' or ') + '</span>';
           }
+          var side2 = t.getAttribute('data-side') === 'design' ? 'design' : 'personality';
+          var cb = combustOf(pl.name, side2);
+          var dgY = dignityOf(pl.name, side2);
           html = '<b>' + esc(sideNm + (pl.label || pretty(pl.name))) + ' in ' + esc(pl.sign) +
             ' ' + dg(pl.position) + '</b>' + moonNote +
             pill(pl.quality) + pill(pl.element) + housePill +
+            (retroOf(pl.name, side2) ? '<span class="pill">Retrograde</span>' : '') +
+            (dgY ? '<span class="pill">' + (dgY === 'domicile' ? 'In domicile' : 'In detriment') + '</span>' : '') +
+            (cb ? '<span class="pill house">Combust ' +
+              (Math.round(cb.separation * 10) / 10) + '\u00b0</span>' : '') +
             (planetBasic(pl.label || pretty(pl.name)) ? '<br><span style="opacity:.72">' +
               esc(planetBasic(pl.label || pretty(pl.name))) + '</span>' : '');
         }
@@ -9628,22 +9936,60 @@ export async function runBuilder(argv: string[] = process.argv.slice(2)): Promis
   // It ships inert in a template and is swapped into the live container on
   // request. Every listener in the astrology view is bound to that container
   // rather than to the glyphs inside it, so a swap costs nothing to rewire.
+  if (astroChart) scene.astro = astroChart;
+  if (astroDesign) scene.astroDesign = astroDesign;
+
+  // Everything the provider does not send. Earth comes from the Human Design
+  // data, where it is a placement in its own right with gate, line, colour,
+  // tone and base, so its longitude is read rather than inferred from the Sun.
+  if (astroChart && client) {
+    const earthLon = (side: "personality" | "design"): number | null => {
+      const e = client.acts.find((a) => a.side === side && a.planet === "Earth");
+      return e ? longitudeOf(e.gate, e.line, e.color, e.tone, e.base) : null;
+    };
+    const birthWhen = new Date(client.birthUtc);
+    scene.astroExtras = {
+      personality: enrichChart(astroChart, birthWhen, earthLon("personality")),
+      design: astroDesign
+        ? enrichChart(astroDesign, new Date(client.designUtc), earthLon("design"))
+        : null,
+      synastry: astroDesign ? crossAspects(astroChart.planets, astroDesign.planets) : [],
+    };
+    // Earth joins the chart's own body list, right after the Sun where Ra puts
+    // it, so the wheel draws it, the hover finds it and the Show toggles reach
+    // it without any of them learning about a special case.
+    const withEarth = (chart: AstroChart, extra: ChartExtras | null) => {
+      if (!extra?.earth) return;
+      const at = chart.planets.findIndex((q) => q.name === "Sun");
+      chart.planets.splice(at < 0 ? chart.planets.length : at + 1,
+        0, extra.earth as unknown as AstroChart["planets"][number]);
+    };
+    withEarth(astroChart, scene.astroExtras.personality);
+    if (astroDesign) withEarth(astroDesign, scene.astroExtras.design);
+  }
+
   const gateRings = client
     ? [[...new Set(client.acts.map((a) => a.gate))],
        [...new Set(client.acts.filter((a) => a.side === "personality").map((a) => a.gate))],
        [...new Set(client.acts.filter((a) => a.side === "design").map((a) => a.gate))]] as const
     : [[], [], []] as const;
+  const cross = scene.astroExtras?.synastry ?? [];
   const astroHtml = astroChart
     ? `<div class="astro">${renderWheel(astroChart, client!.name, astroDesign, "ascendant",
         gateRings[0], gateRings[1], gateRings[2])}</div>` +
       (astroDesign
         ? `<template id="aswheel-design">${renderWheel(astroDesign, client!.name, null, "ascendant",
-            gateRings[0], gateRings[1], gateRings[2])}</template>`
+            gateRings[0], gateRings[1], gateRings[2])}</template>` +
+          // The same two wheels with the aspects between the sides drawn on
+          // them, which is what a synastry of one person is. Each side keeps
+          // its own horizon, so reading it from the design is a different
+          // chart rather than the same picture relabelled.
+          `<template id="aswheel-personality-syn">${renderWheel(astroChart, client!.name, astroDesign,
+            "ascendant", gateRings[0], gateRings[1], gateRings[2], null, undefined, null, cross)}</template>` +
+          `<template id="aswheel-design-syn">${renderWheel(astroDesign, client!.name, astroChart,
+            "ascendant", gateRings[0], gateRings[1], gateRings[2], null, undefined, null, cross)}</template>`
         : "")
     : "";
-  if (astroChart) scene.astro = astroChart;
-  if (astroDesign) scene.astroDesign = astroDesign;
-
   const htmlPath = join(outDir, `${stem}.html`);
   const canvases = [PAPER]
     .map((sk) => buildCanvas(sk, scene, { animate: true, legend: false }))

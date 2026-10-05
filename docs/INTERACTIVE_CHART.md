@@ -441,3 +441,59 @@ Same `runBuilder` as every other chart, so the missing-section guard applies: a
 chart that cannot draw leaves no row, no link and no half-made page. It does not
 replace `scripts/add-client.ts`, which takes a real client all the way through
 reports, folder and Notion row.
+
+### The astrology section, rebuilt to Kaycee's list (10-05)
+
+Her list, in full, and what each became.
+
+**The four angles.** Ascendant, Descendant, Midheaven and Imum Coeli, each with
+its sign, its coordinate and the ruler of that sign. The Descendant and IC are
+the exact opposites of the other two, so they are read rather than fetched.
+
+**Earth on the wheel.** Earth is a Human Design placement with its own gate,
+line, colour, tone and base, and the mandala and the zodiac are one circle, so
+its longitude is read from the HD data and converted exactly. It is not the
+Sun's opposite computed here, although that is what it always turns out to be.
+It joins the chart's own body list straight after the Sun, so the wheel draws
+it, the hover finds it and the Show toggles reach it with no special case. It
+is left out of the unaspected count, because its only aspect is definitional.
+
+**One set of planet toggles.** The astrology view used to carry its own grid, so
+a planet switched off on the bodygraph was still on the wheel. The grid is gone
+and the Show section drives both.
+
+**Placements, houses and mode.** Placements opens closed, with Personality and
+Design as sub-toggles, coordinate and house as columns inside. Built both ways
+first: one combined table overflowed at 315 pixels against 272 available and
+clipped the design column, which is the crowding Kaycee predicted. Houses the
+same shape. Mode replaces Variables on this page only, grouping every placement
+by modality with all three listed even when one is empty; Variables still
+appears in the Human Design views.
+
+**Aspects.** One sub-toggle per kind, counts on each, an Other group for the
+minor aspects the provider returns, and Unaspected for any body making no major
+aspect to another planet.
+
+**Rulerships, dignity, retrograde, combustion.** Her rulership table lives in
+`lib/astro-extras.ts`, modern with the traditional ruler in parentheses, and is
+sent to the page rather than copied into it. Houses carry their natural ruler,
+signs and angles the ruler of their sign. Dignity marks domicile and detriment
+only. Retrograde is computed here, since neither endpoint returns it, and shows
+as the small subscript R she asked for. Combustion uses the traditional Vedic
+limits she supplied, each side measured against its own Sun, with Mercury and
+Venus tightening when retrograde.
+
+**House systems.** Placidus is the provider's and what the ring is drawn from.
+Whole Sign, Equal and Porphyry are arithmetic on an Ascendant already in hand,
+so they change the panel's numbers on a page that has already been built.
+
+**Synastry.** The aspects between the two sides, which the provider never
+returns: it aspects within one chart only, which is why the relationship wheel
+has only ever drawn each person's own. Orbs are hers: conjunction and opposition
+10, square and trine 9, sextile 6. Synastry rides on whichever side is showing,
+so it reads from the personality's horizon or the design's. The second body in
+a row is written in the design red rather than labelled.
+
+**Still to come:** the three transit views. Those need a wheel drawn for a date
+chosen at runtime, which is a server render rather than something a built page
+can do, so it is its own piece of work.

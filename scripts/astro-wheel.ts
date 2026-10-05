@@ -108,7 +108,13 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   anchor: WheelAnchor = "ascendant", carriedGates: readonly number[] = [],
   personalityGates: readonly number[] = [], designGates: readonly number[] = [],
   partner?: WheelPartner | null, selfColour?: string,
-  ringColours?: { a: string; b: string } | null): string {
+  ringColours?: { a: string; b: string } | null,
+  /** Aspects BETWEEN the two sets on this wheel, drawn as their own class so
+   *  the page can show or hide them. The provider never returns these: it
+   *  aspects within one chart only, which is why a synastry has to be worked
+   *  out rather than asked for. */
+  crossAspects?: readonly { p1_name: string; p2_name: string;
+    p1_abs_pos: number; p2_abs_pos: number; aspect: string; orbit: number }[] | null): string {
   ANCHOR = anchor;
   const asc = chart.ascendant;
   const s: string[] = [];
@@ -260,6 +266,23 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
       names: new Set(partner.personality.planets.map((p) => p.name)),
     });
   }
+  // The aspects between a person's two sides, drawn in the gold so they read as
+  // a third thing rather than as either chart's own. Kaycee, 2026-10-05: "the
+  // option to cast the design against the personality as a synastry chart and
+  // vice versa."
+  for (const a of crossAspects ?? []) {
+    // Same core and extra split the rest of the wheel uses, so a synastry opens
+    // at the readable set and the wide ones are one click away rather than a
+    // hundred lines on sight.
+    const core = MAJOR.has(a.aspect) && !MINOR_POINT.has(a.p1_name) &&
+      !MINOR_POINT.has(a.p2_name) && Math.abs(a.orbit) <= 6;
+    const [x1, y1] = pt(a.p1_abs_pos, asc, R_ASPECT);
+    const [x2, y2] = pt(a.p2_abs_pos, asc, R_ASPECT);
+    s.push(`<line class="asp cross ${core ? "core" : "extra"}" x1="${f(x1)}" y1="${f(y1)}" ` +
+      `x2="${f(x2)}" y2="${f(y2)}" stroke="#c9a227" ` +
+      `stroke-width="${HARD.has(a.aspect) ? 0.9 : 0.8}" opacity=".55"/>`);
+  }
+
   for (const set of aspectSets) {
   const planetNames = set.names;
   for (const a of set.list) {
