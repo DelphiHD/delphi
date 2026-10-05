@@ -3325,6 +3325,12 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
     })) } : null,
     natalGates: d.client ? [...new Set(d.client.acts.filter((a) => a.core).map((a) => a.gate))].sort((a, b) => a - b) : [],
     zodiac: ZODIAC.map((z) => ({ name: z, glyph: ZODIAC_GLYPH[z] })),
+    // So any other table can be in the order the placement tables are in, and
+    // carry the same glyphs. Kaycee, 2026-10-05: "can we list the planets in
+    // the table in the same order as the placement tables... let's put the
+    // glyph in front of the planet name".
+    planetOrder: [...ALL_PLANET_ROWS],
+    planetGlyphs: PLANET_GLYPHS,
     conjunctionText: d.client?.report.conjunctions ?? {},
     houses: HOUSES,
     housesIntro: HOUSES_INTRO,
@@ -3937,6 +3943,10 @@ body.mod-transit .trtimes { display:block; }
   background:rgba(132,80,149,.14); overflow:hidden; }
 .trspan .track .fill { height:100%; background:#0d9488; border-radius:3px; }
 .trspan b { font-weight:600; opacity:.6; text-align:right; white-space:nowrap; }
+.trtime { margin-top:7px; }
+.trtlab { font-size:10px; letter-spacing:.07em; text-transform:uppercase; opacity:.55;
+  margin-top:5px; }
+.trtval { margin-left:12px; font-size:11.5px; opacity:.85; }
 body.mod-transit.view-astro .trgridbtn { display:block; }
 body.mod-transit .dfield,
 body.mod-transit #trPlace, body.mod-transit #trAgainst { padding:6px 8px; }
@@ -5284,14 +5294,21 @@ if (DATA.client) {
       var t = (window.__transitTiming || {})[tpid(name)];
       if (!t) return '';
       var now = window.__transitTimingAt || Date.now();
-      var line = function (label, what, a, b) {
+      var line = function (label, a, b) {
         if (!a && !b) return '';
-        return '<br><span style="opacity:.72">' + label + ' <b>' + esc(what) + '</b> &middot; ' +
+        return '<div class="trtlab">' + label + '</div><div class="trtval">' +
           esc(fmtSpan(a, b)) +
-          (leftOf(b, now) ? ' &middot; ' + esc(leftOf(b, now)) : '') + '</span>';
+          (leftOf(b, now) ? ' \u00b7 ' + esc(leftOf(b, now)) : '') + '</div>';
       };
-      return line('Sign', t.sign, t.signEntered, t.signLeaves) +
-        line('Gate', t.gate + '.' + t.line, t.gateEntered, t.gateLeaves);
+      // The sign as a pill with the others, and the two spans nested under
+      // their own labels below them. Kaycee, 2026-10-05: "Let's add a pill for
+      // the signs and put the bullets below the pills. Do In This Sign: and In
+      // This Gate: , indent the bullets slightly to signify nesting."
+      return '<span class="pill">' + esc(t.sign) + '</span>' +
+        '<div class="trtime">' +
+        line('In This Sign:', t.signEntered, t.signLeaves) +
+        line('In This Gate:', t.gateEntered, t.gateLeaves) +
+        '</div>';
     };
 
     window.__drawTransitTimes = function () {
@@ -5309,7 +5326,14 @@ if (DATA.client) {
           j.bodies.forEach(function (b) { if (b.computable) by[tpid(b.planet)] = b; });
           window.__transitTiming = by;
           if (!host) return;
+          var ORDER = DATA.planetOrder || [];
+          var GL = DATA.planetGlyphs || {};
+          var rank = function (nm) {
+            var i = ORDER.indexOf(nm);
+            return i < 0 ? 999 : i;
+          };
           host.innerHTML = j.bodies.filter(function (b) { return b.computable; })
+            .sort(function (x, y) { return rank(x.planet) - rank(y.planet); })
             .map(function (b) {
               var span = function (label, what, a, c) {
                 return '<div class="trspan"><i>' + label + '</i><span>' + esc(what) + ' &middot; ' +
@@ -5317,7 +5341,8 @@ if (DATA.client) {
                   esc(leftOf(c, nowMs)) + '</b><div class="track"><div class="fill" style="width:' +
                   Math.round(through(a, c, nowMs) * 100) + '%"></div></div></div>';
               };
-              return '<div class="trbody"><div class="trhead"><i>' + esc(b.planet) +
+              var gl = GL[b.planet] ? GL[b.planet] + '\u00a0 ' : '';
+              return '<div class="trbody"><div class="trhead"><i>' + esc(gl) + esc(b.planet) +
                 '</i><span>' + esc(b.sign) + ' &middot; ' + b.gate + '.' + b.line +
                 '</span></div>' + span('Sign', b.sign, b.signEntered, b.signLeaves) +
                 span('Gate', b.gate + '.' + b.line, b.gateEntered, b.gateLeaves) + '</div>';
