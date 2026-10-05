@@ -3910,6 +3910,10 @@ body.view-transit .todaysec, body.view-transit .datesec { display:block; }
    "bump everything in the right side control panel down and put the date/time
    picker at the top on all views... So it stays visible." */
 body.mod-transit .panel { display:flex; flex-direction:column; }
+/* The tabs stay at the top of the panel: the moment sits under them, not
+   above them. Kaycee, 2026-10-05: "we should move the Home Dates and Stats buttons
+   back to the top of the control panel on all views". */
+body.mod-transit .panel #ptabs { order:-2; }
 body.mod-transit .datesec { display:block !important; order:-1; margin-top:0;
   border-top:none; padding-top:0; padding-bottom:13px; margin-bottom:13px;
   border-bottom:1px solid rgba(132,80,149,.18); }
