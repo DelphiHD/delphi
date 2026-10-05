@@ -4132,7 +4132,8 @@ body.view-astro .astro .agrid { max-height:calc(100vh - 36px); margin-left:164px
 .agrid table { border-collapse:collapse; margin:0 auto; font-size:12px; }
 .agrid th, .agrid td { width:30px; height:30px; text-align:center; vertical-align:middle;
   border:1px solid rgba(132,80,149,.12); padding:0; }
-.agrid th { font-weight:600; font-size:15px; }
+.agrid th { font-weight:600; font-size:15px; line-height:1; }
+.agrid th[data-head] { -webkit-text-stroke:.35px currentColor; }
 .agrid th.rowh { color:#2f2a33; }
 .agrid th.colh { color:#e06666; }
 .agrid th.corner { border:0; }
@@ -7845,6 +7846,34 @@ if (DATA.client) {
           '<table><thead><tr>' + head + '</tr></thead><tbody>' +
           bodyRows + '</tbody></table></div>' + key + '</div>';
       };
+      /**
+       * The astrological glyphs are not in Montserrat, so each one arrives
+       * from whatever symbol face the machine falls back to, at whatever size
+       * that face drew it. Measured here: the Sun's ink was 6.9 pixels tall
+       * next to Venus at 13.5, which is what Kaycee saw, 2026-10-05: "the sun
+       * glyph looks tiny and mars and venus are very thin."
+       *
+       * Hand-tuned sizes would only be right on the machine they were tuned
+       * on, because the fallback differs by platform. So the page measures
+       * each glyph in the font it actually got and scales it to one ink
+       * height, which comes out even everywhere. A hair of stroke evens the
+       * weight between the solid glyphs and the outlined ones.
+       */
+      var evenGlyphs = function (root) {
+        var cv = document.createElement('canvas');
+        var cx = cv.getContext('2d');
+        if (!cx) return;
+        var BASE = 15, TARGET = 10.5;
+        [].forEach.call(root.querySelectorAll('th[data-head]'), function (th) {
+          var cs = getComputedStyle(th);
+          cx.font = '600 ' + BASE + 'px ' + cs.fontFamily;
+          var m = cx.measureText(th.textContent || '');
+          var h = (m.actualBoundingBoxAscent || 0) + (m.actualBoundingBoxDescent || 0);
+          if (!h) return;
+          th.style.fontSize = Math.max(11, Math.min(26, BASE * TARGET / h)).toFixed(1) + 'px';
+        });
+      };
+
       var showGrid = function (want) {
         gridOn = want;
         bGrid.classList.toggle('on', gridOn);
@@ -7861,6 +7890,7 @@ if (DATA.client) {
         if (gridOn) {
           wheelHeld = liveAstro.innerHTML;
           liveAstro.innerHTML = buildGrid();
+          evenGlyphs(liveAstro);
         } else {
           liveAstro.innerHTML = wheelHeld || drawn[curSide];
           if (window.__markAstroPending) window.__markAstroPending();
