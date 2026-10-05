@@ -60,12 +60,17 @@ export default async function AdminPage() {
   const { data: isAdmin } = await db.from("delphi_admins").select("user_id").eq("user_id", user.id).maybeSingle();
   if (!isAdmin) redirect("/portal");
 
-  const [{ data: charts }, { data: links }, { data: profiles }, transits, admins, mine] = await Promise.all([
+  const [{ data: charts }, { data: links }, { data: profiles }, transits, admins, lastBuilt, mine] = await Promise.all([
     db.from("charts").select("person_name, source, tier, time_accuracy, token, created_at, for_email, owner_id").order("created_at", { ascending: false }),
     db.from("client_charts").select("token, client_name, revoked_at"),
     db.from("profiles").select("id, email, account_type, created_at"),
     db.storage.from("charts").list("transits", { limit: 90, sortBy: { column: "name", order: "desc" } }),
     db.from("delphi_admins").select("user_id"),
+    // When charts were last rebuilt. A chart is a baked file, so a change to
+    // the builder reaches nobody until a republish: Kaycee, 2026-10-05, "are
+    // those changes live on my chart? I'm not seeing them?" The site and the
+    // charts are two different ages and the dashboard should say both.
+    db.from("client_charts").select("updated_at").order("updated_at", { ascending: false }).limit(1),
     db.from("analyst_clients").select("client_id").eq("analyst_id", user.id).is("ended_at", null),
   ]);
 
@@ -161,6 +166,12 @@ export default async function AdminPage() {
     id: `s${i}`, check: c.name, state: c.pass ? "pass" : "FAIL", detail: c.detail, fix: c.fix ?? "",
   }));
 
+  // Two ages: what the site is running, and how old the charts are. A chart
+  // that has not been rebuilt since a builder change is still showing the old
+  // page, and nothing about opening it says so.
+  const builtAt = String(lastBuilt.data?.[0]?.updated_at ?? "").slice(0, 16).replace("T", " ");
+  const deployedSha = (process.env.VERCEL_GIT_COMMIT_SHA ?? "").slice(0, 7);
+
   const cards: [string, number, string][] = [
     ["People", people.length, "charts that belong to somebody"],
     ["Signed up", signups.length, "through the website or an event"],
@@ -206,7 +217,11 @@ export default async function AdminPage() {
       `}</style>
 
       <h1>Dashboard</h1>
-      <p className="sub">Everything here is live from the database. Tap a heading to sort.</p>
+      <p className="sub">
+        Everything here is live from the database. Tap a heading to sort.
+        {builtAt && <> Charts last rebuilt {builtAt} UTC.</>}
+        {deployedSha && <> Site running {deployedSha}.</>}
+      </p>
 
       <div className="cards">
         {cards.map(([label, n, note]) => (

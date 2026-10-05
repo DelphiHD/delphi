@@ -78,8 +78,8 @@
     {
      "id": "p1k",
      "title": "Sign in and come back to your charts",
-     "status": "doing",
-     "note": "The portal at /portal lists a person's charts, branded, live. Ownership applied 10 September: an admin sees everything, a chart account sees only their own, an analyst sees their clients'. Proven on production with two signed-in people. Still to do: inviting the 37, which is a deliberate act, and the family groupings decided then."
+     "status": "done",
+     "note": "Done 5 October. The portal is a sortable, searchable table of every chart on the account with profile, type, authority, definition, personality Sun and birth data, a radio on the row that says which one is you, and Add a chart which does not ask for an email it already has. Charts find their owner: an address on a chart is claimed the first time that person opens the portal, which is how Paul Hollingshead's four and Erlene Goodin's four will arrive whole. Accounts tab on the dashboard shows who has signed up and grants admin or client access, with the last admin protected from removal."
     },
     {
      "id": "p1l",
@@ -98,6 +98,30 @@
      "title": "The free chart cannot be run in a loop",
      "status": "done",
      "note": "Done 10 September. The endpoint had no rate limit, no captcha and no origin check, and every call created an account, called the provider, published a file and sent mail. Now limited per email, per caller and site-wide, with a hashed caller rather than a stored address. Accounts are created unconfirmed so none can be squatted, and an address that cannot receive mail is refused before anything is made."
+    },
+    {
+     "id": "p1m",
+     "title": "The astrology section, rebuilt to her list",
+     "status": "done",
+     "note": "Done 5 October and live on all 81 charts. Four angles with rulers, Earth on the wheel from the Human Design data, one set of planet toggles, Placements and Houses split by side, Elements and Modes as split bars, aspects grouped by kind with unaspected bodies, rulerships, dignity, retrograde, Vedic combustion, four house systems, the design chart as a chart in its own right, synastry between the two sides with her orbs, and an aspect grid with hover-only lines."
+    },
+    {
+     "id": "p1n",
+     "title": "The Ascendant at nine o'clock",
+     "status": "done",
+     "note": "Done 3 October, live on all 81 charts since the 5th."
+    },
+    {
+     "id": "p1o",
+     "title": "Transit views in the astrology section",
+     "status": "doing",
+     "note": "The engine is built and deployed, 5 October: the renderer can draw a transit outside a chart, and /api/transit-wheel returns a drawn wheel plus transit-to-natal aspects for any date, place and side, cast at Greenwich as UTC by default. NOTHING ON A CHART CALLS IT YET. Still to build: the Transit pill and its three states, the date, time and place picker, the chart picker, and making Bodygraph, Circuits and The Wheel transit views too. Orbs settled: 1 degree, 3 for the Sun, Moon on 3 in its own section."
+    },
+    {
+     "id": "p1p",
+     "title": "Pick a saved chart instead of typing birth details",
+     "status": "doing",
+     "note": "The pieces exist as of 5 October: primary_chart_id on the profile, /api/my-charts answering from the session alone, and the chart page proven to share an origin with it so the sign-in reaches it. Still to build: the picker itself, feeding the relationship view and the transit views."
     }
    ]
   },
@@ -149,6 +173,12 @@
      "title": "Ownership and sharing rules",
      "status": "todo",
      "note": "Who can see a chart bought for them, and what happens if they make their own account."
+    },
+    {
+     "id": "p3c",
+     "title": "Share a chart with somebody else",
+     "status": "todo",
+     "note": "Kaycee, 5 October: \"charts always stay with their owners, but I would like them to be able to share them with other people at some point.\" Nothing ever moves between accounts. The visibility column on charts already carries a shared state, put there in September so these charts would not need a backfill; what is missing is the table of who shared what with whom."
     }
    ]
   },
@@ -488,6 +518,10 @@
   {
    "on": "2026-10-05",
    "what": "Astro-cartography is a planned module, not scheduled. Kaycee's requirements, recorded so they are not re-derived: it exists to compare the personality and design maps, each viewable on its own and both together, and it is offered only for known birth times. Groundwork already in place: birth coordinates are geocoded and cached for every chart, and astronomy-engine is already a dependency (lib/hd/ephemeris.ts), so the right ascension and declination the lines need are computable in house. The provider cannot supply them; its astrology endpoint returns ecliptic longitude only. An angular line moves about 15 degrees of longitude per hour of birth time, which is why rough and unknown times are excluded rather than drawn open."
+  },
+  {
+   "on": "2026-10-05",
+   "what": "Where to see what is built: the dashboard's Launch tab is the single answer, and it is kept current rather than written once. A chart-facing change is only on a chart after a republish, so the dashboard now shows when charts were last rebuilt beside when the site last deployed. Kaycee, 5 October: \"I need to be able to see all of this somewhere to fully understand what you are talking about.\""
   }
  ],
  "open": [
