@@ -213,6 +213,35 @@ async function checkYesterdayTransit(): Promise<Check> {
  * unfiled from 09-28 to 10-03 while the reports kept arriving: nothing was
  * watching the gap between the two.
  */
+/**
+ * Today's report, not only yesterday's. The 5 AM digest runs at 11:00 or 12:00
+ * UTC, and under the schedule set on 10-05 the day's report is published hours
+ * before that, so an absence here is a real one. The point is that she hears it
+ * from the system rather than from an empty chart. Kaycee, 2026-10-05: "Why do
+ * I have to ask every day?"
+ */
+async function checkTodayTransit(): Promise<Check> {
+  const day = new Date().toISOString().slice(0, 10);
+  const name = `Today's transit report (${day})`;
+  const fix = `gh workflow run transit-report.yml -f date=${day}   # build it now`;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return { name, pass: false, detail: "no database credentials", fix };
+  const db = createClient(url, key, { auth: { persistSession: false } });
+  const listed = await db.storage.from("charts").list("transits", { limit: 400 });
+  const there = (listed.data ?? []).some((f) => f.name === `${day}.md`);
+  if (!there) return { name, pass: false, detail: "not published yet", fix };
+  const { count } = await db.from("transit_reads")
+    .select("client_slug", { count: "exact", head: true }).eq("date", day);
+  const roster = Object.keys(CLIENTS).length;
+  const filed = count ?? 0;
+  return {
+    name,
+    pass: filed >= roster,
+    detail: filed >= roster ? `published, ${filed} of ${roster} reads filed` : `published, but only ${filed} of ${roster} reads filed`,
+    fix: filed >= roster ? undefined : `npx tsx ~/delphi/scripts/push-transit-reads.ts --from-storage --catch-up --date ${day}`,
+  };
+}
+
 async function checkTransitReads(): Promise<Check> {
   const day = yesterday();
   const name = `Yesterday's client reads (${day})`;
@@ -317,6 +346,7 @@ async function main() {
     await checkMetadata(),
     await checkChartApis(),
     await checkCrossLibrary(),
+    await checkTodayTransit(),
     await checkYesterdayTransit(),
     await checkTransitReads(),
     await checkYesterdayEchoes(),

@@ -14,12 +14,35 @@ name: Daily Transit Report
 
 on:
   schedule:
-    # Six in the morning, Mountain, all year. GitHub only speaks UTC and does
-    # not know about daylight saving, so both hours fire and the one that is not
-    # 6 AM in Denver stops at the first step.
-    - cron: "0 12 * * *"   # 6 AM MDT, summer
-    - cron: "0 13 * * *"   # 6 AM MST, winter
-    - cron: "0 17 * * *"   # a catch-up, in case the scheduler is hours late
+    # Kaycee, 2026-10-05: "Was I not clear that I want this to run autonomously
+    # every morning? Why do I have to ask every day?"
+    #
+    # She was clear. The schedule was the problem. GitHub's scheduler is not a
+    # clock: it queues scheduled runs and drops them under load, and it is worst
+    # on the hour, which is when every cron in the world fires. Measured on this
+    # repository, every run was between two and a half and four and a half hours
+    # late, and on 10-05 the six o'clock run had not fired at all by twenty to
+    # eight. So the report arrived at nine or ten in the morning, or not at all,
+    # and she had to come and ask.
+    #
+    # Two changes. Every time is off the hour, which is the one documented way
+    # to avoid the worst of the queue. And the first attempt is hours BEFORE the
+    # time she wants it, so that even four hours late is still early: the report
+    # is anchored to 12:00 UTC whatever time of day it is generated, so running
+    # at one in the morning produces exactly the same report as running at six.
+    #
+    # Nothing earlier than 07:11 UTC: in winter that is one minute past midnight
+    # in Denver, and a minute before it the run would rebuild yesterday.
+    #
+    # Whichever attempt lands first writes the day. The rest cost about forty
+    # seconds each and stop at "already published".
+    - cron: "11 7 * * *"    # Denver 00:11 MST / 01:11 MDT, the real attempt
+    - cron: "37 8 * * *"
+    - cron: "53 9 * * *"
+    - cron: "19 11 * * *"
+    - cron: "41 12 * * *"
+    - cron: "7 14 * * *"
+    - cron: "33 16 * * *"   # last resort, so no day is ever simply empty
   workflow_dispatch:
     inputs:
       date:

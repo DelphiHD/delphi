@@ -860,3 +860,37 @@ already recorded on 10-01.
 **Blast radius.** `lib/transit/reads.ts` gained an optional directory on both
 loaders and a `transitsDir()` that honours `TRANSIT_OUT_DIR`; the default is
 unchanged, so the chart builder on her Mac behaves exactly as before.
+
+## 2026-10-05 — The transit report fires hours early, off the hour
+
+**Decision.** The workflow's schedule is seven crons, none of them on the hour,
+the first at 07:11 UTC: 07:11, 08:37, 09:53, 11:19, 12:41, 14:07, 16:33. The
+first to actually run writes the day; the rest stop at "already published" in
+about forty seconds. Nothing fires before 07:11 UTC, which is one minute past
+midnight in Denver in winter; a minute earlier and the run would rebuild
+yesterday.
+
+**Why.** Kaycee, 2026-10-05: "Was I not clear that I want this to run
+autonomously every morning? Why do I have to ask every day?" She was clear, and
+the schedule was wrong. GitHub's scheduler is not a clock: it queues scheduled
+runs, drops them under load, and is worst on the hour, which is when every cron
+in the world fires. Measured on this repository, every scheduled run between
+10-03 and 10-04 was two and a half to four and a half hours late, and on 10-05
+the six o'clock run had not fired at all by 13:41 UTC. So the report arrived at
+nine or ten in the morning, or not at all, and she had to come and ask for it.
+
+**Why firing early is free.** The report anchors itself to 12:00 UTC whatever
+time of day it is generated (`nowTime = "12:00"` in `scripts/transit-report.ts`,
+her own edit). A run at one in the morning produces exactly the same report as a
+run at six. So the fix is not to ask GitHub to be punctual, which it will not
+be, but to start so far ahead that four hours late is still early.
+
+**Loud, not silent.** The 5 AM health digest now checks TODAY's report and its
+reads, not only yesterday's. Under this schedule the day's report exists hours
+before the digest runs, so an absence is real, and she hears it from the system
+instead of from an empty chart.
+
+**Rejected.** A Vercel Cron pinging a route that dispatches the workflow would
+be punctual to the minute, which this is not; it needs a GitHub token stored in
+Vercel, and this change needed no input from her. Worth revisiting if the ladder
+ever proves not to be enough.
