@@ -5868,6 +5868,24 @@ if (DATA.client) {
     // itself, and that is its own piece of work. Kaycee: "We don't have to
     // tackle it now, but we should remove the inaccurate pills."
 
+    // The moment, written wherever the chart shows it: the transit column's
+    // clock, and the heading that stands in for a name under Transit Only.
+    // This used to live inside repaint, which only runs when the date changes,
+    // so opening on Transit left the heading blank and the clock on the
+    // reader's own zone.
+    function stampMoment() {
+      var plEl = document.getElementById('trPlace');
+      var where = (plEl && plEl.value.trim()) || 'UTC';
+      var onTransit = body.classList.contains('mod-transit');
+      [].forEach.call(document.querySelectorAll('.tname'), function (e) {
+        e.textContent = shortDate(curD) + '  \u00b7  ' + clock12(curT) + '  \u00b7  ' + where;
+      });
+      [].forEach.call(document.querySelectorAll('.ttime'), function (e) {
+        e.textContent = clock12(curT) + (onTransit ? ' ' + where : (TZ ? ' ' + TZ : ''));
+      });
+    }
+    window.__stampMoment = stampMoment;
+
     // ── painting one moment onto the chart ───────────────────────────────────
     function repaint(d, t, positions) {
       var lit = {};
@@ -5929,20 +5947,7 @@ if (DATA.client) {
         if (p) t.textContent = p.fixingState === 'Exalted' ? UP : p.fixingState === 'Detriment' ? DOWN : '';
       });
       [].forEach.call(document.querySelectorAll('.tdate'), function (e) { e.textContent = shortDate(d); });
-      // Transit Only carries the moment instead of a name. The place is
-      // whatever the panel says, which is UTC until somebody changes it.
-      var plEl = document.getElementById('trPlace');
-      var where = (plEl && plEl.value.trim()) || 'UTC';
-      [].forEach.call(document.querySelectorAll('.tname'), function (e) {
-        e.textContent = shortDate(d) + '  \u00b7  ' + clock12(t) + '  \u00b7  ' + where;
-      });
-      [].forEach.call(document.querySelectorAll('.ttime'), function (e) {
-        // Under the Transit chart type the hour is the one the panel cast, so
-        // it is labelled with that place. Elsewhere it is the reader's own.
-        e.textContent = clock12(t) + (body.classList.contains('mod-transit')
-          ? ' ' + where : (TZ ? ' ' + TZ : ''));
-      });
-
+      stampMoment();
       // and the words, which belong to the calendar day rather than the hour
       fetchRead(d);
     }
@@ -6001,9 +6006,7 @@ if (DATA.client) {
     if (Math.abs(nowStamp.getTime() - baked.getTime()) > STALE_MS) {
       go(localDate(nowStamp), localTime(nowStamp));
     }
-    [].forEach.call(document.querySelectorAll('.ttime'), function (e) {
-      e.textContent = clock12(curT) + (TZ ? ' ' + TZ : '');
-    });
+    stampMoment();
     dfield.addEventListener('change', function () { if (dfield.value) go(dfield.value, curT); });
     tfield.addEventListener('change', function () { if (tfield.value) go(curD, tfield.value.slice(0, 5)); });
     document.getElementById('dprev').addEventListener('click', function () { shiftDay(-1); });
@@ -7990,6 +7993,7 @@ if (DATA.client) {
           savedSides = null;
         }
         if (typeof relight === 'function') relight();
+        if (window.__stampMoment) window.__stampMoment();
       };
 
       window.__astroTransit = function (on) {
@@ -8033,6 +8037,7 @@ if (DATA.client) {
           trChosen = b.getAttribute('data-place');
           trPlace.value = trChosen;
           trList.innerHTML = '';
+          if (window.__stampMoment) window.__stampMoment();
           if (body.classList.contains('mod-transit')) drawTransit();
         });
       }
