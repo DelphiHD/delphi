@@ -3325,12 +3325,6 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
     })) } : null,
     natalGates: d.client ? [...new Set(d.client.acts.filter((a) => a.core).map((a) => a.gate))].sort((a, b) => a - b) : [],
     zodiac: ZODIAC.map((z) => ({ name: z, glyph: ZODIAC_GLYPH[z] })),
-    // So any other table can be in the order the placement tables are in, and
-    // carry the same glyphs. Kaycee, 2026-10-05: "can we list the planets in
-    // the table in the same order as the placement tables... let's put the
-    // glyph in front of the planet name".
-    planetOrder: [...ALL_PLANET_ROWS],
-    planetGlyphs: PLANET_GLYPHS,
     conjunctionText: d.client?.report.conjunctions ?? {},
     houses: HOUSES,
     housesIntro: HOUSES_INTRO,
