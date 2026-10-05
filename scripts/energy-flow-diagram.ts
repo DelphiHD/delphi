@@ -5298,11 +5298,20 @@ if (DATA.client) {
       // their own labels below them. Kaycee, 2026-10-05: "Let's add a pill for
       // the signs and put the bullets below the pills. Do In This Sign: and In
       // This Gate: , indent the bullets slightly to signify nesting."
-      return '<span class="pill">' + esc(t.sign) + '</span>' +
-        '<div class="trtime">' +
+      return '<div class="trtime">' +
         line('In This Sign:', t.signEntered, t.signLeaves) +
         line('In This Gate:', t.gateEntered, t.gateLeaves) +
         '</div>';
+    };
+
+    /** The sign as a pill, for the tooltips that do not already name it in
+     *  their title. Kaycee, 2026-10-05: "I would like astrological sign to be
+     *  it's own pill and placed with the other pills... so in this case the
+     *  sign pill LIBRA would be next to the SPLEEN pill and the bullets just
+     *  below." */
+    window.__trSignPill = function (name) {
+      var t = (window.__transitTiming || {})[tpid(name)];
+      return t && t.sign ? '<span class="pill">' + esc(t.sign) + '</span>' : '';
     };
 
     window.__drawTransitTimes = function () {
@@ -9841,7 +9850,7 @@ function gatePills(L, here, withLine) {
 // and already knows whether this chart carries the gate. Every view's gate
 // hover comes through here: the bodygraph, the mandala, the astrology ring,
 // the placements list and the bridge chips.
-function gateTipHtml(g, only) {
+function gateTipHtml(g, only, extraPill, underPills) {
   var L = (DATA.gateLib || {})[g] || {};
   var here = only || byGate[g] || [];
   // A hover on one placement leads with its line. A hover on the gate itself
@@ -9854,7 +9863,8 @@ function gateTipHtml(g, only) {
   });
   return '<b>Gate ' + g + (one ? '.' + one.line : '') + '</b>' + esc(L.name || '') +
     (one && one.lineName ? ' &middot; ' + esc(one.lineName) : '') +
-    '<span class="tiptags">' + gatePills(L, here, !one) + '</span>' +
+    '<span class="tiptags">' + gatePills(L, here, !one) + (extraPill || '') + '</span>' +
+    (underPills || '') +
     (DATA.client && !here.length ? '<span style="opacity:.68">Not activated in this chart.</span>' : '') +
     // Her Delphi Basic, never the Definitive Book's Keynote. Kaycee, 2026-09-13:
     // "I just want what's in the Delphi Basic field to show up everywhere."
@@ -10159,8 +10169,10 @@ document.addEventListener('mousemove', function (e) {
     var tg = +trow.dataset.gate;
     hot(null); markRows(null); litGate(tg);
     showTip(e, '<b>Transit ' + esc(trow.dataset.planet) + ' ' + esc(tg + '.' + trow.dataset.line) + '</b>' +
-      (window.__trTimingHtml ? window.__trTimingHtml(trow.dataset.planet) : '') +
-      gateTipHtml(tg));
+      gateTipHtml(tg,
+        null,
+        window.__trSignPill ? window.__trSignPill(trow.dataset.planet) : '',
+        window.__trTimingHtml ? window.__trTimingHtml(trow.dataset.planet) : ''));
     return;
   }
   var row = e.target.closest ? e.target.closest('.prow') : null;
