@@ -43,10 +43,26 @@ retyping birth details:
 2. When an account is created or first signs in, any chart whose `for_email`
    matches that address and has no owner is attached to it.
 
-Step 2 does not exist yet. Without it, an email on a chart is only a label.
+Both steps exist as of 2026-10-05. The addresses are on the eight family
+charts, and `lib/claim-charts.ts` attaches any ownerless chart carrying your
+address the first time you open the portal. Only ownerless charts are ever
+claimed: an address is a label, ownership is not.
 
-## The question this leaves
+| Holder | Address |
+|---|---|
+| Paul Hollingshead | jpholli@gmail.com |
+| Erlene Goodin | allgoodinwh@gmail.com |
 
-A child grows up. When Izzie wants her own account, does her chart move to her,
-copy to her, or stay with Paul and become visible to both? That is Kaycee's
-call and nothing here assumes an answer.
+So the moment either of them signs in, their four charts are waiting.
+
+## A chart stays with its owner
+
+Kaycee, 2026-10-05: "charts always stay with their owners, but I would like
+them to be able to share them with other people at some point."
+
+So nothing ever moves a chart between accounts. When Izzie grows up and wants
+her own, her chart does not leave Paul; she is given access to it. The
+`visibility` column on `charts` already has a `shared` state waiting for
+exactly this, put there in the September migration so these charts would not
+need a backfill. What is still missing is the table of who shared what with
+whom, and that is the next piece rather than a question.
