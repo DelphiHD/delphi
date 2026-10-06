@@ -745,12 +745,12 @@ export function renderTransitLayer(
   const g = geometry(opts.size ?? 1600);
   const sky = activations.map((a) => ({ ...a, side: "transit" as const }));
   return `<g class="trlayer">` +
-    // Stopping at the hub, because this layer is laid over a wheel whose
-    // bodygraph is already drawn: a spoke run to the centre crosses it.
-    // Kaycee, 2026-10-05: "the transit lines are covering the bodygraph on the
-    // wheel". The chart's own spokes do reach the centre and are covered by
-    // the bodygraph composited after them, which an overlay cannot rely on.
-    `<g opacity="0.5">${activationSpokes(g, sky, g.r.spokeInner)}</g>` +
+    // These run to the centre exactly as the chart's own spokes do. Stopping
+    // them at the hub radius was tried and looked cut off, because the
+    // bodygraph is a tall rectangle inside that circle and the lines ended in
+    // mid-air around it. They are covered the same way the chart's are: the
+    // page inserts this layer BEFORE the bodygraph rather than after it.
+    `<g opacity="0.5">${activationSpokes(g, sky)}</g>` +
     activationGlyphs(g, sky, opts.glyphScale ?? 1) +
     `</g>`;
 }

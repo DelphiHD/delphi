@@ -811,6 +811,34 @@ function compositeInner(
   return s.replace(/^[\s\S]*?<svg\b[^>]*>/, "").replace(/<\/svg>\s*$/, "");
 }
 
+/**
+ * Tag every gate this chart does not carry so a sky can light it later.
+ *
+ * The transit canvas has always done this, which is why Transit Only works
+ * there. The bodygraph in the mandala's hub never did, so it had nothing to
+ * light for the ten gates of today's sky that Kaycee does not carry and showed
+ * three of thirteen. Kaycee, 2026-10-05: "Why does the Transit Only view work
+ * great on the Bodygraph view, but not on The Wheel view. That makes zero
+ * sense to me. Aren't they exactly the same?" They were not: same information,
+ * two different drawings, only one of them prepared for a transit.
+ *
+ * Unlike transitInner this keeps the outer svg, because the mandala nests the
+ * whole thing into its hub.
+ */
+function tagSkyGates(svg: string, natal: Set<number>): string {
+  let s = svg;
+  for (let g = 1; g <= 64; g++) {
+    if (natal.has(g)) continue;
+    s = s.replace(new RegExp(`(<[a-z]+ id="personality-${g}"[^>]*?)fill="[^"]*"`),
+      (_m, head: string) =>
+        `${head.replace('id="', 'class="tleg" data-gate="' + g + '" id="')}fill="none"`);
+    s = s.replace(new RegExp(`(<path id="_${g}"[^>]*?)fill="[^"]*"`),
+      (_m, head: string) =>
+        `${head.replace('id="', 'class="tdisc" data-gate="' + g + '" id="')}fill="none"`);
+  }
+  return s;
+}
+
 /** The client's chart with a moment's sky laid over it. */
 function transitInner(
   raw: string,
@@ -3001,7 +3029,10 @@ function mandalaView(d: SceneData): string {
         designSun: pick("design", "Sun"),
         designEarth: pick("design", "Earth"),
       },
-      bodygraphSvg: bridgeLegs(tagChart(d.client.svg), definitionMap(d).bridges.map((b) => b.gate)),
+      bodygraphSvg: tagSkyGates(
+        bridgeLegs(tagChart(d.client.svg), definitionMap(d).bridges.map((b) => b.gate)),
+        new Set(d.client.acts.map((a) => a.gate)),
+      ),
     },
     { size: 1200, glyphScale: 1.8 },
   );
@@ -3426,6 +3457,7 @@ body.view-transit.tr-circuits svg.canvas.transit:not(.plain) { display:block !im
 /* Two colours on The Wheel as well: the person's bodies are black whichever
    side they are, and the sky's layer is the teal. */
 body.mod-transit .mandala [data-side="design"] { fill:#000000; stroke:#000000; }
+body:not(.mod-transit) .mandala .tleg, body:not(.mod-transit) .mandala .tdisc { display:none; }
 body.tr-alone .mandala [data-side="personality"],
 body.tr-alone .mandala [data-side="design"] { display:none; }
 body.tr-alone svg.canvas.transit .pleg,
@@ -5387,7 +5419,18 @@ if (DATA.client) {
       if (!svg) return;
       [].forEach.call(svg.querySelectorAll('.trlayer'), function (n) { n.remove(); });
     };
+    /** The sky's gates on the bodygraph in the hub. The same tags and the
+     *  same colour the big bodygraph uses, so the two views answer alike. */
+    var paintHub = function (on) {
+      var lit = {};
+      if (on) (window.__skyPositions || []).forEach(function (sp) { lit[sp.gate] = 1; });
+      [].forEach.call(document.querySelectorAll('.mandala .tleg, .mandala .tdisc'),
+        function (el) {
+          el.setAttribute('fill', lit[el.dataset.gate] ? '#0d9488' : 'none');
+        });
+    };
     window.__drawTransitMandala = function (on) {
+      paintHub(!!on);
       if (!on) { clear(); return; }
       var dEl = document.getElementById('dfield'), tEl = document.getElementById('tfield');
       if (!dEl || !dEl.value) return;
@@ -5400,7 +5443,12 @@ if (DATA.client) {
           var svg = wheel();
           if (!svg) return;
           clear();
-          svg.insertAdjacentHTML('beforeend', j.layer);
+          // Before the bodygraph, never after it: the hub is composited last
+          // in the wheel and is what covers the chart's own spokes. A layer
+          // appended at the end draws straight over it.
+          var hub = svg.querySelector('g[filter*="bodygraph-shadow"]');
+          if (hub) hub.insertAdjacentHTML('beforebegin', j.layer);
+          else svg.insertAdjacentHTML('beforeend', j.layer);
         })
         .catch(function () { /* the wheel simply stays as it was */ });
     };
@@ -6185,9 +6233,13 @@ if (DATA.client) {
       positions.forEach(function (p) { lit[p.gate] = 1; });
 
       // the sky's own gates: charcoal when the transit is there, empty when not
-      [].forEach.call(document.querySelectorAll('svg.canvas.transit .tleg, svg.canvas.transit .tdisc'),
+      // The hub's bodygraph carries the same tags now, so the same sky paints
+      // both and The Wheel shows all thirteen rather than the three Kaycee
+      // happens to carry.
+      [].forEach.call(document.querySelectorAll(
+        'svg.canvas.transit .tleg, svg.canvas.transit .tdisc, .mandala .tleg, .mandala .tdisc'),
         function (el) {
-          el.setAttribute('fill', lit[el.dataset.gate] ? INK : 'none');
+          el.setAttribute('fill', lit[el.dataset.gate] ? CLIENT_TINT_JS : 'none');
         });
       // and the gates the client carries too: the half that belongs to the sky
       // takes the sky's ink on a day the sky is there, and the client's own
