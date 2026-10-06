@@ -3984,7 +3984,10 @@ body.mod-transit .trtimes { display:block; }
 .trtime { margin-top:7px; }
 .trtlab { font-size:10px; letter-spacing:.07em; text-transform:uppercase; opacity:.55;
   margin-top:5px; }
-.trtval { margin-left:12px; font-size:11.5px; opacity:.85; }
+/* The same size as the description text under it, so the tooltip reads as one
+   thing. Kaycee, 2026-10-05: "can we make the bulleted text the same size as
+   the description text?" */
+.trtval { margin-left:12px; font-size:10.5px; line-height:1.5; opacity:.85; }
 body.mod-transit.view-astro .trgridbtn { display:block; }
 body.mod-transit .dfield,
 body.mod-transit #trPlace, body.mod-transit #trAgainst { padding:6px 8px; }
