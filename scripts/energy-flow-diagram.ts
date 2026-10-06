@@ -5526,6 +5526,16 @@ if (DATA.client) {
       }
       save.disabled = true;
       say('Saving and redrawing your chart…');
+      // The chart is cast and published inside this request, which takes
+      // several seconds, and a message that never moves looks like a page
+      // that has stopped. Kaycee: "I didn't realize I needed to refresh the
+      // page so I sat there for a minute."
+      var waited = 0;
+      var tick = setInterval(function () {
+        waited += 1;
+        say('Saving and redrawing your chart… ' + waited + 's');
+      }, 1000);
+      var stop = function () { clearInterval(tick); };
       fetch('/api/chart/edit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -5537,6 +5547,7 @@ if (DATA.client) {
           return { ok: false, error: 'The server did not answer. Please try again shortly.' };
         });
       }).then(function (j) {
+        stop();
         save.disabled = false;
         if (!j.ok) { say(j.error || 'That could not be saved.', true); return; }
         if (!j.changed || !j.changed.length) { say('Nothing was different.'); return; }
@@ -5550,6 +5561,7 @@ if (DATA.client) {
           location.replace(location.pathname + '?saved=' + Date.now());
         }, 1200);
       }).catch(function () {
+        stop();
         save.disabled = false;
         say('That could not be saved.', true);
       });
