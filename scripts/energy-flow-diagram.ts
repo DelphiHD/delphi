@@ -1077,6 +1077,24 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
   // cycles on 2026-09-12: every date identical to the day, every retrograde
   // pass count identical. scripts/check-cycles.ts is that comparison and
   // lib/chart/cycles.ts is still the reference it runs against.
+  /** A UTC instant as the wall clock at a place, "YYYY-MM-DD HH:MM".
+   *
+   *  The connection endpoint reads a date and time as LOCAL to the place it
+   *  is given, which is right for a birth and wrong for a return: a return
+   *  happens at an instant, and handing over its UTC digits with a natal
+   *  place would have cast Kaycee's Saturn Return seven hours out and put a
+   *  different ascendant on it. */
+  const localAt = (utc: string, zone: string): string => {
+    if (!utc || !zone) return "";
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", hour12: false,
+    }).formatToParts(new Date(utc));
+    const get = (t: string) => parts.find((x) => x.type === t)?.value ?? "";
+    const hh = get("hour") === "24" ? "00" : get("hour");
+    return `${get("year")}-${get("month")}-${get("day")} ${hh}:${get("minute")}`;
+  };
+
   let cycles: Cycles | null = null;
   try {
     const local = await cyclesFor({ birthUtc: chart.birth.utcDate });
@@ -1084,7 +1102,11 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
     const shape = (label: string) => {
       const c = local.find((x) => x.label === label);
       return c
-        ? { firstPass: c.firstPass, firstPassDatetime: "", allPasses: c.allPasses,
+        ? { firstPass: c.firstPass,
+            // The return's instant as the clock read at the natal place, which
+            // is what a chart is cast from.
+            firstPassDatetime: localAt(c.firstPassUtc, chart.birth.timezone),
+            allPasses: c.allPasses,
             status: c.status, windowEnd: c.allPasses[c.allPasses.length - 1] ?? null }
         : blank;
     };
@@ -3060,7 +3082,21 @@ function mandalaView(d: SceneData): string {
  * dates belong, which is the wrong way round: the dates are arithmetic and
  * belong to every chart, while the writing is the thing that is bought.
  */
-function mergedCycles(d: SceneData): { label: string; date: string; status: string; text: string; passes?: string[] }[] {
+/** "2033-07-13" as "July 13, 2033". The cycle rows mixed her written dates,
+ *  which read like this, with raw ISO spans for any cycle her report had not
+ *  written up, so one row in four looked like a database field. */
+function cycleDay(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? "");
+  if (!m) return iso ?? "";
+  const MONTHS = ["January", "February", "March", "April", "May", "June", "July",
+    "August", "September", "October", "November", "December"];
+  return `${MONTHS[Number(m[2]) - 1]} ${Number(m[3])}, ${m[1]}`;
+}
+
+function mergedCycles(d: SceneData): {
+  label: string; date: string; status: string; text: string;
+  passes?: string[]; first?: string; last?: string; utc?: string;
+}[] {
   const written = new Map((d.client?.report.cycles ?? []).map((c) => [c.label.toLowerCase(), c]));
   const c = d.client?.cycles;
   if (!c) return d.client?.report.cycles ?? [];
@@ -3071,19 +3107,34 @@ function mergedCycles(d: SceneData): { label: string; date: string; status: stri
   // light-reading, not a darkness-reading". True and useful, and none of it is
   // a client's to read. What a client should be told about a Saturn Return is
   // Kaycee's to write, not this file's to improvise.
-  const rows: { label: string; date: string; status: string; text: string; passes?: string[] }[] = [];
-  const put = (label: string, cy: { firstPass: string; allPasses: string[]; status: string }) => {
+  const rows: {
+    label: string; date: string; status: string; text: string;
+    passes?: string[]; first?: string; last?: string; utc?: string;
+  }[] = [];
+  const put = (label: string, cy: {
+    firstPass: string; allPasses: string[]; status: string; firstPassDatetime?: string;
+  }) => {
     if (!cy.firstPass) return;
     const mine = written.get(label.toLowerCase());
-    const span = cy.allPasses.length > 1
-      ? `${cy.allPasses[0]} to ${cy.allPasses[cy.allPasses.length - 1]}`
-      : cy.firstPass;
+    const first = cy.allPasses[0] ?? cy.firstPass;
+    const last = cy.allPasses[cy.allPasses.length - 1] ?? cy.firstPass;
+    // The exact date and the span are two different facts and the row carries
+    // both, always. The span used to be dropped the moment her report had
+    // written a date for a cycle, which is every cycle that has already
+    // happened. Kaycee, 2026-10-05: "For some reason we remove the range when
+    // it's passed, but it's still important."
     rows.push({
       label,
-      date: mine?.date || span,
+      date: mine?.date || cycleDay(first),
       status: mine?.status || cy.status,
       text: mine?.text ?? "",
       passes: cy.allPasses,
+      first: cycleDay(first),
+      last: cycleDay(last),
+      // The instant the return happens, to the second. A return chart is cast
+      // for when it happens: a line is a hundred minutes of solar travel, so
+      // the day alone would hand somebody the wrong profile for their cycle.
+      utc: cy.firstPassDatetime ?? "",
     });
   };
   put("Saturn Return", c.saturnReturn);
@@ -3204,6 +3255,8 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
       ? { name: d.client.name,
           dates: {
             birth: d.client.subtitle.personality[0] ?? "",
+            // Also where a return is cast: traditionally the natal location,
+            // and the one place the provider has already resolved for them.
             place: d.client.subtitle.personality[1] ?? "",
             design: d.client.subtitle.design[0] ?? "",
           },
@@ -4101,6 +4154,10 @@ body.show-bridges .bridge { opacity:1; }
 .cyc:hover { background:rgba(132,80,149,.14); }
 .cyc b { display:block; font-weight:600; font-size:11px; }
 .cyc span { opacity:.62; }
+/* The span sits under the date as a subordinate fact: same family, a step
+   smaller and a step quieter, so the exact date stays the thing you read. */
+.cyc .cycspan { display:block; font-size:10px; opacity:.45; margin-top:1px; }
+.cyc .cycpull { margin-top:5px; font-size:10px; padding:3px 9px; }
 .bar { display:grid; grid-template-columns:78px 1fr 26px; align-items:center; gap:7px; font-size:11.5px;
   margin-bottom:3px; }
 .bar { cursor:default; padding:1px 6px; margin-left:-6px; margin-right:-6px; border-radius:6px; }
@@ -5254,13 +5311,69 @@ if (DATA.client) {
   var cyc = DATA.client.cycles || [];
   if (cyc.length) {
     datesHtml += '<h4>Cycles</h4>' + cyc.map(function (c, i) {
+      // A cycle with retrograde passes runs over a span, and that span is
+      // worth knowing whether it is ahead or behind. A single-pass cycle has
+      // no span to state, so it says nothing rather than repeating its date.
+      var span = (c.first && c.last && c.first !== c.last)
+        ? '<span class="cycspan">' + esc(c.first) + ' \u2013 ' + esc(c.last) +
+          ((c.passes && c.passes.length > 1)
+            ? ' &middot; ' + c.passes.length + ' passes' : '') + '</span>'
+        : '';
+      // A return is a whole chart cast for the instant it happens, read
+      // against the natal one, so it is a connection and not a transit: the
+      // sky over a chart has no design side, and a return does, 88 degrees of
+      // solar arc before it. Kaycee, 2026-10-05: "for each of the Cycle dates
+      // we need to add an option to pull the cycle chart, but these are
+      // relationship charts, not transit charts."
+      var pull = c.utc
+        ? '<button class="cycpull" data-cycutc="' + esc(c.utc) + '" data-cycname="' +
+          esc(c.label) + '">Pull chart</button>'
+        : '';
       return '<div class="cyc" data-cyc="' + i + '"><b>' + esc(c.label) + '</b>' +
-        '<span>' + esc(c.date) + ' &middot; ' + esc(c.status) + '</span></div>';
+        '<span>' + esc(c.date) + ' &middot; ' + esc(c.status) + '</span>' +
+        span + pull + '</div>';
     }).join('');
   } else {
     datesHtml += '';
   }
   document.getElementById('tab-dates').innerHTML = datesHtml;
+
+  // Pulling a cycle chart is the Relationship module's own request with the
+  // return's instant in place of somebody's birth: nothing here rebuilds it.
+  document.getElementById('tab-dates').addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('.cycpull') : null;
+    if (!b) return;
+    e.stopPropagation();
+    var utc = b.getAttribute('data-cycutc');
+    var nm = b.getAttribute('data-cycname');
+    var place = (DATA.client.dates || {}).place || '';
+    var parts = location.pathname.split('/');
+    var tok = parts[parts.length - 1];
+    if (!tok || !utc || !place) { b.textContent = 'Not available here'; return; }
+    // Already the clock at the natal place, which is how the endpoint reads it.
+    var day = utc.slice(0, 10);
+    var hm = utc.slice(11, 16);
+    var was = b.textContent;
+    b.textContent = 'Casting\u2026';
+    b.disabled = true;
+    fetch('/api/connection?token=' + tok + '&date=' + encodeURIComponent(day) +
+      '&time=' + encodeURIComponent(hm) + '&place=' + encodeURIComponent(place) +
+      '&name=' + encodeURIComponent(nm))
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        b.disabled = false;
+        b.textContent = was;
+        if (!j.ok) { b.textContent = 'Could not cast'; return; }
+        setModule('relation');
+        var back = document.getElementById('relBack');
+        if (back) back.hidden = false;
+        repaintPair(j);
+      })
+      .catch(function () {
+        b.disabled = false;
+        b.textContent = 'Could not cast';
+      });
+  });
   document.getElementById('tab-dates').addEventListener('click', function (e) {
     var el = e.target.closest ? e.target.closest('.cyc') : null;
     if (!el) return;
@@ -6855,8 +6968,16 @@ if (DATA.client) {
       }
     }
     paintRelationship();
-    // the placements panel now has a second person to show
-    if (id !== 'self' && window.__astroSide) window.__astroSide('personality');
+    // The placements panel now has a second person to show.
+    //
+    // This read id, which is setModule's parameter and does not exist here:
+    // repaintPair threw a ReferenceError on this line every single time, after
+    // the pair had already been drawn. The Relationship module's own catch
+    // turned that into "Chart could not be generated. Please try again." on
+    // top of a chart that had in fact been generated. Found on 2026-10-05 by
+    // calling repaintPair from the cycle pills, which reported the same
+    // failure over a chart that was plainly there.
+    if (curMod !== 'self' && window.__astroSide) window.__astroSide('personality');
     if (window.__paintAstroRows) window.__paintAstroRows();
     if (window.__paintAstroMeta) window.__paintAstroMeta();
     if (window.__paintAstroHouses) window.__paintAstroHouses();
