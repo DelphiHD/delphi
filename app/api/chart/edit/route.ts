@@ -122,15 +122,28 @@ export async function POST(request: Request): Promise<Response> {
 
   // Logged before the rebuild, so a rebuild that fails still leaves a record
   // of what was changed and by whom.
+  //
+  // edited_by is a uuid referencing auth.users, not a name: handing it an
+  // email threw inside recordEdit, AFTER the update had landed and BEFORE the
+  // rebuild ran. Kaycee's date changed in the database, her chart was never
+  // redrawn, and the 500 reached her as "please try again". A failure to write
+  // the history must not throw the save away either, so it is reported rather
+  // than raised.
+  let logged = true;
   for (const field of changed) {
-    await recordEdit({
-      chartId: String(chart.id),
-      field,
-      oldValue: was[field] || null,
-      newValue: now[field] || null,
-      editedBy: user.email ?? user.id,
-      recast: true,
-    });
+    try {
+      await recordEdit({
+        chartId: String(chart.id),
+        field,
+        oldValue: was[field] || null,
+        newValue: now[field] || null,
+        editedBy: user.id,
+        recast: true,
+      });
+    } catch (e) {
+      logged = false;
+      console.error(`chart edit log ${token} ${field}: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   try {
@@ -140,10 +153,10 @@ export async function POST(request: Request): Promise<Response> {
     console.error(`chart edit rebuild ${token}: ${e instanceof Error ? e.message : String(e)}`);
     // The details are saved and logged; only the drawing is behind.
     return NextResponse.json({
-      ok: true, changed, rebuilt: false,
+      ok: true, changed, rebuilt: false, logged,
       message: "Saved. The chart itself could not be redrawn just now.",
     });
   }
 
-  return NextResponse.json({ ok: true, changed, rebuilt: true });
+  return NextResponse.json({ ok: true, changed, rebuilt: true, logged });
 }
