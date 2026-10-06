@@ -95,6 +95,30 @@ for how-it-works), in the same commit as the change.
 covers the task, use it. Adding a wrapper on top of working machinery is where the
 failures come from, and the wrapper is what gets blamed on the machinery.
 
+## Two bodygraphs, one change
+
+There are two bodygraphs on a chart and they are different drawings, not one
+picture at two sizes: the big one in the Bodygraph and Circuits views, and the
+small one composited into the hub of the mandala on The Wheel.
+
+**Any change to one is a change to be considered for the other.** Say in the
+commit which you did and why, including when the answer is "only the big one,
+because X".
+
+This exists because the big bodygraph had been prepared for transits years
+before the hub had: every gate a person does NOT carry is drawn into it
+invisibly, ready to light. The hub had only the person's own gates, so under
+Transit Only it showed three of the sky's thirteen and dropped the other ten
+in silence. Kaycee, 2026-10-05: "Why does the Transit Only view work great on
+the Bodygraph view, but not on The Wheel view. That makes zero sense to me.
+Aren't they exactly the same?... I just always assumed the changes made to the
+bodygraph view carried to the wheel."
+
+She is right that they should. Where the same thing can be painted by one pass
+over both, do that rather than writing it twice: the sky's gates are now
+selected as `svg.canvas.transit .tleg, .mandala .tleg` in a single call for
+exactly this reason.
+
 ## Cost discipline (the whole point)
 
 - All Claude API calls go through the `invoke-llm` Supabase Edge Function. No exceptions, no client-side calls.

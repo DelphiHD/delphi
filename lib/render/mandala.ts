@@ -403,10 +403,25 @@ function gateRing(g: Geometry, activatedGates: ReadonlySet<number>): string {
       `</g>`
     );
   });
+  // Each gate's division carried on past its number, through the hexagrams,
+  // up to the zodiac, so a hexagram plainly belongs to the gate beneath it.
+  // Kaycee, 2026-10-05: "can we make the gate boundaries extend to the
+  // astrology sign ring? Not the lines, just the gates." The activation
+  // spokes are untouched; this is only the boundary between one gate and the
+  // next.
+  const dividers = GATE_RANGES.map((range) => {
+    const a = pointAt(g, g.r.gateOuter, range.start);
+    const b = pointAt(g, g.r.zodiacInner, range.start);
+    return `<line class="g-divide" data-gate="${range.gate}" ` +
+      `x1="${a.x.toFixed(2)}" y1="${a.y.toFixed(2)}" ` +
+      `x2="${b.x.toFixed(2)}" y2="${b.y.toFixed(2)}" ` +
+      `stroke="${PALETTE.inactiveGateStroke}" stroke-width="0.7" />`;
+  }).join("\n");
+
   const perimeter =
     `<circle cx="${g.cx}" cy="${g.cy}" r="${g.r.gateOuter}" fill="none" stroke="#333333" stroke-width="1.2" />` +
     `<circle cx="${g.cx}" cy="${g.cy}" r="${g.r.gateInner}" fill="none" stroke="#333333" stroke-width="1.0" />`;
-  return cells.join("\n") + "\n" + perimeter;
+  return cells.join("\n") + "\n" + dividers + "\n" + perimeter;
 }
 
 /* ---------- Spokes and activations ---------- */
