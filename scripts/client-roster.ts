@@ -1,6 +1,23 @@
-// Canonical client roster. Single source of truth.
-// All client-aware scripts (generate-report.ts, render-planetary-docx.ts,
-// export-mandala-pngs.ts) import from here. To add a client: edit ONLY this file.
+// Kaycee's client roster: how a chart is MADE, not the record of what it IS.
+//
+// READ THIS BEFORE CORRECTING SOMEBODY'S BIRTH DETAILS HERE.
+//
+// Editing a birth date, time or place in this file no longer changes that
+// person's published chart. Since 2026-10-05 every chart is built from its row
+// in public.charts (docs/DECISIONS.md, "The database is what a chart is"),
+// because people can now correct their own details from their chart page and
+// those corrections write to the database. While this file was also being
+// read, a correction held until the next full republish and was then quietly
+// undone by whatever was written here.
+//
+// So: a change made here reaches a new chart and nothing else. To correct a
+// chart that already exists, change the database row, or use the Correct these
+// Details form on the chart itself. Change both if you want the two to agree.
+//
+// This file is still the roster: the list of who Kaycee works with, their ids,
+// slugs and the details a chart is first cast from. The client-aware scripts
+// (generate-report.ts, render-planetary-docx.ts, export-mandala-pngs.ts)
+// import from here. To add a client: edit ONLY this file.
 
 export interface ClientBrief {
   /** Permanent, never reused, never changed. Assigned once when a person joins
