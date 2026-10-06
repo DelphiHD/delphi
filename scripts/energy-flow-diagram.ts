@@ -960,6 +960,11 @@ interface ClientCtx {
   /** the birth instant, for anything read at the moment itself: retrograde,
    *  and so the two sides are each measured at their own moment */
   birthUtc: string;
+  /** The birth details as given, for the form that corrects them. The
+   *  subtitle holds them formatted for reading, which is no use to an input. */
+  birthLocalDate: string;
+  birthLocalTime: string;
+  birthZone: string;
   slug: string;
   name: string;
   svg: string;                  // their branded SVG, activations and all
@@ -1258,6 +1263,9 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
       /** the raw design instant, for reading the design side's astrology */
       designUtc: chart.birth.designUtcDate,
       birthUtc: chart.birth.utcDate,
+      birthLocalDate: String(chart.birth.localDate ?? "").slice(0, 10),
+      birthLocalTime: String(chart.birth.localDate ?? "").slice(11, 16),
+      birthZone: chart.birth.timezone ?? "",
     channels: settledChannels,
     centers: settledCenters,
     gates,
@@ -3283,6 +3291,10 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
             // Also where a return is cast: traditionally the natal location,
             // and the one place the provider has already resolved for them.
             place: d.client.subtitle.personality[1] ?? "",
+            // What the correction form opens on.
+            rawDate: d.client.birthLocalDate,
+            rawTime: d.client.birthLocalTime,
+            zone: d.client.birthZone,
             design: d.client.subtitle.design[0] ?? "",
           },
           cycles: mergedCycles(d),
@@ -5413,6 +5425,9 @@ if (DATA.client) {
     if (!open || !form) return;
     var placeChosen = '';
     var placeZone = '';
+    // The place as it stands. Only a CHANGED place has to be re-picked from
+    // the list; leaving it alone keeps the timezone the chart already has.
+    var wasPlace = '';
     var tok = location.pathname.split('/').pop();
 
     var say = function (msg, bad) {
@@ -5439,12 +5454,16 @@ if (DATA.client) {
           return;
         }
         say('');
+        // Open on what is already true, so a correction is a change to one
+        // field rather than a form to fill in again.
         var D2 = DATA.client.dates || {};
-        var dEl = document.getElementById('ebDate');
-        var tEl = document.getElementById('ebTime');
-        var pEl = document.getElementById('ebPlace');
-        if (D2.place) { pEl.value = D2.place; placeChosen = D2.place; }
-        void dEl; void tEl;
+        document.getElementById('ebDate').value = D2.rawDate || '';
+        document.getElementById('ebTime').value = D2.rawTime || '';
+        var pf = document.getElementById('ebPlace');
+        pf.value = D2.place || '';
+        placeChosen = D2.place || '';
+        placeZone = D2.zone || '';
+        wasPlace = D2.place || '';
       }).catch(function () {
         say('That could not be checked just now.', true);
       });
@@ -5494,7 +5513,7 @@ if (DATA.client) {
         timeAccuracy: acc
       };
       if (!payload.birthDate) { say('A birth date is needed.', true); return; }
-      if (!placeZone) {
+      if (payload.place !== wasPlace && !placeZone) {
         say('Pick the birth place from the list so its timezone comes with it.', true);
         return;
       }
@@ -5508,7 +5527,13 @@ if (DATA.client) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
-      }).then(function (r) { return r.json(); }).then(function (j) {
+      }).then(function (r) {
+        // A reply that is not readable is a different failure from a reply
+        // that says no, and saying so beats one message for both.
+        return r.json().catch(function () {
+          return { ok: false, error: 'The server did not answer. Please try again shortly.' };
+        });
+      }).then(function (j) {
         save.disabled = false;
         if (!j.ok) { say(j.error || 'That could not be saved.', true); return; }
         if (!j.changed || !j.changed.length) { say('Nothing was different.'); return; }

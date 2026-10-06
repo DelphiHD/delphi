@@ -22,7 +22,10 @@ import { createClient as createServerClient } from "@/lib/supabase/server";
 import { recordEdit } from "@/lib/hd/chart-record";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+// 120, the same as every other route here that rebuilds a chart. 300 is above
+// what the plan allows and the deployment is rejected for it, which is why the
+// first version of this answered 404 to Kaycee rather than saving anything.
+export const maxDuration = 120;
 export const runtime = "nodejs";
 
 const ACCURACY = new Set(["document", "told", "approximate", "unknown"]);
@@ -74,8 +77,12 @@ export async function POST(request: Request): Promise<Response> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) return bad("a birth date is needed, as YYYY-MM-DD");
   if (!place) return bad("a birth place is needed, chosen from the list");
   // A place and its timezone come from the provider's lookup together, so a
-  // place without one was typed rather than chosen.
-  if (!timezone) return bad("that place was typed rather than chosen from the list");
+  // place without one was typed rather than chosen. An UNCHANGED place keeps
+  // the timezone the chart already has: making somebody re-pick a place they
+  // are not correcting, to fix a minute on the clock, is a trap.
+  const samePlace = place === String(chart.birth_place ?? "");
+  const zone = timezone || (samePlace ? String(chart.birth_timezone ?? "") : "");
+  if (!zone) return bad("that place was typed rather than chosen from the list");
   if (!ACCURACY.has(timeAccuracy)) return bad("that is not one of the birth time answers");
   if (timeAccuracy !== "unknown" && !/^\d{2}:\d{2}$/.test(birthTime)) {
     return bad("a birth time is needed, as HH:MM, unless it is unknown");
@@ -92,7 +99,7 @@ export async function POST(request: Request): Promise<Response> {
     birth_date: birthDate,
     birth_time: timeAccuracy === "unknown" ? "" : birthTime,
     birth_place: place,
-    birth_timezone: timezone,
+    birth_timezone: zone,
     time_accuracy: timeAccuracy,
   };
   const changed = (Object.keys(now) as (keyof typeof now)[]).filter((k) => now[k] !== was[k]);
