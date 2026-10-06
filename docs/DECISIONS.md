@@ -981,3 +981,101 @@ produced a stray link on 2026-10-05 and is guarded against in that function.
 **Consequence to remember.** Editing `client-roster.ts` no longer changes a
 published chart. A correction Kaycee makes by hand in the file has to be made
 in the database too, or made through the chart's own form.
+
+## 2026-10-05 — The Transit chart type is the hub; all four views cast it
+
+**Decision.** Transit is a Chart Type beside Individual and Relationship, not a
+set of controls inside one view. It opens on the current moment with nothing
+cast over it, and Bodygraph, Circuits, The Wheel and Astrology each render the
+same cast their own way. No view is disabled under it.
+
+**Why.** Kaycee: "We already have a Transit button on the left side control
+panel under Chart Type. Basically I want that to be the hub for all transit
+work, not extra buttons on the astrology view." The moment, the place and what
+the transit is cast over live at the top of the right panel in every view, so
+switching view never loses them.
+
+**Default.** The current moment, Transit Only. "Sometimes people just want to
+view the transit without interference."
+
+---
+
+## 2026-10-05 — A transit chart is two colours
+
+**Decision.** On the Bodygraph and The Wheel under the Transit chart type, the
+sky is teal and the person is black. The design red is not used there at all. A
+gate both carry reads teal.
+
+**Why.** Three things can land on one gate and a bodygraph leg has two halves,
+so there is nowhere honest to put a third. An outline was tried: a leg is four
+pixels across and a 1.6 pixel stroke takes forty per cent of it. A ring on the
+gate disc was tried: nobody reads gate discs for this. Kaycee: "let's go back
+to two colors... If they want to dig into all of the sides they can do it in
+the individual view." The question goes away rather than being answered.
+
+---
+
+## 2026-10-05 — Cycle charts are connections, not transits
+
+**Decision.** Pulling a Saturn Return, Uranus Opposition, Kiron Return or
+Second Saturn Return casts it through /api/connection and renders it as a
+relationship chart against the natal one.
+
+**Why.** A return is a whole chart cast for the instant it happens and has its
+own design side, 88 degrees of solar arc earlier. A transit is the sky over a
+chart and has no design side. Kaycee: "these are relationship charts, not
+transit charts." The codebase had already reached the same conclusion in a
+comment and then not acted on it.
+
+**Note.** cyclesFor had always computed the instants to the second; the builder
+was keeping only the day. The instant is converted to the clock at the natal
+place before casting, because the provider reads a time as local to the place
+it is given. Checked against Maia Mechanics: agrees to one minute on the cycle
+and two on its design moment.
+
+---
+
+## 2026-10-05 — Cycle times are UTC; birth times stay local
+
+**Decision.** Cycle and cycle-design moments are displayed in UTC. Birth
+details keep the clock the person was born on.
+
+**Why.** Kaycee: "we don't know where the person will be at that time in the
+future. Some people move very far away from their birth location." It is also
+how Maia reports them. Where a cycle chart is cast changes only the houses and
+ascendant: every gate and line comes from a longitude at an instant, which is
+the same everywhere.
+
+---
+
+## 2026-10-05 — The South Node is exactly opposite the North Node
+
+**Decision.** The astrology layer holds the nodes as one axis. The South Node
+is computed as the North Node plus 180 rather than read from the provider's
+Mean_Node field.
+
+**Why.** That field comes back on an exact whole degree every time: 149.000,
+158.000, 169.000, 199.000. It is rounded, not computed, and up to a degree from
+the true node's opposite. Across 36 charts it put the South Node on the WRONG
+LINE in 16 of them, 44 per cent, worst case 0.972 degrees against a line of
+0.9375. The provider's own Human Design endpoint has the nodes exactly opposite
+on every chart checked, so this is one sloppy field and not its method. The
+bodygraphs were never affected.
+
+**Not done.** The provider's aspect list still measures the node from the
+rounded value. Kaycee does not report on nodal aspects; recomputing the set is
+a larger change than this warranted.
+
+---
+
+## 2026-10-05 — Only signed-in owners may correct birth details
+
+**Decision.** /api/chart/edit requires a session and ownership of the chart.
+Somebody holding the link but not signed in is invited to sign in.
+
+**Why.** Every other endpoint takes the chart token as its credential, which is
+right for reading and wrong for writing: a link gets forwarded, and a birth
+time quietly changed by a stranger would invalidate a written report with
+nothing to show who did it. Kaycee: "Definitely only signed in owners." Every
+change is written to chart_edits with its old value, so an edit can be read
+back and undone.
