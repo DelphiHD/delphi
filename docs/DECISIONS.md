@@ -955,3 +955,29 @@ wears the same marks as the personality one, being exactly as unknown.
 
 **Not republished.** No live chart has been touched. Kaycee, 2026-10-05, on the
 Ascendant change: "hold off, we'll be making more adjustments to that section."
+
+## 2026-10-05 — The database is what a chart is; the roster is how one is made
+
+**Decision.** Every chart, roster or website, is rebuilt from its row in
+`public.charts`. `scripts/client-roster.ts` becomes seed data for creating a
+chart, not the record of what a chart is. `scripts/republish-all.ts` rebuilds
+all 81 by token.
+
+**Why.** People can now correct their own birth details from their chart
+(`/api/chart/edit`, signed-in owners only), and a correction writes to the
+database. Roster charts were rebuilt from the file by slug, so for 37 of 81
+charts a correction held until the next full republish and was then silently
+undone by the file. Two sources of truth, and the one that wins is whichever
+ran last. Kaycee, asked to choose: "1 seems right."
+
+**Blast radius.** The 37 roster charts change where their birth data is read
+from. Checked before the switch: every one has a chart row and a link row, and
+its date, time and place match the file exactly, so the first run after this
+changes nothing. Publishing by token is safe because `publishChart` reuses the
+existing `storage_path`, so the file behind a link already in somebody's inbox
+is overwritten rather than a new address being created; that trap is what
+produced a stray link on 2026-10-05 and is guarded against in that function.
+
+**Consequence to remember.** Editing `client-roster.ts` no longer changes a
+published chart. A correction Kaycee makes by hand in the file has to be made
+in the database too, or made through the chart's own form.

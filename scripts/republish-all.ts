@@ -58,14 +58,25 @@ async function main() {
 
   const charts = (data ?? []).map((c) => {
     const slug = slugOf.get(String(c.token));
-    // A roster chart is one whose link record carries a real slug rather than a
-    // copy of its own token. It has to be rebuilt by that slug or the file
-    // behind its existing link is left alone.
     const roster = !!slug && slug !== String(c.token);
-    // The builder takes a roster slug as a bare argument and a database chart
-    // behind --token. Passing the wrong one is what caused the mess this
-    // comment exists because of.
-    return { ...c, how: roster ? [slug!] : ["--token", String(c.token)], roster };
+    // EVERY chart is rebuilt from the database, roster or not.
+    //
+    // Roster charts used to be rebuilt from scripts/client-roster.ts by their
+    // slug, which made the file the source of truth for 37 of 81 charts and
+    // the database the source for the other 44. A person correcting their own
+    // birth details writes to the database, so for those 37 the correction
+    // held until the next full republish and was then quietly undone by the
+    // file. Kaycee chose the database, 2026-10-05: the roster becomes seed
+    // data for making a chart, not the record of what a chart is.
+    //
+    // Checked before the switch: all 37 roster entries have a chart row and a
+    // link row, and their date, time and place match the file exactly, so
+    // nothing moves on the first run.
+    //
+    // Publishing by token is safe because publishChart reuses the existing
+    // storage_path: the file behind the link already in somebody's inbox is
+    // the one that gets overwritten, not a new address.
+    return { ...c, how: ["--token", String(c.token)], roster };
   });
   // --type keeps only the charts of that Type, cast from their birth data
   const typeArg = process.argv.includes("--type") ? process.argv[process.argv.indexOf("--type") + 1] : "";

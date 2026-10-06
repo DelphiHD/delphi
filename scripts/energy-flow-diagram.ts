@@ -11101,7 +11101,12 @@ async function publishChart(client: ClientCtx, html: string): Promise<string> {
     if (prev.data) {
       previousHtml = await prev.data.text();
       const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-      rolledFrom = `${slug}/versions/${token}-${stamp}.html`;
+      // Beside the published file, not beside the slug this build happened to
+      // be run under. A roster chart rebuilt by --token arrives here with the
+      // token as its slug, which filed its history in a second folder and
+      // split it in two.
+      const folder = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : slug;
+      rolledFrom = `${folder}/versions/${token}-${stamp}.html`;
       const kept = await db.storage.from("charts").upload(rolledFrom, Buffer.from(previousHtml, "utf8"), {
         contentType: "text/html; charset=utf-8",
         upsert: true,
