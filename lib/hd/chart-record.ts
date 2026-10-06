@@ -24,6 +24,9 @@ export interface ChartRecord {
   birthDate: string;
   birthTime: string | null;
   birthPlace: string;
+  /** The place to ASK the provider about, when birthPlace is a town its
+   *  gazetteer does not carry. Null means ask about birthPlace itself. */
+  lookupPlace: string | null;
   birthTimezone: string;
   timeAccuracy: "document" | "told" | "approximate" | "unknown";
   tier: "seed" | "free" | "purchased" | "gift";
@@ -49,6 +52,7 @@ const shape = (r: Record<string, unknown>): ChartRecord => ({
   birthDate: String(r.birth_date),
   birthTime: (r.birth_time as string | null) ?? null,
   birthPlace: String(r.birth_place),
+  lookupPlace: (r.lookup_place as string | null) ?? null,
   birthTimezone: String(r.birth_timezone),
   timeAccuracy: r.time_accuracy as ChartRecord["timeAccuracy"],
   tier: r.tier as ChartRecord["tier"],
@@ -108,7 +112,7 @@ export async function chartByToken(token: string): Promise<ChartRecord | null> {
 export function briefFromRecord(r: ChartRecord): {
   id: string; slug: string; name: string;
   birthDate: string; birthTime: string; birthPlace: string; birthTimezone: string;
-  tier: string; timeAccuracy: ChartRecord["timeAccuracy"];
+  lookupPlace?: string; tier: string; timeAccuracy: ChartRecord["timeAccuracy"];
 } {
   return {
     tier: r.tier,
@@ -127,6 +131,12 @@ export function briefFromRecord(r: ChartRecord): {
     // answers 500 to anything else.
     birthTime: (r.birthTime ?? "12:00").slice(0, 5),
     birthPlace: r.birthPlace,
+    // Carried the same way the roster carries it: birthPlace is the truth
+    // about where somebody was born and is what their chart prints, and this
+    // is only ever the place the provider is asked about. Without it, David
+    // Whiting, born in Salmon, Idaho, could not be cast from the database at
+    // all: the provider has never heard of the town.
+    ...(r.lookupPlace ? { lookupPlace: r.lookupPlace } : {}),
     birthTimezone: r.birthTimezone,
   };
 }
