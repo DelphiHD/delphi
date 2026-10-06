@@ -5438,6 +5438,18 @@ if (DATA.client) {
     open.onclick = function () {
       if (!form.hidden) { form.hidden = true; return; }
       form.hidden = false;
+      // Filled the moment it opens, never later. This used to wait for the
+      // ownership check and fill in afterwards, so anything typed in the
+      // meantime was overwritten by the old values and the save honestly
+      // reported nothing different. Kaycee: "it said nothing was different,
+      // but I changed the day so it definitely would be."
+      var D2 = DATA.client.dates || {};
+      document.getElementById('ebDate').value = D2.rawDate || '';
+      document.getElementById('ebTime').value = D2.rawTime || '';
+      document.getElementById('ebPlace').value = D2.place || '';
+      placeChosen = D2.place || '';
+      placeZone = D2.zone || '';
+      wasPlace = D2.place || '';
       say('Checking who you are…');
       // Whether this viewer owns this chart is the server's answer, not the
       // page's: the page is a baked file and knows nothing about sessions.
@@ -5453,17 +5465,8 @@ if (DATA.client) {
           say('This chart belongs to somebody else, so its details are theirs to change.', true);
           return;
         }
+        // The fields are already filled; this only clears the checking note.
         say('');
-        // Open on what is already true, so a correction is a change to one
-        // field rather than a form to fill in again.
-        var D2 = DATA.client.dates || {};
-        document.getElementById('ebDate').value = D2.rawDate || '';
-        document.getElementById('ebTime').value = D2.rawTime || '';
-        var pf = document.getElementById('ebPlace');
-        pf.value = D2.place || '';
-        placeChosen = D2.place || '';
-        placeZone = D2.zone || '';
-        wasPlace = D2.place || '';
       }).catch(function () {
         say('That could not be checked just now.', true);
       });
