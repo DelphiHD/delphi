@@ -1079,3 +1079,34 @@ time quietly changed by a stranger would invalidate a written report with
 nothing to show who did it. Kaycee: "Definitely only signed in owners." Every
 change is written to chart_edits with its old value, so an edit can be read
 back and undone.
+
+---
+
+## 2026-10-06 — The two side classes have exactly one owner
+
+**Decision.** Nothing writes `off-s-personality` or `off-s-design` directly any
+more. Three things want a side hidden, and each now states what it wants: the
+reader's own Personality and Design buttons, the astrology view's habit of
+opening on personality alone, and the transit type's cast over one side. A
+single resolver works out the answer and sets the buttons from the same answer.
+Under a transit the cast settles both sides by itself and outranks the view's
+habit, because casting the sky over a side that is not drawn is incoherent.
+The side buttons and the cast selector are one question asked twice, so while a
+transit is up a click on either moves the other: both sides on is the whole
+chart, one off is a cast over the one still showing, and neither is the sky
+alone.
+
+**Why.** All three used to write the classes straight onto the body, and the
+transit put them back on the way out from a copy taken on the way in. The copy
+was taken after the astrology view had already hidden design, so leaving the
+transit replayed a state nobody had chosen, and none of the three ever told the
+buttons. Kaycee, 2026-10-06: "if cast over the design side is selected ... when
+I switch back to the individual type the personality side is still hidden", and
+"it takes a few refreshes to get the other side to show back up" — the refreshes
+were her clicking a button that was lit while its side was hidden, so the first
+click moved it the wrong way. A saved copy of a shared state is always a guess
+about who else touched it; resolving it on demand cannot go stale.
+
+**Both bodygraphs.** The side classes already drive the mandala hub through the
+same stylesheet rules, so the big drawing and the small one answer to the one
+resolver and cannot drift apart.

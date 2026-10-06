@@ -5324,6 +5324,12 @@ if (DATA.client) {
       var b = document.getElementById(id);
       if (b) b.classList.add('on');
     });
+    // The sides have one owner; reset has to clear what it remembers, or a side
+    // the reader hid earlier comes back the next time anything else moves.
+    if (window.__sides) {
+      window.__sides.wantP = false; window.__sides.wantD = false; window.__sides.held = false;
+    }
+    if (window.__applySides) window.__applySides();
     bIsl.classList.remove('on');
     bBr.classList.remove('on');
     paintIslands(false);
@@ -6777,8 +6783,71 @@ if (DATA.client) {
   };
   toggleBtn('defined', 'nodefined');
   toggleBtn('hang', 'nohang');
-  toggleBtn('sideP', 'off-s-personality');
-  toggleBtn('sideD', 'off-s-design');
+
+  // ── one owner for the two side classes ────────────────────────────────────
+  // Three things want a side hidden: the reader's own Personality and Design
+  // buttons, the astrology view (which opens on personality alone rather than
+  // meeting 26 glyphs at once), and the transit type (casting the sky over one
+  // side puts the other away). All three used to write off-s-personality and
+  // off-s-design straight onto the body, and the transit put them back from a
+  // copy it took on the way in. The copy was taken after the astrology view had
+  // already hidden design, so leaving the transit replayed a state nobody had
+  // chosen, and none of them ever told the buttons. Kaycee, 2026-10-06: "If
+  // cast over the design side is selected ... when I switch back to the
+  // individual type the personality side is still hidden."
+  // So none of them writes a class now. Each says what it wants, this works it
+  // out once, and the buttons are set from the same answer, which is why they
+  // can no longer disagree with the chart in front of her.
+  var sides = { wantP: false, wantD: false, astro: false, cast: '', held: false };
+  window.__sides = sides;
+  var applySides = function () {
+    var offP, offD;
+    if (sides.cast) {
+      // The cast settles both sides by itself: the side the sky is being read
+      // against is on the stage, the other is not, and over the whole chart
+      // means both. It outranks the view's own habit, or the sky would be cast
+      // over a side that is not being drawn.
+      offP = sides.cast === 'design';
+      offD = sides.cast === 'personality';
+    } else {
+      offP = sides.wantP;
+      offD = sides.wantD || sides.astro;
+    }
+    body.classList.toggle('off-s-personality', offP);
+    body.classList.toggle('off-s-design', offD);
+    var bp = document.getElementById('sideP'), bd = document.getElementById('sideD');
+    if (bp) bp.classList.toggle('on', !offP);
+    if (bd) bd.classList.toggle('on', !offD);
+    offCount();
+  };
+  window.__applySides = applySides;
+
+  var sideBtn = function (id, which) {
+    var b = document.getElementById(id);
+    if (!b) return;
+    b.onclick = function () {
+      var hide = b.classList.contains('on');   // lit means showing, so hide it
+      if (which === 'design') { sides.wantD = hide; sides.held = true; sides.astro = false; }
+      else sides.wantP = hide;
+      // Under a transit these buttons and the cast selector are one question
+      // asked twice: casting over the design is the same as putting the
+      // personality away. So a click moves the selector and the sky is recast,
+      // rather than the two of them fighting over the same class.
+      var sel = document.getElementById('trAgainst');
+      if (sel && body.classList.contains('mod-transit')) {
+        sel.value = sides.wantP ? (sides.wantD ? '' : 'design')
+          : (sides.wantD ? 'personality' : 'whole');
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+        return;
+      }
+      applySides(); relight();
+      // Turning a side off takes it off the stage, so the counts that describe
+      // the stage have to follow it.
+      if (window.__renderStats) window.__renderStats();
+    };
+  };
+  sideBtn('sideP', 'personality');
+  sideBtn('sideD', 'design');
   var setPlanets = function (on) {
     [].forEach.call(document.querySelectorAll('.pbx'), function (b) { b.checked = on; });
     document.getElementById('planets').dispatchEvent(new Event('change', { bubbles: true }));
@@ -6831,22 +6900,15 @@ if (DATA.client) {
   // is a lot to meet at once, and Design is one click away. Restored on the way
   // out, so the bodygraph is never left with a side hidden the reader never hid,
   // and it stops managing the toggle the moment the reader uses it themselves.
-  var astroHidDesign = false, designHeld = false;
-  var sideDBtn = document.getElementById('sideD');
-  if (sideDBtn) sideDBtn.addEventListener('click', function () { designHeld = true; });
   var enterAstro = function () {
-    if (designHeld) return;
-    if (!body.classList.contains('off-s-design')) {
-      body.classList.add('off-s-design');
-      if (sideDBtn) sideDBtn.classList.remove('on');
-      astroHidDesign = true;
-    }
+    if (sides.held || sides.astro) return;
+    sides.astro = true;
+    applySides();
   };
   var leaveAstro = function () {
-    if (!astroHidDesign) return;
-    body.classList.remove('off-s-design');
-    if (sideDBtn) sideDBtn.classList.add('on');
-    astroHidDesign = false;
+    if (!sides.astro) return;
+    sides.astro = false;
+    applySides();
   };
   // Synastry is the one astrology view that exists to show both sides at once,
   // so the opening-on-personality-alone rule above has to stand down for it.
@@ -6854,9 +6916,8 @@ if (DATA.client) {
   // between a visible set and an invisible one. Kaycee, 2026-10-05: "The
   // synastry charts still aren't working."
   window.__astroBothSides = function (both) {
-    if (designHeld) return;
-    if (both) { leaveAstro(); astroHidDesign = false; }
-    else enterAstro();
+    if (sides.held) return;
+    if (both) leaveAstro(); else enterAstro();
   };
 
   // Chart and view are two independent axes. The chart is whose reading this is:
@@ -8723,18 +8784,17 @@ if (DATA.client) {
       // view. Kaycee, 2026-10-05: "the personality and design selections don't
       // do anything." They drive the same side toggles the view section already
       // uses, so the bodygraph and the mandala answer to them too.
-      var savedSides = null;
       window.__applyAgainst = function (on) {
-        if (on && !savedSides) {
-          savedSides = { p: body.classList.contains('off-s-personality'),
-            d: body.classList.contains('off-s-design') };
-        }
         var v = on && trAgainst ? trAgainst.value : '';
         body.classList.toggle('tr-alone', !!on && !v);
-        if (on) {
-          body.classList.toggle('off-s-personality', v === 'design');
-          body.classList.toggle('off-s-design', v === 'personality');
-        } else {
+        // The cast is one of the three things that can put a side away, and the
+        // only one that is nobody's own choice. It is stated here and resolved
+        // in the one place, so leaving the transit needs no copy of anything.
+        if (window.__sides) {
+          window.__sides.cast = on ? v : '';
+          if (window.__applySides) window.__applySides();
+        }
+        if (!on) {
           // Leaving the transit type puts its grid away with it.
           if (window.__transitGridOn) {
             window.__transitGridOn = false;
@@ -8742,13 +8802,6 @@ if (DATA.client) {
             if (gb) { gb.classList.remove('on'); gb.textContent = 'Aspect Grid'; }
             if (window.__showAstroGrid) window.__showAstroGrid(false);
           }
-        }
-        if (!on && savedSides) {
-          // Leaving the transit type hands the side toggles back exactly as
-          // they were, rather than as the transit left them.
-          body.classList.toggle('off-s-personality', savedSides.p);
-          body.classList.toggle('off-s-design', savedSides.d);
-          savedSides = null;
         }
         if (typeof relight === 'function') relight();
         if (window.__stampMoment) window.__stampMoment();
