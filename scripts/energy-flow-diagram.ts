@@ -4183,6 +4183,20 @@ body.show-bridges .bridge { opacity:1; }
    smaller and a step quieter, so the exact date stays the thing you read. */
 .cyc .cycspan { display:block; font-size:10px; opacity:.45; margin-top:1px; }
 .cyc .cycpull { margin-top:5px; font-size:10px; padding:3px 9px; }
+.ebwrap { margin:6px 0 2px; }
+.ebopen { font-size:10px; padding:3px 9px; }
+.ebform { margin-top:8px; }
+.eblab { display:block; font-size:9.5px; letter-spacing:.12em; text-transform:uppercase;
+  opacity:.55; margin:7px 0 3px; }
+.ebfield { width:100%; box-sizing:border-box; font:inherit; font-size:11px; padding:5px 7px;
+  border:1px solid rgba(132,80,149,.25); border-radius:7px; background:#fff; color:var(--ink); }
+#ebPlaceList { list-style:none; margin:4px 0 0; padding:0; border-radius:8px; overflow:hidden; }
+#ebPlaceList button { width:100%; text-align:left; font:inherit; font-size:11px; padding:5px 8px;
+  border:0; background:rgba(132,80,149,.06); cursor:pointer; }
+#ebPlaceList button:hover { background:rgba(132,80,149,.14); }
+.ebsave { width:100%; margin-top:10px; font-size:10.5px; padding:5px 9px; }
+.ebnote { font-size:10.5px; line-height:1.5; opacity:.7; margin-top:6px; }
+.ebnote.bad { color:#9c4a28; opacity:1; }
 .bar { display:grid; grid-template-columns:78px 1fr 26px; align-items:center; gap:7px; font-size:11.5px;
   margin-bottom:3px; }
 .bar { cursor:default; padding:1px 6px; margin-left:-6px; margin-right:-6px; border-radius:6px; }
@@ -5332,6 +5346,31 @@ if (DATA.client) {
   var D = DATA.client.dates || {};
   var datesHtml = '<h4>Birth</h4><div class="line">' + esc(D.birth || '') +
     (D.place ? '<br><span>' + esc(D.place) + '</span>' : '') + '</div>' +
+    // Where the birth details are shown is where they are corrected. Kaycee,
+    // 2026-10-05: "People make mistakes and shouldn't have to pull multiple
+    // charts." A wrong minute used to mean a second chart and a second link,
+    // with the first still in somebody's inbox reading as the truth.
+    '<div class="ebwrap">' +
+      '<button class="ebopen" id="ebOpen">Correct these Details</button>' +
+      '<div class="ebform" id="ebForm" hidden>' +
+        '<label class="eblab">Birth date</label>' +
+        '<input class="ebfield" id="ebDate" type="date">' +
+        '<label class="eblab">Birth time</label>' +
+        '<input class="ebfield" id="ebTime" type="time" step="60">' +
+        '<label class="eblab">Birth place</label>' +
+        '<input class="ebfield" id="ebPlace" type="text" autocomplete="off">' +
+        '<div id="ebPlaceList"></div>' +
+        '<label class="eblab">How well is the time known</label>' +
+        '<select class="ebfield" id="ebAcc">' +
+          '<option value="document">From a document</option>' +
+          '<option value="told">I was told</option>' +
+          '<option value="approximate">Roughly</option>' +
+          '<option value="unknown">I do not know</option>' +
+        '</select>' +
+        '<button class="ebsave" id="ebSave">Save and redraw</button>' +
+        '<div class="ebnote" id="ebNote"></div>' +
+      '</div>' +
+    '</div>' +
     '<h4>Design</h4><div class="line">' + esc(D.design || '') + '</div>';
   var cyc = DATA.client.cycles || [];
   if (cyc.length) {
@@ -5361,6 +5400,126 @@ if (DATA.client) {
     datesHtml += '';
   }
   document.getElementById('tab-dates').innerHTML = datesHtml;
+
+  // Correcting the birth details. Signed-in owners only, on Kaycee's
+  // instruction: a chart link gets forwarded, and a birth time quietly changed
+  // by a stranger would invalidate a written report with nothing to show who
+  // did it. Somebody not signed in is asked to, rather than told no: "if a
+  // person isn't signed in that link should encourage them to do so."
+  (function () {
+    var open = document.getElementById('ebOpen');
+    var form = document.getElementById('ebForm');
+    var note = document.getElementById('ebNote');
+    if (!open || !form) return;
+    var placeChosen = '';
+    var placeZone = '';
+    var tok = location.pathname.split('/').pop();
+
+    var say = function (msg, bad) {
+      note.className = bad ? 'ebnote bad' : 'ebnote';
+      note.innerHTML = msg;
+    };
+
+    open.onclick = function () {
+      if (!form.hidden) { form.hidden = true; return; }
+      form.hidden = false;
+      say('Checking who you are…');
+      // Whether this viewer owns this chart is the server's answer, not the
+      // page's: the page is a baked file and knows nothing about sessions.
+      fetch('/api/my-charts').then(function (r) { return r.json(); }).then(function (j) {
+        var mine = (j && j.mine) || [];
+        var owns = mine.some(function (c) { return c.token === tok; });
+        if (!j || !j.ok || !mine.length) {
+          say('Sign in to correct your birth details. ' +
+            '<a href="/portal">Sign in</a>');
+          return;
+        }
+        if (!owns) {
+          say('This chart belongs to somebody else, so its details are theirs to change.', true);
+          return;
+        }
+        say('');
+        var D2 = DATA.client.dates || {};
+        var dEl = document.getElementById('ebDate');
+        var tEl = document.getElementById('ebTime');
+        var pEl = document.getElementById('ebPlace');
+        if (D2.place) { pEl.value = D2.place; placeChosen = D2.place; }
+        void dEl; void tEl;
+      }).catch(function () {
+        say('That could not be checked just now.', true);
+      });
+    };
+
+    // The place comes from the provider's own list, never a typed string: a
+    // timezone guessed from a place name is where wrong charts come from.
+    var pEl = document.getElementById('ebPlace');
+    var pList = document.getElementById('ebPlaceList');
+    var look = null;
+    if (pEl) {
+      pEl.addEventListener('input', function () {
+        placeChosen = ''; placeZone = '';
+        var q = pEl.value.trim();
+        if (look) clearTimeout(look);
+        if (q.length < 3) { pList.innerHTML = ''; return; }
+        look = setTimeout(function () {
+          fetch('/api/places?q=' + encodeURIComponent(q))
+            .then(function (r) { return r.json(); })
+            .then(function (j) {
+              pList.innerHTML = (j.places || []).slice(0, 5).map(function (o) {
+                return '<li><button type="button" data-pl="' + esc(o.value) +
+                  '" data-tz="' + esc(o.timezone || '') + '">' + esc(o.value) + '</button></li>';
+              }).join('');
+            }).catch(function () { pList.innerHTML = ''; });
+        }, 300);
+      });
+      pList.addEventListener('click', function (e) {
+        var b = e.target.closest ? e.target.closest('[data-pl]') : null;
+        if (!b) return;
+        placeChosen = b.getAttribute('data-pl');
+        placeZone = b.getAttribute('data-tz');
+        pEl.value = placeChosen;
+        pList.innerHTML = '';
+      });
+    }
+
+    var save = document.getElementById('ebSave');
+    if (save) save.onclick = function () {
+      var acc = document.getElementById('ebAcc').value;
+      var payload = {
+        token: tok,
+        birthDate: document.getElementById('ebDate').value,
+        birthTime: document.getElementById('ebTime').value,
+        place: placeChosen || document.getElementById('ebPlace').value.trim(),
+        timezone: placeZone,
+        timeAccuracy: acc
+      };
+      if (!payload.birthDate) { say('A birth date is needed.', true); return; }
+      if (!placeZone) {
+        say('Pick the birth place from the list so its timezone comes with it.', true);
+        return;
+      }
+      if (acc !== 'unknown' && !payload.birthTime) {
+        say('A birth time is needed, unless it is unknown.', true);
+        return;
+      }
+      save.disabled = true;
+      say('Saving and redrawing your chart…');
+      fetch('/api/chart/edit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(function (r) { return r.json(); }).then(function (j) {
+        save.disabled = false;
+        if (!j.ok) { say(j.error || 'That could not be saved.', true); return; }
+        if (!j.changed || !j.changed.length) { say('Nothing was different.'); return; }
+        say('Saved. Reloading your chart…');
+        setTimeout(function () { location.reload(); }, 1200);
+      }).catch(function () {
+        save.disabled = false;
+        say('That could not be saved.', true);
+      });
+    };
+  })();
 
   // Pulling a cycle chart is the Relationship module's own request with the
   // return's instant in place of somebody's birth: nothing here rebuilds it.
