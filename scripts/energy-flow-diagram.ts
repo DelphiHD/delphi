@@ -5541,7 +5541,14 @@ if (DATA.client) {
         if (!j.ok) { say(j.error || 'That could not be saved.', true); return; }
         if (!j.changed || !j.changed.length) { say('Nothing was different.'); return; }
         say('Saved. Reloading your chart…');
-        setTimeout(function () { location.reload(); }, 1200);
+        // Not location.reload(): the chart is a file behind a CDN and the
+        // browser happily serves the copy it already has, so the page came
+        // back looking unchanged until Kaycee reloaded it herself. A fresh
+        // address cannot be answered from cache. The token lives in the path,
+        // so a query string is free.
+        setTimeout(function () {
+          location.replace(location.pathname + '?saved=' + Date.now());
+        }, 1200);
       }).catch(function () {
         save.disabled = false;
         say('That could not be saved.', true);
