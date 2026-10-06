@@ -17,6 +17,14 @@ const execFileAsync = promisify(execFile);
 export interface ReturnCycle {
   firstPass: string;          // YYYY-MM-DD, the canonical return date (matches Maia Mechanics)
   firstPassDatetime: string;  // ISO with UTC time, second-precision
+  /** The same instant as the clock read at the natal place, "YYYY-MM-DD HH:MM".
+   *  A chart service reads a time as local to the place it is given, so this
+   *  is what a cycle chart is cast from; the UTC above is what is displayed. */
+  castLocal?: string;
+  /** The cycle's own design moment, 88 degrees of solar arc before it, as a
+   *  UTC ISO instant. A return is a whole chart and has one, which is why a
+   *  cycle chart is a connection rather than a transit. */
+  designUtc?: string;
   allPasses: string[];        // 1 or 3 entries: the full retrograde dance
   status: "Passed" | "Current" | "Upcoming" | "unknown";
   windowEnd: string | null;

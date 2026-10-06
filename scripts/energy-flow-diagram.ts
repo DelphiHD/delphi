@@ -45,6 +45,7 @@ import { cacheDir, cacheRoot, tryMkdir } from "@/lib/cache-dir";
 import { chartByToken, briefFromRecord, reliabilityForChart } from "@/lib/hd/chart-record";
 import { type Cycles } from "@/lib/chart/cycles";
 import { cyclesFor } from "@/lib/hd/cycles-node";
+import { designMomentFor } from "@/lib/hd/return-chart";
 import {
   reliabilityOf, settled, unsettledChannels, unsettledCenters, unsettledGates,
   centreField, NEEDS_EXACT, VARIABLE_FIELDS, type Reliability,
@@ -1103,9 +1104,11 @@ async function loadClient(brief: ClientBrief): Promise<ClientCtx> {
       const c = local.find((x) => x.label === label);
       return c
         ? { firstPass: c.firstPass,
-            // The return's instant as the clock read at the natal place, which
-            // is what a chart is cast from.
-            firstPassDatetime: localAt(c.firstPassUtc, chart.birth.timezone),
+            firstPassDatetime: c.firstPassUtc,
+            // What the chart service is given, because it reads a time as
+            // local to the place it is handed.
+            castLocal: localAt(c.firstPassUtc, chart.birth.timezone),
+            designUtc: designMomentFor(c.firstPassUtc)?.toISOString() ?? "",
             allPasses: c.allPasses,
             status: c.status, windowEnd: c.allPasses[c.allPasses.length - 1] ?? null }
         : blank;
@@ -3085,6 +3088,23 @@ function mandalaView(d: SceneData): string {
 /** "2033-07-13" as "July 13, 2033". The cycle rows mixed her written dates,
  *  which read like this, with raw ISO spans for any cycle her report had not
  *  written up, so one row in four looked like a database field. */
+/** "2027-06-05T20:49:45Z" as "June 5, 2027 - 20:49 UTC".
+ *
+ *  Always UTC. Kaycee, 2026-10-05: "We should always report these times as UTC
+ *  as we don't know where the person will be at that time in the future. Some
+ *  people move very far away from their birth location." It is also how Maia
+ *  Mechanics reports them, which is what these were checked against: her
+ *  Uranus Opposition agrees to the minute and its design moment to two. */
+function cycleMoment(utc: string): string {
+  const d = new Date(utc ?? "");
+  if (Number.isNaN(d.getTime())) return "";
+  const MONTHS = ["January", "February", "March", "April", "May", "June", "July",
+    "August", "September", "October", "November", "December"];
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mm = String(d.getUTCMinutes()).padStart(2, "0");
+  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()} \u00b7 ${hh}:${mm} UTC`;
+}
+
 function cycleDay(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? "");
   if (!m) return iso ?? "";
@@ -3096,6 +3116,7 @@ function cycleDay(iso: string): string {
 function mergedCycles(d: SceneData): {
   label: string; date: string; status: string; text: string;
   passes?: string[]; first?: string; last?: string; utc?: string;
+  moment?: string; designMoment?: string;
 }[] {
   const written = new Map((d.client?.report.cycles ?? []).map((c) => [c.label.toLowerCase(), c]));
   const c = d.client?.cycles;
@@ -3110,9 +3131,11 @@ function mergedCycles(d: SceneData): {
   const rows: {
     label: string; date: string; status: string; text: string;
     passes?: string[]; first?: string; last?: string; utc?: string;
+    moment?: string; designMoment?: string;
   }[] = [];
   const put = (label: string, cy: {
-    firstPass: string; allPasses: string[]; status: string; firstPassDatetime?: string;
+    firstPass: string; allPasses: string[]; status: string;
+    firstPassDatetime?: string; castLocal?: string; designUtc?: string;
   }) => {
     if (!cy.firstPass) return;
     const mine = written.get(label.toLowerCase());
@@ -3131,10 +3154,12 @@ function mergedCycles(d: SceneData): {
       passes: cy.allPasses,
       first: cycleDay(first),
       last: cycleDay(last),
-      // The instant the return happens, to the second. A return chart is cast
-      // for when it happens: a line is a hundred minutes of solar travel, so
-      // the day alone would hand somebody the wrong profile for their cycle.
-      utc: cy.firstPassDatetime ?? "",
+      // The clock at the natal place: what the chart service is handed, since
+      // it reads a time as local to the place it is given.
+      utc: cy.castLocal ?? "",
+      // What is shown, always in UTC, with the cycle's own design moment.
+      moment: cycleMoment(cy.firstPassDatetime ?? ""),
+      designMoment: cycleMoment(cy.designUtc ?? ""),
     });
   };
   put("Saturn Return", c.saturnReturn);
@@ -5311,13 +5336,12 @@ if (DATA.client) {
   var cyc = DATA.client.cycles || [];
   if (cyc.length) {
     datesHtml += '<h4>Cycles</h4>' + cyc.map(function (c, i) {
-      // A cycle with retrograde passes runs over a span, and that span is
-      // worth knowing whether it is ahead or behind. A single-pass cycle has
-      // no span to state, so it says nothing rather than repeating its date.
-      var span = (c.first && c.last && c.first !== c.last)
-        ? '<span class="cycspan">' + esc(c.first) + ' \u2013 ' + esc(c.last) +
-          ((c.passes && c.passes.length > 1)
-            ? ' &middot; ' + c.passes.length + ' passes' : '') + '</span>'
+      // The cycle's own design moment, 88 degrees of solar arc before it,
+      // which is the other half of what a cycle chart is cast from. Kaycee,
+      // 2026-10-05, having seen Maia report both: "Let's remove the range and
+      // add the cycle design date."
+      var dsg = c.designMoment
+        ? '<span class="cycspan">Design &middot; ' + esc(c.designMoment) + '</span>'
         : '';
       // A return is a whole chart cast for the instant it happens, read
       // against the natal one, so it is a connection and not a transit: the
@@ -5330,8 +5354,8 @@ if (DATA.client) {
           esc(c.label) + '">Pull chart</button>'
         : '';
       return '<div class="cyc" data-cyc="' + i + '"><b>' + esc(c.label) + '</b>' +
-        '<span>' + esc(c.date) + ' &middot; ' + esc(c.status) + '</span>' +
-        span + pull + '</div>';
+        '<span>' + esc(c.moment || c.date) + ' &middot; ' + esc(c.status) + '</span>' +
+        dsg + pull + '</div>';
     }).join('');
   } else {
     datesHtml += '';
