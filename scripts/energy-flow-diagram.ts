@@ -4582,6 +4582,10 @@ body.view-astro #relhome > details { display:none !important; }
 /* The wheel is the only drawing with a base person, so the switch lives there. */
 #relswap { display:none; }
 body.mod-relation.view-astro #relswap { display:inline-flex; }
+/* Synastry here means this person's personality against their own design. On
+   a connection the pair owns the wheel, so the button has nothing left to
+   draw and Swap Perspective is the control that matters. */
+body.mod-relation #asSyn { display:none; }
 #astroplanets .line, #astrohouses .line, #astroaspects .line { display:grid;
   grid-template-columns:74px 1fr auto; gap:6px; font-size:11.5px; line-height:1.85; }
 #astroplanets .line i, #astrohouses .line i, #astroaspects .line i { font-style:normal; opacity:.55; }
@@ -8766,7 +8770,19 @@ if (DATA.client) {
         if (!drawn[side]) return;
         curSide = side;
         A = side === 'design' ? DES : PERS;
-        liveAstro.innerHTML = synOn && drawn[side + '-syn'] ? drawn[side + '-syn'] : drawn[side];
+        // The chart type says WHAT is drawn; the view only says how. On a
+        // connection the astrology view belongs to the pair, the same way the
+        // bodygraph does, and the same way the transit type governs every
+        // view. The pair wheel was being put up and then overwritten here by
+        // this person alone, so the second person appeared only after Swap
+        // Perspective was pressed. Kaycee, 2026-10-08: "when I switch to the
+        // astrology view in relationship mode it defaults to just my
+        // astrology chart and I have to click a lot of buttons to get the
+        // second person to show."
+        var pair = (body.classList.contains('mod-relation') && window.__pairWheel)
+          ? window.__pairWheel() : null;
+        liveAstro.innerHTML = pair
+          || (synOn && drawn[side + '-syn'] ? drawn[side + '-syn'] : drawn[side]);
         // setModule stashes the solo wheel when the pair takes the stage and
         // puts it back afterwards. Keep it pointing at the side she chose, or
         // coming back from a connection would restore the other chart under a
