@@ -221,7 +221,7 @@ export async function GET(request: Request) {
       const theirDesign = await designAt(
         (conn.b as { designUtc?: string }).designUtc, them.birthDate, them.birthTime, askAbout(them));
       wheelSvg = renderWheel(
-        mine, `${conn.a.name} and ${conn.b.name}`, myDesign, "ascendant",
+        mine, conn.a.name, myDesign, "ascendant",
         [...new Set([...conn.a.gates, ...conn.b.gates])],
         [...new Set(conn.a.gates)],
         [...new Set(conn.b.gates)],
@@ -233,7 +233,7 @@ export async function GET(request: Request) {
       // The same wheel from the other side: their houses and ascendant frame it,
       // and the two people keep their colours whichever of them is the base.
       wheelSvgB = renderWheel(
-        theirs, `${conn.b.name} and ${conn.a.name}`, theirDesign, "ascendant",
+        theirs, conn.b.name, theirDesign, "ascendant",
         [...new Set([...conn.a.gates, ...conn.b.gates])],
         [...new Set(conn.b.gates)],
         [...new Set(conn.a.gates)],

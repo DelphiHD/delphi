@@ -516,26 +516,47 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
     // So each person keeps a band, the base person inside and the other
     // outside, with a line drawn between them. Crowded glyphs step inward by
     // less than before, or a stepped glyph would walk out of its own band.
-    const A_PERS = 196, A_DES = 178, B_PERS = 254, B_DES = 236, STEP = 11;
-    const sets: [AstroChart | null | undefined, number, string, string, string][] = [
-      [chart, A_PERS, mine, "a", "personality"],
-      [design, A_DES, lighten(mine), "a", "design"],
-      [partner.personality, B_PERS, partner.colour, "b", "personality"],
-      [partner.design, B_DES, lighten(partner.colour), "b", "design"],
+    // Each band is a short stack of rings a glyph may sit on, and the two
+    // sides of one person SHARE that stack. Crowding used to be worked out
+    // per side, a side at a time, against a step of its own: two glyphs a few
+    // degrees apart were pushed eleven pixels off each other while the glyph
+    // itself is about fifteen tall, so they still overlapped, and a side
+    // could be nudged straight onto the other side's ring without noticing.
+    // Kaycee, 2026-10-08: "Is there anything we can do about the signs
+    // crowding each other like this?"
+    // Now a glyph takes the first free ring in its band, measuring free in
+    // GLYPH WIDTHS rather than in degrees, because six degrees is a wide gap
+    // against the signs and a narrow one near the middle.
+    const BAND_A = [198, 180, 162], BAND_B = [256, 238, 220];
+    const GLYPH_PX = 21;
+    const taken = new Map<number, { lon: number; slot: number }[]>();
+    const place = (band: number[], bandId: number, startSlot: number, lon: number) => {
+      const here = taken.get(bandId) ?? [];
+      taken.set(bandId, here);
+      for (let i = 0; i < band.length; i++) {
+        const slot = (startSlot + i) % band.length;
+        const apart = (GLYPH_PX / band[slot]) * (180 / Math.PI);
+        const clash = here.some((q) => q.slot === slot &&
+          Math.abs(((lon - q.lon + 540) % 360) - 180) < apart);
+        if (!clash) { here.push({ lon, slot }); return band[slot]; }
+      }
+      here.push({ lon, slot: band.length - 1 });
+      return band[band.length - 1];
+    };
+    const sets: [AstroChart | null | undefined, number[], number, number, string, string, string][] = [
+      [chart, BAND_A, 0, 0, mine, "a", "personality"],
+      [design, BAND_A, 0, 1, lighten(mine), "a", "design"],
+      [partner.personality, BAND_B, 1, 0, partner.colour, "b", "personality"],
+      [partner.design, BAND_B, 1, 1, lighten(partner.colour), "b", "design"],
     ];
     // the boundary between the two of them, so the bands read as two wheels
-    s.push(`<circle cx="${CX}" cy="${CY}" r="${(A_PERS + B_DES) / 2}" fill="none" ` +
+    s.push(`<circle cx="${CX}" cy="${CY}" r="${(BAND_A[0] + BAND_B[2]) / 2}" fill="none" ` +
       `stroke="#cfc7d6" stroke-width="1"/>`);
-    for (const [set, radius, colour, who, side] of sets) {
+    for (const [set, band, bandId, startSlot, colour, who, side] of sets) {
       if (!set) continue;
-      const placed: { lon: number; ring: number }[] = [];
       for (const p of [...set.planets].sort((a, b) => a.abs_pos - b.abs_pos)) {
         const lon = p.abs_pos;
-        let ring = 0;
-        while (placed.some((q) => q.ring === ring &&
-          Math.abs(((lon - q.lon + 540) % 360) - 180) < 6)) ring++;
-        placed.push({ lon, ring });
-        const [x, y] = pt(lon, asc, radius - ring * STEP);
+        const [x, y] = pt(lon, asc, place(band, bandId, startSlot, lon));
         s.push(`<text class="pglyph pside" data-aplanet="${p.name}" data-person="${who}" ` +
           `data-side="${side}" x="${f(x)}" y="${f(y + 7)}" text-anchor="middle" ` +
           `font-size="19" fill="${colour}">${GLYPH[p.name] ?? p.name.slice(0, 2)}</text>`);
@@ -602,8 +623,18 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   }
   // Nothing in the middle. The chords are the point of the middle, and a label
   // sitting on top of them makes them impossible to follow.
+  // On a connection each name is written in the colour that person is drawn
+  // in, the way the composite bodygraph's heading already does it, so the
+  // title says which ring is whose before anything is hovered. Kaycee,
+  // 2026-10-08: "can we have the names at the top of the chart be in the
+  // color that they are represented by?"
+  const titled = partner
+    ? `<tspan fill="${selfColour ?? PURPLE}">${name}</tspan>` +
+      `<tspan fill="#6b6790" font-weight="400"> and </tspan>` +
+      `<tspan fill="${partner.colour}">${partner.name}</tspan>`
+    : name;
   s.push(`<text x="${CX}" y="-26" text-anchor="middle" font-size="27" font-weight="600" ` +
-    `letter-spacing=".02em" fill="${INK}">${name}</text>`);
+    `letter-spacing=".02em" fill="${INK}">${titled}</text>`);
   s.push("</svg>");
   return s.join("\n");
 }
