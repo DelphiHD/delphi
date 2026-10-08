@@ -1,5 +1,10 @@
 # Dependencies
-node_modules/
+# No trailing slash. A pattern ending in / matches a directory and nothing
+# else, so it did not match the node_modules SYMLINK that each worktree keeps
+# pointing at the main clone's copy. On 2026-10-05 a git add -A in a worktree
+# committed that symlink, the daily pull laid it down in ~/delphi where it
+# pointed at itself, and the install was gone.
+node_modules
 /.pnp
 .pnp.*
 .yarn/*
