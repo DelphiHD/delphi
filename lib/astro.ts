@@ -174,10 +174,16 @@ export async function getAstro(args: {
   includeProviderSvg?: boolean;
   /** UTC instant to read instead of the birth moment, for the design side.
    *  The design side is the same person at a different moment, so it is read
-   *  the same way: another natal chart, about 88 days earlier. Only its planets
-   *  are used on a shared wheel; its own houses and angles belong to a horizon
-   *  that is not the one the chart is drawn on, exactly as in a synastry
-   *  bi-wheel, where the second chart contributes planets and nothing else. */
+   *  the same way: another natal chart, about 88 days earlier, with an
+   *  ascendant, angles and houses of its own.
+   *
+   *  On a wheel cast for the BIRTH moment only its planets are used, the way
+   *  a synastry bi-wheel takes planets from the second chart and nothing
+   *  else. Its own houses are not wrong there, they simply belong to another
+   *  horizon. Reading two designs together means casting the wheel ON that
+   *  horizon instead, which /api/connection does: Kaycee, 2026-10-08, "each
+   *  design date comes with its own astrology chart and houses. I want to see
+   *  those charts cast together." */
   atUtc?: string;
 }): Promise<AstroChart> {
   const loc = await locate(args.place);

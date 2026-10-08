@@ -190,6 +190,9 @@ export async function GET(request: Request) {
     let astro = null;
     let wheelSvg: string | null = null;
     let wheelSvgB: string | null = null;
+    // the same pair on the design horizon, one per base person
+    let wheelSvgAD: string | null = null;
+    let wheelSvgBD: string | null = null;
     let partnerDesign: unknown = null;
     let wheelError: string | null = null;
     // The aspects between the two of them, kept where the response can reach
@@ -241,6 +244,36 @@ export async function GET(request: Request) {
         PERSON_B,
         { a: PERSON_B, b: PERSON_A },
       );
+      // The same pair read on a DESIGN horizon. A design chart is cast at its
+      // own moment and carries its own ascendant and houses, so two designs
+      // laid in the personality's house frame are in the wrong frame. Kaycee,
+      // 2026-10-08: "each design date comes with its own astrology chart and
+      // houses. I want to see those charts cast together." Four wheels, then:
+      // either person as the base, on either horizon, and the page picks.
+      if (myDesign && theirDesign) {
+        wheelSvgAD = renderWheel(
+          myDesign, conn.a.name, mine, "ascendant",
+          [...new Set([...conn.a.gates, ...conn.b.gates])],
+          [...new Set(conn.a.gates)],
+          [...new Set(conn.b.gates)],
+          { personality: theirDesign, design: theirs, colour: PERSON_B, name: conn.b.name },
+          PERSON_A,
+          { a: PERSON_A, b: PERSON_B },
+          null,
+          "design",
+        );
+        wheelSvgBD = renderWheel(
+          theirDesign, conn.b.name, theirs, "ascendant",
+          [...new Set([...conn.a.gates, ...conn.b.gates])],
+          [...new Set(conn.b.gates)],
+          [...new Set(conn.a.gates)],
+          { personality: myDesign, design: mine, colour: PERSON_A, name: conn.a.name },
+          PERSON_B,
+          { a: PERSON_B, b: PERSON_A },
+          null,
+          "design",
+        );
+      }
       partnerDesign = theirDesign;
       if (wheelSvg) {
         wheelSvg = wheelSvg
@@ -261,6 +294,8 @@ export async function GET(request: Request) {
       astroDesign: partnerDesign,
       wheelSvg,
       wheelSvgB,
+      wheelSvgAD,
+      wheelSvgBD,
       wheelError,
       a: conn.a,
       b: conn.b,

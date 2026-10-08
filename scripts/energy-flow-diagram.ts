@@ -7723,7 +7723,15 @@ if (DATA.client) {
   window.__pairWheel = function () {
     var C = DATA.connection;
     if (!C) return null;
-    return (baseIsB && C.wheelSvgB) ? C.wheelSvgB : C.wheelSvg;
+    // Whose houses, and on which horizon. A design chart is cast at its own
+    // moment and has its own ascendant and houses, so with the personalities
+    // switched off the wheel is rebuilt on the design horizon rather than
+    // laying two designs in a frame that belongs to a birth moment.
+    var onDesign = document.body.classList.contains('off-s-personality');
+    if (baseIsB) {
+      return (onDesign && C.wheelSvgBD) ? C.wheelSvgBD : (C.wheelSvgB || C.wheelSvg);
+    }
+    return (onDesign && C.wheelSvgAD) ? C.wheelSvgAD : C.wheelSvg;
   };
   var relswap = document.getElementById('relswap');
   if (relswap) {
@@ -8991,6 +8999,9 @@ if (DATA.client) {
         if (which === 'design') { sd.wantD = off; sd.held = true; sd.astro = false; }
         else sd.wantP = off;
         window.__applySides();
+        // Dropping the personalities moves the wheel onto the design horizon,
+        // which is a different drawing, not a different set of things shown.
+        showSide(curSide);
       };
       bPers.addEventListener('click', function () {
         if (body.classList.contains('mod-relation')) { sideHere('personality', bPers); return; }

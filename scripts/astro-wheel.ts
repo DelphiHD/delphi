@@ -543,11 +543,19 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
       here.push({ lon, slot: band.length - 1 });
       return band[band.length - 1];
     };
+    // Which side each ring IS follows the wheel's own base, not the slot it
+    // sits in. A design chart is cast at its own moment and has its own
+    // ascendant and houses, so reading two designs together means a wheel
+    // built on a design horizon, with the personalities as the second set.
+    // Kaycee, 2026-10-08: "each design date comes with its own astrology
+    // chart and houses. I want to see those charts cast together."
+    const baseSide = mainSide;
+    const otherSide = mainSide === "design" ? "personality" : "design";
     const sets: [AstroChart | null | undefined, number[], number, number, string, string, string][] = [
-      [chart, BAND_A, 0, 0, mine, "a", "personality"],
-      [design, BAND_A, 0, 1, lighten(mine), "a", "design"],
-      [partner.personality, BAND_B, 1, 0, partner.colour, "b", "personality"],
-      [partner.design, BAND_B, 1, 1, lighten(partner.colour), "b", "design"],
+      [chart, BAND_A, 0, 0, mine, "a", baseSide],
+      [design, BAND_A, 0, 1, lighten(mine), "a", otherSide],
+      [partner.personality, BAND_B, 1, 0, partner.colour, "b", baseSide],
+      [partner.design, BAND_B, 1, 1, lighten(partner.colour), "b", otherSide],
     ];
     // the boundary between the two of them, so the bands read as two wheels
     s.push(`<circle cx="${CX}" cy="${CY}" r="${(BAND_A[0] + BAND_B[2]) / 2}" fill="none" ` +
@@ -618,10 +626,11 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
         `${m((n >> 8) & 255).toString(16).padStart(2, "0")}${m(n & 255).toString(16).padStart(2, "0")}`;
     };
     const selfInk = selfColour ?? PURPLE;
-    spokeFor(chart.planets, "personality", "a", selfInk);
-    if (design) spokeFor(design.planets, "design", "a", pale(selfInk));
-    if (partner.personality) spokeFor(partner.personality.planets, "personality", "b", partner.colour);
-    if (partner.design) spokeFor(partner.design.planets, "design", "b", pale(partner.colour));
+    const bSide = mainSide, oSide = mainSide === "design" ? "personality" : "design";
+    spokeFor(chart.planets, bSide, "a", selfInk);
+    if (design) spokeFor(design.planets, oSide, "a", pale(selfInk));
+    if (partner.personality) spokeFor(partner.personality.planets, bSide, "b", partner.colour);
+    if (partner.design) spokeFor(partner.design.planets, oSide, "b", pale(partner.colour));
   } else {
     spokeFor(chart.planets, mainIsTransit ? "transit" : mainSide);
     if (design) {
