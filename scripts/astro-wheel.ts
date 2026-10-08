@@ -341,6 +341,56 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   // which with those sections closed looks like a control that does nothing.
   s.push(`<g class="houselayer">${renderHouseLayer(chart.houses.map((h) => h.abs_pos), asc)}</g>`);
 
+  // ── ONE RING PER SET ──────────────────────────────────────────────────
+  // A wheel carries one set, two or three: the chart alone, the chart with
+  // its design or with a transit over it, or all three at once. Each gets a
+  // band of its own with a line between them, which is what a bi-wheel and a
+  // tri-wheel are. Kaycee, 2026-10-08: "We may as well create a tri-wheel
+  // version too... The bi-wheel version should be the default for
+  // relationships, transit with design or personality only and in the
+  // individual synastry view when comparing personality and design."
+  //
+  // The chart whose HOUSES are drawn is innermost and everything read
+  // against it goes outward, which is the convention her reference bi-wheel
+  // uses and the one the pair already follows. Each band is a short stack of
+  // rings and a crowded glyph takes the first free one, measured in glyph
+  // widths rather than degrees, because the same gap is wide out by the signs
+  // and narrow near the middle. Angle is never touched.
+  const setCount = 1 + (design && !partner ? 1 : 0) + (outer ? 1 : 0);
+  // Three rings to a band where there is room for them: two was not enough
+  // on this chart, where the Sun and the North Node sit a degree apart and
+  // Earth and Neptune do the same, so a third body at the same angle landed
+  // back on top of the second. A tri-wheel has room for two each, which
+  // covers everything but a three-way pile-up.
+  const BANDS: Record<number, number[][]> = {
+    1: [[R_PLANET, R_PLANET - 18, R_PLANET - 36]],
+    2: [[198, 180, 162], [256, 238, 220]],
+    3: [[188, 172], [222, 206], [256, 240]],
+  };
+  const bands = BANDS[setCount] ?? BANDS[1];
+  const taken = new Map<number, { lon: number; slot: number }[]>();
+  const placeIn = (bandIdx: number, lon: number): number => {
+    const band = bands[bandIdx] ?? bands[0];
+    const here = taken.get(bandIdx) ?? [];
+    taken.set(bandIdx, here);
+    for (let i = 0; i < band.length; i++) {
+      const apart = (21 / band[i]) * (180 / Math.PI);
+      const clash = here.some((q) => q.slot === i &&
+        Math.abs(((lon - q.lon + 540) % 360) - 180) < apart);
+      if (!clash) { here.push({ lon, slot: i }); return band[i]; }
+    }
+    here.push({ lon, slot: band.length - 1 });
+    return band[band.length - 1];
+  };
+  // the lines between the bands, so they read as separate wheels
+  if (setCount > 1 && !partner) {
+    for (let i = 1; i < bands.length; i++) {
+      const r = (bands[i - 1][0] + bands[i][bands[i].length - 1]) / 2;
+      s.push(`<circle cx="${CX}" cy="${CY}" r="${r.toFixed(1)}" fill="none" ` +
+        `stroke="#cfc7d6" stroke-width="1"/>`);
+    }
+  }
+
   // Aspects, drawn as chords inside. Two things get left out. Conjunctions,
   // because a chord between two points in the same place is a dot. And anything
   // involving a house cusp: the API returns those alongside the planet-to-planet
@@ -444,14 +494,10 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   if (outer) {
     s.push(`<circle cx="${CX}" cy="${CY}" r="${R_OVERLAY + 14}" fill="none" ` +
       `stroke="${outer.colour}" stroke-width="1" opacity=".3"/>`);
-    const placedO: { lon: number; ring: number }[] = [];
+    const outerBand = bands.length - 1;
     for (const p of [...outer.chart.planets].sort((a, b) => a.abs_pos - b.abs_pos)) {
       const lon = p.abs_pos;
-      let ring = 0;
-      while (placedO.some((q) => q.ring === ring &&
-        Math.abs(((lon - q.lon + 540) % 360) - 180) < 6)) ring++;
-      placedO.push({ lon, ring });
-      const [x, y] = pt(lon, asc, R_OVERLAY - ring * R_OVERLAY_STEP);
+      const [x, y] = pt(lon, asc, placeIn(outerBand, lon));
       s.push(`<text class="pglyph oside" data-aplanet="${p.name}" data-side="${outer.side}" ` +
         `data-ring="outer" x="${f(x)}" y="${f(y + 7)}" text-anchor="middle" dominant-baseline="central" font-size="19" ` +
         `fill="${outer.colour}">${GLYPH[p.name] ?? p.name.slice(0, 2)}</text>`);
@@ -467,18 +513,14 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   // sits at 85.76, inside gate 12, and a 3 degree nudge to clear the North Node
   // put it visually inside gate 15. With a gate ring outside the zodiac, an
   // angular nudge is the chart telling a lie. Radius is free; angle is not.
-  const placed: { lon: number; ring: number }[] = [];
   // With a partner on the wheel the block below draws every set, this one
   // included, tagged by person. Running this loop as well drew person one's
   // placements a second time, which is what the doubled glyphs were.
   for (const p of (partner ? [] : [...chart.planets]).sort((a, b) => a.abs_pos - b.abs_pos)) {
     const lon = p.abs_pos;
-    let ring = 0;
-    while (placed.some((q) => q.ring === ring &&
-      Math.abs(((lon - q.lon + 540) % 360) - 180) < 6)) ring++;
-    placed.push({ lon, ring });
-    const [x, y] = pt(lon, asc, R_PLANET - ring * R_PLANET_STEP);
-    const [tx, ty] = pt(lon, asc, R_PLANET - ring * R_PLANET_STEP - 13);
+    const rHere = placeIn(0, lon);
+    const [x, y] = pt(lon, asc, rHere);
+    const [tx, ty] = pt(lon, asc, rHere - 13);
     // Transit Only draws the sky as the chart's own ring. Tagged and coloured
     // as the personality it was indistinguishable from a natal chart, so
     // Kaycee read it as the natal placements refusing to go away, and every
@@ -582,18 +624,16 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
       }
     }
   } else if (design) {
-    const placedD: { lon: number; ring: number }[] = [];
+    // The second set has the band after the chart's own: on a tri-wheel the
+    // middle one, with the transit outside it. A transit arriving as the
+    // SECOND set (cast over one side alone) takes the outer band, because the
+    // sky arrives over a chart that was already there.
+    const secondBand = overlayAs?.outside ? bands.length - 1 : Math.min(1, bands.length - 1);
     for (const p of [...design.planets].sort((a, b) => a.abs_pos - b.abs_pos)) {
       const lon = p.abs_pos;
-      let ring = 0;
-      while (placedD.some((q) => q.ring === ring &&
-        Math.abs(((lon - q.lon + 540) % 360) - 180) < 6)) ring++;
-      placedD.push({ lon, ring });
-      // Outside the chart's own ring for a transit, inside it for a design.
-      const base = overlayAs?.outside ? R_OVERLAY : R_DESIGN;
-      const [x, y] = pt(lon, asc, overlayAs?.outside
-        ? base - ring * R_OVERLAY_STEP : base - ring * R_DESIGN_STEP);
-      const [tx, ty] = pt(lon, asc, base - ring * 20 - 12);
+      const rD = placeIn(secondBand, lon);
+      const [x, y] = pt(lon, asc, rD);
+      const [tx, ty] = pt(lon, asc, rD - 12);
       const innerSide = overlayAs?.side ?? (mainSide === "design" ? "personality" : "design");
       const innerFill = overlayAs?.colour ?? (innerSide === "design" ? DESIGN : INK);
       if (overlayAs?.outside && transitRetro?.[p.name]) {
