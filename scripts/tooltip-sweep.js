@@ -55,11 +55,37 @@
     });
   };
 
-  sweep('base');
-  document.getElementById('asGrid').click(); await wait(900);
-  document.querySelectorAll('th[data-head]').forEach((h) =>
-    check('grid header', h, h.getAttribute('data-hperson') || 'a', h.getAttribute('data-head')));
-  document.getElementById('asGrid').click(); await wait(600);
+  // Every surface in every VIEW, not only the one it opens on. The design
+  // grid was reported after the first sweep came back clean, because the
+  // sweep had only ever run the grid on the personality. A surface is only
+  // checked in the state it is checked in.
+  const truthFor = (who, side, planet) => {
+    const list = who === 'a'
+      ? (DATA.placements || []).filter((p) => p.side === side)
+      : ((side === 'design' ? C.b.design : C.b.personality) || []);
+    const m = list.find((p) => (p.planet || p.name) === planet);
+    return m ? m.gate : null;
+  };
+  const grid = (side) => {
+    document.querySelectorAll('th[data-head]').forEach((h) => {
+      hover(h); checked++;
+      const want = truthFor(h.getAttribute('data-hperson') || 'a',
+        h.getAttribute('data-hside'), h.getAttribute('data-head'));
+      const got = gateIn(tip.textContent);
+      if (want && got && want !== got) {
+        fails.push(`${side} grid header ${h.getAttribute('data-head')} `
+          + `(${h.getAttribute('data-hperson')}) said gate ${got}, wanted ${want}`);
+      }
+    });
+  };
+  for (const side of ['personality', 'design']) {
+    document.getElementById(side === 'design' ? 'asDes' : 'asPers').click();
+    await wait(900);
+    sweep(side);
+    document.getElementById('asGrid').click(); await wait(1000);
+    grid(side);
+    document.getElementById('asGrid').click(); await wait(600);
+  }
   document.getElementById('relswap').click(); await wait(1000);
   sweep('swapped');
 

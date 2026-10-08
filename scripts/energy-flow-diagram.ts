@@ -9281,19 +9281,32 @@ if (DATA.client) {
         // PEOPLE, which is what a synastry grid normally means.
         var C = (body.classList.contains('mod-relation') && DATA.connection
           && DATA.connection.synastry) ? DATA.connection : null;
-        var rows = planetsOf('personality').filter(on);
-        var cols = C ? (((C.astro || {}).planets) || []).filter(on)
+        // The grid reads whichever chart the view is on. It was pinned to the
+        // personality on both axes, so with Design selected the headers named
+        // personality placements AND the aspects behind them were the
+        // personality's: a design grid that was not a design grid. Kaycee,
+        // 2026-10-08: "When design is selected, in the astrology grid, with
+        // the aspect grid open, the headers still show the personality
+        // placements."
+        var gSide = (C && curSide === 'design') ? 'design' : 'personality';
+        var rows = (C ? planetsOf(gSide) : planetsOf('personality')).filter(on);
+        var theirs = C ? (gSide === 'design' ? (C.astroDesign || C.astro) : C.astro) : null;
+        var cols = C ? (((theirs || {}).planets) || []).filter(on)
           : planetsOf('design').filter(on);
-        var colSide = C ? 'personality' : 'design';
+        var colSide = C ? gSide : 'design';
+        var rowSideTag = C ? gSide : 'personality';
         var at = {};
-        ((C ? C.synastry : EX.synastry) || []).forEach(function (a) { at[a.p1_name + '|' + a.p2_name] = a; });
+        var list = C
+          ? ((gSide === 'design' ? C.synastryDesign : C.synastry) || C.synastry)
+          : EX.synastry;
+        (list || []).forEach(function (a) { at[a.p1_name + '|' + a.p2_name] = a; });
         var head = '<th class="corner"></th>' + cols.map(function (c) {
           return '<th class="colh" data-head="' + esc(c.name) + '" data-hside="' + colSide +
             '"' + (C ? ' data-hperson="b"' : '') + '>' +
             esc(glyphFor(c)) + '</th>';
         }).join('');
         var bodyRows = rows.map(function (r) {
-          return '<tr><th class="rowh" data-head="' + esc(r.name) + '" data-hside="personality"' +
+          return '<tr><th class="rowh" data-head="' + esc(r.name) + '" data-hside="' + rowSideTag + '"' +
             (C ? ' data-hperson="a"' : '') + '>' +
             esc(glyphFor(r)) + '</th>' +
             cols.map(function (c) {
@@ -9307,7 +9320,8 @@ if (DATA.client) {
                 (exp ? ' expected' : '') + '" data-cell="' +
                 esc(r.name) + '|' + esc(c.name) + '" data-aspect="' + esc(a.aspect) +
                 '" data-orb="' + (Math.round(Math.abs(a.orbit) * 10) / 10) +
-                '" data-pairkind="' + (C ? 'pair' : 'design') + '" data-expected="' + (exp ? '1' : '0') +
+                '" data-pairkind="' + (C ? 'pair' : 'design') +
+                '" data-rowside="' + rowSideTag + '" data-expected="' + (exp ? '1' : '0') +
                 '">' + (ASPECT_GLYPH[a.aspect] || '?') +
                 '<span class="glab">' + (Math.round(Math.abs(a.orbit) * 10) / 10) + '</span></td>';
             }).join('') + '</tr>';
@@ -9519,9 +9533,10 @@ if (DATA.client) {
           // somebody, so each is named after its person rather than left to
           // be guessed from which axis it sits on.
           var C2 = (kind === 'pair' && DATA.connection) ? DATA.connection : null;
-          var firstNm = C2 ? (C2.a.name + "'s " + labelOf(pair[0]))
-            : (rowSide === 'design' ? 'Design ' : '') + labelOf(pair[0]);
-          var secondNm = C2 ? (C2.b.name + "'s " + labelOf(pair[1]))
+          var sideWord = (rowSide === 'design' ? 'Design ' : '');
+          var firstNm = C2 ? (C2.a.name + "'s " + sideWord + labelOf(pair[0]))
+            : sideWord + labelOf(pair[0]);
+          var secondNm = C2 ? (C2.b.name + "'s " + sideWord + labelOf(pair[1]))
             : (kind === 'transit' ? 'Transit ' : '') + labelOf(pair[1]);
           // The page hides the tooltip for any pointer move it does not
           // recognise, and a grid cell is not something it knows about, so the

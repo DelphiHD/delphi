@@ -17,7 +17,8 @@ import { renderWheel } from "@/scripts/astro-wheel";
 import { CLIENTS } from "@/scripts/client-roster";
 import { chartByToken, briefFromRecord } from "@/lib/hd/chart-record";
 import { renderTransitLayer } from "@/lib/render/mandala";
-import { crossAspects } from "@/lib/astro-extras";
+import { crossAspects, pointAt } from "@/lib/astro-extras";
+import { longitudeOf } from "@/lib/hd/gate-longitude";
 import { PLANET_ORDER, type Activation, type Planet } from "@/lib/render/mandala.types";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 
@@ -72,6 +73,37 @@ async function whoIs(db: Db, token: string): Promise<Person | null> {
  * Without this, David Whiting could not be half of a connection at all.
  */
 const askAbout = (p: Person) => p.lookupPlace || p.birthPlace;
+
+/**
+ * The Earth, added to the other person's astrology.
+ *
+ * The astrology provider does not return an Earth: it is not an astrological
+ * planet. The chart's owner gets one because the builder reads it out of
+ * their Human Design data, where Earth is a placement in its own right with a
+ * gate, line, colour, tone and base, and turns that into a longitude. Kaycee,
+ * 2026-10-05: "We should have the exact coordinates of the earth placement
+ * with the human design data... Why do you think you have to make it up?"
+ * Nobody had ever done it for the second person, so their Earth row sat
+ * empty: Kaycee, 2026-10-08, "why is person 2's Earth placement not
+ * populating in the astrology view?" It is read the same way, from their own
+ * Human Design data, and never inferred from their Sun.
+ */
+function withEarth(
+  chart: { planets: { name: string }[]; houses: { abs_pos: number }[] } | null,
+  places: readonly { planet: string; gate: number; line: number;
+    color?: number; tone?: number; base?: number }[] | undefined,
+): void {
+  if (!chart || chart.planets.some((p) => p.name === "Earth")) return;
+  const e = (places ?? []).find((p) => p.planet === "Earth");
+  if (!e) return;
+  try {
+    const lon = longitudeOf(e.gate, e.line, e.color, e.tone, e.base);
+    chart.planets.push(pointAt("Earth", "Earth", lon,
+      chart.houses.map((h) => h.abs_pos)) as unknown as { name: string });
+  } catch {
+    // A gate outside 1..64 is not worth losing the connection over.
+  }
+}
 
 /**
  * The other person's planets, as a layer to lay over the mandala.
@@ -199,12 +231,17 @@ export async function GET(request: Request) {
     // them: the pair of charts they are worked out from lives inside the wheel
     // block below.
     let synastry: ReturnType<typeof crossAspects> = [];
+    // and the same between the two DESIGN charts, because the grid follows
+    // whichever chart is being read, not always the personality
+    let synastryDesign: ReturnType<typeof crossAspects> = [];
     try {
       const [mine, theirs] = await Promise.all([
         getAstro({ birthDate: me.birthDate, birthTime: me.birthTime, place: askAbout(me) }),
         getAstro({ birthDate: them.birthDate, birthTime: them.birthTime, place: askAbout(them) }),
       ]);
       astro = theirs;
+      // Their Earth, before anything is worked out from their planets.
+      withEarth(theirs as never, conn.b.personality);
       synastry = crossAspects(mine.planets, theirs.planets);
       // The base chart keeps its ascendant and houses; the second contributes
       // planets only. That is the convention for a bi-wheel.
@@ -274,6 +311,10 @@ export async function GET(request: Request) {
           "design",
         );
       }
+      withEarth(theirDesign as never, conn.b.design);
+      if (myDesign && theirDesign) {
+        synastryDesign = crossAspects(myDesign.planets, theirDesign.planets);
+      }
       partnerDesign = theirDesign;
       if (wheelSvg) {
         wheelSvg = wheelSvg
@@ -305,6 +346,7 @@ export async function GET(request: Request) {
       // connection, so it was simply not offered there. Kaycee, 2026-10-08:
       // "where is the aspect grid in the astrology view?"
       synastry,
+      synastryDesign,
       // the other person's planets, ready to lay over the wheel
       mandalaLayer:
         glyphLayer(conn.b.personality ?? [], "pairb pairb-personality") +
