@@ -34,6 +34,7 @@ const SOURCES = [
   "scripts/event-qr.ts",             // the QR card an organiser prints
   "lib/email.ts",                    // the chart email
   "app/c/[token]/route.ts",          // what a chart link says when it cannot open
+  "app/chart/save/page.tsx",         // the window that saves a variation
 ];
 
 const APPROVED = "docs/CLIENT_COPY.json";

@@ -3909,6 +3909,11 @@ body.mod-variations .varpanel { display:block; }
 body:not(.mod-variations) .varpanel { display:none !important; }
 body.mod-variations #tip, body.mod-variations #card { display:none !important; }
 .varhead { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--purple); font-weight:600; margin:2px 0 10px; }
+.varsave { display:block; width:100%; margin:12px 0 4px; font:inherit; font-size:11.5px;
+  padding:7px 10px; border-radius:9px; border:0; cursor:pointer;
+  background:var(--gold, #c9a227); color:#fff; }
+.varsave:hover { filter:brightness(1.06); }
+.prop.varlocked { pointer-events:none; }
 .vargrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:10px; }
 .varcard { display:block; text-align:left; background:#fff; color:#1c1a2e; border:1px solid rgba(132,80,149,.2); border-radius:12px; padding:8px 10px 10px; cursor:pointer; font:inherit; }
 .varcard:hover { border-color:rgba(132,80,149,.55); box-shadow:0 6px 18px rgba(60,40,80,.1); }
@@ -7042,6 +7047,7 @@ if (DATA.client) {
           '<div class="vbody">' + v.svg + '</div>' + fields(i, false) + '</button>';
       });
       panel.innerHTML = html + '</div>';
+      giveMetaBack();
       [].forEach.call(panel.querySelectorAll('.varcard'), function (b) {
         b.onclick = function () { open(Number(b.getAttribute('data-i'))); };
       });
@@ -7084,13 +7090,52 @@ if (DATA.client) {
           '<span class="vkeyitem"><span class="linechg">Line</span> changed</span></div>' : '');
     };
 
+    // The header block describes whoever is on the stage. A variation with a
+    // different type and profile under a panel still reading the birth chart's
+    // is the same mismatch as a tooltip answering out of the wrong chart.
+    var metaWas = null;
+    var SAYS = ['Profile', 'Type', 'Authority', 'Definition', 'Incarnation Cross'];
+    var takeMeta = function (v) {
+      var box = document.getElementById('pmeta');
+      if (!box) return;
+      if (metaWas === null) metaWas = box.innerHTML;
+      var say = { Profile: v.profile, Type: v.type, Authority: v.authority,
+        Definition: v.definition, 'Incarnation Cross': v.cross };
+      [].forEach.call(box.querySelectorAll('.prop'), function (pr) {
+        var lab = pr.querySelector('span');
+        var name = lab ? lab.textContent.trim() : '';
+        if (SAYS.indexOf(name) < 0 || !say[name]) return;
+        pr.innerHTML = '<span>' + esc(name) + '</span> ' + esc(say[name]);
+        // The card behind each field is this chart's own writing, which is not
+        // about the variation, so it is not offered while one is up.
+        pr.classList.add('varlocked');
+      });
+    };
+    var giveMetaBack = function () {
+      var box = document.getElementById('pmeta');
+      if (box && metaWas !== null) { box.innerHTML = metaWas; metaWas = null; }
+    };
+    window.__varMetaBack = giveMetaBack;
+
     var open = function (i) {
       var v = list[i];
+      takeMeta(v);
       panel.innerHTML = '<button class="varclose" aria-label="Close">&times;</button>' +
         '<div class="varhead">Variations</div><div class="varfocus">' +
         '<div class="vbody">' + v.svg + '</div><div><div class="vtime">' + span(i) + '</div>' +
-        (v.yours ? '<div class="vyours" style="margin-bottom:8px">Your chart</div>' : '') + fields(i, true) + tables(i) + '</div></div>';
-      panel.querySelector('.varclose').onclick = grid;
+        (v.yours ? '<div class="vyours" style="margin-bottom:8px">Your chart</div>' : '') +
+        fields(i, true) +
+        '<button class="varsave" data-from="' + esc(v.from) + '">Save this Variation</button>' +
+        tables(i) + '</div></div>';
+      panel.querySelector('.varclose').onclick = function () { giveMetaBack(); grid(); };
+      // Saving opens its own window: the name wants changing more often than
+      // not, and the chart it makes is a chart like any other, so it lands
+      // where a chart lands rather than inside this panel.
+      var sv = panel.querySelector('.varsave');
+      if (sv) sv.onclick = function () {
+        window.open('/chart/save?from=' + encodeURIComponent(tok) +
+          '&time=' + encodeURIComponent(sv.getAttribute('data-from')), '_blank');
+      };
       panel.scrollTop = 0;
     };
     return function (on) {
@@ -7116,6 +7161,8 @@ if (DATA.client) {
   var curView = 'plain';
 
   var applyView = function () {
+    // and the one view it does have is the one it opens on
+    if (curMod === 'variations' && curView !== 'plain') curView = 'plain';
     var v = curView;
     // Circuits mean nothing over a transit: the button is disabled rather than
     // hidden, and the drawing falls back to the plain body.
@@ -7140,7 +7187,12 @@ if (DATA.client) {
         var b = document.getElementById(pair[1]);
         if (!b) return;
         b.classList.toggle('on', pair[0] === curView);
-        var off = false;
+        // A variation is a reading of one moment of the birth day, not a chart
+        // this page holds: there is no wheel, no astrology and no circuitry
+        // cast for it. Kaycee, 2026-10-08: "All views except for Bodygraph
+        // should be greyed out when Variations is selected, if someone wants
+        // to explore a timepoint more closely they can save that chart."
+        var off = curMod === 'variations' && pair[0] !== 'plain';
         b.disabled = off;
         b.classList.toggle('disabled', off);
       });
@@ -7181,6 +7233,7 @@ if (DATA.client) {
       partyBtns.forEach(function (x) { if (x) x.classList.add('on'); });
     }
     if (window.__variations) window.__variations(id === 'variations');
+    if (id !== 'variations' && window.__varMetaBack) window.__varMetaBack();
     // The chart type is the hub: it says whether there is a transit at all,
     // and every view then draws the same thing its own way.
     if (window.__applyAgainst) window.__applyAgainst(id === 'transit');

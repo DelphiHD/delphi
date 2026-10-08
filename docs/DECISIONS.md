@@ -1164,3 +1164,34 @@ all 64 gates rather than only the ones the person lacks; an unclaimed leg is
 still fill:none and still invisible. The stylesheet also hid the hub's
 unclaimed legs outside a transit, which hid the partner's gates along with
 them, so that rule now lets a connection through as well.
+
+---
+
+## 2026-10-08 — A variation is a preview until it is saved
+
+**Decision.** The Variations chart type offers the Bodygraph view only; Circuits,
+The Wheel and Astrology are greyed out, and switching to Variations from one of
+them drops to the Bodygraph. Selecting a variation puts it on the stage and the
+header block switches to that variation's own Profile, Type, Authority,
+Definition and Cross. Saving one makes an ordinary chart with its own link,
+named `<Person> HH:MM` by default and editable first, in a window of its own
+that then opens the new chart.
+
+**Why.** Kaycee, 2026-10-08: "All views except for Bodygraph should be greyed
+out when Variations is selected, if someone wants to explore a timepoint more
+closely they can save that chart." A variation is a reading of one moment of
+the birth day, not a chart this page holds: there is no wheel, no astrology and
+no circuitry cast for it, and pretending otherwise would mean drawing things
+nobody computed. Saving is the door to all of it, because a saved variation is
+a chart like any other.
+
+**The header follows the stage.** A variation with a different type under a
+panel still reading the birth chart's is the same mismatch as a tooltip
+answering out of the wrong chart, which is the fault this whole chart has been
+chasing all week. The cards behind those fields go quiet while a variation is
+up: that writing is the chart's own report and is not about the variation.
+
+**Capitalisation.** Buttons, headings and field labels are Title Case. Kaycee,
+2026-10-08: "remember to capitalize so Save this variation becomes Save this
+Variation, Chart Name becomes Chart Name, etc." Whole sentences stay as
+sentences.
