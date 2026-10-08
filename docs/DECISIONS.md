@@ -1137,3 +1137,30 @@ public address: without this, holding two links would be enough to cast a
 connection between two people who had told this system nothing about each
 other. Nothing about the second person is sent to the page either, beyond the
 name and birth date already needed to label the option.
+
+---
+
+## 2026-10-08 — The hub is a bodygraph, so the chart type governs it too
+
+**Decision.** The bodygraph in the mandala's hub now paints a connection the
+same way the big composite does, from one shared painter rather than two
+pieces of code. Leaving the Relationship type puts the hub back exactly as it
+was, because unlike the composite canvas the hub is the one drawing every
+chart type shares.
+
+**Why.** Kaycee, 2026-10-08: "why would the small bodygraph not match the big
+bodygraph? I thought we had settled that in the transit view." It was settled.
+What the transit work gave the hub was every gate, ready to light in one
+colour, which is all a transit needs. A pair needs something a transit never
+did: two people on the same gate at once. The hub turned out to already have
+the geometry for it, a full-width leg and a half-width overlay per gate, so
+nothing had to be invented and no colour rule had to be chosen.
+
+**Three things were in the way, all of them small and all of them old.** A
+gate held inside a DEFINED channel is drawn by the channel shape, so its own
+leg was never tagged and nothing could ever paint it: gate 60 lit for the
+partner on the big drawing and could not on the hub. Tagging is now done for
+all 64 gates rather than only the ones the person lacks; an unclaimed leg is
+still fill:none and still invisible. The stylesheet also hid the hub's
+unclaimed legs outside a transit, which hid the partner's gates along with
+them, so that rule now lets a connection through as well.

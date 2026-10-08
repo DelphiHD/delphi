@@ -829,7 +829,14 @@ function compositeInner(
 function tagSkyGates(svg: string, natal: Set<number>): string {
   let s = svg;
   for (let g = 1; g <= 64; g++) {
-    if (natal.has(g)) continue;
+    // Every gate, not only the ones this person lacks. A gate they carry
+    // INSIDE a defined channel is drawn by the channel shape, so its own leg
+    // was left untagged and nothing could ever paint it: on a connection the
+    // big drawing lit gate 60 for the other person and the hub could not.
+    // tagChart has already been over this and puts its class first, so the
+    // pattern below only ever finds a leg nobody has claimed. Those stay
+    // invisible until something paints them, exactly as before.
+    void natal;
     s = s.replace(new RegExp(`(<[a-z]+ id="personality-${g}"[^>]*?)fill="[^"]*"`),
       (_m, head: string) =>
         `${head.replace('id="', 'class="tleg" data-gate="' + g + '" id="')}fill="none"`);
@@ -3547,7 +3554,13 @@ body.view-transit.tr-circuits svg.canvas.transit:not(.plain) { display:block !im
 /* Two colours on The Wheel as well: the person's bodies are black whichever
    side they are, and the sky's layer is the teal. */
 body.mod-transit .mandala [data-side="design"] { fill:#000000; stroke:#000000; }
-body:not(.mod-transit) .mandala .tleg, body:not(.mod-transit) .mandala .tdisc { display:none; }
+/* A gate this person does not carry is drawn into the hub ready to be claimed,
+   and stays out of sight until something claims it. The sky claims it under a
+   transit; the other person claims it on a connection. Unclaimed it is still
+   fill:none, and the pair painter hides what neither of them carries outright,
+   so letting it through here shows nothing that is not theirs. */
+body:not(.mod-transit):not(.mod-relation) .mandala .tleg,
+body:not(.mod-transit):not(.mod-relation) .mandala .tdisc { display:none; }
 body.tr-alone .mandala [data-side="personality"],
 body.tr-alone .mandala [data-side="design"] { display:none; }
 body.tr-alone svg.canvas.transit .pleg,
@@ -7134,6 +7147,8 @@ if (DATA.client) {
     // and every view then draws the same thing its own way.
     if (window.__applyAgainst) window.__applyAgainst(id === 'transit');
     if (window.__astroTransit) window.__astroTransit(id === 'transit');
+    // The hub is a bodygraph, so it answers to the chart type like the big one.
+    if (window.__pairMandala) window.__pairMandala(id === 'relation');
   };
 
   var view = function (id) {
@@ -7225,16 +7240,26 @@ if (DATA.client) {
       });
   }
 
-  function repaintPair(conn) {
-    var svg = document.querySelector('svg.canvas.composite');
-    if (!svg) return;
-    var A_P = '#845095', A_D = '#b89ac2', B_P = '#0d9488', B_D = '#73c1ba';
+  // Two people on one bodygraph, painted onto whichever drawing is asked for:
+  // the big composite canvas, or the bodygraph in the hub of the mandala. One
+  // implementation, because they are the same drawing at two sizes and the
+  // standing rule is that a change to one is a change to the other. Kaycee,
+  // 2026-10-08: "why would the small bodygraph not match the big bodygraph?"
+  // The hub carries the same geometry: a full-width leg and a half-width
+  // overlay on every gate, so a gate they share reads as two colours there
+  // too. It differs in one way only, and that way helps: gates this person
+  // does not carry were tagged for the sky, which is exactly what is needed
+  // for the gates only the other person brings.
+  // The two people's inks, named once: the painter below and the heading on the
+  // drawing both need them, and they have to be the same two colours.
+  var A_P = '#845095', A_D = '#b89ac2', B_P = '#0d9488', B_D = '#73c1ba';
+  function paintPairInto(root, conn) {
     var gset = function (list) {
       var o = {}; (list || []).forEach(function (x) { o[x.gate || x] = 1; }); return o;
     };
     var ap = gset(conn.a.personality), ad = gset(conn.a.design);
     var bp = gset(conn.b.personality), bd = gset(conn.b.design);
-    [].forEach.call(svg.querySelectorAll('.pleg, .gdisc'), function (el) {
+    [].forEach.call(root.querySelectorAll('.pleg, .tleg, .gdisc, .tdisc'), function (el) {
       var g = el.dataset.gate;
       var mine = ap[g] || ad[g], theirs = bp[g] || bd[g];
       if (!mine && !theirs) { el.style.display = 'none'; return; }
@@ -7253,11 +7278,40 @@ if (DATA.client) {
       if (key === 'solar plexus') key = 'solar-plexus';
       lit[key] = 1;
     });
-    [].forEach.call(svg.querySelectorAll('.cshape[data-center]'), function (el) {
+    [].forEach.call(root.querySelectorAll('.cshape[data-center]'), function (el) {
       var on = !!lit[el.dataset.center];
-      el.setAttribute('fill', on ? (el.dataset.litfill || el.getAttribute('fill'))
-        : (el.dataset.openfill || '#ffffff'));
+      // The hub's centres were drawn without the two fills recorded on them.
+      // The big drawing has them, centre for centre, so it answers for both.
+      var twin = el.dataset.litfill ? null
+        : document.querySelector('svg.canvas.composite .cshape[data-center="' + el.dataset.center + '"]');
+      var litFill = el.dataset.litfill || (twin && twin.dataset.litfill) || el.getAttribute('fill');
+      el.setAttribute('fill', on ? litFill : (el.dataset.openfill || '#ffffff'));
     });
+  }
+
+  // The hub is the ONE drawing every chart type shares, unlike the composite
+  // canvas which exists only for a connection. So what it looked like before
+  // the pair is kept whole and put back on the way out, or Individual and
+  // Transit would inherit somebody else's colours.
+  var hubBeforePair = null;
+  window.__pairMandala = function (on) {
+    var hub = document.querySelector('.mandala');
+    if (!hub) return;
+    if (!on || !DATA.connection) {
+      if (hubBeforePair !== null) { hub.innerHTML = hubBeforePair; hubBeforePair = null; }
+      return;
+    }
+    // a second connection is painted onto the untouched hub, not onto the
+    // first one's leftovers
+    if (hubBeforePair === null) hubBeforePair = hub.innerHTML;
+    else hub.innerHTML = hubBeforePair;
+    paintPairInto(hub, DATA.connection);
+  };
+
+  function repaintPair(conn) {
+    var svg = document.querySelector('svg.canvas.composite');
+    if (!svg) return;
+    paintPairInto(svg, conn);
     var head = svg.querySelector('text');
     if (head) {
       head.innerHTML = '<tspan fill="' + A_P + '">' + esc(conn.a.name) + '</tspan>' +
@@ -7265,6 +7319,7 @@ if (DATA.client) {
         '<tspan fill="' + B_P + '">' + esc(conn.b.name) + '</tspan>';
     }
     DATA.connection = conn;
+    if (window.__pairMandala) window.__pairMandala(curMod === 'relation');
     pairColumns(conn);
     relStats(conn);
     // The synastry wheel arrives drawn, so the Astrology view on a connection
@@ -7565,6 +7620,7 @@ if (DATA.client) {
       var abox = document.querySelector('.astro');
       if (abox && window.__soloWheel) abox.innerHTML = window.__soloWheel;
       DATA.connection = null;
+      if (window.__pairMandala) window.__pairMandala(false);
       if (window.__paintAstroRows) window.__paintAstroRows();
       if (window.__paintAstroMeta) window.__paintAstroMeta();
       if (window.__paintAspects) window.__paintAspects();
