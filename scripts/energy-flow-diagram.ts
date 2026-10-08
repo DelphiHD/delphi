@@ -9416,10 +9416,19 @@ if (DATA.client) {
         var ctx = cv.getContext('2d');
         if (!ctx) return;
         var BASE = 40;
-        // One ink height for every ring. Kaycee, 2026-10-05: "Transit glyphs
-        // should be the same size/weight as natal glyphs."
+        // One ink height for every ring, and a smaller one when the wheel is
+        // carrying three sets. A tri-wheel has three bands to fit between the
+        // house numbers and the ticks, which leaves each band two rings about
+        // sixteen apart, and a fifteen-high glyph does not clear that. The
+        // size is the only free variable left: the bands cannot move without
+        // running into the rings either side of them.
+        var sides = {};
         [].forEach.call(root.querySelectorAll('.pglyph'), function (t) {
-          var target = 15;
+          sides[t.getAttribute('data-side') || '?'] = 1;
+        });
+        var inkTarget = Object.keys(sides).length >= 3 ? 12.5 : 15;
+        [].forEach.call(root.querySelectorAll('.pglyph'), function (t) {
+          var target = inkTarget;
           ctx.font = '400 ' + BASE + 'px ' + getComputedStyle(t).fontFamily;
           var m = ctx.measureText(t.textContent || '');
           var h = (m.actualBoundingBoxAscent || 0) + (m.actualBoundingBoxDescent || 0);
