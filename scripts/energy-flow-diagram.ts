@@ -3820,7 +3820,9 @@ polygon.pending, rect.pending, path.pending,
 .mandala rect.hexbox { pointer-events:none; }
 .mandala rect.hexbox.lit { fill:#f6e4a8 !important; }
 .mandala [data-hex].lit { opacity:1 !important; }
-.mandala line[data-gate].lit { stroke:#c79a2e !important; stroke-width:3.4 !important; stroke-opacity:1 !important; }
+.mandala line[data-gate]:not(.g-divide).lit { stroke:#c79a2e !important; stroke-width:3.4 !important; stroke-opacity:1 !important; }
+/* A gate divider is the edge of a box, never a thing to highlight. */
+.mandala line.g-divide.lit { stroke:#666666 !important; stroke-width:0.7 !important; }
 .mandala text[data-gate].lit { font-weight:bold; }
 ${CIRCUITS.map((c) => `body.off-${c.id} .ch[data-circuit="${c.id}"]:not(.hang) { display:none; }`).join("\n")}
 /* On the bodygraph and the mandala's hub a channel is its drawn legs, so a
@@ -10564,7 +10566,15 @@ function litGate(gates) {
     c.classList.toggle('lit', on);
     c.classList.toggle('mhi', on);
   });
-  [].forEach.call(document.querySelectorAll('.mandala line[data-gate], .mandala text[data-gate]'), function (e) {
+  // NOT the gate dividers. They carry a gate number because they are the
+  // boundary of that gate's cell, and lighting one drew a gold stroke down
+  // ONE SIDE of the hexagram's box, which is the thing being complained
+  // about. Kaycee, 2026-10-08: "I want the line to highlight gold, BUT NOT
+  // THE FUCKING BORDER OF THE HEXAGRAM BOX... I would like the entire box
+  // that the hexagram sits in to light up the same color as the gate number
+  // box." The spoke lights; the boxes fill; nothing is outlined.
+  [].forEach.call(document.querySelectorAll(
+    '.mandala line[data-gate]:not(.g-divide), .mandala text[data-gate]'), function (e) {
     var on = !!want[e.dataset.gate];
     e.classList.toggle('lit', on);
     e.classList.toggle('mhi', on);
