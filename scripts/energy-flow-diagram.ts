@@ -4348,11 +4348,14 @@ body:not(.astro-all) #astroaspects .line.extra { display:none; }
 /* The renderer colours each ring by the side it belongs to, so nothing is
    repainted here. It used to be, which is how a design wheel carrying the
    personality as its inner ring ended up with both rings in the design red. */
-body:not(.mod-self) #astrosiderow { display:none; }
-/* The grid reads the aspects between whatever two sets are on the wheel, so it
-   belongs on a connection as much as on one person. Only Synastry, which means
-   this person's two sides, has nothing to say there. */
-body:not(.mod-self):not(.mod-relation) #astrosynrow { display:none; }
+/* Personality and Design are a control on a connection as much as on one
+   person: turning Personality off is how the two design charts are read
+   together. Kaycee, 2026-10-08: "would it be possible to add a button to view
+   the design charts together". The grid sits with them rather than on a row
+   of its own. Synastry means this person's own two sides and has nothing to
+   say on a connection. */
+body:not(.mod-self):not(.mod-relation) #astrosiderow { display:none; }
+body:not(.mod-self) #astrosynrow { display:none; }
 /* Which chart you are reading, then what is laid over it: two questions, so a
    line between them. Kaycee, 2026-10-05. */
 #astrosynrow { margin-top:7px; padding-top:7px; border-top:1px solid rgba(132,80,149,.16); }
@@ -4481,6 +4484,16 @@ body.view-astro #astrohome { display:block; }
    view already does. */
 /* Either party can be taken off a two-party chart: the pair, or the client and
    the sky. The other side stays exactly as it was drawn. */
+/* Taking a person off the chart takes them off every drawing of it. The
+   buttons only ever reached the composite bodygraph, so on the astrology view
+   they did nothing at all. Kaycee, 2026-10-08: "the buttons to remove a
+   person from the chart don't really do anything." */
+body.off-party-a .astro [data-person="a"],
+body.off-party-b .astro [data-person="b"],
+body.off-party-a .astro .pairasp[data-apwho="a"],
+body.off-party-b .astro .pairasp[data-apwho="b"],
+body.off-party-a .mandala [data-party="a"],
+body.off-party-b .mandala [data-party="b"] { display:none; }
 body.off-party-a svg.canvas.composite [data-party="a"],
 body.off-party-b svg.canvas.composite [data-party="b"] { display:none; }
 body.off-party-a svg.canvas.composite .ptable[data-side="pair-left"],
@@ -4807,8 +4820,8 @@ ${d.client ? "" : viewControls}
           <option value="porphyry">Porphyry</option>
         </select>
       </div>
-      <div class="row" id="astrosiderow" hidden><button id="asPers" class="on">Personality</button><button id="asDes">Design</button></div>
-      <div class="row" id="astrosynrow" hidden><button id="asSyn">Synastry</button><button id="asGrid">Aspect Grid</button></div>
+      <div class="row" id="astrosiderow" hidden><button id="asPers" class="on">Personality</button><button id="asDes">Design</button><button id="asGrid">Aspect Grid</button></div>
+      <div class="row" id="astrosynrow" hidden><button id="asSyn">Synastry</button></div>
       <details class="drop" id="apdrop"><summary>Placements</summary>
         <div id="astroplanets"></div>
       </details>
@@ -6870,14 +6883,26 @@ if (DATA.client) {
       offP = sides.cast === 'design';
       offD = sides.cast === 'personality';
     } else {
+      // The astrology view opens on personality alone so 26 glyphs do not
+      // arrive at once. A connection is already two charts and its design
+      // rings are half of what it is for, so the habit stands down there, the
+      // way it already does for synastry.
+      var astroRule = sides.astro && !body.classList.contains('mod-relation');
       offP = sides.wantP;
-      offD = sides.wantD || sides.astro;
+      offD = sides.wantD || astroRule;
     }
     body.classList.toggle('off-s-personality', offP);
     body.classList.toggle('off-s-design', offD);
     var bp = document.getElementById('sideP'), bd = document.getElementById('sideD');
     if (bp) bp.classList.toggle('on', !offP);
     if (bd) bd.classList.toggle('on', !offD);
+    // On a connection the astrology view's own two buttons mean the same
+    // thing as these, so they say the same thing.
+    if (body.classList.contains('mod-relation')) {
+      var ap = document.getElementById('asPers'), ad = document.getElementById('asDes');
+      if (ap) ap.classList.toggle('on', !offP);
+      if (ad) ad.classList.toggle('on', !offD);
+    }
     offCount();
     // A side coming back has to be DRAWN back. The classes alone used to be
     // enough, because nothing recomputed the drawing while the astrology
@@ -8948,12 +8973,33 @@ if (DATA.client) {
         liveAstro.classList.toggle('on-design', side === 'design');
         if (window.__evenWheelGlyphs) window.__evenWheelGlyphs(liveAstro);
         if (window.__markAstroPending) window.__markAstroPending();
-        bPers.classList.toggle('on', side !== 'design');
-        bDes.classList.toggle('on', side === 'design');
+        if (!body.classList.contains('mod-relation')) {
+          bPers.classList.toggle('on', side !== 'design');
+          bDes.classList.toggle('on', side === 'design');
+        }
         paintAstroMeta(); paintAstroRows(); paintHouses(); paintMode(); paintAspects();
       };
-      bPers.addEventListener('click', function () { showSide('personality'); });
-      bDes.addEventListener('click', function () { showSide('design'); });
+      // On one person these choose between two wheels. On a connection both
+      // people's sides are already on one wheel, so the same button shows and
+      // hides a side across both of them, and turning Personality off is how
+      // the two design charts are read together. Kaycee, 2026-10-08: "would
+      // it be possible to add a button to view the design charts together?"
+      var sideHere = function (which, btn) {
+        var off = btn.classList.contains('on');   // lit means showing
+        var sd = window.__sides;
+        if (!sd || !window.__applySides) return;
+        if (which === 'design') { sd.wantD = off; sd.held = true; sd.astro = false; }
+        else sd.wantP = off;
+        window.__applySides();
+      };
+      bPers.addEventListener('click', function () {
+        if (body.classList.contains('mod-relation')) { sideHere('personality', bPers); return; }
+        showSide('personality');
+      });
+      bDes.addEventListener('click', function () {
+        if (body.classList.contains('mod-relation')) { sideHere('design', bDes); return; }
+        showSide('design');
+      });
       // Synastry rides on whichever side is up, so it reads from the
       // personality's horizon or the design's, which is the "and vice versa".
       if (bSyn && drawn['personality-syn']) {
