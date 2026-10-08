@@ -8965,6 +8965,11 @@ if (DATA.client) {
           (trChosen ? '&place=' + encodeURIComponent(trChosen) : '');
         fetch(q).then(function (r) { return r.json(); }).then(function (j) {
           if (mine !== trSeq) return;            // a newer change already won
+          // Nor may it land after the chart type has moved on. A cast takes
+          // ten seconds or so; switching to Relationship inside that window
+          // left the sky's wheel sitting on top of the pair, because this
+          // only ever checked whether a NEWER TRANSIT had been asked for.
+          if (!body.classList.contains('mod-transit')) return;
           liveAstro.classList.remove('loading');
           if (!j.ok) {
             trNote.className = 'trnote bad';
@@ -9009,6 +9014,7 @@ if (DATA.client) {
           window.__sides.cast = on ? v : '';
           if (window.__applySides) window.__applySides();
         }
+        if (!on) trSeq++;   // nothing still in the air may land after this
         if (!on) {
           // Leaving the transit type puts its grid away with it.
           if (window.__transitGridOn) {
