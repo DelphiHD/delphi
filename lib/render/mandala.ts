@@ -307,7 +307,16 @@ function hexagramRing(
       // No rotation: keep every hexagram upright so the trigram order
       // (line 1 at bottom, line 6 at top) reads consistently regardless
       // of position on the wheel. This matches the MM Mandala convention.
+      // A hexagram is an image, so it had nothing to fill and could only go
+      // from faint to solid. This is the box behind it, transparent until the
+      // gate is lit. Kaycee, 2026-10-08: "the hexagram box should be lighting
+      // up like the gate box is."
+      const pad = side * 0.2;
       return (
+        `<rect class="hexbox" data-hex="${range.gate}" ` +
+        `x="${(p.x - side / 2 - pad).toFixed(2)}" y="${(p.y - side / 2 - pad).toFixed(2)}" ` +
+        `width="${(side + pad * 2).toFixed(2)}" height="${(side + pad * 2).toFixed(2)}" ` +
+        `rx="${(side * 0.18).toFixed(2)}" fill="none" />` +
         `<image class="hex-img" data-hex="${range.gate}" href="${url}" x="${(p.x - side / 2).toFixed(2)}" y="${(p.y - side / 2).toFixed(2)}" ` +
         `width="${side.toFixed(2)}" height="${side.toFixed(2)}" opacity="${opacity}" ` +
         `preserveAspectRatio="xMidYMid meet" />`
@@ -493,23 +502,18 @@ function activationSpokes(
         ? PALETTE.transit : PALETTE.activeSpokeStroke[centerOf(a.gate)];
       const top = pointAt(g, g.r.gateInner, lon);
       const bot = pointAt(g, innerEnd, lon);
-      // The spoke stops at the gate ring, because at rest a line drawn across
-      // the gate cells would scribble over the hexagrams. Highlighting it then
-      // ended in mid-air at the ring while the cell's border lit instead,
-      // which is not where the placement is. Kaycee, 2026-10-08: "I expect the
-      // line to be highlighted all the way to its tip... it looks dumb."
-      // So the last stretch is drawn and kept invisible, and the highlight
-      // brings it in: one line from the centre to the tip, only when lit.
-      const tip = pointAt(g, g.r.gateOuter, lon);
+      // The spoke stops at the gate ring. Carrying it across the ring to the
+      // tip was tried and it lies along a cell's edge whenever the placement
+      // sits near a gate boundary, which is most of them: Kaycee, 2026-10-08,
+      // "See the extra yellow line on the bottom of the hexagram for 57? That
+      // shouldn't be there." The line reaching a LIT BOX says the same thing
+      // without drawing over anything, so the gate cell and its hexagram both
+      // light instead.
       return (
         `<line data-side="${a.side}" data-planet="${a.planet}" data-gate="${a.gate}" ` +
         `x1="${top.x.toFixed(2)}" y1="${top.y.toFixed(2)}" ` +
         `x2="${bot.x.toFixed(2)}" y2="${bot.y.toFixed(2)}" ` +
-        `stroke="${color}" stroke-width="1.4" stroke-opacity="0.85" />` +
-        `<line class="sptip" data-side="${a.side}" data-planet="${a.planet}" data-gate="${a.gate}" ` +
-        `x1="${top.x.toFixed(2)}" y1="${top.y.toFixed(2)}" ` +
-        `x2="${tip.x.toFixed(2)}" y2="${tip.y.toFixed(2)}" ` +
-        `stroke="${color}" stroke-width="1.4" stroke-opacity="0" />`
+        `stroke="${color}" stroke-width="1.4" stroke-opacity="0.85" />`
       );
     })
     .join("\n");
@@ -567,18 +571,40 @@ function activationGlyphs(g: Geometry, activations: readonly Activation[], glyph
   const ringEnd = g.r.spokeOuter - padOuter;
   const ringStep = (ringEnd - ringStart) / (PLANET_RING_ORDER.length - 1);
 
-  // Personality and Design at the same gate.line for the same planet
-  // (rare but possible) get a small radial nudge so they don't overlap.
-  const seen = new Map<string, number>();
+  // The two sides of one planet share its ring, and a slow planet barely
+  // moves in the 88 days between them, so they arrive within a fraction of a
+  // degree of each other and read as one glyph with a shadow behind it.
+  // Kaycee, 2026-10-08: "why do the glyphs look like they have a shadow in
+  // the wheel view?"
+  //
+  // Matching on gate AND line missed it: the two sides are usually a line or
+  // two apart, which is far closer than a glyph is wide. Closeness is now
+  // measured in glyph widths at that ring's radius, and a crowded pair is
+  // pushed apart by more than a glyph, one outward and one inward, so the
+  // pair still reads as belonging to that planet's ring.
+  const lonOf = (a: Activation) => activationLongitude(a);
+  const ringOf = (a: Activation) =>
+    ringStart + PLANET_RING_ORDER.indexOf(a.planet as (typeof PLANET_RING_ORDER)[number]) * ringStep;
+  const crowded = new Set<number>();
+  activations.forEach((a, i) => {
+    activations.forEach((b, j) => {
+      if (j <= i || a.planet !== b.planet) return;
+      const r = ringOf(a);
+      if (r <= 0) return;
+      const apart = ((fontSize * 1.1) / r) * (180 / Math.PI);
+      if (Math.abs(((lonOf(a) - lonOf(b) + 540) % 360) - 180) < apart) {
+        crowded.add(i); crowded.add(j);
+      }
+    });
+  });
   return activations
-    .map((a) => {
+    .map((a, idx) => {
       const planetIdx = PLANET_RING_ORDER.indexOf(a.planet as (typeof PLANET_RING_ORDER)[number]);
       if (planetIdx < 0) return "";
       const baseR = ringStart + planetIdx * ringStep;
-      const key = `${a.planet}-${a.gate}.${a.line}`;
-      const sameCount = seen.get(key) ?? 0;
-      seen.set(key, sameCount + 1);
-      const nudge = sameCount === 0 ? 0 : (a.side === "design" ? -1 : 1) * g.size * 0.006;
+      const nudge = crowded.has(idx)
+        ? (a.side === "design" ? -1 : 1) * fontSize * 0.62
+        : 0;
       const r = baseR + nudge;
       const lon = activationLongitude(a);
       const p = pointAt(g, r, lon);

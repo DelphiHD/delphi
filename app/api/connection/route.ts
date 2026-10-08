@@ -126,6 +126,7 @@ const planetId = (name: string) => name.toLowerCase().replace(/[_\s]+/g, "-");
 function glyphLayer(
   places: readonly { planet: string; gate: number; line: number }[],
   cls: string,
+  side: "personality" | "design",
 ): string {
   const acts: Activation[] = places
     .filter((p) => KNOWN_PLANET.has(planetId(p.planet)))
@@ -136,8 +137,15 @@ function glyphLayer(
       line: p.line,
     }));
   if (!acts.length) return "";
+  // The sky's renderer draws the layer, and it tags everything as the sky,
+  // which is true of a transit and not of a person: hovering the other
+  // person's Mars on the wheel said "Transit Mars" on a connection. Kaycee,
+  // 2026-10-08: "notice that tooltip says Transit Mars, this is on a
+  // relationship chart, not a transit chart." The marks are relabelled as
+  // whose they actually are, here where it is known.
   return `<g class="${cls}">` +
-    renderTransitLayer(acts, { size: MANDALA_SIZE, glyphScale: MANDALA_GLYPH }) +
+    renderTransitLayer(acts, { size: MANDALA_SIZE, glyphScale: MANDALA_GLYPH })
+      .split('data-side="transit"').join(`data-side="${side}" data-person="b"`) +
     `</g>`;
 }
 
@@ -358,8 +366,8 @@ export async function GET(request: Request) {
       },
       // the other person's planets, ready to lay over the wheel
       mandalaLayer:
-        glyphLayer(conn.b.personality ?? [], "pairb pairb-personality") +
-        glyphLayer(conn.b.design ?? [], "pairb pairb-design"),
+        glyphLayer(conn.b.personality ?? [], "pairb pairb-personality", "personality") +
+        glyphLayer(conn.b.design ?? [], "pairb pairb-design", "design"),
       definedTogether: conn.definedTogether,
       openTogether: conn.openTogether,
       definitionLabel: conn.definitionLabel,

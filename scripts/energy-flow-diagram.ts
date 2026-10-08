@@ -3816,11 +3816,9 @@ polygon.pending, rect.pending, path.pending,
    Kaycee, 2026-10-08: "it highlights the edge of the gate for some reason. I
    don't understand. It looks dumb." */
 .mandala [data-gatecell].lit path { fill:#f6e4a8 !important; }
-/* The last stretch of the spoke, across the gate ring to the tip. Drawn with
-   the rest of it and invisible until the gate is lit. */
-.mandala line.sptip { pointer-events:none; }
-.mandala line.sptip.lit { stroke:#c79a2e !important; stroke-width:3.4 !important;
-  stroke-opacity:1 !important; }
+/* The hexagram's own box, lit the same way its gate is. */
+.mandala rect.hexbox { pointer-events:none; }
+.mandala rect.hexbox.lit { fill:#f6e4a8 !important; }
 .mandala [data-hex].lit { opacity:1 !important; }
 .mandala line[data-gate].lit { stroke:#c79a2e !important; stroke-width:3.4 !important; stroke-opacity:1 !important; }
 .mandala text[data-gate].lit { font-weight:bold; }
@@ -11196,6 +11194,30 @@ document.addEventListener('mousemove', function (e) {
     // 2026-10-05: "Can we add the mouseovers to the transiting planet glyphs
     // on the wheel view?" The layer tags them with the mandala's own planet
     // id, which is the key the timings are already held under.
+    // A body belonging to the other person on a connection. It is laid over
+    // the wheel by the same renderer the sky uses, so without this it fell
+    // into the branch below and announced itself as a transit.
+    var mw = mp.dataset.person;
+    if (mw && DATA.connection) {
+      var CN = DATA.connection;
+      var whoM = mw === 'b' ? CN.b : CN.a;
+      var sideM = mp.dataset.side === 'design' ? 'design' : 'personality';
+      var wantM = String(mp.dataset.planet);
+      // no regex: this script lives in a template literal, which eats the
+      // backslashes
+      var idOf = function (n) {
+        return String(n).toLowerCase().split('_').join('-').split(' ').join('-');
+      };
+      var hitM = ((sideM === 'design' ? whoM.design : whoM.personality) || [])
+        .filter(function (q) { return idOf(q.planet) === wantM; })[0];
+      var gateM = hitM ? hitM.gate : +mp.dataset.gate;
+      hot(null); markRows(null); litGate(gateM);
+      showTip(e, '<b>' + esc(whoM.name) + '\u2019s ' +
+        (sideM === 'design' ? 'Design ' : '') + esc(prettyPlanet(wantM)) +
+        (hitM ? ' ' + hitM.gate + '.' + hitM.line : '') + '</b>' +
+        gateTipHtml(gateM, null));
+      return;
+    }
     if (mp.dataset.side === 'transit') {
       var tp = mp.dataset.planet;
       var tt = (window.__transitTiming || {})[tp];
