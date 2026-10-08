@@ -8252,7 +8252,12 @@ if (DATA.client) {
       };
       var sideNm = isTr ? 'Transit ' : (side === 'design' ? 'Design ' : '');
       // The chart's gate for this body is not the transiting body's gate.
-      var g = isTr ? 0 : gateForPlanet(nm, side);
+      // The person was handed in and then not passed on, so the Gate pill in
+      // EVERY tooltip was read out of this chart whoever was being hovered.
+      // That is why fixing one surface after another never finished it: the
+      // leak was inside the thing they all call. Kaycee, 2026-10-08: "How do
+      // we get this right? This feels like everything is going off the rails."
+      var g = isTr ? 0 : gateForPlanet(nm, side, who);
       return '<b>' + esc(sideNm + (pl.label || pretty(pl.name))) + ' in ' + esc(pl.sign) +
         ' ' + dg(pl.position) + '</b>' +
         pill(pl.quality) + pill(pl.element) +
@@ -8422,7 +8427,12 @@ if (DATA.client) {
       // The four headline placements read as a table too, so the pair lines up
       // the same way it does everywhere else on this view.
       var t = {};
-      (relMeta.astro.planets || []).forEach(function (p) { t[p.name] = p; });
+      // The other person has two sides as well. This column was always their
+      // personality, so switching to Design changed one column and not the
+      // other. Kaycee, 2026-10-08: "his info in the control panel doesn't
+      // change when design is selected."
+      var theirSide = chartFor('b', curSide);
+      (theirSide.planets || []).forEach(function (p) { t[p.name] = p; });
       var sgn = function (deg) {
         return ZSIGN[Math.floor(deg / 30) % 12] + ' ' + dg(deg % 30);
       };
@@ -8440,8 +8450,8 @@ if (DATA.client) {
           t.Sun ? esc(t.Sun.sign) + ' ' + dg(t.Sun.position) : '\u2014') : '') +
         (moon ? mrow('Moon', ' data-prow="Moon"', moon.sign + ' ' + dg(moon.position),
           t.Moon ? esc(t.Moon.sign) + ' ' + dg(t.Moon.position) : '\u2014') : '') +
-        mrow('Ascendant', ' data-angrow="As"', sgn(A.ascendant), sgn(relMeta.astro.ascendant)) +
-        mrow('Midheaven', ' data-angrow="Mc"', sgn(A.mc), sgn(relMeta.astro.mc)) +
+        mrow('Ascendant', ' data-angrow="As"', sgn(A.ascendant), sgn(theirSide.ascendant)) +
+        mrow('Midheaven', ' data-angrow="Mc"', sgn(A.mc), sgn(theirSide.mc)) +
         '</div>';
       return;
     }
@@ -8481,7 +8491,8 @@ if (DATA.client) {
       && DATA.connection.astro) ? DATA.connection : null;
     if (relAstro) {
       var them = {};
-      (relAstro.astro.planets || []).forEach(function (p) { them[p.name] = p; });
+      // their side of the reading, the same side this person's column is on
+      (chartFor('b', curSide).planets || []).forEach(function (p) { them[p.name] = p; });
       document.getElementById('astroplanets').innerHTML =
         '<div class="ptbl">' +
         '<div class="hd"></div>' +
@@ -8615,13 +8626,19 @@ if (DATA.client) {
           var nm = r.getAttribute('data-prow');
           if (nm) {
             // the same side the row is describing, not always the birth one
-            var ms = r.getAttribute('data-side') === 'design' ? 'design' : 'personality';
-            showTip(e, planetTip(nm, ms));
-            [].forEach.call(wheelEl.querySelectorAll('[data-aplanet="' + nm + '"][data-side="' + ms + '"]'),
+            // A summary row carries no side of its own: it shows whichever
+            // chart the view is reading, so that is the side it answers for.
+            var ds = r.getAttribute('data-side');
+            var ms = ds ? (ds === 'design' ? 'design' : 'personality') : curSide;
+            var mw = r.getAttribute('data-person');
+            var mOnly = mw ? '[data-person="' + mw + '"]' : '';
+            showTip(e, planetTip(nm, ms, mw));
+            [].forEach.call(
+              wheelEl.querySelectorAll('[data-aplanet="' + nm + '"][data-side="' + ms + '"]' + mOnly),
               function (n) { n.classList.add('hov-glyph'); });
-            var sp = wheelEl.querySelector('[data-spoke="' + ms + ':' + nm + '"]');
+            var sp = wheelEl.querySelector('[data-spoke="' + ms + ':' + nm + '"]' + mOnly);
             if (sp) { sp.setAttribute('opacity', '.5'); sp.setAttribute('data-hov', '1'); }
-            lightGate(nm, ms);
+            lightGate(nm, ms, mw);
             return;
           }
           // an angle: light it and its opposite, since they are one axis
@@ -9472,8 +9489,17 @@ if (DATA.client) {
           if (h) {
             e.stopPropagation();
             var hs = h.getAttribute('data-hside');
+            // WHOSE body this header is. planetTip has always been able to
+            // answer for either person; this one surface was not telling it,
+            // so both Suns on a connection grid reported her personality Sun.
+            // Kaycee, 2026-10-08: "both tool tips for the sun positions in
+            // the aspect grid show my personality Gate 12 in Gemini for all
+            // of mine and Patrick's sun placements, which we know isn't
+            // true... I would expect those tool tips to represent what's on
+            // the chart."
             showTip(e, planetTip(h.getAttribute('data-head'),
-              hs === 'design' || hs === 'transit' ? hs : 'personality'));
+              hs === 'design' || hs === 'transit' ? hs : 'personality',
+              h.getAttribute('data-hperson')));
             return;
           }
           if (!c) { tip.hidden = true; return; }
@@ -9489,14 +9515,20 @@ if (DATA.client) {
           if (!asp) { tip.hidden = true; return; }
           var kind = c.getAttribute('data-pairkind') || 'design';
           var rowSide = c.getAttribute('data-rowside');
-          var firstNm = (rowSide === 'design' ? 'Design ' : '') + labelOf(pair[0]);
-          var secondNm = (kind === 'transit' ? 'Transit ' : '') + labelOf(pair[1]);
+          // On a connection both ends are a Sun or a Moon belonging to
+          // somebody, so each is named after its person rather than left to
+          // be guessed from which axis it sits on.
+          var C2 = (kind === 'pair' && DATA.connection) ? DATA.connection : null;
+          var firstNm = C2 ? (C2.a.name + "'s " + labelOf(pair[0]))
+            : (rowSide === 'design' ? 'Design ' : '') + labelOf(pair[0]);
+          var secondNm = C2 ? (C2.b.name + "'s " + labelOf(pair[1]))
+            : (kind === 'transit' ? 'Transit ' : '') + labelOf(pair[1]);
           // The page hides the tooltip for any pointer move it does not
           // recognise, and a grid cell is not something it knows about, so the
           // tip was being built and then hidden again in the same move.
           e.stopPropagation();
-          showTip(e, '<b><span style="color:#2f2a33">' + esc(firstNm) + '</span> ' +
-            esc(asp) + ' <span style="color:' + (kind === 'transit' ? '#0d9488' : '#e06666') +
+          showTip(e, '<b><span style="color:' + (C2 ? '#845095' : '#2f2a33') + '">' + esc(firstNm) + '</span> ' +
+            esc(asp) + ' <span style="color:' + (kind === 'transit' || kind === 'pair' ? '#0d9488' : '#e06666') +
             '">' + esc(secondNm) + '</span></b>' +
             '<span class="pill house">orb ' + esc(c.getAttribute('data-orb')) + '\u00b0</span>' +
             (c.getAttribute('data-expected') === '1'

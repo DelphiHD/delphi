@@ -144,6 +144,13 @@ export interface WheelPartner {
   design?: AstroChart | null;
   colour: string;
   name: string;
+  /** WHICH PERSON this is, not which ring they are on. The tag used to be
+   *  written from the ring: the base chart was always "a". Swapping
+   *  perspective puts the other person on the base ring, so every hover and
+   *  click then answered out of the wrong chart. Kaycee, 2026-10-08:
+   *  "clicking Patrick's sun highlights mine. Clicking mine highlights his."
+   *  Defaults to "b", with the base taking whichever is left. */
+  who?: "a" | "b";
 }
 
 /**
@@ -405,7 +412,9 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   // default and have them show when clicked maybe?" So they are drawn and
   // held at nothing until a planet is picked, which then shows that planet's
   // own, in that person's colour.
-  const pairWho = partner ? (setIndex === 0 ? "a" : "b") : null;
+  const pairWho = partner
+    ? (setIndex === 0 ? ((partner.who ?? "b") === "b" ? "a" : "b") : (partner.who ?? "b"))
+    : null;
   const planetNames = set.names;
   for (const a of set.list) {
     if (a.aspect === "conjunction") continue;
@@ -551,11 +560,13 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
     // chart and houses. I want to see those charts cast together."
     const baseSide = mainSide;
     const otherSide = mainSide === "design" ? "personality" : "design";
+    const themWho = partner.who ?? "b";
+    const meWho = themWho === "b" ? "a" : "b";
     const sets: [AstroChart | null | undefined, number[], number, number, string, string, string][] = [
-      [chart, BAND_A, 0, 0, mine, "a", baseSide],
-      [design, BAND_A, 0, 1, lighten(mine), "a", otherSide],
-      [partner.personality, BAND_B, 1, 0, partner.colour, "b", baseSide],
-      [partner.design, BAND_B, 1, 1, lighten(partner.colour), "b", otherSide],
+      [chart, BAND_A, 0, 0, mine, meWho, baseSide],
+      [design, BAND_A, 0, 1, lighten(mine), meWho, otherSide],
+      [partner.personality, BAND_B, 1, 0, partner.colour, themWho, baseSide],
+      [partner.design, BAND_B, 1, 1, lighten(partner.colour), themWho, otherSide],
     ];
     // the boundary between the two of them, so the bands read as two wheels
     s.push(`<circle cx="${CX}" cy="${CY}" r="${(BAND_A[0] + BAND_B[2]) / 2}" fill="none" ` +
@@ -627,10 +638,11 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
     };
     const selfInk = selfColour ?? PURPLE;
     const bSide = mainSide, oSide = mainSide === "design" ? "personality" : "design";
-    spokeFor(chart.planets, bSide, "a", selfInk);
-    if (design) spokeFor(design.planets, oSide, "a", pale(selfInk));
-    if (partner.personality) spokeFor(partner.personality.planets, bSide, "b", partner.colour);
-    if (partner.design) spokeFor(partner.design.planets, oSide, "b", pale(partner.colour));
+    const them = partner.who ?? "b", me = them === "b" ? "a" : "b";
+    spokeFor(chart.planets, bSide, me, selfInk);
+    if (design) spokeFor(design.planets, oSide, me, pale(selfInk));
+    if (partner.personality) spokeFor(partner.personality.planets, bSide, them, partner.colour);
+    if (partner.design) spokeFor(partner.design.planets, oSide, them, pale(partner.colour));
   } else {
     spokeFor(chart.planets, mainIsTransit ? "transit" : mainSide);
     if (design) {

@@ -240,7 +240,7 @@ export async function GET(request: Request) {
         [...new Set([...conn.a.gates, ...conn.b.gates])],
         [...new Set(conn.b.gates)],
         [...new Set(conn.a.gates)],
-        { personality: mine, design: myDesign, colour: PERSON_A, name: conn.a.name },
+        { personality: mine, design: myDesign, colour: PERSON_A, name: conn.a.name, who: "a" },
         PERSON_B,
         { a: PERSON_B, b: PERSON_A },
       );
@@ -267,7 +267,7 @@ export async function GET(request: Request) {
           [...new Set([...conn.a.gates, ...conn.b.gates])],
           [...new Set(conn.b.gates)],
           [...new Set(conn.a.gates)],
-          { personality: myDesign, design: mine, colour: PERSON_A, name: conn.a.name },
+          { personality: myDesign, design: mine, colour: PERSON_A, name: conn.a.name, who: "a" },
           PERSON_B,
           { a: PERSON_B, b: PERSON_A },
           null,
