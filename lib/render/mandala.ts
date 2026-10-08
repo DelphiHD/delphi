@@ -455,6 +455,17 @@ function activationWedges(g: Geometry, activatedGates: ReadonlySet<number>): str
     .join("\n");
 }
 
+/** How far a gate-boundary mark reaches: through the gate ring and part of
+ *  the way into the hexagram's box, cradling it. The ruler is the point of
+ *  these marks, showing one thing divided and divided again, so a lit spoke
+ *  has to stop exactly where they stop or it reads as a different object.
+ *  Kaycee, 2026-10-08: "I don't want them to go through the entire hexagram,
+ *  only up to the point that we had originally designed... through the gate
+ *  ring box and into the hexagram box." One constant, so they cannot drift. */
+function boundaryMarkOuter(g: Geometry): number {
+  return g.r.gateInner + (g.r.hexagramOuter - g.r.gateInner) * 0.6375;
+}
+
 function spokeGrid(g: Geometry): string {
   // Spokes run from a small radius near the wheel center (so they appear
   // to radiate from behind the bodygraph instead of stopping at a visible
@@ -463,9 +474,8 @@ function spokeGrid(g: Geometry): string {
   // further still, cradling each hexagram. Extension lengths shortened
   // ~25% from the previous pass.
   const interiorExt = (g.r.hexagramInner - g.r.gateInner) * 1.125;
-  const boundaryExt = (g.r.hexagramOuter - g.r.gateInner) * 0.6375;
   const interiorOuter = g.r.gateInner + interiorExt;
-  const boundaryOuter = g.r.gateInner + boundaryExt;
+  const boundaryOuter = boundaryMarkOuter(g);
   const innerEnd = 0;
   const lines: string[] = [];
   for (let w = 0; w < WHEEL_SEQUENCE.length; w++) {
@@ -502,19 +512,16 @@ function activationSpokes(
         ? PALETTE.transit : PALETTE.activeSpokeStroke[centerOf(a.gate)];
       const top = pointAt(g, g.r.gateInner, lon);
       const bot = pointAt(g, innerEnd, lon);
-      // At rest the spoke stops at the gate ring, because a line drawn across
-      // the cells would scribble over the numbers and the hexagrams. Lit, it
-      // runs ALL THE WAY UP: through the gate number box and on through the
-      // hexagram's box, which is the whole point of it. Kaycee, 2026-10-08:
-      // "I really wish the spoke of the line would highlight all the way up.
-      // That was the whole point of making them go through the gate number
-      // box and into the hexagram box." The line, the gate and the hexagram
-      // are one thing, and the highlight should let a reader see that.
+      // At rest the spoke stops at the gate ring. Lit, it reaches exactly as
+      // far as this wheel's own gate-boundary marks do: through the gate
+      // number box and INTO the hexagram's box, not through it. Those marks
+      // are a ruler, one thing divided and divided again, and a lit spoke
+      // that overshot them read as a different object laid on top.
       //
       // This was built, then taken out again when a stray gold line appeared
       // along a hexagram's edge. That line was the gate DIVIDER lighting up,
       // not this: the right feature was removed for the wrong reason.
-      const tip = pointAt(g, g.r.hexagramOuter, lon);
+      const tip = pointAt(g, boundaryMarkOuter(g), lon);
       return (
         `<line data-side="${a.side}" data-planet="${a.planet}" data-gate="${a.gate}" ` +
         `x1="${top.x.toFixed(2)}" y1="${top.y.toFixed(2)}" ` +
