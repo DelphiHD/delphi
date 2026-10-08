@@ -34,7 +34,7 @@ interface Listed {
   primary?: boolean;
 }
 
-const EMPTY = { ok: true, mine: [] as Listed[], clients: [] as Listed[] };
+const EMPTY = { ok: true, signedIn: false, mine: [] as Listed[], clients: [] as Listed[] };
 
 export async function GET(): Promise<Response> {
   const session = await createServerClient();
@@ -44,7 +44,7 @@ export async function GET(): Promise<Response> {
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return Response.json(EMPTY);
+  if (!url || !key) return Response.json({ ...EMPTY, signedIn: true });
   const db = createClient(url, key, { auth: { persistSession: false } });
 
   // Only charts that still have a live link are offerable: the picker exists to
@@ -90,5 +90,8 @@ export async function GET(): Promise<Response> {
     clients = rows.filter((r) => live.has(String(r.token))).map((r) => shape(r, null));
   }
 
-  return Response.json({ ok: true, mine, clients });
+  // Whether there is an account at all is its own answer. Somebody signed in
+  // with no second chart yet gets no picker but may still be offered the chance
+  // to keep the chart they are about to make, and an empty list cannot say that.
+  return Response.json({ ok: true, signedIn: true, mine, clients });
 }

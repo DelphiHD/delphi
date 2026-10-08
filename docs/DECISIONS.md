@@ -1110,3 +1110,30 @@ about who else touched it; resolving it on demand cannot go stale.
 **Both bodygraphs.** The side classes already drive the mandala hub through the
 same stylesheet rules, so the big drawing and the small one answer to the one
 resolver and cannot drift apart.
+
+---
+
+## 2026-10-08 — A connection can be cast against a chart somebody already has
+
+**Decision.** The Relationship panel offers a signed-in reader the charts on
+their account, and an analyst their clients' charts as well, as an alternative
+to typing birth details. Choosing one casts the connection from that chart's
+record: `/api/connection` takes `other=<token>` and reads the birth time, place
+and timezone server side. Creating someone new can also save them to the
+account, which makes an ordinary chart with its own link, recorded as "I was
+told" about the birth time, after the connection is drawn rather than before.
+
+**Why.** Somebody who has already given us a birth time should never be asked
+for it again, and a parent moving between their children's charts was the case
+that made the picker non-negotiable in the first place. Saving afterwards
+rather than first is because casting and publishing a whole chart takes about
+as long again as the connection, and the connection is the thing being waited
+for.
+
+**The security rule.** A saved chart belongs to the VIEWER, never to the page.
+`other=` requires a session and ownership, or an analyst link to the owner, or
+admin, which is the same rule /api/my-charts answers by. A chart link is a
+public address: without this, holding two links would be enough to cast a
+connection between two people who had told this system nothing about each
+other. Nothing about the second person is sent to the page either, beyond the
+name and birth date already needed to label the option.

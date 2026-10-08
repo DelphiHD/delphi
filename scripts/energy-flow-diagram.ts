@@ -4547,6 +4547,16 @@ body.mod-relation #relhome { display:block; }
 #relpick input { width:100%; box-sizing:border-box; font-family:inherit; font-size:11.5px;
   padding:5px 8px; margin-bottom:6px; border-radius:8px; border:1px solid rgba(132,80,149,.28);
   background:var(--paper); color:inherit; }
+#relpick select { width:100%; box-sizing:border-box; font-family:inherit; font-size:11.5px;
+  padding:5px 8px; margin-bottom:8px; border-radius:8px; border:1px solid rgba(132,80,149,.28);
+  background:var(--paper); color:inherit; }
+#relpick .relsave { display:flex; align-items:center; gap:6px; cursor:pointer;
+  font-size:11px; opacity:.72; margin:0 0 8px; }
+#relpick .relsave input { width:auto; margin:0; }
+/* A chart that is already saved brings its own birth details, so the fields
+   for typing them have nothing to say. */
+#relpick.chosen #relName, #relpick.chosen .two, #relpick.chosen #relPlace,
+#relpick.chosen #relPlaceList, #relpick.chosen #relSaveRow { display:none; }
 #relpick .two { gap:0 6px; }
 #relpick .two input { margin-bottom:6px; }
 #relStatus { min-height:14px; }
@@ -4695,6 +4705,8 @@ ${d.client ? "" : viewControls}
     <div id="tab-home" class="pane">
     <div id="relhome">
       <div id="relpick">
+        <div class="todaylab" id="relWholab" hidden>Connect with</div>
+        <select id="relWho" hidden></select>
         <input id="relName" type="text" placeholder="Their name" autocomplete="off">
         <div class="two">
           <input id="relDate" type="date">
@@ -4702,6 +4714,8 @@ ${d.client ? "" : viewControls}
         </div>
         <input id="relPlace" type="text" placeholder="Start typing a city" autocomplete="off">
         <div id="relPlaceList"></div>
+        <label class="relsave" id="relSaveRow" hidden>
+          <input id="relSave" type="checkbox">Save this chart to my account</label>
         <div class="row">
           <button id="relGo" class="gold">Create Chart</button>
           <button id="relBack" hidden>Back To My Chart</button>
@@ -7350,16 +7364,22 @@ if (DATA.client) {
   var placeInput = document.getElementById('relPlace');
   var placeList = document.getElementById('relPlaceList');
   var placeChosen = '';
+  // The provider answers the place and its timezone together, and saving a
+  // chart needs both: a timezone guessed from a place name later is the same
+  // mistake arriving by a different door.
+  var placeZone = '';
   if (placeInput && placeList) {
     var placeTimer = null;
     var showPlaces = function (places) {
       if (!places.length) { placeList.innerHTML = ''; return; }
       placeList.innerHTML = places.map(function (p) {
-        return '<div data-value="' + esc(p.value) + '">' + esc(p.value) + '</div>';
+        return '<div data-value="' + esc(p.value) + '" data-tz="' +
+          esc(p.timezone || '') + '">' + esc(p.value) + '</div>';
       }).join('');
       [].forEach.call(placeList.children, function (row) {
         row.onclick = function () {
           placeChosen = row.dataset.value;
+          placeZone = row.dataset.tz || '';
           placeInput.value = placeChosen;
           placeInput.classList.remove('unset');
           placeList.innerHTML = '';
@@ -7368,6 +7388,7 @@ if (DATA.client) {
     };
     placeInput.oninput = function () {
       placeChosen = '';
+      placeZone = '';
       placeInput.classList.add('unset');
       var q = placeInput.value.trim();
       if (placeTimer) clearTimeout(placeTimer);
@@ -7378,6 +7399,70 @@ if (DATA.client) {
           .then(function (j) { showPlaces((j && j.places) || []); })
           .catch(function () { placeList.innerHTML = ''; });
       }, 220);
+    };
+  }
+
+  // ── somebody signed in already has charts ────────────────────────────────
+  // Their own, their children's, and for an analyst their clients'. Asking
+  // them to type a birth time they have already given us is what makes a tool
+  // feel like a form. Kaycee, 2026-10-06: "give people who are signed in the
+  // option of choosing a preexisting, saved chart or to create a new one...
+  // If create new is selected I would like to give them the option to save
+  // that chart as well."
+  //
+  // The list comes from /api/my-charts, which answers from the session cookie
+  // and nothing else, so a forwarded link never exposes anybody's charts. The
+  // page itself only learns a name, a birth date and a token: the birth time
+  // and place stay on the server, and the connection is cast from the record
+  // rather than from anything sent back up.
+  var relPick = document.getElementById('relpick');
+  var relWho = document.getElementById('relWho');
+  var relWhoLab = document.getElementById('relWholab');
+  var relSaveRow = document.getElementById('relSaveRow');
+  var relSave = document.getElementById('relSave');
+  var myToken = location.pathname.split('/').pop();
+  var savedGroup = null;
+  if (relWho) {
+    var opt = function (value, text) {
+      var o = document.createElement('option');
+      o.value = value; o.textContent = text;
+      return o;
+    };
+    var listed = function (c) { return opt(c.token, c.name + (c.born ? ' \u00b7 ' + c.born : '')); };
+    var group = function (label) {
+      var g = document.createElement('optgroup');
+      g.label = label;
+      relWho.appendChild(g);
+      return g;
+    };
+    relWho.appendChild(opt('', 'Someone new'));
+    savedGroup = group('Your charts');
+    var clientGroup = null;
+    var reveal = function () {
+      if (!savedGroup.children.length && !(clientGroup && clientGroup.children.length)) return;
+      relWho.hidden = false;
+      if (relWhoLab) relWhoLab.hidden = false;
+    };
+    // Added to the list the moment it is saved, so the chart somebody just
+    // made is there to pick without reloading the page.
+    window.__relAddSaved = function (c) {
+      savedGroup.appendChild(listed(c));
+      reveal();
+    };
+    fetch('/api/my-charts').then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || !j.ok) return;
+      if (j.signedIn && relSaveRow) relSaveRow.hidden = false;
+      var notThisOne = function (c) { return c.token !== myToken; };
+      (j.mine || []).filter(notThisOne).forEach(function (c) { savedGroup.appendChild(listed(c)); });
+      var theirs = (j.clients || []).filter(notThisOne);
+      if (theirs.length) {
+        clientGroup = group('Your clients');
+        theirs.forEach(function (c) { clientGroup.appendChild(listed(c)); });
+      }
+      reveal();
+    }).catch(function () {});
+    relWho.onchange = function () {
+      if (relPick) relPick.classList.toggle('chosen', !!relWho.value);
     };
   }
 
@@ -7394,17 +7479,41 @@ if (DATA.client) {
       // the canonical value from the list, not what was typed
     var pl = placeChosen || document.getElementById('relPlace').value.trim();
       var nm = document.getElementById('relName').value.trim();
+      var chosen = relWho ? relWho.value : '';
+      var keep = !chosen && relSave && relSaveRow && !relSaveRow.hidden && relSave.checked;
       if (!token) { status.textContent = 'This only works on a published chart.'; return; }
-      if (!d || !t || !pl) { status.textContent = 'Birth date, time and place are all needed.'; return; }
+      var q = '/api/connection?token=' + token + '&other=' + encodeURIComponent(chosen);
+      if (!chosen) {
+        if (!d || !t || !pl) { status.textContent = 'Birth date, time and place are all needed.'; return; }
     if (!placeChosen) {
       status.textContent = 'Pick the birth place from the list so it matches one the chart service knows.';
       return;
     }
+        if (keep && !nm) { status.textContent = 'A name is needed to save this chart.'; return; }
+        q = '/api/connection?token=' + token + '&date=' + encodeURIComponent(d) +
+            '&time=' + encodeURIComponent(t) + '&place=' + encodeURIComponent(pl) +
+            '&name=' + encodeURIComponent(nm);
+      }
+      // Saving happens after the connection is drawn, never before it. Casting
+      // and publishing a whole chart takes about as long again, and the thing
+      // she asked for is on screen either way.
+      var keepIt = function () {
+        if (!keep) return;
+        status.textContent = 'Saving to your charts\u2026';
+        fetch('/api/portal/chart', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: nm, birthDate: d, birthTime: t,
+            place: pl, timezone: placeZone, timeAccuracy: 'told' }),
+        }).then(function (r) { return r.json(); }).then(function (sv) {
+          if (!sv || !sv.ok) { status.textContent = 'That chart could not be saved.'; return; }
+          status.textContent = 'Saved to your charts.';
+          relSave.checked = false;
+          if (window.__relAddSaved) window.__relAddSaved({ token: sv.token, name: nm, born: d });
+        }).catch(function () { status.textContent = 'That chart could not be saved.'; });
+      };
       status.textContent = 'Reading their chart\u2026';
       relGo.disabled = true;
-      fetch('/api/connection?token=' + token + '&date=' + encodeURIComponent(d) +
-            '&time=' + encodeURIComponent(t) + '&place=' + encodeURIComponent(pl) +
-            '&name=' + encodeURIComponent(nm))
+      fetch(q)
         .then(function (r) { return r.json(); })
         .then(function (j) {
           relGo.disabled = false;
@@ -7412,6 +7521,7 @@ if (DATA.client) {
           status.textContent = '';
           document.getElementById('relBack').hidden = false;
           repaintPair(j);
+          keepIt();
         })
         .catch(function (e) {
           relGo.disabled = false;

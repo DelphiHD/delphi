@@ -15,27 +15,78 @@ import { getTimezoneForLocation } from "@/lib/mybodygraph";
 import { getAstro } from "@/lib/astro";
 import { renderWheel } from "@/scripts/astro-wheel";
 import { CLIENTS } from "@/scripts/client-roster";
+import { chartByToken, briefFromRecord } from "@/lib/hd/chart-record";
+import { createClient as createServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 const bad = (msg: string, code = 400) =>
   NextResponse.json({ ok: false, error: msg }, { status: code });
 
+// The service client is created without generated database types, so its rows
+// come back as `never` once it is passed around as a value. Named here as what
+// it is: a Supabase client whose tables this file knows by hand.
+type Db = { from: (table: string) => any };   // eslint-disable-line @typescript-eslint/no-explicit-any
+
+interface Person {
+  name: string;
+  birthDate: string;
+  birthTime: string;
+  birthPlace: string;
+  lookupPlace?: string;
+  birthTimezone?: string;
+}
+
+/**
+ * Whose chart a token names, from either source this system has: the roster
+ * Kaycee keeps by hand, or a row in public.charts made through the site. Both
+ * answer the same question, and a connection broke on every chart from the
+ * second kind until they were read together ("that chart is no longer on the
+ * roster", Kaycee 2026-09-17).
+ */
+async function whoIs(db: Db, token: string): Promise<Person | null> {
+  const { data: rec } = await db
+    .from("client_charts")
+    .select("client_slug, revoked_at")
+    .eq("token", token)
+    .maybeSingle();
+  if (!rec || rec.revoked_at) return null;
+  const roster = CLIENTS[String(rec.client_slug)] as Person | undefined;
+  if (roster) return roster;
+  const row = await chartByToken(token);
+  if (!row) return null;
+  const b = briefFromRecord(row);
+  return {
+    name: b.name, birthDate: b.birthDate, birthTime: b.birthTime,
+    birthPlace: b.birthPlace, lookupPlace: b.lookupPlace, birthTimezone: b.birthTimezone,
+  };
+}
+
+/**
+ * The place to ASK about. birthPlace is the truth about where somebody was
+ * born and is what their chart prints; a few of them are towns the provider's
+ * gazetteer has never heard of, and those carry the nearest city it does know.
+ * Without this, David Whiting could not be half of a connection at all.
+ */
+const askAbout = (p: Person) => p.lookupPlace || p.birthPlace;
+
 export async function GET(request: Request) {
   const q = new URL(request.url).searchParams;
   const token = (q.get("token") ?? "").trim();
+  const other = (q.get("other") ?? "").trim();    // a chart the viewer has saved
   const date = (q.get("date") ?? "").trim();      // YYYY-MM-DD
   const time = (q.get("time") ?? "").trim();      // HH:MM
   const place = (q.get("place") ?? "").trim();
   const name = (q.get("name") ?? "").trim() || "Their chart";
 
   if (!/^[a-f0-9]{32}$/.test(token)) return bad("a chart token is required");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return bad("date must be YYYY-MM-DD");
-  if (!/^\d{2}:\d{2}$/.test(time)) return bad("time must be HH:MM");
-  if (place.length < 2 || place.length > 120) return bad("a birth place is required");
-
-  const year = Number(date.slice(0, 4));
-  if (year < 1900 || year > 2100) return bad("that birth year is outside what the provider covers");
+  if (!other) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return bad("date must be YYYY-MM-DD");
+    if (!/^\d{2}:\d{2}$/.test(time)) return bad("time must be HH:MM");
+    if (place.length < 2 || place.length > 120) return bad("a birth place is required");
+    const year = Number(date.slice(0, 4));
+    if (year < 1900 || year > 2100) return bad("that birth year is outside what the provider covers");
+  }
 
   // Who the page belongs to. Nothing the caller types decides this.
   const db = createClient(
@@ -43,40 +94,53 @@ export async function GET(request: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { persistSession: false } },
   );
-  const { data: rec } = await db
-    .from("client_charts")
-    .select("client_slug, revoked_at")
-    .eq("token", token)
-    .maybeSingle();
-  if (!rec || rec.revoked_at) return bad("that chart link is not active", 404);
+  const me = await whoIs(db, token);
+  if (!me) return bad("that chart link is not active", 404);
 
-  // A chart made through the website or an event link is a chart record, not a
-  // roster entry, and Relationship broke on every one of them ("that chart is
-  // no longer on the roster", Kaycee 2026-09-17). Either source answers the
-  // same question: whose chart is this.
-  const roster = CLIENTS[rec.client_slug];
-  const { data: chartRec } = roster ? { data: null } : await db
-    .from("charts")
-    .select("person_name, birth_date, birth_time, birth_place, birth_timezone")
-    .eq("token", token)
-    .maybeSingle();
-  const me = roster ?? (chartRec ? {
-    name: String(chartRec.person_name ?? "Their chart"),
-    birthDate: String(chartRec.birth_date),
-    birthTime: String(chartRec.birth_time ?? "12:00").slice(0, 5),
-    birthPlace: String(chartRec.birth_place ?? ""),
-    birthTimezone: String(chartRec.birth_timezone ?? ""),
-  } : null);
-  if (!me) return bad("that chart is no longer on the roster", 404);
+  // The other half: either birth details typed into the panel, or a chart the
+  // viewer already holds.
+  //
+  // A SAVED CHART IS THE VIEWER'S, NEVER THE PAGE'S. This is the same rule
+  // /api/my-charts answers by, and it is the whole of the security here: a
+  // chart link is a public address, so without a session check, holding two
+  // links would be enough to cast a connection between two strangers who had
+  // told this system nothing about each other.
+  let them: Person | null = null;
+  if (other) {
+    if (!/^[a-f0-9]{32}$/.test(other)) return bad("that is not a chart link");
+    if (other === token) return bad("that is the same chart");
+    const session = await createServerClient();
+    const { data: { user } } = await session.auth.getUser();
+    if (!user) return bad("sign in to use a chart you have saved", 401);
+    const { data: row } = await db.from("charts").select("owner_id").eq("token", other).maybeSingle();
+    if (!row) return bad("that chart could not be found", 404);
+    let allowed = String(row.owner_id ?? "") === user.id;
+    if (!allowed) {
+      const { data: admin } = await db.from("delphi_admins")
+        .select("user_id").eq("user_id", user.id).maybeSingle();
+      allowed = !!admin;
+    }
+    if (!allowed && row.owner_id) {
+      const { data: link } = await db.from("analyst_clients").select("client_id")
+        .eq("analyst_id", user.id).eq("client_id", String(row.owner_id))
+        .is("ended_at", null).maybeSingle();
+      allowed = !!link;
+    }
+    if (!allowed) return bad("that chart belongs to somebody else", 403);
+    them = await whoIs(db, other);
+    if (!them) return bad("that chart could not be found", 404);
+  } else {
+    them = { name, birthDate: date, birthTime: time, birthPlace: place };
+  }
 
   try {
     const [mineTz, theirTz] = await Promise.all([
-      (me as { birthTimezone?: string }).birthTimezone || getTimezoneForLocation(me.birthPlace),
-      getTimezoneForLocation(place),
+      me.birthTimezone || getTimezoneForLocation(askAbout(me)),
+      them.birthTimezone || getTimezoneForLocation(askAbout(them)),
     ]);
     const conn = await getConnectionChart(
       { name: me.name, birthDate: me.birthDate, birthTime: me.birthTime, birthTimezone: mineTz },
-      { name, birthDate: date, birthTime: time, birthTimezone: theirTz },
+      { name: them.name, birthDate: them.birthDate, birthTime: them.birthTime, birthTimezone: theirTz },
     );
     // The partner's natal astrology, fetched alongside the connection. The
     // synastry wheel needs it, and a failure there must not cost the connection
@@ -91,8 +155,8 @@ export async function GET(request: Request) {
     let wheelError: string | null = null;
     try {
       const [mine, theirs] = await Promise.all([
-        getAstro({ birthDate: me.birthDate, birthTime: me.birthTime, place: me.birthPlace }),
-        getAstro({ birthDate: date, birthTime: time, place }),
+        getAstro({ birthDate: me.birthDate, birthTime: me.birthTime, place: askAbout(me) }),
+        getAstro({ birthDate: them.birthDate, birthTime: them.birthTime, place: askAbout(them) }),
       ]);
       astro = theirs;
       // The base chart keeps its ascendant and houses; the second contributes
@@ -109,9 +173,9 @@ export async function GET(request: Request) {
       const designAt = async (utc: string | undefined, birthDate: string, birthTime: string, at: string) =>
         utc ? getAstro({ birthDate, birthTime, place: at, atUtc: utc }).catch(() => null) : null;
       const myDesign = await designAt(
-        (conn.a as { designUtc?: string }).designUtc, me.birthDate, me.birthTime, me.birthPlace);
+        (conn.a as { designUtc?: string }).designUtc, me.birthDate, me.birthTime, askAbout(me));
       const theirDesign = await designAt(
-        (conn.b as { designUtc?: string }).designUtc, date, time, place);
+        (conn.b as { designUtc?: string }).designUtc, them.birthDate, them.birthTime, askAbout(them));
       wheelSvg = renderWheel(
         mine, `${conn.a.name} and ${conn.b.name}`, myDesign, "ascendant",
         [...new Set([...conn.a.gates, ...conn.b.gates])],
