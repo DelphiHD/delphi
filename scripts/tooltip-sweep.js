@@ -89,6 +89,32 @@
   document.getElementById('relswap').click(); await wait(1000);
   sweep('swapped');
 
+  // The three panels, against the connection itself. A panel showing one
+  // person's numbers while two people are on the chart is the same fault as
+  // a tooltip answering out of the wrong chart, and it is not something to
+  // find by reading. Kaycee, 2026-10-08: "They should be representative of
+  // what's actually on the chart. I hope I don't have to go through each
+  // little point one by one."
+  const tab = (n) => document.querySelector(`#ptabs button:nth-child(${n})`).click();
+  const want = (C.a.personality.length + C.a.design.length)
+    + (C.b.personality.length + C.b.design.length);
+  tab(3); await wait(900);
+  const stats = document.getElementById('tab-stats').textContent;
+  const lines = [...stats.matchAll(/Line \d(\d+)/g)].reduce((t, m) => t + Number(m[1]), 0);
+  checked++;
+  if (lines !== want) fails.push(`Stats counts ${lines} activations, the pair has ${want}`);
+  [C.a.name, C.b.name].forEach((n) => {
+    checked++;
+    if (!stats.includes(n)) fails.push(`Stats does not name ${n}`);
+  });
+  tab(2); await wait(700);
+  const dates = document.getElementById('tab-dates').textContent;
+  [C.a.name, C.b.name].forEach((n) => {
+    checked++;
+    if (!dates.includes(n)) fails.push(`Dates does not name ${n}`);
+  });
+  tab(1); await wait(500);
+
   console.log(`${checked} surfaces checked, ${fails.length} disagreed`);
   fails.forEach((f) => console.log('  ' + f));
   return { checked, failures: fails.length, fails };

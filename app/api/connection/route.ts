@@ -347,6 +347,15 @@ export async function GET(request: Request) {
       // "where is the aspect grid in the astrology view?"
       synastry,
       synastryDesign,
+      // The other person's own moments, so the Dates tab can say whose dates
+      // it is showing instead of presenting one person's as the chart's.
+      bBirth: {
+        born: `${them.birthDate}${them.birthTime ? " \u00b7 " + them.birthTime : ""}`,
+        place: them.birthPlace,
+        design: (conn.b as { designUtc?: string }).designUtc
+          ? String((conn.b as { designUtc?: string }).designUtc).slice(0, 16).replace("T", " \u00b7 ") + " UTC"
+          : "",
+      },
       // the other person's planets, ready to lay over the wheel
       mandalaLayer:
         glyphLayer(conn.b.personality ?? [], "pairb pairb-personality") +

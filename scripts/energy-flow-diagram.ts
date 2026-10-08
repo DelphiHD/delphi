@@ -4355,7 +4355,10 @@ body:not(.astro-all) #astroaspects .line.extra { display:none; }
    of its own. Synastry means this person's own two sides and has nothing to
    say on a connection. */
 body:not(.mod-self):not(.mod-relation) #astrosiderow { display:none; }
-body:not(.mod-self):not(.mod-relation) #astrosynrow { display:none; }
+/* Synastry means one person's personality against their own design. On a
+   connection Personality, Design and the perspective switch already say
+   everything it could, so it is not offered there. */
+body:not(.mod-self) #astrosynrow { display:none; }
 /* Which chart you are reading, then what is laid over it: two questions, so a
    line between them. Kaycee, 2026-10-05. */
 #astrosynrow { margin-top:7px; padding-top:7px; border-top:1px solid rgba(132,80,149,.16); }
@@ -6108,7 +6111,20 @@ if (DATA.client) {
     }
 
     renderStats(onStage());
-    window.__renderStats = function () { renderStats(onStage()); };
+    window.__renderStats = function () {
+      // On a connection the stage is two people, so the counts are theirs and
+      // the bars are split by person. relStats draws exactly that and was
+      // being painted over by the single-chart renderer running after it,
+      // which is why the Stats tab showed one chart's 52 in two colours that
+      // happen to be the same two. Kaycee, 2026-10-08: "the Home Dates and
+      // Stats panels in relationship view... should be representative of
+      // what's actually on the chart."
+      if (document.body.classList.contains('mod-relation') && DATA.connection) {
+        relStats(DATA.connection);
+        return;
+      }
+      renderStats(onStage());
+    };
 
     document.getElementById('tab-stats').addEventListener('click', function (e) {
       var el = e.target.closest ? e.target.closest('[data-gate]') : null;
@@ -7448,6 +7464,7 @@ if (DATA.client) {
     }
     DATA.connection = conn;
     if (window.__pairMandala) window.__pairMandala(curMod === 'relation');
+    relDates(conn);
     pairColumns(conn);
     relStats(conn);
     // The synastry wheel arrives drawn, so the Astrology view on a connection
@@ -7758,6 +7775,7 @@ if (DATA.client) {
       if (abox && window.__soloWheel) abox.innerHTML = window.__soloWheel;
       DATA.connection = null;
       if (window.__pairMandala) window.__pairMandala(false);
+      relDates(null);
       if (window.__paintAstroRows) window.__paintAstroRows();
       if (window.__paintAstroMeta) window.__paintAstroMeta();
       if (window.__paintAspects) window.__paintAspects();
@@ -7771,6 +7789,31 @@ if (DATA.client) {
   // count reads as "how much each of us brings" rather than two tables to hold in
   // your head. Kaycee, 2026-09-01: "one bar per stat that shows the count for
   // each segmented by color."
+  /** The Dates tab on a connection: two people were on the chart and it still
+   *  showed one person's birth, design and cycles with nothing saying whose.
+   *  Both are named, and the other person's own birth and design moment sit
+   *  beside them. Their cycles are not here: nobody has cast them. */
+  function relDates(conn) {
+    var pane = document.getElementById('tab-dates');
+    if (!pane) return;
+    var old = document.getElementById('reldates');
+    if (old) old.remove();
+    [].forEach.call(pane.querySelectorAll('.whosedates'), function (n) { n.remove(); });
+    if (!conn) return;
+    var b = conn.bBirth || {};
+    var box = document.createElement('div');
+    box.id = 'reldates';
+    box.innerHTML = '<h4>' + esc(conn.b.name) + '</h4>' +
+      '<div class="line">' + esc(b.born || '') +
+      (b.place ? '<br><span>' + esc(b.place) + '</span>' : '') + '</div>' +
+      (b.design ? '<h4>Design</h4><div class="line">' + esc(b.design) + '</div>' : '');
+    var mine = document.createElement('h4');
+    mine.className = 'whosedates';
+    mine.textContent = conn.a.name;
+    pane.insertBefore(box, pane.firstChild);
+    pane.insertBefore(mine, box.nextSibling);
+  }
+
   function relStats(conn) {
     var pane = document.getElementById('tab-stats');
     if (!pane || !conn) return;
