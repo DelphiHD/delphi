@@ -10159,10 +10159,21 @@ function paintRelationship() {
   });
   // Dark is personality, light is design, the same reading the chart itself uses.
   var A_D = '#b89ac2', B_D = '#73c1ba';
-  var cell = function (pers, des, dark, light) {
+  // Each placement carries what it is, so hovering one answers about THAT
+  // placement: this person, this side, this gate and line. The cell lights the
+  // chart and said nothing, while the same table on an individual chart has
+  // always explained itself. Kaycee, 2026-10-08: "what happened to the
+  // placement table mouseovers in the relationship view?"
+  var cell = function (pers, des, dark, light, who, planet) {
     var bits = [];
-    if (pers) bits.push('<b style="color:' + dark + '">' + pers.gate + '.' + pers.line + '</b>');
-    if (des) bits.push('<b style="color:' + light + '">' + des.gate + '.' + des.line + '</b>');
+    var one = function (pl, colour, side) {
+      return '<b style="color:' + colour + '" data-pgate="' + pl.gate +
+        '" data-pline="' + pl.line + '" data-pside="' + side +
+        '" data-pplanet="' + esc(planet) + '" data-pwho="' + esc(who) + '">' +
+        pl.gate + '.' + pl.line + '</b>';
+    };
+    if (pers) bits.push(one(pers, dark, 'personality'));
+    if (des) bits.push(one(des, light, 'design'));
     return bits.join(' ');
   };
   // The label heads the row and belongs to both of them, so it lights both. A
@@ -10179,8 +10190,8 @@ function paintRelationship() {
       keys.forEach(function (k) { if (e[k]) out.push(e[k].gate); });
       return out.join(',');
     };
-    prow(planet, cell(e.apersonality, e.adesign, COL_A, A_D),
-      cell(e.bpersonality, e.bdesign, COL_B, B_D),
+    prow(planet, cell(e.apersonality, e.adesign, COL_A, A_D, A.name, planet),
+      cell(e.bpersonality, e.bdesign, COL_B, B_D, B.name, planet),
       pick(['apersonality', 'adesign', 'bpersonality', 'bdesign']),
       pick(['apersonality', 'adesign']), pick(['bpersonality', 'bdesign']));
   });
@@ -10321,6 +10332,29 @@ function paintRelationship() {
     row.onmouseenter = function () { litGate(gates); row.classList.add('hi'); };
     row.onmouseleave = function () { litGate(null); row.classList.remove('hi'); };
   });
+  // A placement in the pair table explains itself the way one on an individual
+  // chart does, through the same builder so the two cannot drift: the gate,
+  // its line, the Delphi Basic reading, and a pill saying whose it is. The
+  // person's name matters more here than anywhere: two people's Suns sit side
+  // by side and a tooltip that did not say which would be worse than none.
+  var relHome = document.getElementById('relhome');
+  if (relHome) {
+    relHome.addEventListener('mousemove', function (e) {
+      var b = e.target.closest ? e.target.closest('b[data-pgate]') : null;
+      if (!b) return;
+      var side = b.getAttribute('data-pside');
+      showTip(e, gateTipHtml(+b.getAttribute('data-pgate'), [{
+        gate: +b.getAttribute('data-pgate'),
+        line: +b.getAttribute('data-pline'),
+        side: side,
+        planet: b.getAttribute('data-pplanet'),
+      }], '<span class="pill">' + esc(b.getAttribute('data-pwho')) + '</span>'));
+    });
+    relHome.addEventListener('mouseleave', function () {
+      var t = document.getElementById('tip');
+      if (t) t.hidden = true;
+    });
+  }
   // A centers-table cell carries both a center and the gates held in it, so it
   // lights both. Assigning onmouseenter twice would have kept only the last one.
   [].forEach.call(document.querySelectorAll('#relhome [data-center]'), function (row) {
