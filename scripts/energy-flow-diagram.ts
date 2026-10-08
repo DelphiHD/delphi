@@ -6854,6 +6854,7 @@ if (DATA.client) {
   // can no longer disagree with the chart in front of her.
   var sides = { wantP: false, wantD: false, astro: false, cast: '', held: false };
   window.__sides = sides;
+  var sidesWere = '';
   var applySides = function () {
     var offP, offD;
     if (sides.cast) {
@@ -6873,6 +6874,20 @@ if (DATA.client) {
     if (bp) bp.classList.toggle('on', !offP);
     if (bd) bd.classList.toggle('on', !offD);
     offCount();
+    // A side coming back has to be DRAWN back. The classes alone used to be
+    // enough, because nothing recomputed the drawing while the astrology
+    // view's own rule was hiding design. The chart type does recompute it, so
+    // leaving Relationship or Transit from the astrology view drew the
+    // bodygraph without its design side, and switching back to Bodygraph only
+    // lifted the class: the legs stayed as they had last been worked out.
+    // Kaycee, 2026-10-08: "clicking out of the relationship type into the
+    // individual type the design side is missing again."
+    var now = (offP ? 'P' : '') + (offD ? 'D' : '');
+    if (now !== sidesWere) {
+      sidesWere = now;
+      if (typeof relight === 'function') relight();
+      if (window.__renderStats) window.__renderStats();
+    }
   };
   window.__applySides = applySides;
 
