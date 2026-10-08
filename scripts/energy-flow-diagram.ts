@@ -3816,6 +3816,13 @@ polygon.pending, rect.pending, path.pending,
    Kaycee, 2026-10-08: "it highlights the edge of the gate for some reason. I
    don't understand. It looks dumb." */
 .mandala [data-gatecell].lit path { fill:#f6e4a8 !important; }
+/* The lit stretch of the spoke that carries on through the gate number box
+   and the hexagram box. Drawn with the spoke and invisible until the gate is
+   lit, so nothing new appears at rest or in a static export. It sits UNDER
+   the boxes it crosses, which is why the fills still read. */
+.mandala line.sptip { pointer-events:none; }
+.mandala line.sptip.lit { stroke:#c79a2e !important; stroke-width:3.4 !important;
+  stroke-opacity:1 !important; }
 /* The hexagram's own box, lit the same way its gate is. */
 .mandala rect.hexbox { pointer-events:none; }
 .mandala rect.hexbox.lit { fill:#f6e4a8 !important; }

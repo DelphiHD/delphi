@@ -502,18 +502,28 @@ function activationSpokes(
         ? PALETTE.transit : PALETTE.activeSpokeStroke[centerOf(a.gate)];
       const top = pointAt(g, g.r.gateInner, lon);
       const bot = pointAt(g, innerEnd, lon);
-      // The spoke stops at the gate ring. Carrying it across the ring to the
-      // tip was tried and it lies along a cell's edge whenever the placement
-      // sits near a gate boundary, which is most of them: Kaycee, 2026-10-08,
-      // "See the extra yellow line on the bottom of the hexagram for 57? That
-      // shouldn't be there." The line reaching a LIT BOX says the same thing
-      // without drawing over anything, so the gate cell and its hexagram both
-      // light instead.
+      // At rest the spoke stops at the gate ring, because a line drawn across
+      // the cells would scribble over the numbers and the hexagrams. Lit, it
+      // runs ALL THE WAY UP: through the gate number box and on through the
+      // hexagram's box, which is the whole point of it. Kaycee, 2026-10-08:
+      // "I really wish the spoke of the line would highlight all the way up.
+      // That was the whole point of making them go through the gate number
+      // box and into the hexagram box." The line, the gate and the hexagram
+      // are one thing, and the highlight should let a reader see that.
+      //
+      // This was built, then taken out again when a stray gold line appeared
+      // along a hexagram's edge. That line was the gate DIVIDER lighting up,
+      // not this: the right feature was removed for the wrong reason.
+      const tip = pointAt(g, g.r.hexagramOuter, lon);
       return (
         `<line data-side="${a.side}" data-planet="${a.planet}" data-gate="${a.gate}" ` +
         `x1="${top.x.toFixed(2)}" y1="${top.y.toFixed(2)}" ` +
         `x2="${bot.x.toFixed(2)}" y2="${bot.y.toFixed(2)}" ` +
-        `stroke="${color}" stroke-width="1.4" stroke-opacity="0.85" />`
+        `stroke="${color}" stroke-width="1.4" stroke-opacity="0.85" />` +
+        `<line class="sptip" data-side="${a.side}" data-planet="${a.planet}" data-gate="${a.gate}" ` +
+        `x1="${top.x.toFixed(2)}" y1="${top.y.toFixed(2)}" ` +
+        `x2="${tip.x.toFixed(2)}" y2="${tip.y.toFixed(2)}" ` +
+        `stroke="${color}" stroke-width="1.4" stroke-opacity="0" />`
       );
     })
     .join("\n");
