@@ -3811,7 +3811,16 @@ polygon.pending, rect.pending, path.pending,
 .needtime { color:#845095; font-style:italic; }
 /* and the wheel echoes it */
 .mhi { animation:hlpulse 1.2s ease-in-out infinite; }
-.mandala [data-gatecell].lit path { stroke:#9c7415 !important; stroke-width:2.6 !important; }
+/* The cell is lit by filling it, not by tracing its border. An outline round
+   the gate read as the edge of the box rather than as the placement in it.
+   Kaycee, 2026-10-08: "it highlights the edge of the gate for some reason. I
+   don't understand. It looks dumb." */
+.mandala [data-gatecell].lit path { fill:#f6e4a8 !important; }
+/* The last stretch of the spoke, across the gate ring to the tip. Drawn with
+   the rest of it and invisible until the gate is lit. */
+.mandala line.sptip { pointer-events:none; }
+.mandala line.sptip.lit { stroke:#c79a2e !important; stroke-width:3.4 !important;
+  stroke-opacity:1 !important; }
 .mandala [data-hex].lit { opacity:1 !important; }
 .mandala line[data-gate].lit { stroke:#c79a2e !important; stroke-width:3.4 !important; stroke-opacity:1 !important; }
 .mandala text[data-gate].lit { font-weight:bold; }

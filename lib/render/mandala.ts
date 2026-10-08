@@ -493,11 +493,23 @@ function activationSpokes(
         ? PALETTE.transit : PALETTE.activeSpokeStroke[centerOf(a.gate)];
       const top = pointAt(g, g.r.gateInner, lon);
       const bot = pointAt(g, innerEnd, lon);
+      // The spoke stops at the gate ring, because at rest a line drawn across
+      // the gate cells would scribble over the hexagrams. Highlighting it then
+      // ended in mid-air at the ring while the cell's border lit instead,
+      // which is not where the placement is. Kaycee, 2026-10-08: "I expect the
+      // line to be highlighted all the way to its tip... it looks dumb."
+      // So the last stretch is drawn and kept invisible, and the highlight
+      // brings it in: one line from the centre to the tip, only when lit.
+      const tip = pointAt(g, g.r.gateOuter, lon);
       return (
         `<line data-side="${a.side}" data-planet="${a.planet}" data-gate="${a.gate}" ` +
         `x1="${top.x.toFixed(2)}" y1="${top.y.toFixed(2)}" ` +
         `x2="${bot.x.toFixed(2)}" y2="${bot.y.toFixed(2)}" ` +
-        `stroke="${color}" stroke-width="1.4" stroke-opacity="0.85" />`
+        `stroke="${color}" stroke-width="1.4" stroke-opacity="0.85" />` +
+        `<line class="sptip" data-side="${a.side}" data-planet="${a.planet}" data-gate="${a.gate}" ` +
+        `x1="${top.x.toFixed(2)}" y1="${top.y.toFixed(2)}" ` +
+        `x2="${tip.x.toFixed(2)}" y2="${tip.y.toFixed(2)}" ` +
+        `stroke="${color}" stroke-width="1.4" stroke-opacity="0" />`
       );
     })
     .join("\n");
