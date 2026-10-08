@@ -595,19 +595,38 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   // at the same angle, so the line that joins them is a spoke: it leaves the
   // gate ring, crosses the zodiac, passes the house band, and ends at the
   // aspect circle. Drawn once and revealed on demand rather than built on click.
-  const spokeFor = (list: AstroPoint[], side: string) => {
+  const spokeFor = (list: AstroPoint[], side: string, who?: string, colour?: string) => {
     for (const p of list) {
       const [x1, y1] = pt(p.abs_pos, asc, R_GATE);
       const [x2, y2] = pt(p.abs_pos, asc, R_ASPECT);
       s.push(`<line class="spoke" data-spoke="${side}:${p.name}" ` +
+        (who ? `data-person="${who}" ` : "") +
         `x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" ` +
-        `stroke="${side === "design" ? DESIGN : PURPLE}" stroke-width="2" ` +
+        `stroke="${colour ?? (side === "design" ? DESIGN : PURPLE)}" stroke-width="2" ` +
         `stroke-linecap="round" opacity="0"/>`);
     }
   };
-  spokeFor(chart.planets, mainIsTransit ? "transit" : mainSide);
-  if (design) {
-    spokeFor(design.planets, overlayAs?.side ?? (mainSide === "design" ? "personality" : "design"));
+  if (partner) {
+    // A spoke belongs to a PERSON as much as to a side. Only this person's
+    // were ever drawn, so clicking the other person's Venus lit the spoke of
+    // the same name on this chart: Kaycee, 2026-10-08, "clicking HIS venus
+    // still highlight my venus line in the astrology view."
+    const pale = (hex: string) => {
+      const n = parseInt(hex.slice(1), 16);
+      const m = (v: number) => Math.round(v + (255 - v) * 0.42);
+      return `#${m((n >> 16) & 255).toString(16).padStart(2, "0")}` +
+        `${m((n >> 8) & 255).toString(16).padStart(2, "0")}${m(n & 255).toString(16).padStart(2, "0")}`;
+    };
+    const selfInk = selfColour ?? PURPLE;
+    spokeFor(chart.planets, "personality", "a", selfInk);
+    if (design) spokeFor(design.planets, "design", "a", pale(selfInk));
+    if (partner.personality) spokeFor(partner.personality.planets, "personality", "b", partner.colour);
+    if (partner.design) spokeFor(partner.design.planets, "design", "b", pale(partner.colour));
+  } else {
+    spokeFor(chart.planets, mainIsTransit ? "transit" : mainSide);
+    if (design) {
+      spokeFor(design.planets, overlayAs?.side ?? (mainSide === "design" ? "personality" : "design"));
+    }
   }
 
   // the angles

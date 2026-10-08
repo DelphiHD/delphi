@@ -8562,7 +8562,7 @@ if (DATA.client) {
         [].forEach.call(
           wheelEl.querySelectorAll('[data-aplanet="' + nm + '"][data-side="' + rside + '"]' + only),
           function (n) { n.classList.add('hov-glyph'); });
-        var sp = wheelEl.querySelector('[data-spoke="' + rside + ':' + nm + '"]');
+        var sp = wheelEl.querySelector('[data-spoke="' + rside + ':' + nm + '"]' + only);
         if (sp) { sp.setAttribute('opacity', '.5'); sp.setAttribute('data-hov', '1'); }
         lightGate(nm, rside, who);
         lightSign(nm, rside, who);
@@ -9655,9 +9655,9 @@ if (DATA.client) {
         var isTrClick = side === 'transit';
         var pl = byName(name, side, who);
         if (!pl) return;
-        var spoke = astroEl.querySelector('[data-spoke="' + side + ':' + name + '"]');
-        if (spoke) spoke.setAttribute('opacity', '.85');
         var only = who ? '[data-person="' + who + '"]' : '';
+        var spoke = astroEl.querySelector('[data-spoke="' + side + ':' + name + '"]' + only);
+        if (spoke) spoke.setAttribute('opacity', '.85');
         [].forEach.call(
           astroEl.querySelectorAll('[data-aplanet="' + name + '"][data-side="' + side + '"]' + only),
           function (n) { n.classList.add('lit-glyph'); });
@@ -9680,8 +9680,19 @@ if (DATA.client) {
         // Two full webs on sight is what made a connection unreadable.
         [].forEach.call(astroEl.querySelectorAll('.pairasp'), function (l) {
           var theirs = l.getAttribute('data-apwho') === (who || 'a');
-          var touches = l.getAttribute('data-ap1') === name || l.getAttribute('data-ap2') === name;
-          if (theirs && touches) l.setAttribute('opacity', '.75');
+          var a1 = l.getAttribute('data-ap1'), a2 = l.getAttribute('data-ap2');
+          if (!theirs || (a1 !== name && a2 !== name)) return;
+          l.setAttribute('opacity', '.75');
+          // The body at the other end is part of the answer, so it lights
+          // too. A line on its own leaves the reader tracing it across the
+          // wheel to find out what it reached. Kaycee, 2026-10-08: "would it
+          // be possible to highlight the glyphs of the other planets involved
+          // in the aspect when one is clicked?" Both ends of these are the
+          // personality's, which is the set they are worked out from.
+          var far = a1 === name ? a2 : a1;
+          [].forEach.call(
+            astroEl.querySelectorAll('[data-aplanet="' + far + '"][data-side="personality"]' + only),
+            function (n) { n.classList.add('lit-glyph'); });
         });
         var gate = isTrClick ? 0 : gateForPlanet(name, side, who);
         if (gate) {
