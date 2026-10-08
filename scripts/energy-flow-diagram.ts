@@ -3559,6 +3559,16 @@ body.mod-transit .mandala [data-side="design"] { fill:#000000; stroke:#000000; }
    transit; the other person claims it on a connection. Unclaimed it is still
    fill:none, and the pair painter hides what neither of them carries outright,
    so letting it through here shows nothing that is not theirs. */
+/* On a connection the wheel is read as two people, so the planets round it are
+   told apart the way the legs are: this person purple, the other teal, each
+   with the lighter tone for their design side. Kaycee, 2026-10-08: "I would
+   expect that Person 1's glyphs would be purple and person 2's glyphs would be
+   teal." */
+body.mod-relation .mandala [data-side="personality"] { fill:#845095; stroke:#845095; }
+body.mod-relation .mandala [data-side="design"] { fill:#b89ac2; stroke:#b89ac2; }
+body.mod-relation .mandala .pairb-personality [data-side] { fill:#0d9488; stroke:#0d9488; }
+body.mod-relation .mandala .pairb-design [data-side] { fill:#73c1ba; stroke:#73c1ba; }
+body:not(.mod-relation) .mandala .pairb { display:none; }
 body:not(.mod-transit):not(.mod-relation) .mandala .tleg,
 body:not(.mod-transit):not(.mod-relation) .mandala .tdisc { display:none; }
 body.tr-alone .mandala [data-side="personality"],
@@ -4324,7 +4334,11 @@ body:not(.astro-all) #astroaspects .line.extra { display:none; }
 /* The renderer colours each ring by the side it belongs to, so nothing is
    repainted here. It used to be, which is how a design wheel carrying the
    personality as its inner ring ended up with both rings in the design red. */
-body:not(.mod-self) #astrosiderow, body:not(.mod-self) #astrosynrow { display:none; }
+body:not(.mod-self) #astrosiderow { display:none; }
+/* The grid reads the aspects between whatever two sets are on the wheel, so it
+   belongs on a connection as much as on one person. Only Synastry, which means
+   this person's two sides, has nothing to say there. */
+body:not(.mod-self):not(.mod-relation) #astrosynrow { display:none; }
 /* Which chart you are reading, then what is laid over it: two questions, so a
    line between them. Kaycee, 2026-10-05. */
 #astrosynrow { margin-top:7px; padding-top:7px; border-top:1px solid rgba(132,80,149,.16); }
@@ -7306,6 +7320,16 @@ if (DATA.client) {
     if (hubBeforePair === null) hubBeforePair = hub.innerHTML;
     else hub.innerHTML = hubBeforePair;
     paintPairInto(hub, DATA.connection);
+    // Their planets, laid over the wheel the way the sky's are. Before the
+    // bodygraph, never after it: the hub is composited last and a layer added
+    // at the end draws straight over it.
+    var layer = DATA.connection.mandalaLayer;
+    if (layer) {
+      var wheel = hub.querySelector('svg');
+      var under = wheel && wheel.querySelector('g[filter*="bodygraph-shadow"]');
+      if (under) under.insertAdjacentHTML('beforebegin', layer);
+      else if (wheel) wheel.insertAdjacentHTML('beforeend', layer);
+    }
   };
 
   function repaintPair(conn) {
@@ -9102,25 +9126,38 @@ if (DATA.client) {
         return a.p1_name === a.p2_name && a.aspect === 'conjunction' && !!EXPECTED_SAME[a.p1_name];
       };
       var buildGrid = function () {
+        // Whose aspects these are depends on the chart type, not on this view.
+        // Alone it is this person's two sides; on a connection it is the two
+        // PEOPLE, which is what a synastry grid normally means.
+        var C = (body.classList.contains('mod-relation') && DATA.connection
+          && DATA.connection.synastry) ? DATA.connection : null;
         var rows = planetsOf('personality').filter(on);
-        var cols = planetsOf('design').filter(on);
+        var cols = C ? (((C.astro || {}).planets) || []).filter(on)
+          : planetsOf('design').filter(on);
+        var colSide = C ? 'personality' : 'design';
         var at = {};
-        (EX.synastry || []).forEach(function (a) { at[a.p1_name + '|' + a.p2_name] = a; });
+        ((C ? C.synastry : EX.synastry) || []).forEach(function (a) { at[a.p1_name + '|' + a.p2_name] = a; });
         var head = '<th class="corner"></th>' + cols.map(function (c) {
-          return '<th class="colh" data-head="' + esc(c.name) + '" data-hside="design">' +
+          return '<th class="colh" data-head="' + esc(c.name) + '" data-hside="' + colSide +
+            '"' + (C ? ' data-hperson="b"' : '') + '>' +
             esc(glyphFor(c)) + '</th>';
         }).join('');
         var bodyRows = rows.map(function (r) {
-          return '<tr><th class="rowh" data-head="' + esc(r.name) + '" data-hside="personality">' +
+          return '<tr><th class="rowh" data-head="' + esc(r.name) + '" data-hside="personality"' +
+            (C ? ' data-hperson="a"' : '') + '>' +
             esc(glyphFor(r)) + '</th>' +
             cols.map(function (c) {
               var a = at[r.name + '|' + c.name];
               if (!a) return '<td></td>';
+              // Two people have no fixed 88 days between them, so nothing is
+              // muted as expected: that rule only holds for one person's own
+              // two sides, which was Kaycee's own point.
+              var exp = !C && expectedPair(a);
               return '<td class="has ' + (ASPECT_CLASS[a.aspect] || 'min') +
-                (expectedPair(a) ? ' expected' : '') + '" data-cell="' +
+                (exp ? ' expected' : '') + '" data-cell="' +
                 esc(r.name) + '|' + esc(c.name) + '" data-aspect="' + esc(a.aspect) +
                 '" data-orb="' + (Math.round(Math.abs(a.orbit) * 10) / 10) +
-                '" data-pairkind="design" data-expected="' + (expectedPair(a) ? '1' : '0') +
+                '" data-pairkind="' + (C ? 'pair' : 'design') + '" data-expected="' + (exp ? '1' : '0') +
                 '">' + (ASPECT_GLYPH[a.aspect] || '?') +
                 '<span class="glab">' + (Math.round(Math.abs(a.orbit) * 10) / 10) + '</span></td>';
             }).join('') + '</tr>';
@@ -9131,9 +9168,12 @@ if (DATA.client) {
         var key = '<div class="akey">' + KEY.map(function (k) {
           return '<span class="ak ' + k[2] + '"><b>' + k[0] + '</b>' + k[1] + '</span>';
         }).join('') + '</div>';
+        // The axes are named after whoever is on them.
+        var xName = C ? esc(C.b.name) : 'Design';
+        var yName = C ? esc(C.a.name) : 'Personality';
         return '<div class="agrid">' +
-          '<div class="dax">Design</div>' +
-          '<div class="gwrap"><div class="pax">Personality</div>' +
+          '<div class="dax">' + xName + '</div>' +
+          '<div class="gwrap"><div class="pax">' + yName + '</div>' +
           '<table><thead><tr>' + head + '</tr></thead><tbody>' +
           bodyRows + '</tbody></table></div>' + key + '</div>';
       };
@@ -9513,6 +9553,13 @@ if (DATA.client) {
         if (!g) { clearPicked(); return; }
         var name = g.getAttribute('data-aplanet');
         var side = g.getAttribute('data-side') || 'personality';
+        // WHOSE body this is. The side alone was being read, so on a
+        // connection the other person's Neptune was answered out of this
+        // person's chart and lit this person's Neptune with it. Kaycee,
+        // 2026-10-08: "Why does person 1's neptune light up when I click on
+        // person 2's neptune?" Same mistake the sky's bodies used to make,
+        // on the one surface that had not been taught the difference.
+        var who = g.getAttribute('data-person');
         var already = g.classList.contains('lit-glyph');
         clearPicked();
         if (already) return;
@@ -9521,15 +9568,21 @@ if (DATA.client) {
         // when I click it?" Transit Pluto is in Aquarius; Leo is where her
         // natal Pluto sits, which is what this was reading.
         var isTrClick = side === 'transit';
-        var pl = byName(name, side);
+        var pl = byName(name, side, who);
         if (!pl) return;
         var spoke = astroEl.querySelector('[data-spoke="' + side + ':' + name + '"]');
         if (spoke) spoke.setAttribute('opacity', '.85');
-        [].forEach.call(astroEl.querySelectorAll('[data-aplanet="' + name + '"][data-side="' + side + '"]'),
+        var only = who ? '[data-person="' + who + '"]' : '';
+        [].forEach.call(
+          astroEl.querySelectorAll('[data-aplanet="' + name + '"][data-side="' + side + '"]' + only),
           function (n) { n.classList.add('lit-glyph'); });
         var sb = astroEl.querySelector('[data-asign="' + pl.sign + '"]');
         if (sb) sb.classList.add('lit-band');
-        var hn = HOUSE_N[pl.house];
+        // The houses drawn on a bi-wheel are the BASE person's. The other
+        // person's planet sits in one of them, which is not the house their
+        // own chart files it under, so theirs lights no house rather than the
+        // wrong one.
+        var hn = who === 'b' ? 0 : HOUSE_N[pl.house];
         if (hn) {
           var hEl = astroEl.querySelector('text.hnum[data-house="' + hn + '"]');
           if (hEl) hEl.classList.add('lit-band');
@@ -9538,7 +9591,7 @@ if (DATA.client) {
         // two endpoints name their bodies differently, so a transit lights its
         // sign and its house and leaves the gate ring alone rather than
         // lighting somebody else's gate.
-        var gate = isTrClick ? 0 : gateForPlanet(name, side);
+        var gate = isTrClick ? 0 : gateForPlanet(name, side, who);
         if (gate) {
           [].forEach.call(astroEl.querySelectorAll('.gateband[data-gate="' + gate + '"]'),
             function (n) { n.classList.add('lit-band'); });

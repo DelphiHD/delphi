@@ -16,6 +16,9 @@ import { getAstro } from "@/lib/astro";
 import { renderWheel } from "@/scripts/astro-wheel";
 import { CLIENTS } from "@/scripts/client-roster";
 import { chartByToken, briefFromRecord } from "@/lib/hd/chart-record";
+import { renderTransitLayer } from "@/lib/render/mandala";
+import { crossAspects } from "@/lib/astro-extras";
+import { PLANET_ORDER, type Activation, type Planet } from "@/lib/render/mandala.types";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -69,6 +72,42 @@ async function whoIs(db: Db, token: string): Promise<Person | null> {
  * Without this, David Whiting could not be half of a connection at all.
  */
 const askAbout = (p: Person) => p.lookupPlace || p.birthPlace;
+
+/**
+ * The other person's planets, as a layer to lay over the mandala.
+ *
+ * The wheel's hub shows both bodygraphs now, and a bodygraph without its
+ * planets is half a chart: the glyphs round the wheel were still one person's
+ * alone. Kaycee, 2026-10-08: "I only see one set of glyphs. I would expect
+ * that Person 1's glyphs would be purple and person 2's glyphs would be teal."
+ *
+ * Same renderer the sky uses, at the same size and glyph scale the published
+ * wheel is drawn at, so it lands exactly on the spokes it belongs to. The two
+ * sides go in separate groups and the page tints them, the way the chart's own
+ * two sides are told apart.
+ */
+const MANDALA_SIZE = 1200;
+const MANDALA_GLYPH = 1.8;
+const KNOWN_PLANET = new Set<string>(PLANET_ORDER);
+const planetId = (name: string) => name.toLowerCase().replace(/[_\s]+/g, "-");
+
+function glyphLayer(
+  places: readonly { planet: string; gate: number; line: number }[],
+  cls: string,
+): string {
+  const acts: Activation[] = places
+    .filter((p) => KNOWN_PLANET.has(planetId(p.planet)))
+    .map((p) => ({
+      side: "transit" as const,
+      planet: planetId(p.planet) as Planet,
+      gate: p.gate,
+      line: p.line,
+    }));
+  if (!acts.length) return "";
+  return `<g class="${cls}">` +
+    renderTransitLayer(acts, { size: MANDALA_SIZE, glyphScale: MANDALA_GLYPH }) +
+    `</g>`;
+}
 
 export async function GET(request: Request) {
   const q = new URL(request.url).searchParams;
@@ -153,12 +192,17 @@ export async function GET(request: Request) {
     let wheelSvgB: string | null = null;
     let partnerDesign: unknown = null;
     let wheelError: string | null = null;
+    // The aspects between the two of them, kept where the response can reach
+    // them: the pair of charts they are worked out from lives inside the wheel
+    // block below.
+    let synastry: ReturnType<typeof crossAspects> = [];
     try {
       const [mine, theirs] = await Promise.all([
         getAstro({ birthDate: me.birthDate, birthTime: me.birthTime, place: askAbout(me) }),
         getAstro({ birthDate: them.birthDate, birthTime: them.birthTime, place: askAbout(them) }),
       ]);
       astro = theirs;
+      synastry = crossAspects(mine.planets, theirs.planets);
       // The base chart keeps its ascendant and houses; the second contributes
       // planets only. That is the convention for a bi-wheel.
       const carried = [...new Set([...conn.a.gates, ...conn.b.gates])];
@@ -220,6 +264,16 @@ export async function GET(request: Request) {
       wheelError,
       a: conn.a,
       b: conn.b,
+      // The aspects BETWEEN the two of them, which is what a synastry is and
+      // what the provider never returns: it only aspects within one chart.
+      // The grid on the astrology view had nothing to draw from on a
+      // connection, so it was simply not offered there. Kaycee, 2026-10-08:
+      // "where is the aspect grid in the astrology view?"
+      synastry,
+      // the other person's planets, ready to lay over the wheel
+      mandalaLayer:
+        glyphLayer(conn.b.personality ?? [], "pairb pairb-personality") +
+        glyphLayer(conn.b.design ?? [], "pairb pairb-design"),
       definedTogether: conn.definedTogether,
       openTogether: conn.openTogether,
       definitionLabel: conn.definitionLabel,
