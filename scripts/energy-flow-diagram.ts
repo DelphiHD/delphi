@@ -4355,7 +4355,7 @@ body:not(.astro-all) #astroaspects .line.extra { display:none; }
    of its own. Synastry means this person's own two sides and has nothing to
    say on a connection. */
 body:not(.mod-self):not(.mod-relation) #astrosiderow { display:none; }
-body:not(.mod-self) #astrosynrow { display:none; }
+body:not(.mod-self):not(.mod-relation) #astrosynrow { display:none; }
 /* Which chart you are reading, then what is laid over it: two questions, so a
    line between them. Kaycee, 2026-10-05. */
 #astrosynrow { margin-top:7px; padding-top:7px; border-top:1px solid rgba(132,80,149,.16); }
@@ -4636,10 +4636,7 @@ body.view-astro #relhome > details { display:none !important; }
 /* The wheel is the only drawing with a base person, so the switch lives there. */
 #relswap { display:none; }
 body.mod-relation.view-astro #relswap { display:inline-flex; }
-/* Synastry here means this person's personality against their own design. On
-   a connection the pair owns the wheel, so the button has nothing left to
-   draw and Swap Perspective is the control that matters. */
-body.mod-relation #asSyn { display:none; }
+
 #astroplanets .line, #astrohouses .line, #astroaspects .line { display:grid;
   grid-template-columns:74px 1fr auto; gap:6px; font-size:11.5px; line-height:1.85; }
 #astroplanets .line i, #astrohouses .line i, #astroaspects .line i { font-style:normal; opacity:.55; }
@@ -6883,13 +6880,18 @@ if (DATA.client) {
       offP = sides.cast === 'design';
       offD = sides.cast === 'personality';
     } else {
-      // The astrology view opens on personality alone so 26 glyphs do not
-      // arrive at once. A connection is already two charts and its design
-      // rings are half of what it is for, so the habit stands down there, the
-      // way it already does for synastry.
-      var astroRule = sides.astro && !body.classList.contains('mod-relation');
+      var astroRule = sides.astro;
       offP = sides.wantP;
       offD = sides.wantD || astroRule;
+    }
+    // On a connection the astrology view says which chart is being read, and
+    // that is the whole answer: Personality draws the two personalities,
+    // Design the two designs, Synastry all four. It outranks the view's habit
+    // of opening on personality alone, which is about one person's chart.
+    var av = window.__astroView;
+    if (av && body.classList.contains('mod-relation') && body.classList.contains('view-astro')) {
+      offP = !av.syn && av.side === 'design';
+      offD = !av.syn && av.side === 'personality';
     }
     body.classList.toggle('off-s-personality', offP);
     body.classList.toggle('off-s-design', offD);
@@ -7727,7 +7729,8 @@ if (DATA.client) {
     // moment and has its own ascendant and houses, so with the personalities
     // switched off the wheel is rebuilt on the design horizon rather than
     // laying two designs in a frame that belongs to a birth moment.
-    var onDesign = document.body.classList.contains('off-s-personality');
+    var av = window.__astroView;
+    var onDesign = !!(av && av.side === 'design');
     if (baseIsB) {
       return (onDesign && C.wheelSvgBD) ? C.wheelSvgBD : (C.wheelSvgB || C.wheelSvg);
     }
@@ -8969,6 +8972,11 @@ if (DATA.client) {
         // astrology view in relationship mode it defaults to just my
         // astrology chart and I have to click a lot of buttons to get the
         // second person to show."
+        // What the astrology view is looking at: which chart, and whether the
+        // other side is on the wheel with it. The side classes and the choice
+        // of wheel both read this, so one answer drives both.
+        window.__astroView = { syn: synOn, side: side };
+        if (window.__applySides) window.__applySides();
         var pair = (body.classList.contains('mod-relation') && window.__pairWheel)
           ? window.__pairWheel() : null;
         liveAstro.innerHTML = pair
@@ -8987,30 +8995,15 @@ if (DATA.client) {
         }
         paintAstroMeta(); paintAstroRows(); paintHouses(); paintMode(); paintAspects();
       };
-      // On one person these choose between two wheels. On a connection both
-      // people's sides are already on one wheel, so the same button shows and
-      // hides a side across both of them, and turning Personality off is how
-      // the two design charts are read together. Kaycee, 2026-10-08: "would
-      // it be possible to add a button to view the design charts together?"
-      var sideHere = function (which, btn) {
-        var off = btn.classList.contains('on');   // lit means showing
-        var sd = window.__sides;
-        if (!sd || !window.__applySides) return;
-        if (which === 'design') { sd.wantD = off; sd.held = true; sd.astro = false; }
-        else sd.wantP = off;
-        window.__applySides();
-        // Dropping the personalities moves the wheel onto the design horizon,
-        // which is a different drawing, not a different set of things shown.
-        showSide(curSide);
-      };
-      bPers.addEventListener('click', function () {
-        if (body.classList.contains('mod-relation')) { sideHere('personality', bPers); return; }
-        showSide('personality');
-      });
-      bDes.addEventListener('click', function () {
-        if (body.classList.contains('mod-relation')) { sideHere('design', bDes); return; }
-        showSide('design');
-      });
+      // These mean exactly what they mean on one person. Personality is the
+      // personality chart on its own horizon, Design is the design chart on
+      // its own, Synastry is the two together, and the perspective switch
+      // says whose horizon it is cast on. A connection is that same set of
+      // choices with another person in it. Kaycee, 2026-10-08: "We have it
+      // right for the individual type... Now we're just adding another
+      // person to the mix."
+      bPers.addEventListener('click', function () { showSide('personality'); });
+      bDes.addEventListener('click', function () { showSide('design'); });
       // Synastry rides on whichever side is up, so it reads from the
       // personality's horizon or the design's, which is the "and vice versa".
       if (bSyn && drawn['personality-syn']) {
