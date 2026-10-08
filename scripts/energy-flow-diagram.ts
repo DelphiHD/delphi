@@ -9630,6 +9630,8 @@ if (DATA.client) {
         [].forEach.call(astroEl.querySelectorAll('.spoke'), function (l) { l.setAttribute('opacity', '0'); });
         [].forEach.call(astroEl.querySelectorAll('.lit-band'), function (n) { n.classList.remove('lit-band'); });
         [].forEach.call(astroEl.querySelectorAll('.lit-glyph'), function (n) { n.classList.remove('lit-glyph'); });
+        // On a connection the chords are put away again with everything else.
+        [].forEach.call(astroEl.querySelectorAll('.pairasp'), function (n) { n.setAttribute('opacity', '0'); });
       };
       astroEl.addEventListener('click', function (e) {
         var g = e.target.closest ? e.target.closest('[data-aplanet]') : null;
@@ -9674,6 +9676,13 @@ if (DATA.client) {
         // two endpoints name their bodies differently, so a transit lights its
         // sign and its house and leaves the gate ring alone rather than
         // lighting somebody else's gate.
+        // The lines this body makes in its own chart, and only this body's.
+        // Two full webs on sight is what made a connection unreadable.
+        [].forEach.call(astroEl.querySelectorAll('.pairasp'), function (l) {
+          var theirs = l.getAttribute('data-apwho') === (who || 'a');
+          var touches = l.getAttribute('data-ap1') === name || l.getAttribute('data-ap2') === name;
+          if (theirs && touches) l.setAttribute('opacity', '.75');
+        });
         var gate = isTrClick ? 0 : gateForPlanet(name, side, who);
         if (gate) {
           [].forEach.call(astroEl.querySelectorAll('.gateband[data-gate="' + gate + '"]'),

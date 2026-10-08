@@ -399,7 +399,13 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
       `stroke-width="${HARD.has(a.aspect) ? 1.3 : 1.1}" opacity="0"/>`);
   }
 
-  for (const set of aspectSets) {
+  for (const [setIndex, set] of aspectSets.entries()) {
+  // On a connection there are two full webs of chords and they bury the
+  // middle of the wheel. Kaycee, 2026-10-08: "We can remove the aspects by
+  // default and have them show when clicked maybe?" So they are drawn and
+  // held at nothing until a planet is picked, which then shows that planet's
+  // own, in that person's colour.
+  const pairWho = partner ? (setIndex === 0 ? "a" : "b") : null;
   const planetNames = set.names;
   for (const a of set.list) {
     if (a.aspect === "conjunction") continue;
@@ -415,9 +421,13 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
       !MINOR_POINT.has(a.p2_name) && Math.abs(a.orbit) <= 6;
     const [x1, y1] = pt(a.p1_abs_pos, asc, R_ASPECT);
     const [x2, y2] = pt(a.p2_abs_pos, asc, R_ASPECT);
-    s.push(`<line class="asp ${core ? "core" : "extra"}" x1="${f(x1)}" y1="${f(y1)}" ` +
+    s.push(`<line class="asp ${core ? "core" : "extra"}${pairWho ? " pairasp" : ""}" ` +
+      (pairWho
+        ? `data-apwho="${pairWho}" data-ap1="${a.p1_name}" data-ap2="${a.p2_name}" `
+        : "") +
+      `x1="${f(x1)}" y1="${f(y1)}" ` +
       `x2="${f(x2)}" y2="${f(y2)}" stroke="${colour}" ` +
-      `stroke-width="${HARD.has(a.aspect) ? 0.9 : 0.8}" opacity=".5"/>`);
+      `stroke-width="${HARD.has(a.aspect) ? 0.9 : 0.8}" opacity="${pairWho ? 0 : ".5"}"/>`);
   }
   }
 
@@ -497,12 +507,25 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
       return `#${m(r).toString(16).padStart(2, "0")}${m(g).toString(16).padStart(2, "0")}${m(b).toString(16).padStart(2, "0")}`;
     };
     const mine = selfColour ?? PURPLE;
+    // A BI-WHEEL. The two of them used to be laid at 212/170 and 180/138, which
+    // interleaves: one person's design sat between the other's two sides and
+    // the whole middle of the chart read as one crowd. Kaycee, 2026-10-08,
+    // with a Harry and Meghan bi-wheel beside it: "the synastry charts are
+    // getting messy. Would it be possible to adopt a style similar to the one
+    // shown? Where each person gets their own ring."
+    // So each person keeps a band, the base person inside and the other
+    // outside, with a line drawn between them. Crowded glyphs step inward by
+    // less than before, or a stepped glyph would walk out of its own band.
+    const A_PERS = 196, A_DES = 178, B_PERS = 254, B_DES = 236, STEP = 11;
     const sets: [AstroChart | null | undefined, number, string, string, string][] = [
-      [chart, R_PLANET, mine, "a", "personality"],
-      [design, R_PLANET - 42, lighten(mine), "a", "design"],
-      [partner.personality, R_DESIGN, partner.colour, "b", "personality"],
-      [partner.design, R_DESIGN - 42, lighten(partner.colour), "b", "design"],
+      [chart, A_PERS, mine, "a", "personality"],
+      [design, A_DES, lighten(mine), "a", "design"],
+      [partner.personality, B_PERS, partner.colour, "b", "personality"],
+      [partner.design, B_DES, lighten(partner.colour), "b", "design"],
     ];
+    // the boundary between the two of them, so the bands read as two wheels
+    s.push(`<circle cx="${CX}" cy="${CY}" r="${(A_PERS + B_DES) / 2}" fill="none" ` +
+      `stroke="#cfc7d6" stroke-width="1"/>`);
     for (const [set, radius, colour, who, side] of sets) {
       if (!set) continue;
       const placed: { lon: number; ring: number }[] = [];
@@ -512,7 +535,7 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
         while (placed.some((q) => q.ring === ring &&
           Math.abs(((lon - q.lon + 540) % 360) - 180) < 6)) ring++;
         placed.push({ lon, ring });
-        const [x, y] = pt(lon, asc, radius - ring * 19);
+        const [x, y] = pt(lon, asc, radius - ring * STEP);
         s.push(`<text class="pglyph pside" data-aplanet="${p.name}" data-person="${who}" ` +
           `data-side="${side}" x="${f(x)}" y="${f(y + 7)}" text-anchor="middle" ` +
           `font-size="19" fill="${colour}">${GLYPH[p.name] ?? p.name.slice(0, 2)}</text>`);
