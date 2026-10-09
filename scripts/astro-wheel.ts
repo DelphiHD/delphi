@@ -70,7 +70,7 @@ const R_OUT = 310, R_SIGN = 272, R_TICK = 262;
 // asked for, so the house numbers and the chord circle move inward and hand
 // that room to the bands. Kaycee, 2026-10-08: "I think we have lots of room
 // to play with here if we remove the aspects from the center."
-const R_TRANSIT = 244, R_PLANET = 212, R_HOUSE = 120, R_ASPECT = 104;
+const R_TRANSIT = 244, R_PLANET = 212, R_HOUSE = 78, R_ASPECT = 62;
 const R_PLANET_STEP = 14, R_DESIGN_STEP = 14;
 /** Design planets sit just inside the personality ring, on the same zodiac. */
 const R_DESIGN = 180;
@@ -368,8 +368,8 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   // covers everything but a three-way pile-up.
   const BANDS: Record<number, number[][]> = {
     1: [[R_PLANET, R_PLANET - 18, R_PLANET - 36]],
-    2: [[196, 177, 158], [256, 237, 218]],
-    3: [[166, 147, 128], [208, 189, 170], [252, 233, 214]],
+    2: [[190, 168, 146], [256, 234, 212]],
+    3: [[136, 118, 100], [194, 176, 158], [252, 234, 216]],
   };
   const bands = BANDS[setCount] ?? BANDS[1];
   const taken = new Map<number, { lon: number; slot: number }[]>();
@@ -510,10 +510,10 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
       const lon = p.abs_pos;
       const [x, y] = pt(lon, asc, placeIn(outerBand, lon));
       s.push(`<text class="pglyph oside" data-aplanet="${p.name}" data-side="${outer.side}" ` +
-        `data-ring="outer" x="${f(x)}" y="${f(y + 7)}" text-anchor="middle" dominant-baseline="central" font-size="19" ` +
+        `data-ring="outer" x="${f(x)}" y="${f(y)}" text-anchor="middle" dominant-baseline="central" font-size="19" ` +
         `fill="${outer.colour}">${GLYPH[p.name] ?? p.name.slice(0, 2)}</text>`);
       if (transitRetro?.[p.name]) {
-        s.push(retroMark(x, y + 7, 19, outer.colour, p.name, outer.side, "outer"));
+        s.push(retroMark(x, y, 19, outer.colour, p.name, outer.side, "outer"));
       }
     }
   }
@@ -539,13 +539,13 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
     const mSide = mainIsTransit ? "transit" : mainSide;
     const mFill = mainIsTransit ? TRANSIT_TEAL : (mainSide === "design" ? DESIGN : INK);
     s.push(`<text class="pglyph ${mainIsTransit ? "oside" : mainSide === "design" ? "dside" : "pside"}" ` +
-      `data-aplanet="${p.name}" data-side="${mSide}" data-ring="main" x="${f(x)}" y="${f(y + 8)}" ` +
+      `data-aplanet="${p.name}" data-side="${mSide}" data-ring="main" x="${f(x)}" y="${f(y)}" ` +
       `text-anchor="middle" dominant-baseline="central" font-size="21" fill="${mFill}">` +
       `${GLYPH[p.name] ?? p.name.slice(0, 2)}</text>`);
     // Transit Only draws the sky as the chart's own ring, so the retrograde
     // mark belongs here too. A natal wheel passes nothing and is unchanged.
     if (mainIsTransit && transitRetro?.[p.name]) {
-      s.push(retroMark(x, y + 8, 21, mFill, p.name, mSide, "main"));
+      s.push(retroMark(x, y, 21, mFill, p.name, mSide, "main"));
     }
     // The degree lives in the hover, not on the face. Twenty-six glyphs plus
     // twenty-six numbers is more ink than the wheel can carry, and the number is
@@ -630,8 +630,9 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
         const lon = p.abs_pos;
         const [x, y] = pt(lon, asc, place(band, bandId, startSlot, lon));
         s.push(`<text class="pglyph pside" data-aplanet="${p.name}" data-person="${who}" ` +
-          `data-side="${side}" x="${f(x)}" y="${f(y + 7)}" text-anchor="middle" ` +
-          `font-size="19" fill="${colour}">${GLYPH[p.name] ?? p.name.slice(0, 2)}</text>`);
+          `data-side="${side}" x="${f(x)}" y="${f(y)}" text-anchor="middle" ` +
+          `dominant-baseline="central" font-size="19" fill="${colour}">` +
+          `${GLYPH[p.name] ?? p.name.slice(0, 2)}</text>`);
       }
     }
   } else if (design) {
@@ -648,11 +649,11 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
       const innerSide = overlayAs?.side ?? (mainSide === "design" ? "personality" : "design");
       const innerFill = overlayAs?.colour ?? (innerSide === "design" ? DESIGN : INK);
       if (overlayAs?.outside && transitRetro?.[p.name]) {
-        s.push(retroMark(x, y + 7, 19, innerFill, p.name, innerSide, "inner"));
+        s.push(retroMark(x, y, 19, innerFill, p.name, innerSide, "inner"));
       }
       s.push(`<text class="pglyph ${innerSide === "design" ? "dside" : "pside"}" ` +
         `data-aplanet="${p.name}" data-side="${innerSide}" data-ring="inner" ` +
-        `x="${f(x)}" y="${f(y + 7)}" text-anchor="middle" dominant-baseline="central" font-size="19" ` +
+        `x="${f(x)}" y="${f(y)}" text-anchor="middle" dominant-baseline="central" font-size="19" ` +
         `fill="${innerFill}">` +
         `${GLYPH[p.name] ?? p.name.slice(0, 2)}</text>`);
       // no degree label on the design ring: with 26 glyphs on two rings the
@@ -719,6 +720,42 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   // title says which ring is whose before anything is hovered. Kaycee,
   // 2026-10-08: "can we have the names at the top of the chart be in the
   // color that they are represented by?"
+  // ── who is on which ring, in the corners ──────────────────────────────
+  // Her reference bi-wheel names each chart in a corner and says which wheel
+  // it is, so the reader knows what they are looking at without hovering
+  // anything. Kaycee, 2026-10-08: "can we put Person 1 (personality here)
+  // info in the upper left corner, person 2 (design) in the upper right and
+  // person three (transit) in the lower left of the stage in their
+  // corresponding colors and an indication of which ring they are in?"
+  // The corners of the square are empty: the wheel is a circle inside it.
+  if (setCount > 1) {
+    const ringWord = (i: number) =>
+      setCount === 2 ? (i === 0 ? "Inner wheel" : "Outer wheel")
+        : ["Inner wheel", "Middle wheel", "Outer wheel"][i];
+    const mineInk = selfColour ?? (mainIsTransit ? TRANSIT_TEAL : mainSide === "design" ? DESIGN : INK);
+    const legend: { name: string; ink: string }[] = partner
+      ? [{ name, ink: mineInk }, { name: partner.name, ink: partner.colour }]
+      : [
+          { name: mainIsTransit ? "Transit" : mainSide === "design" ? "Design" : "Personality",
+            ink: mineInk },
+          ...(design ? [{
+            name: overlayAs?.side === "transit" ? "Transit"
+              : mainSide === "design" ? "Personality" : "Design",
+            ink: overlayAs?.colour ?? (mainSide === "design" ? INK : DESIGN),
+          }] : []),
+          ...(outer ? [{ name: "Transit", ink: outer.colour }] : []),
+        ];
+    // upper left, upper right, lower left: the order she asked for
+    const spots: [number, number, string][] = [[2, 8, "start"], [718, 8, "end"], [2, 676, "start"]];
+    legend.slice(0, 3).forEach((entry, i) => {
+      const [lx, ly, anchor] = spots[i];
+      s.push(`<text x="${lx}" y="${ly}" text-anchor="${anchor}" font-size="15" ` +
+        `font-weight="600" fill="${entry.ink}">${entry.name}</text>`);
+      s.push(`<text x="${lx}" y="${ly + 17}" text-anchor="${anchor}" font-size="11.5" ` +
+        `fill="#6b6790">${ringWord(i)}</text>`);
+    });
+  }
+
   const titled = partner
     ? `<tspan fill="${selfColour ?? PURPLE}">${name}</tspan>` +
       `<tspan fill="#6b6790" font-weight="400"> and </tspan>` +
