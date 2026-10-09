@@ -364,8 +364,8 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   // covers everything but a three-way pile-up.
   const BANDS: Record<number, number[][]> = {
     1: [[R_PLANET, R_PLANET - 18, R_PLANET - 36]],
-    2: [[198, 180, 162], [256, 238, 220]],
-    3: [[188, 172], [222, 206], [256, 240]],
+    2: [[196, 177, 158], [256, 237, 218]],
+    3: [[166, 147, 128], [208, 189, 170], [252, 233, 214]],
   };
   const bands = BANDS[setCount] ?? BANDS[1];
   const taken = new Map<number, { lon: number; slot: number }[]>();
@@ -462,9 +462,14 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   // default and have them show when clicked maybe?" So they are drawn and
   // held at nothing until a planet is picked, which then shows that planet's
   // own, in that person's colour.
+  // Every wheel's chords are held at nothing until a body is picked, not
+  // only a pair's. The web across the middle is what made this unreadable
+  // and what was filling the room the bands needed. Kaycee, 2026-10-08:
+  // "we have lots of room to play with here if we remove the aspects from
+  // the center, but we need to really nail the aspect clicks if we do that."
   const pairWho = partner
     ? (setIndex === 0 ? ((partner.who ?? "b") === "b" ? "a" : "b") : (partner.who ?? "b"))
-    : null;
+    : "a";
   const planetNames = set.names;
   for (const a of set.list) {
     if (a.aspect === "conjunction") continue;

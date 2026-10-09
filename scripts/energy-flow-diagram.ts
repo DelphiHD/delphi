@@ -9426,7 +9426,8 @@ if (DATA.client) {
         [].forEach.call(root.querySelectorAll('.pglyph'), function (t) {
           sides[t.getAttribute('data-side') || '?'] = 1;
         });
-        var inkTarget = Object.keys(sides).length >= 3 ? 12.5 : 15;
+        var inkTarget = 15;
+        void sides;
         [].forEach.call(root.querySelectorAll('.pglyph'), function (t) {
           var target = inkTarget;
           ctx.font = '400 ' + BASE + 'px ' + getComputedStyle(t).fontFamily;
