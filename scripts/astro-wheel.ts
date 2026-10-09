@@ -745,8 +745,11 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
           }] : []),
           ...(outer ? [{ name: "Transit", ink: outer.colour }] : []),
         ];
-    // upper left, upper right, lower left: the order she asked for
-    const spots: [number, number, string][] = [[2, 8, "start"], [718, 8, "end"], [2, 676, "start"]];
+    // Upper left, upper right, then lower RIGHT. She asked for lower left and
+    // that is where her reference puts it, but on this stage the floating
+    // chart-type dock sits in that corner and the label landed behind it.
+    // The opposite corner is the only other one the wheel leaves empty.
+    const spots: [number, number, string][] = [[2, 8, "start"], [718, 8, "end"], [718, 676, "end"]];
     legend.slice(0, 3).forEach((entry, i) => {
       const [lx, ly, anchor] = spots[i];
       s.push(`<text x="${lx}" y="${ly}" text-anchor="${anchor}" font-size="15" ` +
