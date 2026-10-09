@@ -66,7 +66,11 @@ const R_GATE = 348, R_GATE_IN = 316;
    is what the transit band is standing in. A relationship band belongs
    between the design and the houses when the synastry charts arrive. */
 const R_OUT = 310, R_SIGN = 272, R_TICK = 262;
-const R_TRANSIT = 244, R_PLANET = 212, R_HOUSE = 150, R_ASPECT = 132;
+// The middle of the wheel is empty at rest now that the chords wait to be
+// asked for, so the house numbers and the chord circle move inward and hand
+// that room to the bands. Kaycee, 2026-10-08: "I think we have lots of room
+// to play with here if we remove the aspects from the center."
+const R_TRANSIT = 244, R_PLANET = 212, R_HOUSE = 120, R_ASPECT = 104;
 const R_PLANET_STEP = 14, R_DESIGN_STEP = 14;
 /** Design planets sit just inside the personality ring, on the same zodiac. */
 const R_DESIGN = 180;
@@ -495,10 +499,12 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   }
   }
 
-  // A third ring, outside everything, for a transit over a whole chart.
+  // A third ring, outside everything, for a transit over a whole chart. It
+  // carries no ring marker of its own: every set has a band with a divider
+  // drawn between them now, so the teal circle was a second answer to a
+  // question already answered. Kaycee, 2026-10-08: "Is the chord web that
+  // teal band? If so, remove it."
   if (outer) {
-    s.push(`<circle cx="${CX}" cy="${CY}" r="${R_OVERLAY + 14}" fill="none" ` +
-      `stroke="${outer.colour}" stroke-width="1" opacity=".3"/>`);
     const outerBand = bands.length - 1;
     for (const p of [...outer.chart.planets].sort((a, b) => a.abs_pos - b.abs_pos)) {
       const lon = p.abs_pos;
