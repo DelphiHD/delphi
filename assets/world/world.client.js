@@ -106,23 +106,23 @@ function markup(G) {
   for (var lon = -150; lon <= 150; lon += 30) grat.push("M" + f((lon + 180) / 360 * G.W) + ",0V" + f(G.H));
   for (var lat = -60; lat <= 60; lat += 30) grat.push("M0," + f((G.TOP - lat) / (G.TOP - G.BOTTOM) * G.H) + "H" + G.W);
   var opt = function (kind, key, icon, name) {
-    return '<div class="opt" data-kind="' + kind + '" data-chip="' + key + '"><span class="radio"></span><span class="gl">' + icon + '</span>' + name + '</div>';
+    return '<div class="w-opt" data-kind="' + kind + '" data-chip="' + key + '"><span class="radio"></span><span class="gl">' + icon + '</span>' + name + '</div>';
   };
   var swatch = function (a) { return '<svg width="26" height="8"><line class="ln personality ' + a + '" x1="2" x2="24" y1="4" y2="4"/></svg>'; };
   var planets = function (kind) { return HD_BODIES.map(function (b) { return opt(kind, b, GLYPHS[b], b); }).join(""); };
   var dd = function (kind, title, items, extra) {
     return '<div class="dd" data-dd="' + kind + '"><button>' + title + '<span class="n"></span></button><div class="menu">' + items + (extra || "") +
-      '<div class="foot"><button class="pill" data-all="' + kind + '">All</button><button class="pill" data-none="' + kind + '">None</button></div></div></div>';
+      '<div class="foot"><button class="w-pill" data-all="' + kind + '">All</button><button class="w-pill" data-none="' + kind + '">None</button></div></div></div>';
   };
   var extras = '<div class="sep"></div>' + opt("extras", "Chiron", "⚷", "Chiron") + opt("extras", "Lilith", "⚸", "Lilith");
   var angles = [["ASC", "Ascendant"], ["DSC", "Descendant"], ["MC", "Midheaven"], ["IC", "IC"]].map(function (a) { return opt("angles", a[0], swatch(a[0]), a[1]); }).join("");
-  return '<div class="bar"><span id="w-side" style="display:flex;gap:4px"><button class="pill on" data-v="both">Both</button><button class="pill" data-v="personality">Personality</button><button class="pill" data-v="design">Design</button></span>' +
+  return '<div class="w-bar"><span id="w-side" style="display:flex;gap:4px"><button class="w-pill on" data-v="both">Both</button><button class="w-pill" data-v="personality">Personality</button><button class="w-pill" data-v="design">Design</button></span>' +
     '<span class="gap"></span>' + dd("lines", "Lines", planets("lines"), extras) + dd("angles", "Angles", angles) + dd("parans", "Parans", planets("parans")) +
-    '<button class="pill" id="w-findBtn">Find My Places</button><button class="pill" id="w-cmpBtn">Compare Places</button>' +
+    '<button class="w-pill" id="w-findBtn">Find My Places</button><button class="w-pill" id="w-cmpBtn">Compare Places</button>' +
     '<div class="search"><input id="w-q" placeholder="Search A City" autocomplete="off"><div class="results" id="w-results"></div></div>' +
     '<div class="zoom"><button data-z="in" title="Zoom In">+</button><button data-z="out" title="Zoom Out">&minus;</button><button data-z="reset">Reset</button></div>' +
-    '<button class="pill" id="w-snapMap">Save Map Image</button></div>' +
-    '<div class="stage"><svg viewBox="0 0 ' + VW + ' ' + f(VH) + '" preserveAspectRatio="xMidYMin meet" id="w-map">' +
+    '<button class="w-pill" id="w-snapMap">Save Map Image</button></div>' +
+    '<div class="w-stage"><svg viewBox="0 0 ' + VW + ' ' + f(VH) + '" preserveAspectRatio="xMidYMin meet" id="w-map">' +
     '<defs><clipPath id="w-clip"><rect width="' + G.W + '" height="' + f(G.H) + '"/></clipPath></defs>' +
     '<g transform="translate(' + ML + ',' + MT + ')"><rect class="frame" width="' + G.W + '" height="' + f(G.H) + '"/>' +
     '<g clip-path="url(#w-clip)"><g id="w-world">' +
@@ -141,7 +141,7 @@ function init(root, D, G, opts) {
 const API = opts.api || {};
 const withToken = function (u) { return opts.token ? u + (u.indexOf("?") < 0 ? "?" : "&") + "token=" + encodeURIComponent(opts.token) : u; };
 const WHERE = D.where;
-const pill = a => '<span class="pill">' + a + '</span>';
+const pill = a => '<span class="w-pill">' + a + '</span>';
 const SIDE = { personality: "Personality", design: "Design" };
 const GLYPH = Object.assign({}, GLYPHS);
 // Lines and parans drawn here from each side's sky; tagged with the side.
@@ -187,9 +187,9 @@ function describe(el){
   const d=el.dataset, side=SIDE[d.side];
   if(d.body2){const lat=+d.lat;
     return "<b>"+side+" Paran</b>"+
-      '<div class="row">'+side+" "+d.body+" "+pill(d.angle)+"</div>"+
-      '<div class="row">'+side+" "+d.body2+" "+pill(d.angle2)+"</div>"+
-      '<span class="meta">Latitude '+Math.abs(lat).toFixed(1)+"°"+(lat>=0?"N":"S")+"</span>";}
+      '<div class="w-row">'+side+" "+d.body+" "+pill(d.angle)+"</div>"+
+      '<div class="w-row">'+side+" "+d.body2+" "+pill(d.angle2)+"</div>"+
+      '<span class="w-meta">Latitude '+Math.abs(lat).toFixed(1)+"°"+(lat>=0?"N":"S")+"</span>";}
   return "<b>"+side+" "+d.body+" in "+WHERE[d.side][d.body]+"</b><br>"+pill(d.angle);
 }
 const NS="http://www.w3.org/2000/svg";
@@ -319,19 +319,19 @@ function paint(){
     el.classList.toggle("off",!(sideOk(el.dataset)&&lineOn(el.dataset.body)&&st.angles.has(el.dataset.angle)));
   for(const el of document.querySelectorAll("#w-parans [data-side]"))
     el.classList.toggle("off",!(sideOk(el.dataset)&&pairOk(el.dataset)&&(st.angles.has(el.dataset.angle)||st.angles.has(el.dataset.angle2))));
-  for(const c of document.querySelectorAll(".opt[data-kind]"))c.classList.toggle("on",st[c.dataset.kind].has(c.dataset.chip));
+  for(const c of document.querySelectorAll(".w-opt[data-kind]"))c.classList.toggle("on",st[c.dataset.kind].has(c.dataset.chip));
   for(const x of EXTRAS)root.classList.toggle("x-"+x,st.extras.has(x));
   for(const k in ALL)document.querySelector('[data-dd="'+k+'"] .n').textContent=st[k].size===ALL[k].length?"All":st[k].size?st[k].size:"None";
   draw();
   if(typeof renderHere==="function"){renderHere();renderCompare();if(finding)renderFind()}
 }
-document.getElementById("w-side").onclick=e=>{const b=e.target.closest(".pill");if(!b)return;
-  document.querySelectorAll("#w-side .pill").forEach(p=>p.classList.toggle("on",p===b));st.side=b.dataset.v;paint()};
+document.getElementById("w-side").onclick=e=>{const b=e.target.closest(".w-pill");if(!b)return;
+  document.querySelectorAll("#w-side .w-pill").forEach(p=>p.classList.toggle("on",p===b));st.side=b.dataset.v;paint()};
 root.addEventListener("click",e=>{
   const dd=e.target.closest(".dd");
   for(const m of document.querySelectorAll(".dd.open"))if(m!==dd)m.classList.remove("open");
   if(dd&&e.target.closest(".dd>button")){dd.classList.toggle("open");return}
-  const t=e.target.closest("button,.opt");if(!t)return;
+  const t=e.target.closest("button,.w-opt");if(!t)return;
   if(t.dataset.all){st[t.dataset.all]=new Set(ALL[t.dataset.all]);return paint()}
   if(t.dataset.none){st[t.dataset.none].clear();return paint()}
   if(t.dataset.kind){const s=st[t.dataset.kind],b=t.dataset.chip;s.has(b)?s.delete(b):s.add(b);paint()}
@@ -441,7 +441,7 @@ function renderHere(){
   if(!here&&!pinned.size){box.classList.remove("open");return}
   // A pinned line: her Delphi Basic for the planet, and the angle by name.
   const cards=[...pinned].map(k=>{const [side,body,angle]=k.split("|");
-    return '<div class="card" '+tag(side,body,angle)+'><button class="un" data-un="'+k+'" title="Unpin">&times;</button>'+
+    return '<div class="w-card" '+tag(side,body,angle)+'><button class="un" data-un="'+k+'" title="Unpin">&times;</button>'+
       '<b>'+SIDE[side]+" "+body+" · "+ANGLE_NAME[angle]+'</b><div class="deg">'+body+" in "+WHERE[side][body]+' <span class="ap">'+angle+'</span></div>'+
       (BASIC[body]?'<p>'+BASIC[body]+'</p>':'')+'</div>'}).join("");
   if(!here){box.innerHTML='<button class="x" title="Close">&times;</button>'+cards;box.classList.add("open");return}
@@ -527,7 +527,7 @@ function utcWhen(iso){const m=/^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-
 function showWheel(r,where,which){
   const w=document.getElementById("w-wheel");
   w.querySelector(".box").innerHTML='<button class="x" title="Close">&times;</button><h2>Relocated Chart · '+where+'</h2>'+
-    '<div class="wtabs">'+[["personality","Personality"],["design","Design"],["both","Both"]].map(([k,t])=>'<button class="pill'+(k===which?" on":"")+'" data-wtab="'+k+'">'+t+'</button>').join("")+'<button class="pill snap" data-snapwheel="1">Save Chart Image</button></div>'+
+    '<div class="wtabs">'+[["personality","Personality"],["design","Design"],["both","Both"]].map(([k,t])=>'<button class="w-pill'+(k===which?" on":"")+'" data-wtab="'+k+'">'+t+'</button>').join("")+'<button class="w-pill snap" data-snapwheel="1">Save Chart Image</button></div>'+
     // A one-sided wheel has no corner legend (that drawing is shared with the
     // live charts and left alone), so the window says which side it is.
     (which==="both"?"":'<div class="wsub" style="color:'+(which==="design"?"var(--design)":"var(--ink)")+'"><b>'+SIDE[which]+'</b> · '+utcWhen(which==="design"?CAST.d:CAST.p)+" · "+where+'</div>')+
@@ -552,7 +552,7 @@ const ZOD=["Aries","Taurus","Gemini","Cancer","Leo","Virgo","Libra","Scorpio","S
 function wheelTip(el){
   const r=reloc.get(relocKey());if(!r||!r.svg)return"";
   const w=document.getElementById("w-wheel"),which=w.dataset.which;
-  const pill=(t,c)=>t?'<span class="pill '+(c||String(t).toLowerCase())+'">'+t+'</span>':"";
+  const pill=(t,c)=>t?'<span class="w-pill '+(c||String(t).toLowerCase())+'">'+t+'</span>':"";
   if(el.dataset.aplanet){
     const sd=el.dataset.side==="design"?"design":"personality";
     const pl=r[sd].planets[el.dataset.aplanet];if(!pl)return"";
@@ -716,8 +716,8 @@ function renderFind(){
   computeFind();
   const F=lastFind;
   box.innerHTML='<button class="x" title="Close">&times;</button><h2>Find My Places</h2>'+
-    '<div class="grid">'+[...BODIES,...EXTRAS.filter(x=>st.extras.has(x))].map(b=>'<div class="opt'+(want.has(b)?" on":"")+'" data-want="'+b+'"><span class="radio"></span><span class="gl">'+GLYPH[b]+'</span>'+b+'</div>').join("")+'</div>'+
-    '<h3>Latitude Limit</h3><div class="lims">'+[[45,"45°"],[60,"60°"],[66.5,"Polar Circles"],[90,"No Limit"]].map(([v,t])=>'<button class="pill'+(v===latLimit?" on":"")+'" data-lim="'+v+'">'+t+'</button>').join("")+'</div>'+
+    '<div class="grid">'+[...BODIES,...EXTRAS.filter(x=>st.extras.has(x))].map(b=>'<div class="w-opt'+(want.has(b)?" on":"")+'" data-want="'+b+'"><span class="radio"></span><span class="gl">'+GLYPH[b]+'</span>'+b+'</div>').join("")+'</div>'+
+    '<h3>Latitude Limit</h3><div class="lims">'+[[45,"45°"],[60,"60°"],[66.5,"Polar Circles"],[90,"No Limit"]].map(([v,t])=>'<button class="w-pill'+(v===latLimit?" on":"")+'" data-lim="'+v+'">'+t+'</button>').join("")+'</div>'+
     (F.groups.length?'<h3>Closest Matches</h3>'+(F.top.length?F.top.map((t,i)=>'<div class="fr" data-fi="'+i+'"><b>'+t.c.n+'</b> <span class="co">'+t.c.c+'</span>'+
       '<div class="mt">'+t.per.filter(p=>p.v).map(p=>'<span><span style="color:'+(p.sd==="design"?"var(--design)":"var(--ink)")+'">'+GLYPH[p.b]+'</span>'+gradePill(GRADES.find(g=>g[1]===p.v))+'</span>').join("")+'</div></div>').join(""):'<div class="none">No cities within 700 miles of these lines.</div>'):"");
   box.classList.add("open");
@@ -759,9 +759,9 @@ function renderCompare(){
     '<tr class="sum"><td>Moderate</td>'+A.map(a=>'<td>'+count(a,2)+'</td>').join("")+'</tr>'+
     '<tr class="sum"><td>Mild</td>'+A.map(a=>'<td>'+count(a,1)+'</td>').join("")+'</tr>'+
     relocRows()+
-    '<tr class="sec"><td colspan="'+(saved.length+1)+'">Lines</td></tr>'+
+    '<tr class="w-sec"><td colspan="'+(saved.length+1)+'">Lines</td></tr>'+
     [...lines.values()].sort((a,b)=>a.best-b.best).map(e=>'<tr '+tag(e.l.side,e.l.body,e.l.angle)+'><td><span class="gl '+e.l.side+'" style="color:'+(e.l.side==="design"?"var(--design)":"var(--ink)")+'">'+GLYPH[e.l.body]+'</span> '+SIDE[e.l.side]+" "+e.l.body+' <span class="ap">'+e.l.angle+'</span></td>'+saved.map((s,i)=>cell(e.at[i])).join("")+'</tr>').join("")+
-    '<tr class="sec"><td colspan="'+(saved.length+1)+'">Parans</td></tr>'+
+    '<tr class="w-sec"><td colspan="'+(saved.length+1)+'">Parans</td></tr>'+
     [...pars.values()].sort((a,b)=>a.best-b.best).map(e=>{const p=e.p;return '<tr '+tag(p.side,p.a,p.angleA)+' data-body2="'+p.b+'" data-angle2="'+p.angleB+'"><td>'+SIDE[p.side]+" "+p.a+' <span class="ap">'+p.angleA+'</span> '+p.b+' <span class="ap">'+p.angleB+'</span></td>'+saved.map((s,i)=>cell(e.at[i])).join("")+'</tr>'}).join("")+
     '</table>';
   box.classList.add("open");
@@ -774,7 +774,7 @@ function relocRows(){
   const sides=st.side==="both"?["personality","design"]:[st.side];
   const ANGULAR=new Set([1,4,7,10]);
   const cellOf=f=>R.map(r=>r==="loading"||!r?'<td class="mi">…</td>':r==="failed"?'<td class="mi"></td>':'<td>'+f(r)+'</td>').join("");
-  let h='<tr class="sec"><td colspan="'+(saved.length+1)+'">Relocated Chart</td></tr>';
+  let h='<tr class="w-sec"><td colspan="'+(saved.length+1)+'">Relocated Chart</td></tr>';
   for(const sd of sides)for(const a of ["ASC","DSC","MC","IC"]){const N=NATAL[sd].angles[a];
     h+='<tr><td>'+SIDE[sd]+" "+ANGLE_NAME[a]+' <span class="was">natal '+N.text+" · "+N.gate+"."+N.line+'</span></td>'+
       cellOf(r=>{const R=r[sd].angles[a],who=ownGate(R.gate);
