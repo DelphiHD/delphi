@@ -12315,20 +12315,31 @@ export async function runBuilder(argv: string[] = process.argv.slice(2)): Promis
        [...new Set(client.acts.filter((a) => a.side === "design").map((a) => a.gate))]] as const
     : [[], [], []] as const;
   const cross = scene.astroExtras?.synastry ?? [];
+  // The moment each wheel was cast, for the corners. Only the date: the hour
+  // is on the Dates tab and a corner is a label, not a record.
+  const dateOnly = (t: string) => t.split("\u00b7")[0].trim();
+  const whenBorn = dateOnly(scene.client?.subtitle.personality[0] ?? "");
+  const whenDesign = dateOnly(scene.client?.subtitle.design[0] ?? "");
+  const bornThenDesign = [whenBorn, whenDesign];
+  const designThenBorn = [whenDesign, whenBorn];
   const astroHtml = astroChart
     ? `<div class="astro">${renderWheel(astroChart, client!.name, astroDesign, "ascendant",
-        gateRings[0], gateRings[1], gateRings[2])}</div>` +
+        gateRings[0], gateRings[1], gateRings[2], null, undefined, null, null,
+        "personality", null, null, null, false, bornThenDesign)}</div>` +
       (astroDesign
         ? `<template id="aswheel-design">${renderWheel(astroDesign, client!.name, null, "ascendant",
-            gateRings[0], gateRings[1], gateRings[2], null, undefined, null, null, "design")}</template>` +
+            gateRings[0], gateRings[1], gateRings[2], null, undefined, null, null, "design",
+            null, null, null, false, designThenBorn)}</template>` +
           // The same two wheels with the aspects between the sides drawn on
           // them, which is what a synastry of one person is. Each side keeps
           // its own horizon, so reading it from the design is a different
           // chart rather than the same picture relabelled.
           `<template id="aswheel-personality-syn">${renderWheel(astroChart, client!.name, astroDesign,
-            "ascendant", gateRings[0], gateRings[1], gateRings[2], null, undefined, null, null, "personality", null, cross)}</template>` +
+            "ascendant", gateRings[0], gateRings[1], gateRings[2], null, undefined, null, null,
+            "personality", null, cross, null, false, bornThenDesign)}</template>` +
           `<template id="aswheel-design-syn">${renderWheel(astroDesign, client!.name, astroChart,
-            "ascendant", gateRings[0], gateRings[1], gateRings[2], null, undefined, null, null, "design", null, cross)}</template>`
+            "ascendant", gateRings[0], gateRings[1], gateRings[2], null, undefined, null, null,
+            "design", null, cross, null, false, designThenBorn)}</template>`
         : "")
     : "";
   const htmlPath = join(outDir, `${stem}.html`);

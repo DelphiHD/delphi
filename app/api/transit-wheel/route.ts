@@ -179,7 +179,13 @@ export async function GET(request: Request): Promise<Response> {
           : { side: "transit", outside: true, colour: TRANSIT_COLOUR },
         whole ? "personality" : side,
         designChart ? { chart: sky, side: "transit", colour: TRANSIT_COLOUR } : null,
-        aspects, retroFor(sky.planets, date, time)),
+        aspects, retroFor(sky.planets, date, time), false,
+        // the moment each ring was cast, for the corners
+        [
+          String(chart.birth_date ?? "").slice(0, 10),
+          designChart ? String(designUtc ?? "").slice(0, 10) : `${date} ${time}`,
+          designChart ? `${date} ${time}` : "",
+        ]),
       // The sky's OWN placements. Without these the page had nothing to say
       // about a transiting body and answered out of the birth chart instead:
       // Kaycee hovered a transit Mars sitting in Leo and was told "Mars in

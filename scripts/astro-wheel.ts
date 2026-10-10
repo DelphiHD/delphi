@@ -227,7 +227,12 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
   /** True when this wheel's OWN ring is the sky rather than a birth chart,
    *  which is what Transit Only draws. Without it the retrograde marks would
    *  have nowhere to go in the one view where every body is transiting. */
-  mainIsTransit = false): string {
+  mainIsTransit = false,
+  /** When each set on the wheel was cast, in the order the corners name them.
+   *  A corner that says Design without saying WHICH moment leaves the reader
+   *  to remember that it is 88 days before the birth. Kaycee, 2026-10-10:
+   *  "can we add the relevant dates to the corner positions?" */
+  legendWhen: (string | null | undefined)[] = []): string {
   ANCHOR = anchor;
   const asc = chart.ascendant;
   const s: string[] = [];
@@ -781,6 +786,11 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
         `font-weight="600" fill="${entry.ink}">${entry.name}</text>`);
       s.push(`<text x="${lx}" y="${ly + 17}" text-anchor="${anchor}" font-size="11.5" ` +
         `fill="#6b6790">${ringWord(i)}</text>`);
+      const when = legendWhen[i];
+      if (when) {
+        s.push(`<text x="${lx}" y="${ly + 33}" text-anchor="${anchor}" font-size="11" ` +
+          `fill="#6b6790">${when}</text>`);
+      }
     });
   }
 
