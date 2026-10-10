@@ -54,8 +54,39 @@ const BODY: Record<string, Body> = {
 const RAD = Math.PI / 180;
 const wrap180 = (d: number) => ((((d + 180) % 360) + 360) % 360) - 180;
 
+/** Positions supplied from outside astronomy-engine, by body: Chiron from
+ *  NASA Horizons, Lilith from the provider. Right ascension and declination
+ *  of date, in degrees. */
+export type Given = Record<string, { ra: number; dec: number }>;
+
+/** Ecliptic longitude and latitude of date to right ascension and declination. */
+export function eclipticToEquatorial(lon: number, lat: number, when: Date): { ra: number; dec: number } {
+  const eps = e_tilt(MakeTime(when)).tobl * RAD;
+  const l = lon * RAD, b = lat * RAD;
+  const ra = Math.atan2(Math.sin(l) * Math.cos(eps) - Math.tan(b) * Math.sin(eps), Math.cos(l)) / RAD;
+  const dec = Math.asin(Math.sin(b) * Math.cos(eps) + Math.cos(b) * Math.sin(eps) * Math.sin(l)) / RAD;
+  return { ra: (ra + 360) % 360, dec };
+}
+
+/**
+ * Lilith, the mean lunar apogee, from the provider's own longitude.
+ *
+ * The provider gives Lilith's ecliptic longitude only. Its latitude is where
+ * that longitude sits on the mean lunar orbit, tilted 5.1454 degrees to the
+ * ecliptic about the mean node (Meeus, Astronomical Algorithms, ch. 47):
+ * sin(lat) = sin(i) sin(lon - node). Kaycee, 2026-10-10: start from the
+ * provider's position so the map agrees with her charts. See docs/DECISIONS.md.
+ */
+export function lilithEquatorial(providerLon: number, when: Date): { ra: number; dec: number; lat: number } {
+  const T = (MakeTime(when).tt) / 36525;   // Julian centuries of TT from J2000
+  const node = 125.0445479 - 1934.1362891 * T + 0.0020754 * T * T + T ** 3 / 467441 - T ** 4 / 60616000;
+  const lat = Math.asin(Math.sin(5.1453964 * RAD) * Math.sin((providerLon - node) * RAD)) / RAD;
+  return { ...eclipticToEquatorial(providerLon, lat, when), lat };
+}
+
 /** Geocentric right ascension and declination of date, in degrees. */
-export function equatorial(body: string, when: Date): { ra: number; dec: number } {
+export function equatorial(body: string, when: Date, given: Given = {}): { ra: number; dec: number } {
+  if (given[body]) return given[body];
   const t = MakeTime(when);
   if (body === "Moon" || BODY[body] !== undefined) {
     const eqj = body === "Moon" ? GeoMoon(t) : GeoVector(BODY[body], t, true);
@@ -118,8 +149,8 @@ function horizonCurves(mc: number, dec: number): { ASC: LonLat[]; DSC: LonLat[] 
   return { ASC, DSC };
 }
 
-export function linesFor(body: string, when: Date): BodyLines {
-  const { ra, dec } = equatorial(body, when);
+export function linesFor(body: string, when: Date, given: Given = {}): BodyLines {
+  const { ra, dec } = equatorial(body, when, given);
   const gast = SiderealTime(MakeTime(when)) * 15;
   const mc = wrap180(ra - gast);
   const ic = wrap180(mc + 180);
@@ -137,8 +168,8 @@ export function linesFor(body: string, when: Date): BodyLines {
   };
 }
 
-export function mapFor(when: Date, bodies: readonly string[] = HD_BODIES): BodyLines[] {
-  return bodies.map((b) => linesFor(b, when));
+export function mapFor(when: Date, bodies: readonly string[] = HD_BODIES, given: Given = {}): BodyLines[] {
+  return bodies.map((b) => linesFor(b, when, given));
 }
 
 export interface Paran {
@@ -184,10 +215,10 @@ function curvesCross(p: LonLat[], q: LonLat[]): LonLat[] {
 }
 
 /** Every paran among these bodies at one instant. */
-export function paransFor(when: Date, bodies: readonly string[] = HD_BODIES): Paran[] {
+export function paransFor(when: Date, bodies: readonly string[] = HD_BODIES, given: Given = {}): Paran[] {
   const gast = SiderealTime(MakeTime(when)) * 15;
   const sky = bodies.map((body) => {
-    const { ra, dec } = equatorial(body, when);
+    const { ra, dec } = equatorial(body, when, given);
     const mc = wrap180(ra - gast);
     return { body, MC: mc, IC: wrap180(mc + 180), ...horizonCurves(mc, dec) };
   });

@@ -273,3 +273,7 @@ planet is marked good or bad anywhere; the person picks.
   off to start, as the live charts open without them. They have no map lines
   (our ephemeris has no right ascension for them); they control the relocated
   wheels, the house table and the gate matches.
+- **Chiron and Lilith lines** (Kaycee, 10 October). Chiron from NASA JPL
+  Horizons, Lilith from the provider's longitude on the mean lunar orbit; see
+  DECISIONS.md for why and the checks. Their switches now draw lines, glyphs
+  and parans too, and add them to Find My Places.

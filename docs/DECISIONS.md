@@ -1195,3 +1195,65 @@ up: that writing is the chart's own report and is not about the variation.
 2026-10-08: "remember to capitalize so Save this variation becomes Save this
 Variation, Chart Name becomes Chart Name, etc." Whole sentences stay as
 sentences.
+
+---
+
+## 2026-10-10 — Chiron from NASA Horizons, Lilith from the provider's longitude
+
+**Decision.** Astro-cartography draws Chiron's lines from its right ascension
+and declination as given by NASA JPL Horizons (geocentric, apparent, one lookup
+per instant, cached on disk), and Lilith's from the provider's own ecliptic
+longitude with its latitude worked out on the mean lunar orbit (inclination
+5.1454 degrees about the mean node, Meeus ch. 47). Code: `lib/horizons.ts`,
+`lilithEquatorial` in `lib/astrocartography.ts`.
+
+**Why.** Kaycee, 2026-10-10: "we do need their lines too. Are you sure we
+don't get that data through our api?" Checked: neither the astrology endpoint
+nor the HD endpoint returns declination, latitude or right ascension for any
+body; ecliptic longitude only. astronomy-engine, which supplies every other
+body, has neither Chiron nor Lilith. Drawing them flat on the ecliptic was the
+third option and was rejected: on her chart it would move Chiron's ASC line
+198 miles and Lilith's 240 miles at 40N, most of a grade band.
+
+**Checks.** Horizons' Chiron converted back to ecliptic longitude agrees with
+the provider's Chiron to 0.4 arcminutes. Lilith starts from the provider's
+longitude on purpose, so the map agrees with her charts: the textbook mean
+apogee differs from the provider's by 7 arcminutes, which a latitude worked out
+from either barely notices. Her natal Chiron sat 3.2 degrees below the ecliptic,
+her Lilith 3.6.
+
+**Cost.** Horizons is free and keyless. It is the second outside service the
+chart pipeline calls besides the provider, after OpenStreetMap geocoding.
+
+---
+
+## 2026-10-10 — Astro-cartography: what was decided building the preview
+
+All Kaycee's calls, in a standalone preview on the `astrocartography` branch
+(`scripts/astrocartography-preview.ts`); none of it is on the live charts yet.
+The detail and the measurements are in `docs/ASTROCARTOGRAPHY_PLAN.md`.
+
+- **Bodies.** The thirteen, each switchable; Earth and both Nodes start off.
+  Chiron and Lilith have their own switches, off to start, as the live charts.
+- **Parans are in**, as solid bands with a 1 degree orb (confirmed).
+- **Coastline** world-atlas land-50m, borders from countries-50m, cities
+  from Natural Earth. All public domain; no credit line on the map.
+- **Place search** uses the provider's own place list, not GeoNames, because
+  GeoNames would need a credit on the map. Coordinates for a chosen place come
+  the way a birthplace's do (`locate()`). On the live site it needs a sibling
+  of `/api/places` that returns coordinates.
+- **Grades** Strong within 300 miles, Moderate to 500, Mild to 700. Parans
+  graded within the 1 degree orb by thirds. Proposed by us, accepted by her.
+- **Find My Places** lets the person choose the planets. Nothing labels a
+  planet good or bad: "I'm trying to resist telling them that certain planets
+  are always good or always bad." A Latitude Limit, starting at 60 degrees,
+  because across 12 charts 56% of top matches lay beyond 60 degrees against
+  5% of cities.
+- **Relocated chart** cast by the provider for the birth instant at the new
+  coordinates (`getAstro` gained an optional `coords`). Personality and
+  design each on their own relocated horizon, and both together.
+- **Gates on relocated angles** shown, with any match to the person's own
+  activations marked once in gold. Shown as plain tables, not pills.
+- **Next features go to the live charts**, not the preview: transits on the
+  map, relationship map, place report, local space. They must work within the
+  existing chart code.

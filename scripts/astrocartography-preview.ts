@@ -29,7 +29,8 @@ import { getChart } from "../lib/mybodygraph";
 import { locate, getAstro } from "../lib/astro";
 import { ZODIAC, houseOf } from "../lib/astro-extras";
 import { gateLineFromLongitude } from "../lib/hd/gate-longitude";
-import { mapFor, paransFor, HD_BODIES } from "../lib/astrocartography";
+import { mapFor, paransFor, lilithEquatorial, HD_BODIES, type Given } from "../lib/astrocartography";
+import { chironEquatorial } from "../lib/horizons";
 import { GLYPH } from "./astro-wheel";
 import { loadLibraryChunks } from "../lib/hd/chunks-source";
 
@@ -167,6 +168,9 @@ function cities(file: string) {
     return `${d}\u00b0${m < 10 ? "0" : ""}${m}'`;
   };
   const where: Record<string, Record<string, string>> = {};
+  // Chiron from NASA Horizons and Lilith from the provider's longitude, so
+  // their lines are drawn where the bodies really were. docs/DECISIONS.md.
+  const given: Record<string, Given> = {};
   const natal: Record<string, { asc: string; mc: string; house: Record<string, number>; angles: Record<string, { text: string; gate: number; line: number }> }> = {};
   const HOUSE: Record<string, number> = { First: 1, Second: 2, Third: 3, Fourth: 4, Fifth: 5, Sixth: 6,
     Seventh: 7, Eighth: 8, Ninth: 9, Tenth: 10, Eleventh: 11, Twelfth: 12 };
@@ -176,6 +180,11 @@ function cities(file: string) {
     ["design", await getAstro({ birthDate: String(row.birth_date), birthTime: String(row.birth_time).slice(0, 5), place: String(row.birth_place), atUtc: chart.birth.designUtcDate })],
   ] as const) {
     where[side] = {};
+    const when = side === "design" ? new Date(chart.birth.designUtcDate) : new Date(chart.birth.utcDate);
+    const lil = astro.planets.find((p) => p.name === "Mean_Lilith");
+    if (!lil) throw new Error(`no ${side} Lilith from the provider`);
+    const L = lilithEquatorial(lil.abs_pos, when);
+    given[side] = { Chiron: await chironEquatorial(when), Lilith: { ra: L.ra, dec: L.dec } };
     for (const p of astro.planets) where[side][p.label] = `${p.sign} ${deg(p.position)}`;
     const sun = astro.planets.find((p) => p.label === "Sun");
     if (sun) {
@@ -206,12 +215,12 @@ function cities(file: string) {
   const LN: { side: string; body: string; angle: string; runs: number[][][] }[] = [];
   const PR: { side: string; a: string; angleA: string; b: string; angleB: string; lat: number; lon: number }[] = [];
   for (const [side, when] of Object.entries(sides)) {
-    for (const b of mapFor(when)) {
+    for (const b of mapFor(when, [...HD_BODIES, "Chiron", "Lilith"], given[side])) {
       for (const [angle, runs] of Object.entries(b.lines)) {
         LN.push({ side, body: b.body, angle, runs: runs.map((run) => run.map(([lo, la]) => [r3(lo), r3(la)])) });
       }
     }
-    for (const p of paransFor(when)) {
+    for (const p of paransFor(when, [...HD_BODIES, "Chiron", "Lilith"], given[side])) {
       if (p.lat > TOP || p.lat < BOTTOM) continue;
       PR.push({ side, a: p.a, angleA: p.angleA, b: p.b, angleB: p.angleB, lat: r3(p.lat), lon: r3(p.lon) });
     }
@@ -485,6 +494,9 @@ const EXTRAS=["Chiron","Lilith"];
 GLYPH.Chiron="⚷";GLYPH.Lilith="⚸";
 // The bodies the relocated chart speaks about: the menu's planets, and Chiron
 // and Lilith when they are switched on.
+// A body's lines are on when the Lines menu has it, or, for Chiron and
+// Lilith, when their own switch is on.
+const lineOn=b=>st.lines.has(b)||st.extras.has(b);
 const chartBodies=()=>[...BODIES.filter(b=>st.lines.has(b)),...EXTRAS.filter(b=>st.extras.has(b))];
 // One resolver answers "what is this?", read from the element, never its position.
 function describe(el){
@@ -580,7 +592,7 @@ function layoutLabels(){
   const g=document.getElementById("labels");g.replaceChildren();
   const LABELS=[];
   for(const l of LN)if(!l.el.classList.contains("off"))for(const a of anchors(l))LABELS.push({side:l.side,body:l.body,angle:l.angle,...a});
-  const vis=LABELS.filter(l=>(st.side==="both"||l.side===st.side)&&st.lines.has(l.body)&&st.angles.has(l.angle));
+  const vis=LABELS.filter(l=>(st.side==="both"||l.side===st.side)&&lineOn(l.body)&&st.angles.has(l.angle));
   for(const edge of ["top","bottom","left","right"]){
     const row=vis.filter(l=>l.edge===edge).sort((a,b)=>a.pos-b.pos);
     const gap=edge==="top"||edge==="bottom"?22:16, max=edge==="top"||edge==="bottom"?W:H;
@@ -616,11 +628,11 @@ function layoutLabels(){
 // have their lines on the map, so a hover never lights a hidden line. Kaycee,
 // 10 October: with Earth's lines off, Earth's parans should be too. Checking
 // only the partner left Earth in whenever Parans was set to All.
-const pairOk=d=>(st.parans.has(d.body)||st.parans.has(d.body2))&&st.lines.has(d.body)&&st.lines.has(d.body2);
+const pairOk=d=>(st.parans.has(d.body)||st.parans.has(d.body2))&&lineOn(d.body)&&lineOn(d.body2);
 function paint(){
   const sideOk=d=>st.side==="both"||d.side===st.side;
   for(const el of document.querySelectorAll("#lines [data-side]"))
-    el.classList.toggle("off",!(sideOk(el.dataset)&&st.lines.has(el.dataset.body)&&st.angles.has(el.dataset.angle)));
+    el.classList.toggle("off",!(sideOk(el.dataset)&&lineOn(el.dataset.body)&&st.angles.has(el.dataset.angle)));
   for(const el of document.querySelectorAll("#parans [data-side]"))
     el.classList.toggle("off",!(sideOk(el.dataset)&&pairOk(el.dataset)&&(st.angles.has(el.dataset.angle)||st.angles.has(el.dataset.angle2))));
   for(const c of document.querySelectorAll(".opt[data-kind]"))c.classList.toggle("on",st[c.dataset.kind].has(c.dataset.chip));
@@ -710,11 +722,11 @@ function analyze(lat,lon){
   const sideOk=s=>st.side==="both"||s===st.side;
   const rows=[],prs=[];
   for(const l of LN){
-    if(!sideOk(l.side)||!st.lines.has(l.body)||!st.angles.has(l.angle))continue;
+    if(!sideOk(l.side)||!lineOn(l.body)||!st.angles.has(l.angle))continue;
     const mi=distTo(l,lat,lon),g=gradeMi(mi);if(g)rows.push({l,mi,g});
   }
   for(const p of PR){
-    if(!sideOk(p.side)||!st.lines.has(p.a)||!st.lines.has(p.b)||!(st.angles.has(p.angleA)||st.angles.has(p.angleB)))continue;
+    if(!sideOk(p.side)||!lineOn(p.a)||!lineOn(p.b)||!(st.angles.has(p.angleA)||st.angles.has(p.angleB)))continue;
     const d=Math.abs(p.lat-lat),g=gradeLat(d);if(g)prs.push({p,d,g});
   }
   rows.sort((a,b)=>a.mi-b.mi);prs.sort((a,b)=>a.d-b.d);
@@ -1020,7 +1032,7 @@ function renderFind(){
   computeFind();
   const F=lastFind;
   box.innerHTML='<button class="x" title="Close">&times;</button><h2>Find My Places</h2>'+
-    '<div class="grid">'+BODIES.map(b=>'<div class="opt'+(want.has(b)?" on":"")+'" data-want="'+b+'"><span class="radio"></span><span class="gl">'+GLYPH[b]+'</span>'+b+'</div>').join("")+'</div>'+
+    '<div class="grid">'+[...BODIES,...EXTRAS.filter(x=>st.extras.has(x))].map(b=>'<div class="opt'+(want.has(b)?" on":"")+'" data-want="'+b+'"><span class="radio"></span><span class="gl">'+GLYPH[b]+'</span>'+b+'</div>').join("")+'</div>'+
     '<h3>Latitude Limit</h3><div class="lims">'+[[45,"45°"],[60,"60°"],[66.5,"Polar Circles"],[90,"No Limit"]].map(([v,t])=>'<button class="pill'+(v===latLimit?" on":"")+'" data-lim="'+v+'">'+t+'</button>').join("")+'</div>'+
     (F.groups.length?'<h3>Closest Matches</h3>'+(F.top.length?F.top.map((t,i)=>'<div class="fr" data-fi="'+i+'"><b>'+t.c.n+'</b> <span class="co">'+t.c.c+'</span>'+
       '<div class="mt">'+t.per.filter(p=>p.v).map(p=>'<span><span style="color:'+(p.sd==="design"?"var(--design)":"var(--ink)")+'">'+GLYPH[p.b]+'</span>'+gradePill(GRADES.find(g=>g[1]===p.v))+'</span>').join("")+'</div></div>').join(""):'<div class="none">No cities within 700 miles of these lines.</div>'):"");
