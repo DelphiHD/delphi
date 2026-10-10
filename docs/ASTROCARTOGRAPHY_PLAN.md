@@ -228,3 +228,27 @@ relocated chart. All five are wanted eventually; 1 and 2 are built.
   controls, by the live chart's method: the drawing as it stands, computed
   styles baked in, Montserrat carried inside, twice the size, a footer naming
   the person, what is shown and the brand marks, handed over as a file.
+
+### Find My Places (10 October)
+
+Kaycee's framing: the person chooses which planets they want close. "I'm
+trying to resist telling them that certain planets are always good or always
+bad and want them to be able to explore on their own intuitively." So no
+planet is marked good or bad anywhere; the person picks.
+
+- Each chosen planet scores its grade at a place (Strong 3, Moderate 2, Mild 1)
+  for each side in view, through the angles the Angles menu allows. Shaded as
+  a gold wash on a 2 degree grid under the lines, and the cities ranked
+  exactly (great-circle distance to each line), ties broken by total distance.
+- Natural Earth's 40 research stations are left out of the ranking: places on
+  the map, not places to live.
+- Known bias: near the poles every line converges, so high latitudes score
+  well for any choice. Real geometry, not a bug; worth her view on whether
+  the ranking should temper it.
+- Next features move to the live charts (her decision, 10 October): transits
+  on the map, relationship map, place report, local space. They have to work
+  within the existing chart code.
+- The HD twist was shown to her as an example, not built: the gates on a
+  place's relocated angles (Lisbon: Personality ASC Gate 6.3, MC Gate 12.2;
+  Design ASC Gate 1.1, MC Gate 4.4; natal Ogden ASC Gate 15.5), from
+  lib/hd/gate-longitude. Whether it means anything is her call.

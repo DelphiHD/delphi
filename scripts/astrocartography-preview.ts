@@ -130,6 +130,8 @@ function cities(file: string) {
     return {
       n: String(q.name), c: String(q.adm0name), lat: r3(Number(q.latitude)), lon: r3(Number(q.longitude)),
       z: Number(q.min_zoom), cap: String(q.featurecla).startsWith("Admin-0 capital") ? 1 : 0,
+      // Research stations are places on the map but not places to live.
+      stn: String(q.featurecla) === "Scientific station" ? 1 : 0,
       pop: Number(q.pop_max),
     };
   }).sort((a: { z: number; pop: number }, b: { z: number; pop: number }) => a.z - b.z || b.pop - a.pop);
@@ -300,6 +302,20 @@ h1{margin:0;font-weight:600;font-size:22px;color:var(--purple)}
 #cmpBtn{display:none}#cmpBtn.has{display:inline-block}
 #compare{position:absolute;left:24px;right:24px;bottom:16px;max-height:55%;overflow:auto;background:#fff;border:1px solid #d9d0e0;border-radius:12px;box-shadow:0 10px 30px rgba(47,42,51,.18);padding:12px 16px;display:none;font-size:12px}
 #compare.open{display:block}
+#find{position:absolute;top:8px;left:24px;width:300px;max-height:calc(100% - 24px);overflow:auto;background:#fff;border:1px solid #d9d0e0;border-radius:12px;box-shadow:0 10px 30px rgba(47,42,51,.16);padding:14px 16px;font-size:12px;display:none;box-sizing:border-box}
+#find.open{display:block}
+#find h2{margin:0 26px 8px 0;font-size:15px;font-weight:600;color:var(--purple)}
+#find h3{margin:12px 0 6px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+#find .x{position:absolute;top:10px;right:12px;border:0;background:none;font-size:18px;color:var(--muted);cursor:pointer}
+#find .grid{display:grid;grid-template-columns:1fr 1fr;gap:2px}
+#find .opt{padding:4px 6px}
+#find .mt{display:flex;flex-wrap:wrap;gap:3px;margin-top:3px}
+#find .mt span{display:inline-flex;align-items:center;gap:3px}
+#find .fr{padding:6px;border-radius:6px;cursor:pointer}
+#find .fr:hover{background:#faf3df}
+#find .fr b{font-weight:600}#find .fr .co{color:var(--muted);font-size:11px}
+#findBtn.on{background:var(--gold);border-color:var(--gold);color:#fff}
+#heat{pointer-events:none}
 .rel .ang{display:flex;justify-content:space-between;padding:3px 6px}
 .rel .ang span{color:var(--muted)}
 .rel .was{color:var(--muted)}
@@ -378,7 +394,7 @@ h1{margin:0;font-weight:600;font-size:22px;color:var(--purple)}
 <header><h1>${personName}</h1>
 <div class="sub">${row.birth_place} · ${row.birth_date} ${String(row.birth_time).slice(0, 5)} · design ${sides.design.toISOString().slice(0, 16).replace("T", " ")} UTC</div></header>
 <div class="bar"><span id="side" style="display:flex;gap:4px"><button class="pill on" data-v="both">Both</button><button class="pill" data-v="personality">Personality</button><button class="pill" data-v="design">Design</button></span>
-<span class="gap"></span>${dropdown("lines", "Lines", planetItems)}${dropdown("angles", "Angles", angleItems)}${dropdown("parans", "Parans", planetItems)}<button class="pill" id="cmpBtn">Compare Places</button><div class="search"><input id="q" placeholder="Search A City" autocomplete="off"><div class="results" id="results"></div></div><div class="zoom"><button data-z="in" title="Zoom In">+</button><button data-z="out" title="Zoom Out">&minus;</button><button data-z="reset">Reset</button></div><button class="pill" id="snapMap">Save Map Image</button></div>
+<span class="gap"></span>${dropdown("lines", "Lines", planetItems)}${dropdown("angles", "Angles", angleItems)}${dropdown("parans", "Parans", planetItems)}<button class="pill" id="findBtn">Find My Places</button><button class="pill" id="cmpBtn">Compare Places</button><div class="search"><input id="q" placeholder="Search A City" autocomplete="off"><div class="results" id="results"></div></div><div class="zoom"><button data-z="in" title="Zoom In">+</button><button data-z="out" title="Zoom Out">&minus;</button><button data-z="reset">Reset</button></div><button class="pill" id="snapMap">Save Map Image</button></div>
 <div class="stage"><svg viewBox="0 0 ${VW} ${f(VH)}" preserveAspectRatio="xMidYMin meet" id="map">
 <defs><clipPath id="clip"><rect width="${W}" height="${f(H)}"/></clipPath></defs>
 <g transform="translate(${ML},${MT})">
@@ -387,6 +403,7 @@ h1{margin:0;font-weight:600;font-size:22px;color:var(--purple)}
 <g id="world">
 <path class="grat" vector-effect="non-scaling-stroke" d="${graticule.join("")}"/>
 <path class="land" vector-effect="non-scaling-stroke" d="${landPath(join(geoDir, "land-50m.json"))}"/>
+<image id="heat" x="0" y="0" width="${W}" height="${f(H)}" preserveAspectRatio="none" href=""/>
 <path class="border" vector-effect="non-scaling-stroke" d="${bordersPath(join(geoDir, "countries-50m.json"))}"/>
 </g>
 <g id="cities"></g>
@@ -400,7 +417,7 @@ h1{margin:0;font-weight:600;font-size:22px;color:var(--purple)}
 <rect width="${W}" height="${f(H)}" fill="none" stroke="#8d8396" stroke-width="1.5"/>
 </g>
 <g id="labels"></g>
-</svg><div id="here"></div><div id="compare"></div></div>
+</svg><div id="here"></div><div id="compare"></div><div id="find"></div></div>
 <img id="logo" hidden alt="" src="data:image/svg+xml;base64,${readFileSync(join("assets", "brand", "Delphi Logo.svg")).toString("base64")}">
 <img id="know" hidden alt="" src="data:image/svg+xml;base64,${readFileSync(join("assets", "brand", "Know Thyself.svg")).toString("base64")}">
 <div id="tip"></div><div id="wheel"><div class="box"></div></div>
@@ -574,10 +591,10 @@ function paint(){
     el.classList.toggle("off",!(sideOk(el.dataset)&&st.lines.has(el.dataset.body)&&st.angles.has(el.dataset.angle)));
   for(const el of document.querySelectorAll("#parans [data-side]"))
     el.classList.toggle("off",!(sideOk(el.dataset)&&pairOk(el.dataset)&&(st.angles.has(el.dataset.angle)||st.angles.has(el.dataset.angle2))));
-  for(const c of document.querySelectorAll(".opt"))c.classList.toggle("on",st[c.dataset.kind].has(c.dataset.chip));
+  for(const c of document.querySelectorAll(".opt[data-kind]"))c.classList.toggle("on",st[c.dataset.kind].has(c.dataset.chip));
   for(const k in ALL)document.querySelector('[data-dd="'+k+'"] .n').textContent=st[k].size===ALL[k].length?"All":st[k].size?st[k].size:"None";
   draw();
-  if(typeof renderHere==="function"){renderHere();renderCompare()}
+  if(typeof renderHere==="function"){renderHere();renderCompare();if(finding)renderFind()}
 }
 document.getElementById("side").onclick=e=>{const b=e.target.closest(".pill");if(!b)return;
   document.querySelectorAll("#side .pill").forEach(p=>p.classList.toggle("on",p===b));st.side=b.dataset.v;paint()};
@@ -881,6 +898,85 @@ document.getElementById("here").addEventListener("click",e=>{
     saved.push({n:here.name?here.name.replace(/^Near /,"Near "):fmtLat(here.lat)+", "+fmtLon(here.lon),c:here.country||"",lat:here.lat,lon:here.lon});
     persist();renderHere();renderCompare();redraw()}
 });
+// ---- Find My Places ---------------------------------------------------------
+// The person chooses which planets they want close; the map shades where those
+// planets' lines fall nearest and lists the closest cities. Nothing here says a
+// planet is good or bad. Kaycee, 10 October: "I'm trying to resist telling them
+// that certain planets are always good or always bad and want them to be able
+// to explore on their own intuitively."
+// Each chosen planet scores its grade at a place (Strong 3, Moderate 2, Mild 1)
+// for each side in view, through the angles the Angles menu allows.
+const want=new Set();let finding=false;
+const STEP=2,GC=Math.round(360/STEP),GR=Math.round((TOP-BOTTOM)/STEP);
+const dense=new Map();   // line -> points every 0.4 degrees
+function densePts(l){
+  if(dense.has(l))return dense.get(l);const out=[];
+  for(const run of l.runs)for(let i=1;i<run.length;i++){const a=run[i-1],b=run[i];
+    const n=Math.max(1,Math.ceil(Math.max(Math.abs(b[0]-a[0]),Math.abs(b[1]-a[1]))/0.4));
+    for(let k=0;k<n;k++){const t=k/n;out.push([a[0]+t*(b[0]-a[0]),a[1]+t*(b[1]-a[1])])}}
+  dense.set(l,out);return out;
+}
+function chosenLines(){
+  const sides=st.side==="both"?["personality","design"]:[st.side];
+  const groups=[];
+  for(const sd of sides)for(const b of want){
+    const ls=LN.filter(l=>l.side===sd&&l.body===b&&st.angles.has(l.angle));if(ls.length)groups.push({sd,b,ls})}
+  return groups;
+}
+const gradeVal=mi=>mi<=300?3:mi<=500?2:mi<=700?1:0;
+let lastFind=null;
+function computeFind(){
+  const groups=chosenLines();
+  const score=new Float32Array(GC*GR);
+  for(const g of groups){
+    const best=new Float32Array(GC*GR).fill(Infinity);
+    for(const l of g.ls)for(const [plon,plat] of densePts(l)){
+      if(plat>TOP+11||plat<BOTTOM-11)continue;
+      const r0=Math.max(0,Math.floor((TOP-plat-10.2)/STEP)),r1=Math.min(GR-1,Math.floor((TOP-plat+10.2)/STEP));
+      for(let r=r0;r<=r1;r++){const clat=TOP-(r+.5)*STEP;
+        const span=10.2/Math.max(.15,Math.cos(clat*RAD));
+        const c0=Math.floor((plon-span+180)/STEP),c1=Math.floor((plon+span+180)/STEP);
+        for(let cc=c0;cc<=c1;cc++){const c=((cc%GC)+GC)%GC,clon=-180+(c+.5)*STEP;
+          const d=hav(clat,clon,plat,plon),i=r*GC+c;if(d<best[i])best[i]=d}}
+    }
+    for(let i=0;i<best.length;i++)score[i]+=gradeVal(best[i]);
+  }
+  const max=3*groups.length;
+  // Paint the score as a soft gold wash under the lines.
+  const cv=document.createElement("canvas");cv.width=GC;cv.height=GR;const g=cv.getContext("2d"),img=g.createImageData(GC,GR);
+  for(let i=0;i<score.length;i++){const a=max?score[i]/max:0;img.data[i*4]=199;img.data[i*4+1]=154;img.data[i*4+2]=46;img.data[i*4+3]=Math.round(Math.pow(a,1.6)*190)}
+  g.putImageData(img,0,0);
+  document.getElementById("heat").setAttribute("href",groups.length?cv.toDataURL():"");
+  // Rank cities exactly, starting from the cells that score at all.
+  const cell=(lat,lon)=>{const r=Math.min(GR-1,Math.max(0,Math.floor((TOP-lat)/STEP))),c=Math.min(GC-1,Math.max(0,Math.floor((lon+180)/STEP)));return score[r*GC+c]};
+  const ranked=[];
+  if(groups.length)for(const c of CITIES){if(c.stn||c.lat>TOP||c.lat<BOTTOM||cell(c.lat,c.lon)<=0)continue;
+    let sc=0,sum=0;const per=[];
+    for(const g2 of groups){const mi=Math.min(...g2.ls.map(l=>distTo(l,c.lat,c.lon)));const v=gradeVal(mi);sc+=v;sum+=Math.min(mi,700);per.push({sd:g2.sd,b:g2.b,mi,v})}
+    if(sc>0)ranked.push({c,sc,sum,per})}
+  ranked.sort((a,b)=>b.sc-a.sc||a.sum-b.sum);
+  lastFind={groups,max,top:ranked.slice(0,12)};
+}
+function renderFind(){
+  const box=document.getElementById("find"),btn=document.getElementById("findBtn");
+  btn.classList.toggle("on",finding);
+  if(!finding){box.classList.remove("open");document.getElementById("heat").setAttribute("href","");return}
+  computeFind();
+  const F=lastFind;
+  box.innerHTML='<button class="x" title="Close">&times;</button><h2>Find My Places</h2>'+
+    '<div class="grid">'+BODIES.map(b=>'<div class="opt'+(want.has(b)?" on":"")+'" data-want="'+b+'"><span class="radio"></span><span class="gl">'+GLYPH[b]+'</span>'+b+'</div>').join("")+'</div>'+
+    (F.groups.length?'<h3>Closest Matches</h3>'+(F.top.length?F.top.map((t,i)=>'<div class="fr" data-fi="'+i+'"><b>'+t.c.n+'</b> <span class="co">'+t.c.c+'</span>'+
+      '<div class="mt">'+t.per.filter(p=>p.v).map(p=>'<span><span style="color:'+(p.sd==="design"?"var(--design)":"var(--ink)")+'">'+GLYPH[p.b]+'</span>'+gradePill(GRADES.find(g=>g[1]===p.v))+'</span>').join("")+'</div></div>').join(""):'<div class="none">No cities within 700 miles of these lines.</div>'):"");
+  box.classList.add("open");
+}
+document.getElementById("findBtn").onclick=()=>{finding=!finding;renderFind()};
+document.getElementById("find").addEventListener("click",e=>{
+  if(e.target.closest(".x")){finding=false;return renderFind()}
+  const w=e.target.closest("[data-want]");if(w){const b=w.dataset.want;want.has(b)?want.delete(b):want.add(b);return renderFind()}
+  const r=e.target.closest("[data-fi]");if(r){const c=lastFind.top[+r.dataset.fi].c;
+    const k=Math.max(view.k,4);view.k=k;view.tx=W/2-((c.lon+180)/360*W)*k;view.ty=H/2-((TOP-c.lat)/(TOP-BOTTOM)*H)*k;clampView();openHere(c.lat,c.lon,c)}
+});
+
 // ---- Saved places, compared ---------------------------------------------
 function drawSaved(){
   const g=document.getElementById("pin");
