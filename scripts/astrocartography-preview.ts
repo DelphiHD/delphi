@@ -27,7 +27,7 @@ import { homedir } from "node:os";
 import { createClient } from "@supabase/supabase-js";
 import { getChart } from "../lib/mybodygraph";
 import { locate, getAstro } from "../lib/astro";
-import { ZODIAC } from "../lib/astro-extras";
+import { ZODIAC, houseOf } from "../lib/astro-extras";
 import { mapFor, paransFor, HD_BODIES } from "../lib/astrocartography";
 import { GLYPH } from "./astro-wheel";
 import { loadLibraryChunks } from "../lib/hd/chunks-source";
@@ -164,6 +164,10 @@ function cities(file: string) {
     return `${d}\u00b0${m < 10 ? "0" : ""}${m}'`;
   };
   const where: Record<string, Record<string, string>> = {};
+  const natal: Record<string, { asc: string; mc: string; house: Record<string, number> }> = {};
+  const HOUSE: Record<string, number> = { First: 1, Second: 2, Third: 3, Fourth: 4, Fifth: 5, Sixth: 6,
+    Seventh: 7, Eighth: 8, Ninth: 9, Tenth: 10, Eleventh: 11, Twelfth: 12 };
+  const signDeg = (v: number) => `${ZODIAC[Math.floor(v / 30)]} ${deg(v % 30)}`;
   for (const [side, astro] of [
     ["personality", await getAstro({ birthDate: String(row.birth_date), birthTime: String(row.birth_time).slice(0, 5), place: String(row.birth_place) })],
     ["design", await getAstro({ birthDate: String(row.birth_date), birthTime: String(row.birth_time).slice(0, 5), place: String(row.birth_place), atUtc: chart.birth.designUtcDate })],
@@ -176,6 +180,10 @@ function cities(file: string) {
       where[side].Earth = `${ZODIAC[Math.floor(e / 30)]} ${deg(e % 30)}`;
     }
     for (const b of HD_BODIES) if (!where[side][b]) throw new Error(`no ${side} position for ${b}`);
+    const house: Record<string, number> = {};
+    for (const p of astro.planets) house[p.label] = HOUSE[String(p.house).split("_")[0]] ?? 0;
+    if (sun) house.Earth = houseOf((sun.abs_pos + 180) % 360, astro.houses.map((h) => h.abs_pos));
+    natal[side] = { asc: signDeg(astro.ascendant), mc: signDeg(astro.mc), house };
   }
 
   // Her own words for each planet, the Delphi Basic the chart's planet hovers
@@ -292,6 +300,16 @@ h1{margin:0;font-weight:600;font-size:22px;color:var(--purple)}
 #cmpBtn{display:none}#cmpBtn.has{display:inline-block}
 #compare{position:absolute;left:24px;right:24px;bottom:16px;max-height:55%;overflow:auto;background:#fff;border:1px solid #d9d0e0;border-radius:12px;box-shadow:0 10px 30px rgba(47,42,51,.18);padding:12px 16px;display:none;font-size:12px}
 #compare.open{display:block}
+.rel .ang{display:flex;justify-content:space-between;padding:3px 6px}
+.rel .ang span{color:var(--muted)}
+.rel .was{color:var(--muted)}
+.wheelbtn{font:inherit;font-size:11px;font-weight:600;border:1px solid var(--purple);background:#fff;color:var(--purple);border-radius:999px;padding:4px 10px;cursor:pointer;margin:6px 0 2px}
+#wheel{position:fixed;inset:0;background:rgba(47,42,51,.45);display:none;align-items:center;justify-content:center;z-index:20}
+#wheel.open{display:flex}
+#wheel .box{background:#fff;border-radius:14px;padding:14px 16px;max-width:min(92vw,820px);max-height:92vh;overflow:auto;position:relative}
+#wheel .box h2{margin:0 30px 6px 0;font-size:14px;color:var(--purple)}
+#wheel .box svg{width:min(80vh,760px);height:auto;display:block}
+#wheel .x{position:absolute;top:8px;right:12px;border:0;background:none;font-size:20px;color:var(--muted);cursor:pointer}
 #compare h2{margin:0 0 8px;font-size:14px;color:var(--purple)}
 #compare .x{position:absolute;top:8px;right:12px;border:0;background:none;font-size:18px;color:var(--muted);cursor:pointer}
 #compare table{border-collapse:collapse;width:100%}
@@ -369,7 +387,7 @@ h1{margin:0;font-weight:600;font-size:22px;color:var(--purple)}
 </g>
 <g id="labels"></g>
 </svg><div id="here"></div><div id="compare"></div></div>
-<div id="tip"></div>
+<div id="tip"></div><div id="wheel"><div class="box"></div></div>
 <script>
 const WHERE=${JSON.stringify(where)};
 const pill=a=>'<span class="pill">'+a+'</span>';
@@ -379,6 +397,8 @@ const LN=${JSON.stringify(LN)};
 const PR=${JSON.stringify(PR)};
 const BIRTH=${JSON.stringify([place.lon, place.lat])};
 const BASIC=${JSON.stringify(basics)};
+const NATAL=${JSON.stringify(natal)};
+const CAST={place:${JSON.stringify(String(row.birth_place))},p:${JSON.stringify(chart.birth.utcDate)},d:${JSON.stringify(chart.birth.designUtcDate)}};
 const CITIES=${JSON.stringify(cities(join(geoDir, "..", "natural-earth", "ne_50m_populated_places_simple.geojson")))};
 const TOP=${TOP},BOTTOM=${BOTTOM},ORB=1;
 const PERSON=${JSON.stringify(personName)};
@@ -657,6 +677,7 @@ function renderHere(){
     '<h2>'+(here.name||fmtLat(here.lat)+", "+fmtLon(here.lon))+'</h2>'+
     '<div class="co">'+(here.name?(here.country?here.country+" · ":"")+fmtLat(here.lat)+", "+fmtLon(here.lon):"")+'</div>'+
     (isSaved(here)?'<button class="save done">Saved</button>':'<button class="save" data-save="1">Save Place</button>')+
+    relocHtml()+
     '<h3>Lines</h3>'+(rows.length?rows.map(r=>'<div class="hr" '+tag(r.l.side,r.l.body,r.l.angle)+'>'+
       '<span class="gl '+r.l.side+'">'+GLYPH[r.l.body]+'</span><span class="nm">'+SIDE[r.l.side]+" "+r.l.body+' <span class="ap">'+r.l.angle+'</span></span>'+
       '<span class="mi">'+Math.round(r.mi)+' mi</span>'+gradePill(r.g)+'</div>').join(""):'<div class="none">No lines within 700 miles.</div>')+
@@ -665,14 +686,53 @@ function renderHere(){
       '<span class="mi">'+r.d.toFixed(1)+'°</span>'+gradePill(r.g)+'</div>').join(""):'<div class="none">No parans within 1° of this latitude.</div>');
   box.classList.add("open");
 }
+// ---- Relocated chart ----------------------------------------------------
+// The birth moment cast at the chosen place, both sides, by the provider via
+// the local server. The planets do not move; angles and houses do.
+const reloc=new Map();   // "lat,lon" -> result, or "loading" / "failed"
+const ord=n=>n+(n%100>10&&n%100<14?"th":["th","st","nd","rd"][n%10]||"th");
+function relocKey(){return here.lat.toFixed(4)+","+here.lon.toFixed(4)}
+function fetchReloc(){
+  if(!live||!here)return;const k=relocKey();if(reloc.has(k))return;
+  reloc.set(k,"loading");const at={...here};
+  fetch("/api/relocate?"+new URLSearchParams({lat:at.lat,lon:at.lon,name:PERSON,...CAST})).then(r=>r.json())
+    .then(r=>{reloc.set(k,r.ok?r:"failed");if(here&&relocKey()===k)renderHere()})
+    .catch(()=>{reloc.set(k,"failed");if(here&&relocKey()===k)renderHere()});
+}
+const fmtDeg=v=>{let d=Math.floor(v),m=Math.round((v-d)*60);if(m===60){d++;m=0}return d+"°"+(m<10?"0":"")+m+"'"};
+function relocHtml(){
+  if(!live)return"";
+  const r=reloc.get(relocKey());
+  if(!r||r==="loading")return'<h3>Relocated Chart</h3><div class="none">Casting…</div>';
+  if(r==="failed")return'<h3>Relocated Chart</h3><div class="none">Could not cast this place.</div>';
+  const sides=st.side==="both"?["personality","design"]:[st.side];
+  const ANGULAR=new Set([1,4,7,10]);
+  let h='<div class="rel"><h3>Relocated Chart</h3>';
+  for(const sd of sides){const R=r[sd];
+    h+='<div class="ang"><b>'+SIDE[sd]+' Ascendant</b>'+R.asc.sign+" "+fmtDeg(R.asc.deg)+'</div>'+
+       '<div class="ang"><span>was '+NATAL[sd].asc+'</span></div>'+
+       '<div class="ang"><b>'+SIDE[sd]+' Midheaven</b>'+R.mc.sign+" "+fmtDeg(R.mc.deg)+'</div>'+
+       '<div class="ang"><span>was '+NATAL[sd].mc+'</span></div>'}
+  const moved=[];
+  for(const sd of sides)for(const b of BODIES){if(!st.lines.has(b))continue;
+    const a=NATAL[sd].house[b],z=r[sd].house[b];if(a&&z&&a!==z)moved.push({sd,b,a,z})}
+  h+='<h3>Planets Changing House</h3>'+(moved.length?moved.map(m=>'<div class="hr" '+tag(m.sd,m.b,"")+'>'+
+    '<span class="gl '+m.sd+'">'+GLYPH[m.b]+'</span><span class="nm">'+SIDE[m.sd]+" "+m.b+'</span>'+
+    '<span class="was">'+ord(m.a)+' →</span> <b>'+ord(m.z)+'</b>'+(ANGULAR.has(m.z)?' <span class="gr g3">Angular</span>':'')+'</div>').join(""):'<div class="none">No planet changes house here.</div>');
+  h+='<button class="wheelbtn" data-wheel="1">View Wheel</button></div>';
+  return h;
+}
+document.getElementById("wheel").addEventListener("click",e=>{if(e.target.id==="wheel"||e.target.closest(".x"))e.currentTarget.classList.remove("open")});
 function openHere(lat,lon,city){
   const c=city||nearestCity(lat,lon);
   here={lat,lon,name:city?city.n:(c?"Near "+c.n:null),country:c?c.c:null};
   if(city){here.lat=city.lat;here.lon=city.lon}
-  renderHere();redraw();
+  fetchReloc();renderHere();redraw();
 }
 document.getElementById("here").addEventListener("click",e=>{
   if(e.target.closest(".x")){here=null;pinned.clear();renderHere();redraw();return}
+  if(e.target.closest("[data-wheel]")){const r=reloc.get(relocKey());if(r&&r.svg){
+    const w=document.getElementById("wheel");w.querySelector(".box").innerHTML='<button class="x" title="Close">&times;</button><h2>Relocated Chart · '+(here.name?here.name.replace(/^Near /,""):fmtLat(here.lat)+", "+fmtLon(here.lon))+'</h2>'+r.svg;w.classList.add("open")}return}
   const un=e.target.closest("[data-un]");if(un){pinned.delete(un.dataset.un);renderHere();redraw();return}
   if(e.target.closest("[data-save]")&&here){
     saved.push({n:here.name?here.name.replace(/^Near /,"Near "):fmtLat(here.lat)+", "+fmtLon(here.lon),c:here.country||"",lat:here.lat,lon:here.lon});

@@ -185,8 +185,12 @@ export async function getAstro(args: {
    *  design date comes with its own astrology chart and houses. I want to see
    *  those charts cast together." */
   atUtc?: string;
+  /** Cast the same moment for somewhere else: the relocated chart. Angles and
+   *  houses follow these coordinates; the planets do not move. Used with
+   *  atUtc, so the instant is fixed whatever the local clock says there. */
+  coords?: { lat: number; lon: number };
 }): Promise<AstroChart> {
-  const loc = await locate(args.place);
+  const loc = { ...(await locate(args.place)), ...(args.coords ?? {}) };
   const url = new URL(API_BASE + ASTRO_PATH);
   url.searchParams.set("api_key", apiKey());
   if (args.atUtc) {

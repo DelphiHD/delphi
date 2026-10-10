@@ -188,3 +188,23 @@ relocated chart. All five are wanted eventually; 1 and 2 are built.
   of Strong, Moderate and Mild, then every line and paran that reaches any of
   them, best first. Kept in the browser for now; in the live chart they
   belong to the account.
+
+### Relocated chart (10 October)
+
+- `getAstro` takes an optional `coords`: the same instant cast for another
+  place. Additive; every existing caller is unchanged. The provider computes
+  the angles and houses; nothing is derived here except Earth's house, which
+  is the Sun's opposite point placed in the provider's own cusps, as on the
+  natal chart.
+- The panel's Relocated Chart section, for each side in view: the Ascendant
+  and Midheaven there against the natal ones, and every planet whose house
+  changes, natal to relocated, flagged Angular when it lands in the 1st, 4th,
+  7th or 10th. View Wheel opens the relocated wheel drawn by renderWheel, the
+  Astrology view's own drawing: personality houses, design outer.
+- Cross-checked against the map at Lisbon: Personality Sun MC 112 mi and Sun
+  12th to 10th; Personality Neptune IC 239 mi and Neptune to the 4th; Design
+  Moon DSC 154 mi and Design Moon to the 7th. The provider and our lines agree.
+- Served by /api/relocate on the local server; when this goes live it becomes
+  a route beside /api/transit-wheel, which already casts wheels the same way.
+- Not yet: hovers inside the relocated wheel, and a wheel on the design
+  chart's own relocated horizon (the Relationship view's pattern).
