@@ -345,10 +345,11 @@ function layoutLabels(){
     });
   }
 }
-// A paran shows when one of its bodies is picked in the Parans menu and the
-// other has its lines on the map, so a hover never lights a hidden line.
-// Kaycee, 10 October: with Earth's lines off, a Venus-Earth paran should be too.
-const pairOk=d=>(st.parans.has(d.body)&&st.lines.has(d.body2))||(st.parans.has(d.body2)&&st.lines.has(d.body));
+// A paran shows when one of its bodies is picked in the Parans menu and BOTH
+// have their lines on the map, so a hover never lights a hidden line. Kaycee,
+// 10 October: with Earth's lines off, Earth's parans should be too. Checking
+// only the partner left Earth in whenever Parans was set to All.
+const pairOk=d=>(st.parans.has(d.body)||st.parans.has(d.body2))&&st.lines.has(d.body)&&st.lines.has(d.body2);
 function paint(){
   const sideOk=d=>st.side==="both"||d.side===st.side;
   for(const el of document.querySelectorAll("#lines [data-side]"))
@@ -384,7 +385,7 @@ document.getElementById("map").addEventListener("mousemove",e=>{
   if(el.dataset.body2){el.classList.add("hot");el.parentNode.appendChild(el)}
   hot(el.dataset,true);
   tip.innerHTML=describe(el);tip.style.display="block";
-  tip.style.left=Math.min(e.clientX+14,innerWidth-300)+"px";tip.style.top=(e.clientY+14)+"px";
+  tip.style.left=Math.max(8,Math.min(e.clientX+14,innerWidth-tip.offsetWidth-8))+"px";tip.style.top=(e.clientY+14)+"px";
 });
 document.getElementById("map").addEventListener("mouseleave",()=>{tip.style.display="none";if(cur){cur.classList.remove("hot");hot(cur.dataset,false);cur=null}});
 paint();

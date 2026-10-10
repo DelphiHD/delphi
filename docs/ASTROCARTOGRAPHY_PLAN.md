@@ -115,6 +115,8 @@ Kaycee chose the **detailed coastline** (land-50m). Her changes:
   own menu.
 - The Angles menu filters parans too: a paran shows when either of its two
   angles is selected. Earth's lines start switched off (Kaycee, 10 October).
-- A paran shows when one body is picked in the Parans menu and the other has
-  its lines on. So Earth's parans follow Earth's lines, off by default, and a
-  paran hover never lights a line that is hidden (Kaycee, 10 October).
+- A paran shows when one of its bodies is picked in the Parans menu and BOTH
+  bodies have their lines on. So Earth's parans follow Earth's lines, off by
+  default, and a paran hover never lights a line that is hidden (Kaycee, 10
+  October). The first version checked only the partner, and Parans set to All
+  still showed Earth's; she caught it.
