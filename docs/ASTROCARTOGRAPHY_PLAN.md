@@ -75,3 +75,22 @@ look, and **parans are in**. Local space and relocation stay out for now.
 - Parans are about 360 per map. The preview shows a focused planet's parans by
   default, all on request. Land crossing the 180 meridian (Fiji, Chukotka) is
   unwrapped and drawn on both edges, or it streaks across the map.
+
+### Second pass, same day
+
+Kaycee chose the **detailed coastline** (land-50m). Her changes:
+
+- Four line styles: ASC solid, DSC dashed, IC dotted, MC dash-dot.
+- Glyphs outside the frame where each line leaves it, as astro-seek does:
+  MC and IC along the top, horizon curves on the side or bottom they exit by,
+  spread so none overlap, with a short leader to the line. The map runs 80N to
+  70S so most curves turn inside the frame instead of crowding the bottom.
+- Lines and parans are switched by **separate rows**. Before, one chip did
+  both, and turning a planet's parans off took its lines off the map too.
+  Her words: she is "not sure yet how I want it to be different", so this is a
+  first answer, not a settled one.
+- Parans are solid translucent bands, 1 degree of latitude either side,
+  personality in the brand purple and design in the bodygraph red. The 1
+  degree orb is a placeholder for her to set.
+- Cross-checked against astro-seek's map for her chart: Sun, Moon and Venus
+  meridians agree to within a few tenths of a degree.
