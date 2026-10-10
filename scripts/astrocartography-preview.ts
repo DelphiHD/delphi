@@ -6,8 +6,9 @@
  *
  *   npx tsx scripts/astrocartography-preview.ts "Kaycee Vandenberg" .cache/world-atlas
  *
- * The geo directory holds land-50m.json from world-atlas@2.0.2. Kaycee chose
- * the detailed coastline over land-110m on 10 October.
+ * The geo directory holds land-50m.json and countries-50m.json from
+ * world-atlas@2.0.2 (Kaycee chose the detailed coastline on 10 October), and
+ * ../natural-earth/ne_50m_populated_places_simple.geojson for the cities.
  *
  * Lines and parans are switched separately: Kaycee, 10 October, turning off a
  * planet's parans had also taken its lines off the map, which she did not
@@ -82,6 +83,56 @@ function landPath(file: string): string {
 }
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
+
+/**
+ * Country borders, faint, from world-atlas countries-50m (the same source and
+ * detail as the coastline, so they meet it exactly). Only arcs two countries
+ * share are drawn: the coast is already the land's edge.
+ */
+function bordersPath(file: string): string {
+  const topo = JSON.parse(readFileSync(file, "utf8"));
+  const [sx, sy] = topo.transform.scale;
+  const [tx, ty] = topo.transform.translate;
+  const owners = new Map<number, Set<number>>();
+  topo.objects.countries.geometries.forEach((g: { type: string; arcs: unknown }, gi: number) => {
+    const walk = (a: unknown): void => {
+      if (typeof a === "number") {
+        const i = a < 0 ? ~a : a;
+        if (!owners.has(i)) owners.set(i, new Set());
+        owners.get(i)!.add(gi);
+      } else if (Array.isArray(a)) a.forEach(walk);
+    };
+    walk(g.arcs);
+  });
+  const out: string[] = [];
+  owners.forEach((who, i) => {
+    if (who.size < 2) return;
+    let ax = 0, ay = 0;
+    const pts = topo.arcs[i].map(([dx, dy]: number[]) => { ax += dx; ay += dy; return [ax * sx + tx, ay * sy + ty]; });
+    let d = "";
+    pts.forEach(([lon, lat]: number[], k: number) => {
+      // A border that crosses the 180 meridian is lifted there, not drawn round.
+      const jump = k > 0 && Math.abs(lon - pts[k - 1][0]) > 180;
+      d += `${k === 0 || jump ? "M" : "L"}${f(x(lon))},${f(y(lat))}`;
+    });
+    out.push(d);
+  });
+  return out.join("");
+}
+
+/** Natural Earth's populated places: name, country, position, and the zoom
+ *  at which a web map would first show it, which decides when it appears. */
+function cities(file: string) {
+  const geo = JSON.parse(readFileSync(file, "utf8"));
+  return geo.features.map((ft: { properties: Record<string, unknown> }) => {
+    const q = ft.properties;
+    return {
+      n: String(q.name), c: String(q.adm0name), lat: r3(Number(q.latitude)), lon: r3(Number(q.longitude)),
+      z: Number(q.min_zoom), cap: String(q.featurecla).startsWith("Admin-0 capital") ? 1 : 0,
+      pop: Number(q.pop_max),
+    };
+  }).sort((a: { z: number; pop: number }, b: { z: number; pop: number }) => a.z - b.z || b.pop - a.pop);
+}
 
 (async () => {
   const s = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
@@ -208,6 +259,38 @@ h1{margin:0;font-weight:600;font-size:22px;color:var(--purple)}
 .pr.design rect,.pr.design circle{fill:var(--design)}
 .pr.hot rect{fill:var(--gold);opacity:.4}.pr.hot circle{fill:var(--gold);r:7;stroke-width:2}
 .birth{fill:var(--purple);stroke:#fff;stroke-width:2}
+.border{fill:none;stroke:#b9b4bf;stroke-width:.6;stroke-opacity:.8}
+#cities{pointer-events:none}
+.city circle{fill:#6f6878}.city.cap circle{fill:#fff;stroke:#6f6878;stroke-width:1.4}
+.city text{font-size:10px;fill:#5d5666;paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round}
+#rings{pointer-events:none}.ring{fill:var(--gold);fill-opacity:.07;stroke:var(--gold);stroke-width:1.2;stroke-dasharray:4 3}
+.ring.inner{fill-opacity:.1;stroke-dasharray:none}
+#pin{pointer-events:none}.pin{fill:var(--gold);stroke:#fff;stroke-width:2}
+.stage{position:relative}
+#here{position:absolute;top:8px;right:24px;width:330px;max-height:calc(100% - 24px);overflow:auto;background:#fff;border:1px solid #d9d0e0;border-radius:12px;box-shadow:0 10px 30px rgba(47,42,51,.16);padding:14px 16px;font-size:12px;display:none;box-sizing:border-box}
+#here.open{display:block}
+#here h2{margin:0 26px 2px 0;font-size:15px;font-weight:600;color:var(--purple)}
+#here .co{color:var(--muted);font-size:11px}
+#here h3{margin:14px 0 6px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+#here .x{position:absolute;top:10px;right:12px;border:0;background:none;font-size:18px;color:var(--muted);cursor:pointer}
+.hr{display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:6px;cursor:default}
+.hr:hover{background:#faf3df}
+.hr .gl{width:16px;text-align:center;font-size:14px}.hr .gl.personality{color:var(--ink)}.hr .gl.design{color:var(--design)}
+.hr .nm{flex:1}
+.hr .mi{color:var(--muted);font-variant-numeric:tabular-nums;min-width:52px;text-align:right}
+.ap,.gr{display:inline-block;padding:2px 7px;border-radius:999px;font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+.ap{background:var(--purple);color:#fff}
+.gr{min-width:58px;text-align:center}
+.gr.g3{background:var(--gold);color:#fff}.gr.g2{background:#ecd9a4;color:#6b5210}.gr.g1{border:1px solid #d8c48c;color:#8a6a14}
+#here .none{color:var(--muted);padding:4px 6px}
+.search{position:relative}
+.search input{font:inherit;font-size:12px;border:1px solid #d9d0e0;border-radius:999px;padding:6px 12px;width:180px;outline:none}
+.search input:focus{border-color:var(--purple)}
+.results{display:none;position:absolute;z-index:6;top:34px;left:0;background:#fff;border:1px solid #d9d0e0;border-radius:10px;box-shadow:0 8px 24px rgba(47,42,51,.14);padding:6px;min-width:240px}
+.results.open{display:block}
+.results div{padding:6px 8px;border-radius:6px;cursor:pointer;font-size:13px}
+.results div.sel,.results div:hover{background:#f6f0f9}
+.results span{color:var(--muted);font-size:11px;margin-left:4px}
 .off{display:none}
 #tip{position:fixed;transform-origin:0 0;pointer-events:none;background:#fff;border:1px solid #d9d0e0;border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 4px 14px rgba(47,42,51,.12);display:none;max-width:280px}
 #tip b{color:var(--ink)}
@@ -229,7 +312,7 @@ h1{margin:0;font-weight:600;font-size:22px;color:var(--purple)}
 <header><h1>${personName}</h1>
 <div class="sub">${row.birth_place} · ${row.birth_date} ${String(row.birth_time).slice(0, 5)} · design ${sides.design.toISOString().slice(0, 16).replace("T", " ")} UTC</div></header>
 <div class="bar"><span id="side" style="display:flex;gap:4px"><button class="pill on" data-v="both">Both</button><button class="pill" data-v="personality">Personality</button><button class="pill" data-v="design">Design</button></span>
-<span class="gap"></span>${dropdown("lines", "Lines", planetItems)}${dropdown("angles", "Angles", angleItems)}${dropdown("parans", "Parans", planetItems)}<div class="zoom"><button data-z="in" title="Zoom In">+</button><button data-z="out" title="Zoom Out">&minus;</button><button data-z="reset">Reset</button></div></div>
+<span class="gap"></span>${dropdown("lines", "Lines", planetItems)}${dropdown("angles", "Angles", angleItems)}${dropdown("parans", "Parans", planetItems)}<div class="search"><input id="q" placeholder="Search A City" autocomplete="off"><div class="results" id="results"></div></div><div class="zoom"><button data-z="in" title="Zoom In">+</button><button data-z="out" title="Zoom Out">&minus;</button><button data-z="reset">Reset</button></div></div>
 <div class="stage"><svg viewBox="0 0 ${VW} ${f(VH)}" preserveAspectRatio="xMidYMin meet" id="map">
 <defs><clipPath id="clip"><rect width="${W}" height="${f(H)}"/></clipPath></defs>
 <g transform="translate(${ML},${MT})">
@@ -238,15 +321,19 @@ h1{margin:0;font-weight:600;font-size:22px;color:var(--purple)}
 <g id="world">
 <path class="grat" vector-effect="non-scaling-stroke" d="${graticule.join("")}"/>
 <path class="land" vector-effect="non-scaling-stroke" d="${landPath(join(geoDir, "land-50m.json"))}"/>
+<path class="border" vector-effect="non-scaling-stroke" d="${bordersPath(join(geoDir, "countries-50m.json"))}"/>
 </g>
+<g id="cities"></g>
+<g id="rings"></g>
 <g id="parans"></g>
 <g id="lines"></g>
 <circle class="birth" id="birth" r="5"><title>${row.birth_place}</title></circle>
+<g id="pin"></g>
 </g>
 <rect width="${W}" height="${f(H)}" fill="none" stroke="#8d8396" stroke-width="1.5"/>
 </g>
 <g id="labels"></g>
-</svg></div>
+</svg><div id="here"></div></div>
 <div id="tip"></div>
 <script>
 const WHERE=${JSON.stringify(where)};
@@ -256,9 +343,10 @@ const GLYPH=${JSON.stringify(Object.fromEntries(HD_BODIES.map((b) => [b, glyph(b
 const LN=${JSON.stringify(LN)};
 const PR=${JSON.stringify(PR)};
 const BIRTH=${JSON.stringify([place.lon, place.lat])};
+const CITIES=${JSON.stringify(cities(join(geoDir, "..", "natural-earth", "ne_50m_populated_places_simple.geojson")))};
 const TOP=${TOP},BOTTOM=${BOTTOM},ORB=1;
 const PERSON=${JSON.stringify(personName)};
-const ML=${ML},MT=${MT},W=${W},H=${f(H)};
+const ML=${ML},MT=${MT},MR=${MR},W=${W},H=${f(H)};
 const BODIES=${JSON.stringify(HD_BODIES)};
 const ANGLES=["ASC","DSC","MC","IC"];
 const ALL={lines:BODIES,parans:BODIES,angles:ANGLES};
@@ -296,7 +384,28 @@ function draw(){
     const y0=Y(p.lat+ORB),y1=Y(p.lat-ORB);p.rect.setAttribute("y",y0.toFixed(1));p.rect.setAttribute("height",(y1-y0).toFixed(1));
     p.dot.setAttribute("cx",X(p.lon).toFixed(1));p.dot.setAttribute("cy",Y(p.lat).toFixed(1))}
   const b=document.getElementById("birth");b.setAttribute("cx",X(BIRTH[0]));b.setAttribute("cy",Y(BIRTH[1]));
+  drawCities();drawHere();
   layoutLabels();
+}
+/**
+ * Cities appear as the map zooms, in Natural Earth's own order of importance,
+ * and a name is skipped rather than drawn over another.
+ */
+function drawCities(){
+  const g=document.getElementById("cities");g.replaceChildren();
+  const px=svg.getBoundingClientRect().width*W/(ML+W+MR);
+  const zoom=Math.log2(px*view.k/256)+0.6;
+  const taken=[];
+  for(const c of CITIES){
+    if(c.z>zoom)break;
+    const x=X(c.lon),y=Y(c.lat);if(x<0||x>W||y<0||y>H)continue;
+    const box=[x-3,y-6,x+6+c.n.length*5.6,y+6];
+    if(taken.some(t=>box[0]<t[2]&&box[2]>t[0]&&box[1]<t[3]&&box[3]>t[1]))continue;
+    taken.push(box);
+    const e=mk("g",{class:"city"+(c.cap?" cap":"")});
+    e.append(mk("circle",{cx:x,cy:y,r:c.cap?3:2.2}));
+    const t=mk("text",{x:x+5,y:y+3.5});t.textContent=c.n;e.append(t);g.append(e);
+  }
 }
 /**
  * Where each line in view leaves the frame, worked out for the current view,
@@ -377,6 +486,7 @@ function paint(){
   for(const c of document.querySelectorAll(".opt"))c.classList.toggle("on",st[c.dataset.kind].has(c.dataset.chip));
   for(const k in ALL)document.querySelector('[data-dd="'+k+'"] .n').textContent=st[k].size===ALL[k].length?"All":st[k].size?st[k].size:"None";
   draw();
+  if(typeof renderHere==="function")renderHere();
 }
 document.getElementById("side").onclick=e=>{const b=e.target.closest(".pill");if(!b)return;
   document.querySelectorAll("#side .pill").forEach(p=>p.classList.toggle("on",p===b));st.side=b.dataset.v;paint()};
@@ -393,6 +503,7 @@ const tip=document.getElementById("tip");
 function hot(d,on){
   const q=(b,a)=>'#lines [data-side="'+d.side+'"][data-body="'+b+'"][data-angle="'+a+'"], #labels [data-side="'+d.side+'"][data-body="'+b+'"][data-angle="'+a+'"]';
   for(const el of document.querySelectorAll(q(d.body,d.angle)+(d.body2?", "+q(d.body2,d.angle2):"")))el.classList.toggle("hot",on);
+  if(d.body2)for(const p of PR)if(p.side===d.side&&p.a===d.body&&p.angleA===d.angle&&p.b===d.body2&&p.angleB===d.angle2&&!p.el.classList.contains("off"))p.el.classList.toggle("hot",on);
 }
 let cur=null;
 document.getElementById("map").addEventListener("mousemove",e=>{
@@ -416,6 +527,91 @@ document.getElementById("map").addEventListener("mousemove",e=>{
   tip.style.left=Math.max(vl+pad,tx)+"px";tip.style.top=Math.max(vt+pad,ty)+"px";
 });
 document.getElementById("map").addEventListener("mouseleave",()=>{tip.style.display="none";if(cur){cur.classList.remove("hot");hot(cur.dataset,false);cur=null}});
+// ---- What's here -------------------------------------------------------
+// Distances are great-circle miles from the clicked spot to each line.
+// Grades, proposed 10 October for Kaycee to adjust: within 300 miles Strong,
+// to 500 Moderate, to 700 Mild, past 700 not listed. A paran is a latitude, so
+// it is graded on the 1 degree orb she set: within a third of it Strong, two
+// thirds Moderate, the whole degree Mild.
+const R=3958.8,RAD=Math.PI/180;
+const GRADES=[[300,3,"Strong"],[500,2,"Moderate"],[700,1,"Mild"]];
+const gradeMi=mi=>GRADES.find(g=>mi<=g[0]);
+const gradeLat=d=>d<=ORB/3?GRADES[0]:d<=ORB*2/3?GRADES[1]:d<=ORB?GRADES[2]:null;
+function hav(la1,lo1,la2,lo2){const a=Math.sin((la2-la1)*RAD/2)**2+Math.cos(la1*RAD)*Math.cos(la2*RAD)*Math.sin((lo2-lo1)*RAD/2)**2;return 2*R*Math.asin(Math.min(1,Math.sqrt(a)))}
+function distTo(l,lat,lon){
+  if(l.angle==="MC"||l.angle==="IC"){
+    // A meridian is half a great circle, pole to pole.
+    let dl=Math.abs(((l.runs[0][0][0]-lon)%360+540)%360-180)*RAD;
+    if(dl>Math.PI/2)return R*(Math.PI/2-Math.abs(lat)*RAD);
+    return R*Math.asin(Math.abs(Math.sin(dl))*Math.cos(lat*RAD));
+  }
+  let best=Infinity;
+  for(const run of l.runs)for(let i=1;i<run.length;i++){
+    const a=run[i-1],b=run[i];
+    if(Math.min(a[1],b[1])>lat+12||Math.max(a[1],b[1])<lat-12)continue;
+    const n=Math.max(1,Math.ceil(Math.max(Math.abs(b[0]-a[0]),Math.abs(b[1]-a[1]))/0.2));
+    for(let k=0;k<=n;k++){const t=k/n;best=Math.min(best,hav(lat,lon,a[1]+t*(b[1]-a[1]),a[0]+t*(b[0]-a[0])))}
+  }
+  return best;
+}
+let here=null;   // {lat, lon, name, country}
+function nearestCity(lat,lon){let best=null,d=75;for(const c of CITIES){const m=hav(lat,lon,c.lat,c.lon);if(m<d){d=m;best=c}}return best}
+function ringPath(lat,lon,mi){
+  const d=mi/R,la=lat*RAD,pts=[];
+  for(let b=0;b<=360;b+=3){const br=b*RAD;
+    const la2=Math.asin(Math.sin(la)*Math.cos(d)+Math.cos(la)*Math.sin(d)*Math.cos(br));
+    const lo2=lon+Math.atan2(Math.sin(br)*Math.sin(d)*Math.cos(la),Math.cos(d)-Math.sin(la)*Math.sin(la2))/RAD;
+    pts.push([lo2,la2/RAD])}
+  return "M"+pts.map(p=>X(p[0]).toFixed(1)+","+Y(p[1]).toFixed(1)).join("L")+"Z";
+}
+function drawHere(){
+  const r=document.getElementById("rings"),p=document.getElementById("pin");r.replaceChildren();p.replaceChildren();
+  if(!here)return;
+  r.append(mk("path",{class:"ring",d:ringPath(here.lat,here.lon,700)}),mk("path",{class:"ring inner",d:ringPath(here.lat,here.lon,300)}));
+  p.append(mk("circle",{class:"pin",cx:X(here.lon),cy:Y(here.lat),r:6}));
+}
+const fmtLat=v=>Math.abs(v).toFixed(1)+"°"+(v>=0?"N":"S"),fmtLon=v=>Math.abs(v).toFixed(1)+"°"+(v>=0?"E":"W");
+const tag=(side,body,angle)=>'data-side="'+side+'" data-body="'+body+'" data-angle="'+angle+'"';
+function renderHere(){
+  const box=document.getElementById("here");
+  if(!here){box.classList.remove("open");return}
+  const sideOk=s=>st.side==="both"||s===st.side;
+  const rows=[];
+  for(const l of LN){
+    if(!sideOk(l.side)||!st.lines.has(l.body)||!st.angles.has(l.angle))continue;
+    const mi=distTo(l,here.lat,here.lon),g=gradeMi(mi);if(!g)continue;
+    rows.push({l,mi,g});
+  }
+  rows.sort((a,b)=>a.mi-b.mi);
+  const prs=[];
+  for(const p of PR){
+    if(!sideOk(p.side)||!st.lines.has(p.a)||!st.lines.has(p.b)||!(st.angles.has(p.angleA)||st.angles.has(p.angleB)))continue;
+    const d=Math.abs(p.lat-here.lat),g=gradeLat(d);if(!g)continue;
+    prs.push({p,d,g});
+  }
+  prs.sort((a,b)=>a.d-b.d);
+  const gp=g=>'<span class="gr g'+g[1]+'">'+g[2]+'</span>';
+  box.innerHTML='<button class="x" title="Close">&times;</button>'+
+    '<h2>'+(here.name||fmtLat(here.lat)+", "+fmtLon(here.lon))+'</h2>'+
+    '<div class="co">'+(here.name?(here.country?here.country+" · ":"")+fmtLat(here.lat)+", "+fmtLon(here.lon):"")+'</div>'+
+    '<h3>Lines</h3>'+(rows.length?rows.map(r=>'<div class="hr" '+tag(r.l.side,r.l.body,r.l.angle)+'>'+
+      '<span class="gl '+r.l.side+'">'+GLYPH[r.l.body]+'</span><span class="nm">'+SIDE[r.l.side]+" "+r.l.body+' <span class="ap">'+r.l.angle+'</span></span>'+
+      '<span class="mi">'+Math.round(r.mi)+' mi</span>'+gp(r.g)+'</div>').join(""):'<div class="none">No lines within 700 miles.</div>')+
+    '<h3>Parans</h3>'+(prs.length?prs.map(r=>'<div class="hr" '+tag(r.p.side,r.p.a,r.p.angleA)+' data-body2="'+r.p.b+'" data-angle2="'+r.p.angleB+'">'+
+      '<span class="nm">'+SIDE[r.p.side]+" "+r.p.a+' <span class="ap">'+r.p.angleA+'</span> '+r.p.b+' <span class="ap">'+r.p.angleB+'</span></span>'+
+      '<span class="mi">'+r.d.toFixed(1)+'°</span>'+gp(r.g)+'</div>').join(""):'<div class="none">No parans within 1° of this latitude.</div>');
+  box.classList.add("open");
+}
+function openHere(lat,lon,city){
+  const c=city||nearestCity(lat,lon);
+  here={lat,lon,name:city?city.n:(c?"Near "+c.n:null),country:c?c.c:null};
+  if(city){here.lat=city.lat;here.lon=city.lon}
+  renderHere();redraw();
+}
+document.getElementById("here").addEventListener("click",e=>{if(e.target.closest(".x")){here=null;renderHere();redraw()}});
+document.getElementById("here").addEventListener("mouseover",e=>{const r=e.target.closest(".hr");if(r)hot(r.dataset,true)});
+document.getElementById("here").addEventListener("mouseout",e=>{const r=e.target.closest(".hr");if(r)hot(r.dataset,false)});
+
 // Zoom inside the frame. A pinch arrives as a ctrl-wheel (Chrome, Firefox) or
 // as gesture events (Safari); either is caught here so the page itself never
 // zooms. Two-finger scroll or a drag pans once zoomed in.
@@ -438,12 +634,44 @@ svg.addEventListener("gesturestart",e=>{e.preventDefault();gesturing=true;g0=vie
 svg.addEventListener("gesturechange",e=>{e.preventDefault();const [fx,fy]=frameAt(e.clientX,e.clientY);zoomAt(fx,fy,g0*e.scale)});
 svg.addEventListener("gestureend",e=>{e.preventDefault();gesturing=false});
 let drag=null;
-svg.addEventListener("pointerdown",e=>{if(view.k<=1||e.button!==0)return;drag={x:e.clientX,y:e.clientY,tx:view.tx,ty:view.ty};svg.setPointerCapture(e.pointerId);svg.classList.add("grabbing")});
-svg.addEventListener("pointermove",e=>{if(!drag)return;const s=svg.getScreenCTM().a;view.tx=drag.tx+(e.clientX-drag.x)/s;view.ty=drag.ty+(e.clientY-drag.y)/s;clampView();redraw()});
-svg.addEventListener("pointerup",()=>{drag=null;svg.classList.remove("grabbing")});
+// A press that barely moves is a click: it asks what is here. One that moves
+// is a drag, which pans once zoomed in.
+let press=null;
+svg.addEventListener("pointerdown",e=>{if(e.button!==0)return;press={x:e.clientX,y:e.clientY,moved:false};
+  if(view.k>1){drag={x:e.clientX,y:e.clientY,tx:view.tx,ty:view.ty};svg.setPointerCapture(e.pointerId)}});
+svg.addEventListener("pointermove",e=>{if(press&&Math.hypot(e.clientX-press.x,e.clientY-press.y)>4)press.moved=true;
+  if(!drag||!press||!press.moved)return;svg.classList.add("grabbing");const s=svg.getScreenCTM().a;view.tx=drag.tx+(e.clientX-drag.x)/s;view.ty=drag.ty+(e.clientY-drag.y)/s;clampView();redraw()});
+svg.addEventListener("pointerup",e=>{
+  if(press&&!press.moved){const [fx,fy]=frameAt(e.clientX,e.clientY);
+    if(fx>=0&&fx<=W&&fy>=0&&fy<=H){const lon=((fx-view.tx)/view.k)/W*360-180,lat=TOP-((fy-view.ty)/view.k)/H*(TOP-BOTTOM);openHere(lat,lon)}}
+  press=null;drag=null;svg.classList.remove("grabbing")});
 document.querySelector(".zoom").onclick=e=>{const z=e.target.closest("button");if(!z)return;
   if(z.dataset.z==="reset"){view.k=1;view.tx=0;view.ty=0;clampView();return redraw()}
   zoomAt(W/2,H/2,view.k*(z.dataset.z==="in"?1.6:1/1.6))};
+// ---- City search ---------------------------------------------------------
+const q=document.getElementById("q"),res=document.getElementById("results");
+const norm=t=>t.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+let hits=[],sel=0;
+function goTo(c){
+  res.classList.remove("open");q.value=c.n;
+  const k=Math.max(view.k,5);view.k=k;view.tx=W/2-((c.lon+180)/360*W)*k;view.ty=H/2-((TOP-c.lat)/(TOP-BOTTOM)*H)*k;clampView();
+  openHere(c.lat,c.lon,c);
+}
+function showHits(){
+  res.innerHTML=hits.map((c,i)=>'<div class="'+(i===sel?"sel":"")+'" data-i="'+i+'">'+c.n+'<span>'+c.c+'</span></div>').join("");
+  res.classList.toggle("open",hits.length>0);
+}
+q.addEventListener("input",()=>{const t=norm(q.value.trim());sel=0;
+  if(!t){hits=[];return showHits()}
+  const starts=CITIES.filter(c=>norm(c.n).startsWith(t)),has=CITIES.filter(c=>!norm(c.n).startsWith(t)&&norm(c.n).includes(t));
+  hits=[...starts.sort((a,b)=>b.pop-a.pop),...has.sort((a,b)=>b.pop-a.pop)].slice(0,8);showHits()});
+q.addEventListener("keydown",e=>{
+  if(e.key==="ArrowDown"){sel=Math.min(hits.length-1,sel+1);showHits();e.preventDefault()}
+  else if(e.key==="ArrowUp"){sel=Math.max(0,sel-1);showHits();e.preventDefault()}
+  else if(e.key==="Enter"&&hits[sel])goTo(hits[sel]);
+  else if(e.key==="Escape")res.classList.remove("open")});
+res.addEventListener("mousedown",e=>{const d=e.target.closest("[data-i]");if(d){e.preventDefault();goTo(hits[+d.dataset.i])}});
+q.addEventListener("blur",()=>setTimeout(()=>res.classList.remove("open"),100));
 paint();
 </script></body></html>`;
 

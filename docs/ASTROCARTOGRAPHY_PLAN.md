@@ -136,3 +136,32 @@ Kaycee chose the **detailed coastline** (land-50m). Her changes:
   and graticule are one transformed group with non-scaling strokes.
 - The page is a stage: controls fixed at the top, the map fitted to the rest
   of the window, so nothing scrolls away.
+
+### Places (10 October)
+
+Kaycee: "how can we make this super useful?" Click options proposed, in her
+order: (1) click a place for what is there, (2) city search, then later (3)
+saved places compared side by side, (4) click a line to pin it with her own
+words for that planet on that angle (her copy, never authored by us), (5) the
+relocated chart. All five are wanted eventually; 1 and 2 are built.
+
+- **Country borders**, faint: world-atlas countries-50m, only arcs two
+  countries share, so the coast is not drawn twice.
+- **Cities**: Natural Earth ne_50m_populated_places_simple (1,251 places,
+  public domain). Each appears at its own `min_zoom`, most important first,
+  and a name that would overlap another is skipped.
+- **What's here**: click anywhere (a press that does not move; a drag pans).
+  A gold pin with 300 and 700 mile rings, and a panel listing lines within
+  700 miles, nearest first, and parans within the 1 degree orb. It follows the
+  menus, so what it lists is what the map shows. Hovering a row lights it.
+- **Grades** (Kaycee: "use those metrics and maybe come up with some kind of
+  grading system"). Proposed, hers to adjust: lines within 300 miles Strong,
+  to 500 Moderate, to 700 Mild. Parans on the 1 degree orb: within a third
+  Strong, two thirds Moderate, the whole degree Mild.
+- Distances are great-circle miles: to a meridian by the cross-track formula,
+  to a horizon curve by sampling its segments every 0.2 degrees. Checked: a
+  point on a line reads 0.01 mi; Lisbon to Personality Mars MC reads 110 mi
+  against 111 by hand.
+- **Search**: names from the same 1,251 places, accent-insensitive, biggest
+  first. Choosing one zooms there and opens its panel. Smaller towns are not
+  in this set; a fuller list or a geocoder is the next step if she needs them.
