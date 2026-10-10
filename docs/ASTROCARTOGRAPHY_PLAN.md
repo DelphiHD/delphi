@@ -321,3 +321,9 @@ yet; each structural item waits for her call.
   default, and she asked for the same here. The doc is out of date (it
   predates energy-flow-diagram.ts) and needs refreshing.
 - Whether a "told" birth time counts as exact enough for the map.
+
+**Kaycee's decisions, 10 October:** the plan is approved, including the shared
+world-map file and NASA Horizons in the chart build. A "told" birth time is
+exact enough for the map. The view is called **The World**. The Chiron/Lilith
+line in ARCHITECTURE.md belonged to the deprecated reports; the whole doc needs
+a total revision and is not a constraint on this work.
