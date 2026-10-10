@@ -127,3 +127,12 @@ Kaycee chose the **detailed coastline** (land-50m). Her changes:
 - Tooltips hold their size under a pinch-zoom: the page's visual viewport
   scale is undone on the tooltip alone, and it is kept inside what is on
   screen. Browser zoom (Cmd +) is not countered; it is meant to enlarge text.
+- **The map zooms inside its frame**, never the page (Kaycee, 10 October:
+  tooltips were unreadable under a page zoom). Pinch (ctrl-wheel in Chrome,
+  gesture events in Safari), two-finger scroll or drag to pan, and + / - /
+  Reset in the control bar. Lines, parans, the birthplace and the edge glyphs
+  are drawn in the page from longitude and latitude for the current view, so
+  the glyphs travel with the zoom and name whatever lines are in view. Land
+  and graticule are one transformed group with non-scaling strokes.
+- The page is a stage: controls fixed at the top, the map fitted to the rest
+  of the window, so nothing scrolls away.
