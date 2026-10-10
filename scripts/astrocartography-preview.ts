@@ -248,7 +248,7 @@ svg{width:100%;height:auto;display:block}
 .pr.hot rect{fill:var(--gold);opacity:.4}.pr.hot circle{fill:var(--gold);r:7;stroke-width:2}
 .birth{fill:var(--purple);stroke:#fff;stroke-width:2}
 .off{display:none}
-#tip{position:fixed;pointer-events:none;background:#fff;border:1px solid #d9d0e0;border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 4px 14px rgba(47,42,51,.12);display:none;max-width:280px}
+#tip{position:fixed;transform-origin:0 0;pointer-events:none;background:#fff;border:1px solid #d9d0e0;border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 4px 14px rgba(47,42,51,.12);display:none;max-width:280px}
 #tip b{color:var(--ink)}
 #tip .pill{display:inline-block;padding:2.5px 8px;border-radius:999px;font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin:5px 5px 1px 0;line-height:1.5;background:var(--purple);color:#fff}
 #tip .row{margin-top:4px}#tip .meta{opacity:.65;display:block;margin-top:4px}
@@ -386,7 +386,17 @@ document.getElementById("map").addEventListener("mousemove",e=>{
   if(el.dataset.body2){el.classList.add("hot");el.parentNode.appendChild(el)}
   hot(el.dataset,true);
   tip.innerHTML=describe(el);tip.style.display="block";
-  tip.style.left=Math.max(8,Math.min(e.clientX+14,innerWidth-tip.offsetWidth-8))+"px";tip.style.top=(e.clientY+14)+"px";
+  // A pinch-zoom magnifies the page, tooltip and all. Kaycee, 10 October:
+  // the tooltip should not zoom with the map. Undo the zoom on the tooltip
+  // alone and keep it inside the part of the page actually on screen.
+  const vv=window.visualViewport, z=vv?vv.scale:1;
+  tip.style.transform="scale("+(1/z)+")";
+  const w=tip.offsetWidth/z, h=tip.offsetHeight/z, pad=8/z;
+  const vl=vv?vv.offsetLeft:0, vt=vv?vv.offsetTop:0, vw=vv?vv.width:innerWidth, vh=vv?vv.height:innerHeight;
+  let tx=e.clientX+14/z, ty=e.clientY+14/z;
+  if(tx+w>vl+vw-pad)tx=e.clientX-14/z-w;
+  if(ty+h>vt+vh-pad)ty=e.clientY-14/z-h;
+  tip.style.left=Math.max(vl+pad,tx)+"px";tip.style.top=Math.max(vt+pad,ty)+"px";
 });
 document.getElementById("map").addEventListener("mouseleave",()=>{tip.style.display="none";if(cur){cur.classList.remove("hot");hot(cur.dataset,false);cur=null}});
 paint();

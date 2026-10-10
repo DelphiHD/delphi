@@ -120,3 +120,10 @@ Kaycee chose the **detailed coastline** (land-50m). Her changes:
   default, and a paran hover never lights a line that is hidden (Kaycee, 10
   October). The first version checked only the partner, and Parans set to All
   still showed Earth's; she caught it.
+- A body's ASC and DSC curves now meet. They join at 90 - |dec|, where
+  longitude races; half-degree sampling stopped short and left a visible gap
+  (Kaycee, 10 October). The sampler closes in on each limit and ends exactly
+  on it. That also found 42 parans the gap had hidden, all checked.
+- Tooltips hold their size under a pinch-zoom: the page's visual viewport
+  scale is undone on the tooltip alone, and it is kept inside what is on
+  screen. Browser zoom (Cmd +) is not countered; it is meant to enlarge text.

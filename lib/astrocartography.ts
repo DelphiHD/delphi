@@ -99,9 +99,18 @@ function horizonCurves(mc: number, dec: number): { ASC: LonLat[]; DSC: LonLat[] 
   const ASC: LonLat[] = [];
   const DSC: LonLat[] = [];
   const tanDec = Math.tan(dec * RAD);
-  for (const lat of LATS) {
-    const c = -Math.tan(lat * RAD) * tanDec;
-    if (c < -1 || c > 1) continue;   // circumpolar or never up: no horizon crossing
+  // The two curves meet at 90 - |dec|, north and south, where the body just
+  // grazes the horizon. Longitude races there, so half-degree steps stopped
+  // well short and left a gap between a body's ASC and DSC (Kaycee, 10
+  // October). Sample in close to each limit and end exactly on it.
+  const limit = 90 - Math.abs(dec);
+  const lats = LATS.filter((lat) => Math.abs(lat) < limit);
+  if (limit <= 85) {
+    for (const d of [0.25, 0.1, 0.04, 0.01, 0.002, 0]) lats.push(limit - d, -(limit - d));
+  }
+  lats.sort((a, b) => a - b);
+  for (const lat of lats) {
+    const c = Math.max(-1, Math.min(1, -Math.tan(lat * RAD) * tanDec));
     const h0 = Math.acos(c) / RAD;
     ASC.push([wrap180(mc - h0), lat]);
     DSC.push([wrap180(mc + h0), lat]);
