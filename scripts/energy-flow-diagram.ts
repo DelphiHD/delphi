@@ -122,7 +122,8 @@ function variableRows(parts: { text: string; key?: string }[]) {
 }
 import { loadLibraryNames } from "@/lib/hd/library-names";
 import { renderFullMandala } from "@/lib/render/mandala";
-import { getAstro, type AstroChart } from "@/lib/astro";
+import { getAstro, locate, type AstroChart } from "@/lib/astro";
+import { buildWorldData, type WorldData } from "@/lib/world";
 import { enrichChart, crossAspects, SIGN_RULER, HOUSE_RULER, rulerLabel,
   type ChartExtras } from "@/lib/astro-extras";
 import { HOUSES, HOUSES_INTRO } from "@/lib/hd/houses";
@@ -2427,6 +2428,8 @@ interface SceneData {
   connection?: ConnectionScene;
   /** natal astrology, present only on a client chart */
   astro?: AstroChart;
+  /** The World, astro-cartography: each side's sky, for an exact birth time. */
+  world?: WorldData | null;
   /** the design side, read at the design instant */
   astroDesign?: AstroChart;
   /** what the provider does not send: Earth, retrograde, combustion, dignity,
@@ -3216,6 +3219,7 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
       <button id="vBody" data-help="Your channels by circuit, the families of energy they belong to: Individual, Tribal, Collective and Integration." data-help-label="Circuits">Circuits</button>
       <button id="vMandala" data-help="The wheel your chart comes from: all 64 gates in zodiac order, with your planets where they fall." data-help-label="The Wheel">The Wheel</button>
       <button id="vAstro" data-help="Your natal astrology chart: signs, houses, planets and the aspects between them." data-help-label="Astrology">Astrology</button>
+      ${d.world ? `<button id="vWorld" data-help="Where on Earth each of your planets was rising, setting or overhead when you were born." data-help-label="The World">The World</button>` : ""}
     </div>
     <details class="drop showdrop" id="placements" hidden>
       <summary>Show<span class="offcount" id="offcount" hidden></span></summary>
@@ -3267,6 +3271,7 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
     centerGates: CENTER_GATES,
     centerRows: (Object.keys(CENTER_GATES) as Center[]).map((k) => ({ key: k, label: CENTER_LABEL[k] })),
     astro: d.astro ? { ...d.astro, design: d.astroDesign ?? null } : null,
+    world: d.world ?? null,
     astroExtras: d.astroExtras ?? null,
     // The wheel's own glyph table, keyed by the provider's names, so the grid
     // draws each body exactly as the wheel does. The chart's other table is
@@ -4287,6 +4292,18 @@ body.view-astro .astro { display:flex; align-items:center; justify-content:cente
      2026-10-05: "can they stay in the same place as the wheel view?" */
   height:calc(100vh - 36px); }
 body.view-astro .astro svg { height:calc(100vh - 36px); width:auto; max-width:100%; display:block; }
+/* The World, astro-cartography: its own styles, scoped under .world, then
+   shown only in its view. Kaycee, 2026-10-10, named it. */
+${d.world ? readFileSync(join(process.cwd(), "assets", "world", "world.css"), "utf8") : ""}
+.world { display:none !important; }
+body.view-world .world { display:flex !important; flex-direction:column; width:100%; height:calc(100vh - 36px);
+  background:#faf8fb; overflow:hidden; }
+body.view-world svg.canvas, body.view-world .mandala, body.view-world .astro { display:none !important; }
+body.view-world { background:#ffffff; color:#1c1a2e; }
+/* The dock owns the stage's lower left. A square wheel leaves that corner
+   empty; a world map is wide and ran under it, so the map keeps clear of the
+   dock's column. */
+@media (min-width: 900px) { body.view-world .world .w-stage { padding-left:172px; } }
 /* the classic set on opening; the rest is a click away rather than a deletion */
 body:not(.astro-all) .astro .asp.extra { display:none; }
 .astro [data-asign], .astro [data-aplanet], .astro [data-house], .astro [data-angle] { cursor:pointer; }
@@ -4522,8 +4539,8 @@ body.off-party-b svg.canvas.transit .ptable[data-side="transit"] { display:none;
    individual chart already has. It shows only in the Relationship module, and
    the single-person canvases stand down while it does. */
 svg.canvas.composite { display:none; }
-body.mod-relation:not(.view-astro):not(.view-mandala) svg.canvas.composite { display:block; }
-body.mod-relation:not(.view-astro):not(.view-mandala) svg.canvas:not(.composite) { display:none !important; }
+body.mod-relation:not(.view-astro):not(.view-mandala):not(.view-world) svg.canvas.composite { display:block; }
+body.mod-relation:not(.view-astro):not(.view-mandala):not(.view-world) svg.canvas:not(.composite) { display:none !important; }
 body:not(.mod-relation) svg.canvas.composite { display:none !important; }
 
 /* The pair reads as two columns so a difference is a glance, not a search. Type
@@ -4635,6 +4652,9 @@ body.mod-relation #datesec, body.mod-relation #todaysec { display:none !importan
 body.view-astro #pmeta, body.view-astro #circdrop,
 body.view-astro #todaysec, body.view-astro #chandrop,
 body.view-astro #defdrop { display:none !important; }
+body.view-world #pmeta, body.view-world #circdrop,
+body.view-world #todaysec, body.view-world #chandrop,
+body.view-world #defdrop, body.view-world #vardrop { display:none !important; }
 /* The astrology view hands the panel to its own sections, but the moment being
    cast is not one of them: it decides which chart the view is drawing. Hidden
    here it took the picker away in exactly the view Kaycee was working in. */
@@ -4720,7 +4740,7 @@ body.view-mandala .mandala svg { max-height:calc(100vh - 28px); width:auto; heig
 <body class="skin-paper${d.client ? " chart" : ""}">
 <div class="wrap">
   ${logoSrc ? `<img class="brandmark logo" src="${logoSrc}" alt="Delphi">` : ""}
-  <div class="stage">${canvases}${mandala}${astro}<div class="tip" id="tip" hidden></div><div class="card" id="card" hidden></div>${knowSrc ? `<img class="brandmark know" src="${knowSrc}" alt="Know thyself">` : ""}${d.client ? `<div class="varpanel" id="varpanel"></div><div class="viewdock docked">${viewControls}</div>` : ""}</div>
+  <div class="stage">${canvases}${mandala}${astro}${d.world ? `<div class="world" id="worldview"></div>` : ""}<div class="tip" id="tip" hidden></div><div class="card" id="card" hidden></div>${knowSrc ? `<img class="brandmark know" src="${knowSrc}" alt="Know thyself">` : ""}${d.client ? `<div class="varpanel" id="varpanel"></div><div class="viewdock docked">${viewControls}</div>` : ""}</div>
   <aside class="panel">
 ${d.client ? "" : `<h1 id="ptitle">Centers, function, and flow</h1>
     <p class="sub" id="psub">Nine centers, each labeled with what it does. The moving light follows every channel toward the Throat, the only center that turns energy into expression.</p>`}
@@ -4884,6 +4904,7 @@ ${d.client ? `<div class="booknote"><div class="booklab">Book a session</div>${(
 ${d.client ? "" : `<div class="readout" id="readout"></div>`}
   </aside>
 </div>
+${d.world ? `<script>${readFileSync(join(process.cwd(), "assets", "world", "world.client.js"), "utf8").replace(/<\/script/gi, "<\\/script")}</script>` : ""}
 <script>
 var DATA = ${JSON.stringify(payload)};
 var CLIENT_TINT_JS = ${JSON.stringify(CLIENT_TINT)};
@@ -5303,6 +5324,12 @@ if (DATA.client) {
     return bits.join('  ·  ');
   }
   document.getElementById('snap').onclick = function () {
+    // The World saves its own map, with its own footer of dates and settings.
+    if (body.classList.contains('view-world')) {
+      var ws = document.getElementById('w-snapMap');
+      if (ws) ws.click();
+      return;
+    }
     var svg = activeSvg();
     if (!svg) return;
     var vb = (svg.getAttribute('viewBox') || '').trim().split(' ').map(Number);
@@ -7206,7 +7233,7 @@ if (DATA.client) {
   })();
 
   var MODULES = ['self', 'variations', 'transit', 'relation'];
-  var VIEWS = ['plain', 'body', 'mandala', 'astro'];
+  var VIEWS = ['plain', 'body', 'mandala', 'astro', 'world'];
   var curMod = 'self';
   var curView = 'plain';
 
@@ -7227,12 +7254,24 @@ if (DATA.client) {
     // drawing rather than show it.
     var transit = curMod === 'transit' && (v === 'plain' || v === 'body');
     body.classList.toggle('view-astro', v === 'astro');
+    body.classList.toggle('view-world', v === 'world');
+    // The World is drawn the first time it is opened: its map is a shared
+    // file, fetched once, and the chart carries only its own sky.
+    if (v === 'world' && DATA.world && window.DelphiWorld) {
+      var wtok = (location.pathname.split('/c/')[1] || '').split('/')[0];
+      window.DelphiWorld.mount(document.getElementById('worldview'), DATA.world, {
+        geometry: '/world/world-v1.json',
+        api: { places: '/api/places', place: '/api/place', relocate: '/api/relocate' },
+        token: wtok.length === 32 ? wtok : '',
+        fontCss: FONTCSS,
+      });
+    }
     body.classList.toggle('view-mandala', v === 'mandala');
     body.classList.toggle('view-plain', v === 'plain' && !transit);
     body.classList.toggle('view-transit', transit);
     body.classList.toggle('tr-circuits', transit && v === 'body');
 
-    [['plain', 'vPlain'], ['body', 'vBody'], ['mandala', 'vMandala'], ['astro', 'vAstro']]
+    [['plain', 'vPlain'], ['body', 'vBody'], ['mandala', 'vMandala'], ['astro', 'vAstro'], ['world', 'vWorld']]
       .forEach(function (pair) {
         var b = document.getElementById(pair[1]);
         if (!b) return;
@@ -8260,6 +8299,8 @@ if (DATA.client) {
 
   var va0 = document.getElementById('vAstro');
   if (va0) va0.onclick = function () { view('astro'); };
+  var vw0 = document.getElementById('vWorld');
+  if (vw0) vw0.onclick = function () { view('world'); };
 
   // The Astrology view answers with astrology. The Human Design sections of the
   // home tab are hidden by CSS in this view and these stand in their place, so
@@ -11678,6 +11719,11 @@ function assertNothingMissing(html: string, who: string): void {
     ["the placement tables", /class="ptable"/],
     ["the panel", /id="pmeta"|class="meta/],
   ];
+  // The World, when the chart carries one (an exact birth time): the data, the
+  // view's container and its script, all three.
+  if (/"world":\{"v":1/.test(html)) {
+    wanted.push(["The World's view", /id="worldview"/], ["The World's script", /window\.DelphiWorld/]);
+  }
   const missing = wanted.filter(([, re]) => !re.test(html)).map(([name]) => name);
   if (missing.length) {
     throw new Error(`${who}: the chart is missing ${missing.join(" and ")}. Nothing was published.`);
@@ -12279,6 +12325,37 @@ export async function runBuilder(argv: string[] = process.argv.slice(2)): Promis
   // rather than to the glyphs inside it, so a swap costs nothing to rewire.
   if (astroChart) scene.astro = astroChart;
   if (astroDesign) scene.astroDesign = astroDesign;
+
+  // The World, astro-cartography, for a birth time exact enough to place an
+  // angle ("told" counts: Kaycee, 2026-10-10, "told is fine for a map"). Like
+  // every other section, a chart that should have it is not published without
+  // it: Chiron's place comes from NASA Horizons, and if that cannot be reached
+  // the build stops here and says so. docs/ASTROCARTOGRAPHY_PLAN.md.
+  if (client && astroChart && astroDesign && client.reliability.exact) {
+    try {
+      const place = placeForLookup(built!);
+      const basic: Record<string, string> = {};
+      for (const c of chunks) {
+        if (c.source_kind !== "planet") continue;
+        const t = delphiText(c.metadata);
+        if (t) basic[(c.title ?? "").trim()] = t;
+      }
+      scene.world = await buildWorldData({
+        person: client.name,
+        born: { date: built!.birthDate, time: built!.birthTime, place },
+        birthplace: await locate(place),
+        utc: client.birthUtc, designUtc: client.designUtc,
+        astro: { personality: astroChart, design: astroDesign },
+        activations: {
+          personality: client.acts.filter((a) => a.side === "personality"),
+          design: client.acts.filter((a) => a.side === "design"),
+        },
+        basic,
+      });
+    } catch (err) {
+      throw new Error(`The World could not be drawn: ${(err as Error).message} (nothing published)`);
+    }
+  }
 
   // Everything the provider does not send. Earth comes from the Human Design
   // data, where it is a placement in its own right with gate, line, colour,

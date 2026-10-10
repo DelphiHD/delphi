@@ -67,6 +67,12 @@ createServer(async (req, res) => {
       res.writeHead(200, { "content-type": "application/json" });
       return res.end(readFileSync(join("public", url.pathname)));
     }
+    // A chart built locally (not published), at the address the site uses,
+    // so The World can be tried inside the real chart. CHART_HTML names it.
+    if (url.pathname.startsWith("/c/") && process.env.CHART_HTML) {
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      return res.end(readFileSync(process.env.CHART_HTML));
+    }
     // The page itself: the one asked for, or the only one there.
     const name = decodeURIComponent(url.pathname.slice(1)) ||
       readdirSync(DIR).find((f) => f.endsWith(".html")) || "";

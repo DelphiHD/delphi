@@ -35,6 +35,7 @@ const SOURCES = [
   "lib/email.ts",                    // the chart email
   "app/c/[token]/route.ts",          // what a chart link says when it cannot open
   "app/chart/save/page.tsx",         // the window that saves a variation
+  "assets/world/world.client.js",    // The World, the astro-cartography view
 ];
 
 const APPROVED = "docs/CLIENT_COPY.json";

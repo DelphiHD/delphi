@@ -627,10 +627,10 @@ function mapState(){
   const dates=[];
   if(st.side!=="design")dates.push("Personality: "+born);
   if(st.side!=="personality")dates.push("Design: "+utcWhen(CAST.d));
-  return ["Astrocartography · "+(st.side==="both"?"Personality + Design":SIDE[st.side]),...dates,
+  return ["The World · "+(st.side==="both"?"Personality + Design":SIDE[st.side]),...dates,
     "Lines: "+n("lines")+"  ·  Angles: "+n("angles")+"  ·  Parans: "+n("parans")];
 }
-document.getElementById("w-snapMap").onclick=()=>snapshot(document.getElementById("w-map"),[PERSON,...mapState()],PERSON+" - Astrocartography.png");
+document.getElementById("w-snapMap").onclick=()=>snapshot(document.getElementById("w-map"),[PERSON,...mapState()],PERSON+" - The World.png");
 function openHere(lat,lon,city){
   const c=city||nearestCity(lat,lon);
   here={lat,lon,name:city?city.n:(c?"Near "+c.n:null),country:c?c.c:null};
