@@ -296,7 +296,9 @@ const ML=${ML},MT=${MT},W=${W},H=${f(H)};
 const BODIES=${JSON.stringify(HD_BODIES)};
 const ANGLES=["ASC","DSC","MC","IC"];
 const ALL={lines:BODIES,parans:BODIES,angles:ANGLES};
-const st={side:"both",lines:new Set(BODIES),angles:new Set(ANGLES),parans:new Set()};
+// Earth starts off: Kaycee, 10 October. It is the Sun's lines turned round,
+// and every one of them doubles a Sun line already on the map.
+const st={side:"both",lines:new Set(BODIES.filter(b=>b!=="Earth")),angles:new Set(ANGLES),parans:new Set()};
 // One resolver answers "what is this?", read from the element, never its position.
 function describe(el){
   const d=el.dataset, side=SIDE[d.side];
@@ -348,7 +350,7 @@ function paint(){
   for(const el of document.querySelectorAll("#lines [data-side]"))
     el.classList.toggle("off",!(sideOk(el.dataset)&&st.lines.has(el.dataset.body)&&st.angles.has(el.dataset.angle)));
   for(const el of document.querySelectorAll("#parans [data-side]"))
-    el.classList.toggle("off",!(sideOk(el.dataset)&&(st.parans.has(el.dataset.body)||st.parans.has(el.dataset.body2))));
+    el.classList.toggle("off",!(sideOk(el.dataset)&&(st.parans.has(el.dataset.body)||st.parans.has(el.dataset.body2))&&(st.angles.has(el.dataset.angle)||st.angles.has(el.dataset.angle2))));
   for(const c of document.querySelectorAll(".opt"))c.classList.toggle("on",st[c.dataset.kind].has(c.dataset.chip));
   for(const k in ALL)document.querySelector('[data-dd="'+k+'"] .n').textContent=st[k].size===ALL[k].length?"All":st[k].size?st[k].size:"None";
   layoutLabels();
