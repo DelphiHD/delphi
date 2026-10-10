@@ -28,6 +28,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getChart } from "../lib/mybodygraph";
 import { locate, getAstro } from "../lib/astro";
 import { ZODIAC, houseOf } from "../lib/astro-extras";
+import { gateLineFromLongitude } from "../lib/hd/gate-longitude";
 import { mapFor, paransFor, HD_BODIES } from "../lib/astrocartography";
 import { GLYPH } from "./astro-wheel";
 import { loadLibraryChunks } from "../lib/hd/chunks-source";
@@ -166,7 +167,7 @@ function cities(file: string) {
     return `${d}\u00b0${m < 10 ? "0" : ""}${m}'`;
   };
   const where: Record<string, Record<string, string>> = {};
-  const natal: Record<string, { asc: string; mc: string; house: Record<string, number> }> = {};
+  const natal: Record<string, { asc: string; mc: string; house: Record<string, number>; angles: Record<string, { text: string; gate: number; line: number }> }> = {};
   const HOUSE: Record<string, number> = { First: 1, Second: 2, Third: 3, Fourth: 4, Fifth: 5, Sixth: 6,
     Seventh: 7, Eighth: 8, Ninth: 9, Tenth: 10, Eleventh: 11, Twelfth: 12 };
   const signDeg = (v: number) => `${ZODIAC[Math.floor(v / 30)]} ${deg(v % 30)}`;
@@ -185,7 +186,9 @@ function cities(file: string) {
     const house: Record<string, number> = {};
     for (const p of astro.planets) house[p.label] = HOUSE[String(p.house).split("_")[0]] ?? 0;
     if (sun) house.Earth = houseOf((sun.abs_pos + 180) % 360, astro.houses.map((h) => h.abs_pos));
-    natal[side] = { asc: signDeg(astro.ascendant), mc: signDeg(astro.mc), house };
+    const ang = (v: number) => { const w = ((v % 360) + 360) % 360; const g = gateLineFromLongitude(w); return { text: signDeg(w), gate: g.gate, line: g.line }; };
+    natal[side] = { asc: signDeg(astro.ascendant), mc: signDeg(astro.mc), house,
+      angles: { ASC: ang(astro.ascendant), DSC: ang(astro.ascendant + 180), MC: ang(astro.mc), IC: ang(astro.mc + 180) } };
   }
 
   // Her own words for each planet, the Delphi Basic the chart's planet hovers
@@ -307,6 +310,7 @@ h1{margin:0;font-weight:600;font-size:22px;color:var(--purple)}
 #find h2{margin:0 26px 8px 0;font-size:15px;font-weight:600;color:var(--purple)}
 #find h3{margin:12px 0 6px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 #find .x{position:absolute;top:10px;right:12px;border:0;background:none;font-size:18px;color:var(--muted);cursor:pointer}
+#find .lims{display:flex;flex-wrap:wrap;gap:4px}
 #find .grid{display:grid;grid-template-columns:1fr 1fr;gap:2px}
 #find .opt{padding:4px 6px}
 #find .mt{display:flex;flex-wrap:wrap;gap:3px;margin-top:3px}
@@ -319,6 +323,7 @@ h1{margin:0;font-weight:600;font-size:22px;color:var(--purple)}
 .rel .ang{display:flex;justify-content:space-between;padding:3px 6px}
 .rel .ang span{color:var(--muted)}
 .rel .was{color:var(--muted)}
+.rel .ang .av{color:var(--ink)}.rel .ang .ap{color:#fff}.rel .ang.own span{color:#8a6a14;font-weight:600}
 .reltog{display:block;width:100%;text-align:left;font:inherit;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:#faf8fb;border:1px solid #eee7f1;border-radius:8px;padding:7px 10px;margin:12px 0 4px;cursor:pointer}
 .reltog::before{content:"▸";display:inline-block;margin-right:6px;transition:transform .15s}
 .reltog.open::before{transform:rotate(90deg)}
@@ -749,6 +754,11 @@ function fetchReloc(pl,wheels,done){
     .catch(()=>{reloc.set(k,"failed");done()});
 }
 const fmtDeg=v=>{let d=Math.floor(v),m=Math.round((v-d)*60);if(m===60){d++;m=0}return d+"°"+(m<10?"0":"")+m+"'"};
+// Whose gate a relocated angle lands in, from this chart's own activations.
+function ownGate(g){
+  const who=[];for(const sd of ["personality","design"])for(const [pl,gl] of Object.entries(GATE_OF[sd]))if(+gl.split(".")[0]===g)who.push(SIDE[sd]+" "+pl+" "+gl);
+  return who.length?'<div class="ang own"><span>Your gate: '+who.join(", ")+'</span></div>':"";
+}
 function relocHtml(){
   if(!live)return"";
   const head='<button class="reltog'+(relOpen?" open":"")+'" data-reltog="1">Relocated Chart</button>';
@@ -759,11 +769,10 @@ function relocHtml(){
   const sides=st.side==="both"?["personality","design"]:[st.side];
   const ANGULAR=new Set([1,4,7,10]);
   let h=head+'<div class="rel"><button class="wheelbtn" data-wheel="1">View Chart</button>';
-  for(const sd of sides){const R=r[sd];
-    h+='<div class="ang"><b>'+SIDE[sd]+' Ascendant</b>'+R.asc.sign+" "+fmtDeg(R.asc.deg)+'</div>'+
-       '<div class="ang"><span>was '+NATAL[sd].asc+'</span></div>'+
-       '<div class="ang"><b>'+SIDE[sd]+' Midheaven</b>'+R.mc.sign+" "+fmtDeg(R.mc.deg)+'</div>'+
-       '<div class="ang"><span>was '+NATAL[sd].mc+'</span></div>'}
+  for(const sd of sides)for(const a of ["ASC","DSC","MC","IC"]){const R=r[sd].angles[a],N=NATAL[sd].angles[a];
+    h+='<div class="ang"><b>'+SIDE[sd]+" "+ANGLE_NAME[a]+'</b><span class="av">'+R.sign+" "+fmtDeg(R.deg)+' <span class="ap">Gate '+R.gate+"."+R.line+'</span></span></div>'+
+       ownGate(R.gate)+
+       '<div class="ang"><span>was '+N.text+" · Gate "+N.gate+"."+N.line+'</span></div>'}
   const moved=[];
   for(const sd of sides)for(const b of BODIES){if(!st.lines.has(b))continue;
     const a=NATAL[sd].house[b],z=r[sd].house[b];if(a&&z&&a!==z)moved.push({sd,b,a,z})}
@@ -818,7 +827,8 @@ function wheelTip(el){
   const a=ANGLE_OF[el.dataset.angle];if(!a)return"";
   const sd=which==="design"?"design":"personality",v=r[sd][a[0]];
   const at=(a[1]==="Descendant"||a[1]==="IC")?opp(v):v;
-  return "<b>"+SIDE[sd]+" "+a[1]+"</b>"+at.sign+" "+fmtDeg(at.deg);
+  const key2={Ascendant:"ASC",Descendant:"DSC",Midheaven:"MC",IC:"IC"}[a[1]],G=r[sd].angles[key2];
+  return "<b>"+SIDE[sd]+" "+a[1]+" in "+at.sign+" "+fmtDeg(at.deg)+"</b>"+pill("Gate "+G.gate+"."+G.line,"house");
 }
 document.getElementById("wheel").addEventListener("mousemove",e=>{
   const el=e.target.closest("[data-aplanet],[data-angle]");
@@ -907,6 +917,10 @@ document.getElementById("here").addEventListener("click",e=>{
 // Each chosen planet scores its grade at a place (Strong 3, Moderate 2, Mild 1)
 // for each side in view, through the angles the Angles menu allows.
 const want=new Set();let finding=false;
+// Near the poles every line converges, so the far north and south score well
+// for any choice: across twelve charts, 56% of top-ten matches lay beyond 60
+// degrees against 5% of cities. The person sets how far to look; 60 to start.
+let latLimit=60;
 const STEP=2,GC=Math.round(360/STEP),GR=Math.round((TOP-BOTTOM)/STEP);
 const dense=new Map();   // line -> points every 0.4 degrees
 function densePts(l){
@@ -944,13 +958,13 @@ function computeFind(){
   const max=3*groups.length;
   // Paint the score as a soft gold wash under the lines.
   const cv=document.createElement("canvas");cv.width=GC;cv.height=GR;const g=cv.getContext("2d"),img=g.createImageData(GC,GR);
-  for(let i=0;i<score.length;i++){const a=max?score[i]/max:0;img.data[i*4]=199;img.data[i*4+1]=154;img.data[i*4+2]=46;img.data[i*4+3]=Math.round(Math.pow(a,1.6)*190)}
+  for(let i=0;i<score.length;i++){const rowLat=TOP-(Math.floor(i/GC)+.5)*STEP;const a=max&&Math.abs(rowLat)<=latLimit?score[i]/max:0;img.data[i*4]=199;img.data[i*4+1]=154;img.data[i*4+2]=46;img.data[i*4+3]=Math.round(Math.pow(a,1.6)*190)}
   g.putImageData(img,0,0);
   document.getElementById("heat").setAttribute("href",groups.length?cv.toDataURL():"");
   // Rank cities exactly, starting from the cells that score at all.
   const cell=(lat,lon)=>{const r=Math.min(GR-1,Math.max(0,Math.floor((TOP-lat)/STEP))),c=Math.min(GC-1,Math.max(0,Math.floor((lon+180)/STEP)));return score[r*GC+c]};
   const ranked=[];
-  if(groups.length)for(const c of CITIES){if(c.stn||c.lat>TOP||c.lat<BOTTOM||cell(c.lat,c.lon)<=0)continue;
+  if(groups.length)for(const c of CITIES){if(c.stn||Math.abs(c.lat)>latLimit||c.lat>TOP||c.lat<BOTTOM||cell(c.lat,c.lon)<=0)continue;
     let sc=0,sum=0;const per=[];
     for(const g2 of groups){const mi=Math.min(...g2.ls.map(l=>distTo(l,c.lat,c.lon)));const v=gradeVal(mi);sc+=v;sum+=Math.min(mi,700);per.push({sd:g2.sd,b:g2.b,mi,v})}
     if(sc>0)ranked.push({c,sc,sum,per})}
@@ -965,6 +979,7 @@ function renderFind(){
   const F=lastFind;
   box.innerHTML='<button class="x" title="Close">&times;</button><h2>Find My Places</h2>'+
     '<div class="grid">'+BODIES.map(b=>'<div class="opt'+(want.has(b)?" on":"")+'" data-want="'+b+'"><span class="radio"></span><span class="gl">'+GLYPH[b]+'</span>'+b+'</div>').join("")+'</div>'+
+    '<h3>Latitude Limit</h3><div class="lims">'+[[45,"45°"],[60,"60°"],[66.5,"Polar Circles"],[90,"No Limit"]].map(([v,t])=>'<button class="pill'+(v===latLimit?" on":"")+'" data-lim="'+v+'">'+t+'</button>').join("")+'</div>'+
     (F.groups.length?'<h3>Closest Matches</h3>'+(F.top.length?F.top.map((t,i)=>'<div class="fr" data-fi="'+i+'"><b>'+t.c.n+'</b> <span class="co">'+t.c.c+'</span>'+
       '<div class="mt">'+t.per.filter(p=>p.v).map(p=>'<span><span style="color:'+(p.sd==="design"?"var(--design)":"var(--ink)")+'">'+GLYPH[p.b]+'</span>'+gradePill(GRADES.find(g=>g[1]===p.v))+'</span>').join("")+'</div></div>').join(""):'<div class="none">No cities within 700 miles of these lines.</div>'):"");
   box.classList.add("open");
@@ -972,6 +987,7 @@ function renderFind(){
 document.getElementById("findBtn").onclick=()=>{finding=!finding;renderFind()};
 document.getElementById("find").addEventListener("click",e=>{
   if(e.target.closest(".x")){finding=false;return renderFind()}
+  const lim=e.target.closest("[data-lim]");if(lim){latLimit=+lim.dataset.lim;return renderFind()}
   const w=e.target.closest("[data-want]");if(w){const b=w.dataset.want;want.has(b)?want.delete(b):want.add(b);return renderFind()}
   const r=e.target.closest("[data-fi]");if(r){const c=lastFind.top[+r.dataset.fi].c;
     const k=Math.max(view.k,4);view.k=k;view.tx=W/2-((c.lon+180)/360*W)*k;view.ty=H/2-((TOP-c.lat)/(TOP-BOTTOM)*H)*k;clampView();openHere(c.lat,c.lon,c)}
@@ -1021,10 +1037,9 @@ function relocRows(){
   const ANGULAR=new Set([1,4,7,10]);
   const cellOf=f=>R.map(r=>r==="loading"||!r?'<td class="mi">…</td>':r==="failed"?'<td class="mi"></td>':'<td>'+f(r)+'</td>').join("");
   let h='<tr class="sec"><td colspan="'+(saved.length+1)+'">Relocated Chart</td></tr>';
-  for(const sd of sides){
-    h+='<tr><td>'+SIDE[sd]+' Ascendant <span class="was">was '+NATAL[sd].asc+'</span></td>'+cellOf(r=>r[sd].asc.sign+" "+fmtDeg(r[sd].asc.deg))+'</tr>';
-    h+='<tr><td>'+SIDE[sd]+' Midheaven <span class="was">was '+NATAL[sd].mc+'</span></td>'+cellOf(r=>r[sd].mc.sign+" "+fmtDeg(r[sd].mc.deg))+'</tr>';
-  }
+  for(const sd of sides)for(const a of ["ASC","DSC","MC","IC"]){const N=NATAL[sd].angles[a];
+    h+='<tr><td>'+SIDE[sd]+" "+ANGLE_NAME[a]+' <span class="was">was '+N.text+" · Gate "+N.gate+"."+N.line+'</span></td>'+
+      cellOf(r=>{const R=r[sd].angles[a];return R.sign+" "+fmtDeg(R.deg)+' <span class="ap">Gate '+R.gate+"."+R.line+'</span>'})+'</tr>'}
   for(const sd of sides)for(const bd of BODIES){if(!st.lines.has(bd))continue;const n=NATAL[sd].house[bd];
     h+='<tr><td><span style="color:'+(sd==="design"?"var(--design)":"var(--ink)")+'">'+GLYPH[bd]+'</span> '+SIDE[sd]+" "+bd+' <span class="was">natal '+ord(n)+'</span></td>'+
       cellOf(r=>{const z=r[sd].house[bd];return(z===n?'<span class="was">'+ord(z)+'</span>':'<b>'+ord(z)+'</b>')+(ANGULAR.has(z)?' <span class="gr g3">Angular</span>':'')})+'</tr>'}

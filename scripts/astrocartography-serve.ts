@@ -20,6 +20,7 @@ import { homedir } from "node:os";
 import { locate, getAstro, type AstroChart } from "../lib/astro";
 import { houseOf, ZODIAC } from "../lib/astro-extras";
 import { renderWheel } from "./astro-wheel";
+import { gateLineFromLongitude } from "../lib/hd/gate-longitude";
 
 const PORT = Number(process.env.ACG_PORT ?? 8782);
 const DIR = join(homedir(), "Desktop", "HD Reports", "Astrocartography");
@@ -80,7 +81,11 @@ createServer(async (req, res) => {
           planets.Earth = { label: "Earth", sign, deg: e % 30,
             element: a.signs[sign]?.element ?? "", quality: a.signs[sign]?.quality ?? "", house: out.Earth };
         }
-        return { asc: at(a.ascendant), mc: at(a.mc), house: out, planets };
+        // Each relocated angle falls in a gate on the mandala, the way a planet
+        // does. Kaycee, 10 October, liked seeing which gates rise at a place.
+        const angle = (v: number) => { const g = gateLineFromLongitude(((v % 360) + 360) % 360); return { ...at(((v % 360) + 360) % 360), gate: g.gate, line: g.line }; };
+        const angles = { ASC: angle(a.ascendant), DSC: angle(a.ascendant + 180), MC: angle(a.mc), IC: angle(a.mc + 180) };
+        return { asc: at(a.ascendant), mc: at(a.mc), house: out, planets, angles };
       };
       if (g("wheels") === "0") return json(res, 200, { ok: true, personality: sum(p), design: sum(d) });
       // Three wheels, as the chart draws them. Each side on its OWN relocated

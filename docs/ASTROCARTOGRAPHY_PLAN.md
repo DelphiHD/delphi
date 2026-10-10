@@ -252,3 +252,15 @@ planet is marked good or bad anywhere; the person picks.
   place's relocated angles (Lisbon: Personality ASC Gate 6.3, MC Gate 12.2;
   Design ASC Gate 1.1, MC Gate 4.4; natal Ogden ASC Gate 15.5), from
   lib/hd/gate-longitude. Whether it means anything is her call.
+- **The far north, measured.** Find My Places run headless over 12 charts
+  with documented birth times, every pair of the ten planets, both sides:
+  56% of top-ten matches lay beyond 60 degrees latitude against 5% of
+  cities (per chart 40% to 76%). Systematic, not her chart. So the person
+  sets a Latitude Limit (45, 60, Polar Circles, No Limit), starting at 60;
+  the shading and the ranking both stop at it.
+- **Gates on the relocated angles** (Kaycee: "yes, I really like this").
+  All four angles per side, each with its gate and line from
+  lib/hd/gate-longitude, the natal angle and its gate beneath, and "Your
+  gate" naming any of this chart's own activations in that gate. In the
+  panel, in Compare Places, and on the relocated wheel's angle hovers.
+  Lisbon: Personality MC Gate 12.2, the gate of her Personality Sun 12.4.
