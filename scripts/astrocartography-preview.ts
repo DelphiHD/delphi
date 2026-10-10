@@ -345,12 +345,16 @@ function layoutLabels(){
     });
   }
 }
+// A paran shows when one of its bodies is picked in the Parans menu and the
+// other has its lines on the map, so a hover never lights a hidden line.
+// Kaycee, 10 October: with Earth's lines off, a Venus-Earth paran should be too.
+const pairOk=d=>(st.parans.has(d.body)&&st.lines.has(d.body2))||(st.parans.has(d.body2)&&st.lines.has(d.body));
 function paint(){
   const sideOk=d=>st.side==="both"||d.side===st.side;
   for(const el of document.querySelectorAll("#lines [data-side]"))
     el.classList.toggle("off",!(sideOk(el.dataset)&&st.lines.has(el.dataset.body)&&st.angles.has(el.dataset.angle)));
   for(const el of document.querySelectorAll("#parans [data-side]"))
-    el.classList.toggle("off",!(sideOk(el.dataset)&&(st.parans.has(el.dataset.body)||st.parans.has(el.dataset.body2))&&(st.angles.has(el.dataset.angle)||st.angles.has(el.dataset.angle2))));
+    el.classList.toggle("off",!(sideOk(el.dataset)&&pairOk(el.dataset)&&(st.angles.has(el.dataset.angle)||st.angles.has(el.dataset.angle2))));
   for(const c of document.querySelectorAll(".opt"))c.classList.toggle("on",st[c.dataset.kind].has(c.dataset.chip));
   for(const k in ALL)document.querySelector('[data-dd="'+k+'"] .n').textContent=st[k].size===ALL[k].length?"All":st[k].size?st[k].size:"None";
   layoutLabels();
