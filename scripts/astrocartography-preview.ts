@@ -423,6 +423,8 @@ const GATE_OF=${JSON.stringify({
 const FONTCSS=${JSON.stringify([400, 600].map((w) =>
   `@font-face{font-family:Montserrat;font-weight:${w};src:url(data:font/ttf;base64,${readFileSync(join("assets", "fonts", `Montserrat-${w}.ttf`)).toString("base64")}) format('truetype');}`).join(""))};
 const GATES={pg:${JSON.stringify(chart.activations.personality.map((a) => a.gate).join(","))},dg:${JSON.stringify(chart.activations.design.map((a) => a.gate).join(","))}};
+// The birth as the person knows it: local date and clock, and the place.
+const BORN=${JSON.stringify({ date: String(row.birth_date), time: String(row.birth_time).slice(0, 5), place: String(row.birth_place) })};
 const CAST={place:${JSON.stringify(String(row.birth_place))},p:${JSON.stringify(chart.birth.utcDate)},d:${JSON.stringify(chart.birth.designUtcDate)}};
 const CITIES=${JSON.stringify(cities(join(geoDir, "..", "natural-earth", "ne_50m_populated_places_simple.geojson")))};
 const TOP=${TOP},BOTTOM=${BOTTOM},ORB=1;
@@ -836,7 +838,7 @@ function snapshot(svgEl,lines,filename){
   const xml=new XMLSerializer().serializeToString(clone);
   const img=new Image();
   img.onload=()=>{
-    const S=2,foot=150,cv=document.createElement("canvas");cv.width=vw*S;cv.height=vh*S+foot;
+    const S=2,foot=Math.max(150,62+lines.length*26),cv=document.createElement("canvas");cv.width=vw*S;cv.height=vh*S+foot;
     const g=cv.getContext("2d");g.fillStyle="#ffffff";g.fillRect(0,0,cv.width,cv.height);g.drawImage(img,0,0,vw*S,vh*S);
     const y0=vh*S+8;g.strokeStyle="rgba(132,80,149,.35)";g.lineWidth=2;g.beginPath();g.moveTo(52,y0);g.lineTo(cv.width-52,y0);g.stroke();
     const logo=document.getElementById("logo"),know=document.getElementById("know");
@@ -853,7 +855,14 @@ function snapshot(svgEl,lines,filename){
 }
 function mapState(){
   const n=k=>st[k].size===ALL[k].length?"All":st[k].size?[...st[k]].join(", "):"None";
-  return ["Astrocartography · "+(st.side==="both"?"Personality + Design":SIDE[st.side]),
+  // The moment each map was cast, for the sides on it. Kaycee, 10 October:
+  // "can you add the date(s) to the map image?"
+  const [y,mo,d]=BORN.date.split("-").map(Number),[hh,mm]=BORN.time.split(":").map(Number);
+  const born=MONTHS[mo-1]+" "+d+", "+y+" · "+(hh%12===0?12:hh%12)+":"+String(mm).padStart(2,"0")+" "+(hh<12?"AM":"PM")+" · "+BORN.place;
+  const dates=[];
+  if(st.side!=="design")dates.push("Personality: "+born);
+  if(st.side!=="personality")dates.push("Design: "+utcWhen(CAST.d));
+  return ["Astrocartography · "+(st.side==="both"?"Personality + Design":SIDE[st.side]),...dates,
     "Lines: "+n("lines")+"  ·  Angles: "+n("angles")+"  ·  Parans: "+n("parans")];
 }
 document.getElementById("snapMap").onclick=()=>snapshot(document.getElementById("map"),[PERSON,...mapState()],PERSON+" - Astrocartography.png");
