@@ -296,9 +296,10 @@ const ML=${ML},MT=${MT},W=${W},H=${f(H)};
 const BODIES=${JSON.stringify(HD_BODIES)};
 const ANGLES=["ASC","DSC","MC","IC"];
 const ALL={lines:BODIES,parans:BODIES,angles:ANGLES};
-// Earth starts off: Kaycee, 10 October. It is the Sun's lines turned round,
-// and every one of them doubles a Sun line already on the map.
-const st={side:"both",lines:new Set(BODIES.filter(b=>b!=="Earth")),angles:new Set(ANGLES),parans:new Set()};
+// Earth and both Nodes start off: Kaycee, 10 October. They are still one
+// click away, and All includes them.
+const START_OFF=["Earth","North Node","South Node"];
+const st={side:"both",lines:new Set(BODIES.filter(b=>!START_OFF.includes(b))),angles:new Set(ANGLES),parans:new Set()};
 // One resolver answers "what is this?", read from the element, never its position.
 function describe(el){
   const d=el.dataset, side=SIDE[d.side];

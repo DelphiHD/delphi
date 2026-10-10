@@ -114,7 +114,7 @@ Kaycee chose the **detailed coastline** (land-50m). Her changes:
   own line style. It narrows lines and their edge glyphs; parans keep their
   own menu.
 - The Angles menu filters parans too: a paran shows when either of its two
-  angles is selected. Earth's lines start switched off (Kaycee, 10 October).
+  angles is selected. Earth's lines start switched off, and so do both Nodes' (Kaycee, 10 October).
 - A paran shows when one of its bodies is picked in the Parans menu and BOTH
   bodies have their lines on. So Earth's parans follow Earth's lines, off by
   default, and a paran hover never lights a line that is hidden (Kaycee, 10
