@@ -303,6 +303,11 @@ h1{margin:0;font-weight:600;font-size:22px;color:var(--purple)}
 .rel .ang{display:flex;justify-content:space-between;padding:3px 6px}
 .rel .ang span{color:var(--muted)}
 .rel .was{color:var(--muted)}
+.reltog{display:block;width:100%;text-align:left;font:inherit;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:#faf8fb;border:1px solid #eee7f1;border-radius:8px;padding:7px 10px;margin:12px 0 4px;cursor:pointer}
+.reltog::before{content:"▸";display:inline-block;margin-right:6px;transition:transform .15s}
+.reltog.open::before{transform:rotate(90deg)}
+.wtabs{display:flex;gap:4px;margin:0 0 6px}
+.wsub{font-size:12px;margin:2px 0 4px}
 .wheelbtn{font:inherit;font-size:11px;font-weight:600;border:1px solid var(--purple);background:#fff;color:var(--purple);border-radius:999px;padding:4px 10px;cursor:pointer;margin:6px 0 2px}
 #wheel{position:fixed;inset:0;background:rgba(47,42,51,.45);display:none;align-items:center;justify-content:center;z-index:20}
 #wheel.open{display:flex}
@@ -317,6 +322,7 @@ h1{margin:0;font-weight:600;font-size:22px;color:var(--purple)}
 #compare th{font-size:12px;font-weight:600;position:sticky;top:-12px;background:#fff}
 #compare th .rm{border:0;background:none;color:var(--muted);cursor:pointer;font-size:13px}
 #compare th .pl{cursor:pointer;color:var(--purple)}
+#compare .was{color:var(--muted);font-weight:400;font-size:11px}
 #compare td.mi{color:var(--muted);font-variant-numeric:tabular-nums}
 #compare tr.sum td{font-weight:600}
 #compare tr[data-side]:hover td{background:#faf3df}
@@ -398,6 +404,7 @@ const PR=${JSON.stringify(PR)};
 const BIRTH=${JSON.stringify([place.lon, place.lat])};
 const BASIC=${JSON.stringify(basics)};
 const NATAL=${JSON.stringify(natal)};
+const GATES={pg:${JSON.stringify(chart.activations.personality.map((a) => a.gate).join(","))},dg:${JSON.stringify(chart.activations.design.map((a) => a.gate).join(","))}};
 const CAST={place:${JSON.stringify(String(row.birth_place))},p:${JSON.stringify(chart.birth.utcDate)},d:${JSON.stringify(chart.birth.designUtcDate)}};
 const CITIES=${JSON.stringify(cities(join(geoDir, "..", "natural-earth", "ne_50m_populated_places_simple.geojson")))};
 const TOP=${TOP},BOTTOM=${BOTTOM},ORB=1;
@@ -691,23 +698,30 @@ function renderHere(){
 // the local server. The planets do not move; angles and houses do.
 const reloc=new Map();   // "lat,lon" -> result, or "loading" / "failed"
 const ord=n=>n+(n%100>10&&n%100<14?"th":["th","st","nd","rd"][n%10]||"th");
-function relocKey(){return here.lat.toFixed(4)+","+here.lon.toFixed(4)}
-function fetchReloc(){
-  if(!live||!here)return;const k=relocKey();if(reloc.has(k))return;
-  reloc.set(k,"loading");const at={...here};
-  fetch("/api/relocate?"+new URLSearchParams({lat:at.lat,lon:at.lon,name:PERSON,...CAST})).then(r=>r.json())
-    .then(r=>{reloc.set(k,r.ok?r:"failed");if(here&&relocKey()===k)renderHere()})
-    .catch(()=>{reloc.set(k,"failed");if(here&&relocKey()===k)renderHere()});
+const keyOf=pl=>pl.lat.toFixed(4)+","+pl.lon.toFixed(4);
+function relocKey(){return keyOf(here)}
+const placeName=pl=>pl.name?pl.name.replace(/^Near /,"")+(pl.country?", "+pl.country:""):fmtLat(pl.lat)+", "+fmtLon(pl.lon);
+let relOpen=false;   // the section starts closed
+/** Cast a place; with wheels for the panel, without for the comparison. */
+function fetchReloc(pl,wheels,done){
+  if(!live)return;const k=keyOf(pl),have=reloc.get(k);
+  if(have==="loading"||(have&&have.ok&&(have.svg||!wheels)))return;
+  reloc.set(k,"loading");
+  fetch("/api/relocate?"+new URLSearchParams({lat:pl.lat,lon:pl.lon,name:PERSON,at:placeName(pl),wheels:wheels?"1":"0",...CAST,...GATES})).then(r=>r.json())
+    .then(r=>{reloc.set(k,r.ok?r:"failed");done()})
+    .catch(()=>{reloc.set(k,"failed");done()});
 }
 const fmtDeg=v=>{let d=Math.floor(v),m=Math.round((v-d)*60);if(m===60){d++;m=0}return d+"°"+(m<10?"0":"")+m+"'"};
 function relocHtml(){
   if(!live)return"";
+  const head='<button class="reltog'+(relOpen?" open":"")+'" data-reltog="1">Relocated Chart</button>';
+  if(!relOpen)return head;
   const r=reloc.get(relocKey());
-  if(!r||r==="loading")return'<h3>Relocated Chart</h3><div class="none">Casting…</div>';
-  if(r==="failed")return'<h3>Relocated Chart</h3><div class="none">Could not cast this place.</div>';
+  if(!r||r==="loading")return head+'<div class="none">Casting…</div>';
+  if(r==="failed")return head+'<div class="none">Could not cast this place.</div>';
   const sides=st.side==="both"?["personality","design"]:[st.side];
   const ANGULAR=new Set([1,4,7,10]);
-  let h='<div class="rel"><h3>Relocated Chart</h3>';
+  let h=head+'<div class="rel"><button class="wheelbtn" data-wheel="1">View Chart</button>';
   for(const sd of sides){const R=r[sd];
     h+='<div class="ang"><b>'+SIDE[sd]+' Ascendant</b>'+R.asc.sign+" "+fmtDeg(R.asc.deg)+'</div>'+
        '<div class="ang"><span>was '+NATAL[sd].asc+'</span></div>'+
@@ -719,20 +733,37 @@ function relocHtml(){
   h+='<h3>Planets Changing House</h3>'+(moved.length?moved.map(m=>'<div class="hr" '+tag(m.sd,m.b,"")+'>'+
     '<span class="gl '+m.sd+'">'+GLYPH[m.b]+'</span><span class="nm">'+SIDE[m.sd]+" "+m.b+'</span>'+
     '<span class="was">'+ord(m.a)+' →</span> <b>'+ord(m.z)+'</b>'+(ANGULAR.has(m.z)?' <span class="gr g3">Angular</span>':'')+'</div>').join(""):'<div class="none">No planet changes house here.</div>');
-  h+='<button class="wheelbtn" data-wheel="1">View Wheel</button></div>';
-  return h;
+  return h+'</div>';
 }
-document.getElementById("wheel").addEventListener("click",e=>{if(e.target.id==="wheel"||e.target.closest(".x"))e.currentTarget.classList.remove("open")});
+const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+function utcWhen(iso){const m=/^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2})/.exec(iso);if(!m)return iso;const h=+m[4];
+  return MONTHS[+m[2]-1]+" "+(+m[3])+", "+m[1]+" · "+(h%12===0?12:h%12)+":"+m[5]+" "+(h<12?"AM":"PM")+" UTC"}
+// Personality and design each on their own relocated horizon, or both
+// together on the personality's, as the Astrology view draws a natal chart.
+function showWheel(r,where,which){
+  const w=document.getElementById("wheel");
+  w.querySelector(".box").innerHTML='<button class="x" title="Close">&times;</button><h2>Relocated Chart · '+where+'</h2>'+
+    '<div class="wtabs">'+[["personality","Personality"],["design","Design"],["both","Both"]].map(([k,t])=>'<button class="pill'+(k===which?" on":"")+'" data-wtab="'+k+'">'+t+'</button>').join("")+'</div>'+
+    // A one-sided wheel has no corner legend (that drawing is shared with the
+    // live charts and left alone), so the window says which side it is.
+    (which==="both"?"":'<div class="wsub" style="color:'+(which==="design"?"var(--design)":"var(--ink)")+'"><b>'+SIDE[which]+'</b> · '+utcWhen(which==="design"?CAST.d:CAST.p)+" · "+where+'</div>')+
+    r.svg[which];
+  w.dataset.where=where;w.classList.add("open");
+}
+document.getElementById("wheel").addEventListener("click",e=>{
+  if(e.target.id==="wheel"||e.target.closest(".x"))return e.currentTarget.classList.remove("open");
+  const t=e.target.closest("[data-wtab]");if(t){const r=reloc.get(relocKey());if(r&&r.svg)showWheel(r,e.currentTarget.dataset.where,t.dataset.wtab)}
+});
 function openHere(lat,lon,city){
   const c=city||nearestCity(lat,lon);
   here={lat,lon,name:city?city.n:(c?"Near "+c.n:null),country:c?c.c:null};
   if(city){here.lat=city.lat;here.lon=city.lon}
-  fetchReloc();renderHere();redraw();
+  if(relOpen)fetchReloc(here,true,renderHere);renderHere();redraw();
 }
 document.getElementById("here").addEventListener("click",e=>{
   if(e.target.closest(".x")){here=null;pinned.clear();renderHere();redraw();return}
-  if(e.target.closest("[data-wheel]")){const r=reloc.get(relocKey());if(r&&r.svg){
-    const w=document.getElementById("wheel");w.querySelector(".box").innerHTML='<button class="x" title="Close">&times;</button><h2>Relocated Chart · '+(here.name?here.name.replace(/^Near /,""):fmtLat(here.lat)+", "+fmtLon(here.lon))+'</h2>'+r.svg;w.classList.add("open")}return}
+  if(e.target.closest("[data-reltog]")){relOpen=!relOpen;if(relOpen&&here)fetchReloc(here,true,renderHere);renderHere();return}
+  if(e.target.closest("[data-wheel]")){const r=reloc.get(relocKey());if(r&&r.svg)showWheel(r,placeName(here),"personality");return}
   const un=e.target.closest("[data-un]");if(un){pinned.delete(un.dataset.un);renderHere();redraw();return}
   if(e.target.closest("[data-save]")&&here){
     saved.push({n:here.name?here.name.replace(/^Near /,"Near "):fmtLat(here.lat)+", "+fmtLon(here.lon),c:here.country||"",lat:here.lat,lon:here.lon});
@@ -750,6 +781,7 @@ function renderCompare(){
   const b=document.getElementById("cmpBtn");b.classList.toggle("has",saved.length>0);b.textContent="Compare Places ("+saved.length+")";
   const box=document.getElementById("compare");
   if(!comparing||!saved.length){box.classList.remove("open");return}
+  for(const s of saved)fetchReloc({lat:s.lat,lon:s.lon,name:s.n,country:s.c},false,renderCompare);
   const A=saved.map(s=>analyze(s.lat,s.lon));
   // Every line or paran that reaches any saved place, best first.
   const lines=new Map(),pars=new Map();
@@ -764,12 +796,31 @@ function renderCompare(){
     '<tr class="sum"><td>Strong</td>'+A.map(a=>'<td>'+count(a,3)+'</td>').join("")+'</tr>'+
     '<tr class="sum"><td>Moderate</td>'+A.map(a=>'<td>'+count(a,2)+'</td>').join("")+'</tr>'+
     '<tr class="sum"><td>Mild</td>'+A.map(a=>'<td>'+count(a,1)+'</td>').join("")+'</tr>'+
+    relocRows()+
     '<tr class="sec"><td colspan="'+(saved.length+1)+'">Lines</td></tr>'+
     [...lines.values()].sort((a,b)=>a.best-b.best).map(e=>'<tr '+tag(e.l.side,e.l.body,e.l.angle)+'><td><span class="gl '+e.l.side+'" style="color:'+(e.l.side==="design"?"var(--design)":"var(--ink)")+'">'+GLYPH[e.l.body]+'</span> '+SIDE[e.l.side]+" "+e.l.body+' <span class="ap">'+e.l.angle+'</span></td>'+saved.map((s,i)=>cell(e.at[i])).join("")+'</tr>').join("")+
     '<tr class="sec"><td colspan="'+(saved.length+1)+'">Parans</td></tr>'+
     [...pars.values()].sort((a,b)=>a.best-b.best).map(e=>{const p=e.p;return '<tr '+tag(p.side,p.a,p.angleA)+' data-body2="'+p.b+'" data-angle2="'+p.angleB+'"><td>'+SIDE[p.side]+" "+p.a+' <span class="ap">'+p.angleA+'</span> '+p.b+' <span class="ap">'+p.angleB+'</span></td>'+saved.map((s,i)=>cell(e.at[i])).join("")+'</tr>'}).join("")+
     '</table>';
   box.classList.add("open");
+}
+// The relocated chart for every saved place: angles for each side in view,
+// then each planet's house there, natal house beside its name.
+function relocRows(){
+  if(!live)return"";
+  const R=saved.map(s=>reloc.get(keyOf(s)));
+  const sides=st.side==="both"?["personality","design"]:[st.side];
+  const ANGULAR=new Set([1,4,7,10]);
+  const cellOf=f=>R.map(r=>r==="loading"||!r?'<td class="mi">…</td>':r==="failed"?'<td class="mi"></td>':'<td>'+f(r)+'</td>').join("");
+  let h='<tr class="sec"><td colspan="'+(saved.length+1)+'">Relocated Chart</td></tr>';
+  for(const sd of sides){
+    h+='<tr><td>'+SIDE[sd]+' Ascendant <span class="was">was '+NATAL[sd].asc+'</span></td>'+cellOf(r=>r[sd].asc.sign+" "+fmtDeg(r[sd].asc.deg))+'</tr>';
+    h+='<tr><td>'+SIDE[sd]+' Midheaven <span class="was">was '+NATAL[sd].mc+'</span></td>'+cellOf(r=>r[sd].mc.sign+" "+fmtDeg(r[sd].mc.deg))+'</tr>';
+  }
+  for(const sd of sides)for(const bd of BODIES){if(!st.lines.has(bd))continue;const n=NATAL[sd].house[bd];
+    h+='<tr><td><span style="color:'+(sd==="design"?"var(--design)":"var(--ink)")+'">'+GLYPH[bd]+'</span> '+SIDE[sd]+" "+bd+' <span class="was">natal '+ord(n)+'</span></td>'+
+      cellOf(r=>{const z=r[sd].house[bd];return(z===n?'<span class="was">'+ord(z)+'</span>':'<b>'+ord(z)+'</b>')+(ANGULAR.has(z)?' <span class="gr g3">Angular</span>':'')})+'</tr>'}
+  return h;
 }
 document.getElementById("cmpBtn").onclick=()=>{comparing=!comparing;renderCompare()};
 document.getElementById("compare").addEventListener("click",e=>{

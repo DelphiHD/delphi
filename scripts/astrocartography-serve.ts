@@ -71,7 +71,36 @@ createServer(async (req, res) => {
         const at = (v: number) => ({ sign: ZODIAC[Math.floor(v / 30)], deg: v % 30 });
         return { asc: at(a.ascendant), mc: at(a.mc), house: out };
       };
-      const svg = renderWheel(p, g("name"), d);
+      if (g("wheels") === "0") return json(res, 200, { ok: true, personality: sum(p), design: sum(d) });
+      // Three wheels, as the chart draws them. Each side on its OWN relocated
+      // horizon, because a design chart carries its own ascendant and houses
+      // (Kaycee, 2026-10-08), and both together on the personality horizon,
+      // the way the Astrology view shows a natal chart. Kaycee, 10 October: "I
+      // would like to be able to see the astrological chart for both the
+      // design and personality sides." Corners say when and where each was
+      // cast: the birth instant in UTC, since the local clock is another
+      // place's, and the place it was cast for.
+      const gates = (k: string) => g(k).split(",").map(Number).filter(Boolean);
+      const pG = gates("pg"), dG = gates("dg"), all = [...new Set([...pG, ...dG])];
+      const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August",
+        "September", "October", "November", "December"];
+      const when = (utc: string) => {
+        const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(utc);
+        if (!m) return utc;
+        const h = Number(m[4]);
+        return `${MONTHS[Number(m[2]) - 1]} ${Number(m[3])}, ${m[1]} \u00b7 ${h % 12 === 0 ? 12 : h % 12}:${m[5]} ${h < 12 ? "AM" : "PM"} UTC`;
+      };
+      const at = g("at");
+      const pWhen = [when(g("p")), at], dWhen = [when(g("d")), at];
+      const name = g("name");
+      const svg = {
+        personality: renderWheel(p, name, null, "ascendant", pG, pG, [], null, undefined, null, null,
+          "personality", null, null, null, false, [pWhen]),
+        design: renderWheel(d, name, null, "ascendant", dG, [], dG, null, undefined, null, null,
+          "design", null, null, null, false, [dWhen]),
+        both: renderWheel(p, name, d, "ascendant", all, pG, dG, null, undefined, null, null,
+          "personality", null, null, null, false, [pWhen, dWhen]),
+      };
       return json(res, 200, { ok: true, personality: sum(p), design: sum(d), svg });
     }
     // The page itself: the one asked for, or the only one there.

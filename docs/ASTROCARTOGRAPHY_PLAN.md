@@ -208,3 +208,14 @@ relocated chart. All five are wanted eventually; 1 and 2 are built.
   a route beside /api/transit-wheel, which already casts wheels the same way.
 - Not yet: hovers inside the relocated wheel, and a wheel on the design
   chart's own relocated horizon (the Relationship view's pattern).
+- Kaycee's changes, same day: the Relocated Chart section is a toggle that
+  starts closed (cast only when opened), with View Chart at its top. The
+  chart window has three wheels: Personality and Design, each on its OWN
+  relocated horizon, and Both on the personality's, as the Astrology view
+  draws a natal chart. renderWheel draws no corner legend for a one-sided
+  wheel and is shared with the live charts, so it is left alone and the
+  window names the side, the UTC instant and the place above the wheel.
+- Compare Places carries the relocated chart: each side's Ascendant and
+  Midheaven per place against natal, then every planet's house per place,
+  changed houses bold, angular flagged. Check: Ogden's column equals the
+  natal chart exactly, ascendant and all 26 houses.
