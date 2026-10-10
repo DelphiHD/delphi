@@ -30,6 +30,7 @@ import { locate, getAstro } from "../lib/astro";
 import { ZODIAC } from "../lib/astro-extras";
 import { mapFor, paransFor, HD_BODIES } from "../lib/astrocartography";
 import { GLYPH } from "./astro-wheel";
+import { loadLibraryChunks } from "../lib/hd/chunks-source";
 
 const [, , personName, geoDir] = process.argv;
 if (!personName || !geoDir) throw new Error("usage: astrocartography-preview.ts <person> <geo-dir>");
@@ -177,6 +178,16 @@ function cities(file: string) {
     for (const b of HD_BODIES) if (!where[side][b]) throw new Error(`no ${side} position for ${b}`);
   }
 
+  // Her own words for each planet, the Delphi Basic the chart's planet hovers
+  // read. Same column names as delphiText in energy-flow-diagram.ts.
+  const basics: Record<string, string> = {};
+  for (const c of await loadLibraryChunks({ preferLocal: process.env.HD_LIBRARY_LOCAL === "1" })) {
+    if (c.source_kind !== "planet") continue;
+    const m = (c.metadata ?? {}) as Record<string, string>;
+    const t = ["Delphi Basic", "Delphi Basic Description", "Delphi Free Chart"].map((f) => (m[f] ?? "").toString().trim()).find(Boolean);
+    if (t) basics[(c.title ?? "").trim()] = t;
+  }
+
   // Lines and parans go to the page as longitude and latitude; it draws them
   // for whatever part of the world is in view.
   const LN: { side: string; body: string; angle: string; runs: number[][][] }[] = [];
@@ -269,6 +280,29 @@ h1{margin:0;font-weight:600;font-size:22px;color:var(--purple)}
 .stage{position:relative}
 #here{position:absolute;top:8px;right:24px;width:330px;max-height:calc(100% - 24px);overflow:auto;background:#fff;border:1px solid #d9d0e0;border-radius:12px;box-shadow:0 10px 30px rgba(47,42,51,.16);padding:14px 16px;font-size:12px;display:none;box-sizing:border-box}
 #here.open{display:block}
+.hit{fill:none;stroke:transparent;stroke-width:12;pointer-events:stroke;cursor:pointer}
+.ln.pinned{stroke:var(--gold);stroke-width:3.2}.lbl.pinned{fill:var(--gold)}
+.card{border:1px solid #ecd9a4;background:#fffbf0;border-radius:10px;padding:10px 12px;margin:0 0 10px;position:relative}
+.card b{display:block;font-size:13px;margin-right:18px}.card .deg{color:var(--muted);font-size:11px;margin:2px 0 6px}
+.card p{margin:6px 0 0;line-height:1.5;color:#3d3644}
+.card .un{position:absolute;top:6px;right:8px;border:0;background:none;color:var(--muted);font-size:15px;cursor:pointer}
+.save{font:inherit;font-size:11px;font-weight:600;border:1px solid var(--gold);background:#fff;color:#8a6a14;border-radius:999px;padding:4px 10px;cursor:pointer;margin-top:8px}
+.save.done{background:var(--gold);color:#fff;cursor:default}
+.spin{fill:#fff;stroke:var(--gold);stroke-width:2.2}.spin-l{font-size:10px;font-weight:600;fill:#8a6a14;paint-order:stroke;stroke:#fff;stroke-width:3px}
+#cmpBtn{display:none}#cmpBtn.has{display:inline-block}
+#compare{position:absolute;left:24px;right:24px;bottom:16px;max-height:55%;overflow:auto;background:#fff;border:1px solid #d9d0e0;border-radius:12px;box-shadow:0 10px 30px rgba(47,42,51,.18);padding:12px 16px;display:none;font-size:12px}
+#compare.open{display:block}
+#compare h2{margin:0 0 8px;font-size:14px;color:var(--purple)}
+#compare .x{position:absolute;top:8px;right:12px;border:0;background:none;font-size:18px;color:var(--muted);cursor:pointer}
+#compare table{border-collapse:collapse;width:100%}
+#compare th,#compare td{padding:5px 8px;border-bottom:1px solid #f0eaf3;text-align:left;white-space:nowrap}
+#compare th{font-size:12px;font-weight:600;position:sticky;top:-12px;background:#fff}
+#compare th .rm{border:0;background:none;color:var(--muted);cursor:pointer;font-size:13px}
+#compare th .pl{cursor:pointer;color:var(--purple)}
+#compare td.mi{color:var(--muted);font-variant-numeric:tabular-nums}
+#compare tr.sum td{font-weight:600}
+#compare tr[data-side]:hover td{background:#faf3df}
+#compare .sec td{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding-top:12px}
 #here h2{margin:0 26px 2px 0;font-size:15px;font-weight:600;color:var(--purple)}
 #here .co{color:var(--muted);font-size:11px}
 #here h3{margin:14px 0 6px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
@@ -312,7 +346,7 @@ h1{margin:0;font-weight:600;font-size:22px;color:var(--purple)}
 <header><h1>${personName}</h1>
 <div class="sub">${row.birth_place} · ${row.birth_date} ${String(row.birth_time).slice(0, 5)} · design ${sides.design.toISOString().slice(0, 16).replace("T", " ")} UTC</div></header>
 <div class="bar"><span id="side" style="display:flex;gap:4px"><button class="pill on" data-v="both">Both</button><button class="pill" data-v="personality">Personality</button><button class="pill" data-v="design">Design</button></span>
-<span class="gap"></span>${dropdown("lines", "Lines", planetItems)}${dropdown("angles", "Angles", angleItems)}${dropdown("parans", "Parans", planetItems)}<div class="search"><input id="q" placeholder="Search A City" autocomplete="off"><div class="results" id="results"></div></div><div class="zoom"><button data-z="in" title="Zoom In">+</button><button data-z="out" title="Zoom Out">&minus;</button><button data-z="reset">Reset</button></div></div>
+<span class="gap"></span>${dropdown("lines", "Lines", planetItems)}${dropdown("angles", "Angles", angleItems)}${dropdown("parans", "Parans", planetItems)}<button class="pill" id="cmpBtn">Compare Places</button><div class="search"><input id="q" placeholder="Search A City" autocomplete="off"><div class="results" id="results"></div></div><div class="zoom"><button data-z="in" title="Zoom In">+</button><button data-z="out" title="Zoom Out">&minus;</button><button data-z="reset">Reset</button></div></div>
 <div class="stage"><svg viewBox="0 0 ${VW} ${f(VH)}" preserveAspectRatio="xMidYMin meet" id="map">
 <defs><clipPath id="clip"><rect width="${W}" height="${f(H)}"/></clipPath></defs>
 <g transform="translate(${ML},${MT})">
@@ -327,13 +361,14 @@ h1{margin:0;font-weight:600;font-size:22px;color:var(--purple)}
 <g id="rings"></g>
 <g id="parans"></g>
 <g id="lines"></g>
+<g id="hits"></g>
 <circle class="birth" id="birth" r="5"><title>${row.birth_place}</title></circle>
 <g id="pin"></g>
 </g>
 <rect width="${W}" height="${f(H)}" fill="none" stroke="#8d8396" stroke-width="1.5"/>
 </g>
 <g id="labels"></g>
-</svg><div id="here"></div></div>
+</svg><div id="here"></div><div id="compare"></div></div>
 <div id="tip"></div>
 <script>
 const WHERE=${JSON.stringify(where)};
@@ -343,6 +378,7 @@ const GLYPH=${JSON.stringify(Object.fromEntries(HD_BODIES.map((b) => [b, glyph(b
 const LN=${JSON.stringify(LN)};
 const PR=${JSON.stringify(PR)};
 const BIRTH=${JSON.stringify([place.lon, place.lat])};
+const BASIC=${JSON.stringify(basics)};
 const CITIES=${JSON.stringify(cities(join(geoDir, "..", "natural-earth", "ne_50m_populated_places_simple.geojson")))};
 const TOP=${TOP},BOTTOM=${BOTTOM},ORB=1;
 const PERSON=${JSON.stringify(personName)};
@@ -372,14 +408,21 @@ const X=lon=>((lon+180)/360*W)*view.k+view.tx;
 const Y=lat=>((TOP-lat)/(TOP-BOTTOM)*H)*view.k+view.ty;
 // Build every mark once, tagged by identity; drawing only moves them.
 const gl=document.getElementById("lines"),gp=document.getElementById("parans");
-for(const l of LN){l.el=mk("path",{class:"ln "+l.side+" "+l.angle,"data-person":PERSON,"data-side":l.side,"data-body":l.body,"data-angle":l.angle});gl.append(l.el)}
+// Each line also gets a wide invisible twin, so it can be hovered and clicked
+// without hunting for a 2 pixel stroke. The twin carries the same identity.
+const gh=document.getElementById("hits");
+for(const l of LN){const id={"data-person":PERSON,"data-side":l.side,"data-body":l.body,"data-angle":l.angle};
+  l.el=mk("path",{class:"ln "+l.side+" "+l.angle,...id});gl.append(l.el);
+  l.hit=mk("path",{class:"hit",...id});gh.append(l.hit)}
 for(const p of PR){
   p.el=mk("g",{class:"pr "+p.side,"data-person":PERSON,"data-side":p.side,"data-body":p.a,"data-angle":p.angleA,"data-body2":p.b,"data-angle2":p.angleB,"data-lat":p.lat.toFixed(2)});
   p.rect=mk("rect",{x:0,width:W});p.dot=mk("circle",{r:3.5});p.el.append(p.rect,p.dot);gp.append(p.el)}
 function draw(){
   document.getElementById("world").setAttribute("transform","matrix("+view.k+",0,0,"+view.k+","+view.tx+","+view.ty+")");
-  for(const l of LN){if(l.el.classList.contains("off"))continue;
-    l.el.setAttribute("d",l.runs.map(r=>"M"+r.map(p=>X(p[0]).toFixed(1)+","+Y(p[1]).toFixed(1)).join("L")).join(""))}
+  for(const l of LN){l.hit.classList.toggle("off",l.el.classList.contains("off"));if(l.el.classList.contains("off"))continue;
+    const d=l.runs.map(r=>"M"+r.map(p=>X(p[0]).toFixed(1)+","+Y(p[1]).toFixed(1)).join("L")).join("");
+    l.el.setAttribute("d",d);l.hit.setAttribute("d",d);
+    l.el.classList.toggle("pinned",pinned.has(key(l)))}
   for(const p of PR){if(p.el.classList.contains("off"))continue;
     const y0=Y(p.lat+ORB),y1=Y(p.lat-ORB);p.rect.setAttribute("y",y0.toFixed(1));p.rect.setAttribute("height",(y1-y0).toFixed(1));
     p.dot.setAttribute("cx",X(p.lon).toFixed(1));p.dot.setAttribute("cy",Y(p.lat).toFixed(1))}
@@ -467,6 +510,7 @@ function layoutLabels(){
         if(left){an.setAttribute("dx","0");lab.append(an,gl);an.setAttribute("x",xx-19);an.setAttribute("y",MT+p+4);}
         else{lab.append(gl,an);an.setAttribute("dx","3");}
         lead=mk("path",{d:"M"+(left?ML-8:ML+W+8)+","+(MT+p)+"L"+(left?ML:ML+W)+","+(MT+l.pos)});}
+      if(pinned.has(l.side+"|"+l.body+"|"+l.angle))lab.classList.add("pinned");
       lead.setAttribute("class","lead "+l.side);
       g.append(lead,lab);
     });
@@ -486,7 +530,7 @@ function paint(){
   for(const c of document.querySelectorAll(".opt"))c.classList.toggle("on",st[c.dataset.kind].has(c.dataset.chip));
   for(const k in ALL)document.querySelector('[data-dd="'+k+'"] .n').textContent=st[k].size===ALL[k].length?"All":st[k].size?st[k].size:"None";
   draw();
-  if(typeof renderHere==="function")renderHere();
+  if(typeof renderHere==="function"){renderHere();renderCompare()}
 }
 document.getElementById("side").onclick=e=>{const b=e.target.closest(".pill");if(!b)return;
   document.querySelectorAll("#side .pill").forEach(p=>p.classList.toggle("on",p===b));st.side=b.dataset.v;paint()};
@@ -555,6 +599,30 @@ function distTo(l,lat,lon){
   return best;
 }
 let here=null;   // {lat, lon, name, country}
+// Lines clicked to keep them lit, by identity: side, body and angle.
+const pinned=new Set();
+const key=l=>l.side+"|"+l.body+"|"+l.angle;
+const ANGLE_NAME={ASC:"Ascendant",DSC:"Descendant",MC:"Midheaven",IC:"IC"};
+// Saved places stay in this browser for now. In the live chart they belong to
+// the account that saved them.
+const STORE="acg-places|"+PERSON;
+let saved=[];try{saved=JSON.parse(localStorage.getItem(STORE)||"[]")}catch(e){saved=[]}
+function persist(){try{localStorage.setItem(STORE,JSON.stringify(saved))}catch(e){}}
+/** What reaches one place, under the current menus. Shared by the panel and the comparison. */
+function analyze(lat,lon){
+  const sideOk=s=>st.side==="both"||s===st.side;
+  const rows=[],prs=[];
+  for(const l of LN){
+    if(!sideOk(l.side)||!st.lines.has(l.body)||!st.angles.has(l.angle))continue;
+    const mi=distTo(l,lat,lon),g=gradeMi(mi);if(g)rows.push({l,mi,g});
+  }
+  for(const p of PR){
+    if(!sideOk(p.side)||!st.lines.has(p.a)||!st.lines.has(p.b)||!(st.angles.has(p.angleA)||st.angles.has(p.angleB)))continue;
+    const d=Math.abs(p.lat-lat),g=gradeLat(d);if(g)prs.push({p,d,g});
+  }
+  rows.sort((a,b)=>a.mi-b.mi);prs.sort((a,b)=>a.d-b.d);
+  return {rows,prs};
+}
 function nearestCity(lat,lon){let best=null,d=75;for(const c of CITIES){const m=hav(lat,lon,c.lat,c.lon);if(m<d){d=m;best=c}}return best}
 function ringPath(lat,lon,mi){
   const d=mi/R,la=lat*RAD,pts=[];
@@ -566,40 +634,35 @@ function ringPath(lat,lon,mi){
 }
 function drawHere(){
   const r=document.getElementById("rings"),p=document.getElementById("pin");r.replaceChildren();p.replaceChildren();
+  drawSaved();
   if(!here)return;
   r.append(mk("path",{class:"ring",d:ringPath(here.lat,here.lon,700)}),mk("path",{class:"ring inner",d:ringPath(here.lat,here.lon,300)}));
   p.append(mk("circle",{class:"pin",cx:X(here.lon),cy:Y(here.lat),r:6}));
 }
 const fmtLat=v=>Math.abs(v).toFixed(1)+"°"+(v>=0?"N":"S"),fmtLon=v=>Math.abs(v).toFixed(1)+"°"+(v>=0?"E":"W");
 const tag=(side,body,angle)=>'data-side="'+side+'" data-body="'+body+'" data-angle="'+angle+'"';
+const gradePill=g=>'<span class="gr g'+g[1]+'">'+g[2]+'</span>';
+const isSaved=h=>saved.some(s=>Math.abs(s.lat-h.lat)<1e-4&&Math.abs(s.lon-h.lon)<1e-4);
 function renderHere(){
   const box=document.getElementById("here");
-  if(!here){box.classList.remove("open");return}
-  const sideOk=s=>st.side==="both"||s===st.side;
-  const rows=[];
-  for(const l of LN){
-    if(!sideOk(l.side)||!st.lines.has(l.body)||!st.angles.has(l.angle))continue;
-    const mi=distTo(l,here.lat,here.lon),g=gradeMi(mi);if(!g)continue;
-    rows.push({l,mi,g});
-  }
-  rows.sort((a,b)=>a.mi-b.mi);
-  const prs=[];
-  for(const p of PR){
-    if(!sideOk(p.side)||!st.lines.has(p.a)||!st.lines.has(p.b)||!(st.angles.has(p.angleA)||st.angles.has(p.angleB)))continue;
-    const d=Math.abs(p.lat-here.lat),g=gradeLat(d);if(!g)continue;
-    prs.push({p,d,g});
-  }
-  prs.sort((a,b)=>a.d-b.d);
-  const gp=g=>'<span class="gr g'+g[1]+'">'+g[2]+'</span>';
-  box.innerHTML='<button class="x" title="Close">&times;</button>'+
+  if(!here&&!pinned.size){box.classList.remove("open");return}
+  // A pinned line: her Delphi Basic for the planet, and the angle by name.
+  const cards=[...pinned].map(k=>{const [side,body,angle]=k.split("|");
+    return '<div class="card" '+tag(side,body,angle)+'><button class="un" data-un="'+k+'" title="Unpin">&times;</button>'+
+      '<b>'+SIDE[side]+" "+body+" · "+ANGLE_NAME[angle]+'</b><div class="deg">'+body+" in "+WHERE[side][body]+' <span class="ap">'+angle+'</span></div>'+
+      (BASIC[body]?'<p>'+BASIC[body]+'</p>':'')+'</div>'}).join("");
+  if(!here){box.innerHTML='<button class="x" title="Close">&times;</button>'+cards;box.classList.add("open");return}
+  const {rows,prs}=analyze(here.lat,here.lon);
+  box.innerHTML='<button class="x" title="Close">&times;</button>'+cards+
     '<h2>'+(here.name||fmtLat(here.lat)+", "+fmtLon(here.lon))+'</h2>'+
     '<div class="co">'+(here.name?(here.country?here.country+" · ":"")+fmtLat(here.lat)+", "+fmtLon(here.lon):"")+'</div>'+
+    (isSaved(here)?'<button class="save done">Saved</button>':'<button class="save" data-save="1">Save Place</button>')+
     '<h3>Lines</h3>'+(rows.length?rows.map(r=>'<div class="hr" '+tag(r.l.side,r.l.body,r.l.angle)+'>'+
       '<span class="gl '+r.l.side+'">'+GLYPH[r.l.body]+'</span><span class="nm">'+SIDE[r.l.side]+" "+r.l.body+' <span class="ap">'+r.l.angle+'</span></span>'+
-      '<span class="mi">'+Math.round(r.mi)+' mi</span>'+gp(r.g)+'</div>').join(""):'<div class="none">No lines within 700 miles.</div>')+
+      '<span class="mi">'+Math.round(r.mi)+' mi</span>'+gradePill(r.g)+'</div>').join(""):'<div class="none">No lines within 700 miles.</div>')+
     '<h3>Parans</h3>'+(prs.length?prs.map(r=>'<div class="hr" '+tag(r.p.side,r.p.a,r.p.angleA)+' data-body2="'+r.p.b+'" data-angle2="'+r.p.angleB+'">'+
       '<span class="nm">'+SIDE[r.p.side]+" "+r.p.a+' <span class="ap">'+r.p.angleA+'</span> '+r.p.b+' <span class="ap">'+r.p.angleB+'</span></span>'+
-      '<span class="mi">'+r.d.toFixed(1)+'°</span>'+gp(r.g)+'</div>').join(""):'<div class="none">No parans within 1° of this latitude.</div>');
+      '<span class="mi">'+r.d.toFixed(1)+'°</span>'+gradePill(r.g)+'</div>').join(""):'<div class="none">No parans within 1° of this latitude.</div>');
   box.classList.add("open");
 }
 function openHere(lat,lon,city){
@@ -608,7 +671,54 @@ function openHere(lat,lon,city){
   if(city){here.lat=city.lat;here.lon=city.lon}
   renderHere();redraw();
 }
-document.getElementById("here").addEventListener("click",e=>{if(e.target.closest(".x")){here=null;renderHere();redraw()}});
+document.getElementById("here").addEventListener("click",e=>{
+  if(e.target.closest(".x")){here=null;pinned.clear();renderHere();redraw();return}
+  const un=e.target.closest("[data-un]");if(un){pinned.delete(un.dataset.un);renderHere();redraw();return}
+  if(e.target.closest("[data-save]")&&here){
+    saved.push({n:here.name?here.name.replace(/^Near /,"Near "):fmtLat(here.lat)+", "+fmtLon(here.lon),c:here.country||"",lat:here.lat,lon:here.lon});
+    persist();renderHere();renderCompare();redraw()}
+});
+// ---- Saved places, compared ---------------------------------------------
+function drawSaved(){
+  const g=document.getElementById("pin");
+  for(const s of saved){const x=X(s.lon),y=Y(s.lat);if(x<0||x>W||y<0||y>H)continue;
+    g.append(mk("circle",{class:"spin",cx:x,cy:y,r:5}));
+    const t=mk("text",{class:"spin-l",x:x+8,y:y-6});t.textContent=s.n.replace(/^Near /,"");g.append(t)}
+}
+let comparing=false;
+function renderCompare(){
+  const b=document.getElementById("cmpBtn");b.classList.toggle("has",saved.length>0);b.textContent="Compare Places ("+saved.length+")";
+  const box=document.getElementById("compare");
+  if(!comparing||!saved.length){box.classList.remove("open");return}
+  const A=saved.map(s=>analyze(s.lat,s.lon));
+  // Every line or paran that reaches any saved place, best first.
+  const lines=new Map(),pars=new Map();
+  A.forEach((a,i)=>{
+    for(const r of a.rows){const k=key(r.l);if(!lines.has(k))lines.set(k,{l:r.l,at:[],best:9e9});const e=lines.get(k);e.at[i]=r;e.best=Math.min(e.best,r.mi)}
+    for(const r of a.prs){const p=r.p,k=[p.side,p.a,p.angleA,p.b,p.angleB].join("|");if(!pars.has(k))pars.set(k,{p,at:[],best:9});const e=pars.get(k);e.at[i]=r;e.best=Math.min(e.best,r.d)}
+  });
+  const cell=r=>r?'<td class="mi">'+(r.mi!==undefined?Math.round(r.mi)+" mi":r.d.toFixed(1)+"°")+" "+gradePill(r.g)+"</td>":"<td></td>";
+  const count=(a,n)=>a.rows.filter(r=>r.g[1]===n).length+a.prs.filter(r=>r.g[1]===n).length;
+  box.innerHTML='<button class="x" title="Close">&times;</button><h2>Compare Places</h2><table>'+
+    '<tr><th></th>'+saved.map((s,i)=>'<th><span class="pl" data-go="'+i+'">'+s.n+'</span> <button class="rm" data-rm="'+i+'" title="Remove">&times;</button></th>').join("")+'</tr>'+
+    '<tr class="sum"><td>Strong</td>'+A.map(a=>'<td>'+count(a,3)+'</td>').join("")+'</tr>'+
+    '<tr class="sum"><td>Moderate</td>'+A.map(a=>'<td>'+count(a,2)+'</td>').join("")+'</tr>'+
+    '<tr class="sum"><td>Mild</td>'+A.map(a=>'<td>'+count(a,1)+'</td>').join("")+'</tr>'+
+    '<tr class="sec"><td colspan="'+(saved.length+1)+'">Lines</td></tr>'+
+    [...lines.values()].sort((a,b)=>a.best-b.best).map(e=>'<tr '+tag(e.l.side,e.l.body,e.l.angle)+'><td><span class="gl '+e.l.side+'" style="color:'+(e.l.side==="design"?"var(--design)":"var(--ink)")+'">'+GLYPH[e.l.body]+'</span> '+SIDE[e.l.side]+" "+e.l.body+' <span class="ap">'+e.l.angle+'</span></td>'+saved.map((s,i)=>cell(e.at[i])).join("")+'</tr>').join("")+
+    '<tr class="sec"><td colspan="'+(saved.length+1)+'">Parans</td></tr>'+
+    [...pars.values()].sort((a,b)=>a.best-b.best).map(e=>{const p=e.p;return '<tr '+tag(p.side,p.a,p.angleA)+' data-body2="'+p.b+'" data-angle2="'+p.angleB+'"><td>'+SIDE[p.side]+" "+p.a+' <span class="ap">'+p.angleA+'</span> '+p.b+' <span class="ap">'+p.angleB+'</span></td>'+saved.map((s,i)=>cell(e.at[i])).join("")+'</tr>'}).join("")+
+    '</table>';
+  box.classList.add("open");
+}
+document.getElementById("cmpBtn").onclick=()=>{comparing=!comparing;renderCompare()};
+document.getElementById("compare").addEventListener("click",e=>{
+  if(e.target.closest(".x")){comparing=false;return renderCompare()}
+  const rm=e.target.closest("[data-rm]");if(rm){saved.splice(+rm.dataset.rm,1);persist();renderCompare();renderHere();return redraw()}
+  const go=e.target.closest("[data-go]");if(go){const s=saved[+go.dataset.go];openHere(s.lat,s.lon,{n:s.n,c:s.c,lat:s.lat,lon:s.lon})}
+});
+document.getElementById("compare").addEventListener("mouseover",e=>{const r=e.target.closest("tr[data-side]");if(r)hot(r.dataset,true)});
+document.getElementById("compare").addEventListener("mouseout",e=>{const r=e.target.closest("tr[data-side]");if(r)hot(r.dataset,false)});
 document.getElementById("here").addEventListener("mouseover",e=>{const r=e.target.closest(".hr");if(r)hot(r.dataset,true)});
 document.getElementById("here").addEventListener("mouseout",e=>{const r=e.target.closest(".hr");if(r)hot(r.dataset,false)});
 
@@ -637,11 +747,16 @@ let drag=null;
 // A press that barely moves is a click: it asks what is here. One that moves
 // is a drag, which pans once zoomed in.
 let press=null;
-svg.addEventListener("pointerdown",e=>{if(e.button!==0)return;press={x:e.clientX,y:e.clientY,moved:false};
+svg.addEventListener("pointerdown",e=>{if(e.button!==0)return;
+  // What was pressed is read now: once the pointer is captured for a drag,
+  // later events all report the map itself.
+  press={x:e.clientX,y:e.clientY,moved:false,line:e.target.closest("#hits [data-side], #labels [data-side]")};
   if(view.k>1){drag={x:e.clientX,y:e.clientY,tx:view.tx,ty:view.ty};svg.setPointerCapture(e.pointerId)}});
 svg.addEventListener("pointermove",e=>{if(press&&Math.hypot(e.clientX-press.x,e.clientY-press.y)>4)press.moved=true;
   if(!drag||!press||!press.moved)return;svg.classList.add("grabbing");const s=svg.getScreenCTM().a;view.tx=drag.tx+(e.clientX-drag.x)/s;view.ty=drag.ty+(e.clientY-drag.y)/s;clampView();redraw()});
 svg.addEventListener("pointerup",e=>{
+  const onLine=press&&!press.moved&&press.line;
+  if(onLine){const d=onLine.dataset,k=d.side+"|"+d.body+"|"+d.angle;pinned.has(k)?pinned.delete(k):pinned.add(k);renderHere();redraw();press=null;drag=null;return}
   if(press&&!press.moved){const [fx,fy]=frameAt(e.clientX,e.clientY);
     if(fx>=0&&fx<=W&&fy>=0&&fy<=H){const lon=((fx-view.tx)/view.k)/W*360-180,lat=TOP-((fy-view.ty)/view.k)/H*(TOP-BOTTOM);openHere(lat,lon)}}
   press=null;drag=null;svg.classList.remove("grabbing")});

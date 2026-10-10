@@ -176,3 +176,15 @@ relocated chart. All five are wanted eventually; 1 and 2 are built.
   ("Near Salt Lake City"); the provider cannot reverse-geocode.
 - When this moves into the chart, /api/places already exists on the site; it
   needs a sibling that returns coordinates for a chosen place.
+- Grades confirmed by Kaycee as proposed (Strong, Moderate, Mild).
+- **Pinned lines**: clicking a line or its edge glyph pins it gold; the panel
+  shows a card per pinned line with the angle by name and her Delphi Basic
+  for the planet, read from the synced library the same way the chart's
+  planet hovers are. Angle text is just the name for now (her call); her own
+  words per angle can go in when she writes them. Each line has a 12 px
+  invisible twin carrying the same identity, so it can be hovered and clicked.
+- **Saved places**: Save Place in the panel; saved places show as gold rings
+  on the map and Compare Places opens a table, one column per place: counts
+  of Strong, Moderate and Mild, then every line and paran that reaches any of
+  them, best first. Kept in the browser for now; in the live chart they
+  belong to the account.
