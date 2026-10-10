@@ -235,10 +235,18 @@ function cities(file: string) {
     { key: "MC", icon: swatch("MC"), name: "Midheaven" },
     { key: "IC", icon: swatch("IC"), name: "IC" },
   ];
-  const dropdown = (kind: string, title: string, items: Item[]) =>
+  const opt = (kind: string, i: Item) => `<div class="opt" data-kind="${kind}" data-chip="${i.key}"><span class="radio"></span>` +
+    `<span class="gl">${i.icon}</span>${i.name}</div>`;
+  // Chiron and Lilith have no lines here (no right ascension for them in our
+  // ephemeris) but they are on the relocated wheels and can share a gate with
+  // an angle, so they get switches of their own. Kaycee, 10 October: "we need
+  // the option to toggle off/on chiron and lilith, default to off", as the live
+  // charts open without them.
+  const extraItems = `<div class="sep"></div>` + opt("extras", { key: "Chiron", icon: "⚷", name: "Chiron" }) +
+    opt("extras", { key: "Lilith", icon: "⚸", name: "Lilith" });
+  const dropdown = (kind: string, title: string, items: Item[], extra = "") =>
     `<div class="dd" data-dd="${kind}"><button>${title}<span class="n"></span></button><div class="menu">` +
-    items.map((i) => `<div class="opt" data-kind="${kind}" data-chip="${i.key}"><span class="radio"></span>` +
-      `<span class="gl">${i.icon}</span>${i.name}</div>`).join("") +
+    items.map((i) => opt(kind, i)).join("") + extra +
     `<div class="foot"><button class="pill" data-all="${kind}">All</button><button class="pill" data-none="${kind}">None</button></div></div></div>`;
 
   const VW = ML + W + MR, VH = MT + H + MB;
@@ -291,7 +299,7 @@ h1{margin:0;font-weight:600;font-size:22px;color:var(--purple)}
 .ring.inner{fill-opacity:.1;stroke-dasharray:none}
 #pin{pointer-events:none}.pin{fill:var(--gold);stroke:#fff;stroke-width:2}
 .stage{position:relative}
-#here{position:absolute;top:8px;right:24px;width:330px;max-height:calc(100% - 24px);overflow:auto;background:#fff;border:1px solid #d9d0e0;border-radius:12px;box-shadow:0 10px 30px rgba(47,42,51,.16);padding:14px 16px;font-size:12px;display:none;box-sizing:border-box}
+#here{position:absolute;top:8px;right:24px;width:400px;max-height:calc(100% - 24px);overflow:auto;background:#fff;border:1px solid #d9d0e0;border-radius:12px;box-shadow:0 10px 30px rgba(47,42,51,.16);padding:14px 16px;font-size:12px;display:none;box-sizing:border-box}
 #here.open{display:block}
 .hit{fill:none;stroke:transparent;stroke-width:12;pointer-events:stroke;cursor:pointer}
 .ln.pinned{stroke:var(--gold);stroke-width:3.2}.lbl.pinned{fill:var(--gold)}
@@ -323,7 +331,18 @@ h1{margin:0;font-weight:600;font-size:22px;color:var(--purple)}
 .rel .ang{display:flex;justify-content:space-between;padding:3px 6px}
 .rel .ang span{color:var(--muted)}
 .rel .was{color:var(--muted)}
-.rel .ang .av{color:var(--ink)}.rel .ang .ap{color:#fff}.rel .ang.own span{color:#8a6a14;font-weight:600}
+.rt{width:100%;border-collapse:collapse;margin:8px 0 2px;font-size:11.5px}
+.rt th{text-align:left;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:3px 3px;border-bottom:1px solid #eee7f1}
+.rt th:first-child{color:var(--ink)}
+.rt td{padding:4px 3px;border-bottom:1px solid #f5f1f7;white-space:nowrap}
+.rt td.g{font-variant-numeric:tabular-nums}
+.rt .n{color:var(--muted)}
+.rt .own,.mine .own{color:#9c7415;font-weight:600}
+.rt td.own::after{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--gold);margin-left:4px;vertical-align:middle}
+.rt.ht td:first-child{width:60%}
+.rt tr.hr{display:table-row}
+.mine{margin:8px 0 4px;padding:8px 10px;background:#fffbf0;border:1px solid #ecd9a4;border-radius:8px;font-size:11.5px;line-height:1.6}
+.mine b{display:block;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#8a6a14;margin-bottom:2px}.rel .ang.own span{color:#8a6a14;font-weight:600}
 .reltog{display:block;width:100%;text-align:left;font:inherit;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:#faf8fb;border:1px solid #eee7f1;border-radius:8px;padding:7px 10px;margin:12px 0 4px;cursor:pointer}
 .reltog::before{content:"▸";display:inline-block;margin-right:6px;transition:transform .15s}
 .reltog.open::before{transform:rotate(90deg)}
@@ -343,6 +362,7 @@ h1{margin:0;font-weight:600;font-size:22px;color:var(--purple)}
 #compare th{font-size:12px;font-weight:600;position:sticky;top:-12px;background:#fff}
 #compare th .rm{border:0;background:none;color:var(--muted);cursor:pointer;font-size:13px}
 #compare th .pl{cursor:pointer;color:var(--purple)}
+#compare .own{color:#9c7415;font-weight:600}
 #compare .was{color:var(--muted);font-weight:400;font-size:11px}
 #compare td.mi{color:var(--muted);font-variant-numeric:tabular-nums}
 #compare tr.sum td{font-weight:600}
@@ -394,12 +414,14 @@ h1{margin:0;font-weight:600;font-size:22px;color:var(--purple)}
 .radio{width:14px;height:14px;border-radius:50%;border:1.5px solid #b7aec0;box-sizing:border-box;flex:none}
 .opt.on .radio{border:4px solid var(--purple)}
 .opt .gl{min-width:18px;text-align:center;font-size:15px;display:flex;justify-content:center}
+.menu .sep{border-top:1px solid #eee7f1;margin:6px 0}
+body:not(.x-Chiron) #wheel [data-aplanet=Chiron],body:not(.x-Lilith) #wheel [data-aplanet=Mean_Lilith]{display:none}
 .menu .foot{display:flex;gap:6px;border-top:1px solid #eee7f1;margin-top:6px;padding-top:8px}
 </style></head><body>
 <header><h1>${personName}</h1>
 <div class="sub">${row.birth_place} · ${row.birth_date} ${String(row.birth_time).slice(0, 5)} · design ${sides.design.toISOString().slice(0, 16).replace("T", " ")} UTC</div></header>
 <div class="bar"><span id="side" style="display:flex;gap:4px"><button class="pill on" data-v="both">Both</button><button class="pill" data-v="personality">Personality</button><button class="pill" data-v="design">Design</button></span>
-<span class="gap"></span>${dropdown("lines", "Lines", planetItems)}${dropdown("angles", "Angles", angleItems)}${dropdown("parans", "Parans", planetItems)}<button class="pill" id="findBtn">Find My Places</button><button class="pill" id="cmpBtn">Compare Places</button><div class="search"><input id="q" placeholder="Search A City" autocomplete="off"><div class="results" id="results"></div></div><div class="zoom"><button data-z="in" title="Zoom In">+</button><button data-z="out" title="Zoom Out">&minus;</button><button data-z="reset">Reset</button></div><button class="pill" id="snapMap">Save Map Image</button></div>
+<span class="gap"></span>${dropdown("lines", "Lines", planetItems, extraItems)}${dropdown("angles", "Angles", angleItems)}${dropdown("parans", "Parans", planetItems)}<button class="pill" id="findBtn">Find My Places</button><button class="pill" id="cmpBtn">Compare Places</button><div class="search"><input id="q" placeholder="Search A City" autocomplete="off"><div class="results" id="results"></div></div><div class="zoom"><button data-z="in" title="Zoom In">+</button><button data-z="out" title="Zoom Out">&minus;</button><button data-z="reset">Reset</button></div><button class="pill" id="snapMap">Save Map Image</button></div>
 <div class="stage"><svg viewBox="0 0 ${VW} ${f(VH)}" preserveAspectRatio="xMidYMin meet" id="map">
 <defs><clipPath id="clip"><rect width="${W}" height="${f(H)}"/></clipPath></defs>
 <g transform="translate(${ML},${MT})">
@@ -458,7 +480,12 @@ const ALL={lines:BODIES,parans:BODIES,angles:ANGLES};
 // Earth and both Nodes start off: Kaycee, 10 October. They are still one
 // click away, and All includes them.
 const START_OFF=["Earth","North Node","South Node"];
-const st={side:"both",lines:new Set(BODIES.filter(b=>!START_OFF.includes(b))),angles:new Set(ANGLES),parans:new Set()};
+const st={side:"both",lines:new Set(BODIES.filter(b=>!START_OFF.includes(b))),angles:new Set(ANGLES),parans:new Set(),extras:new Set()};
+const EXTRAS=["Chiron","Lilith"];
+GLYPH.Chiron="⚷";GLYPH.Lilith="⚸";
+// The bodies the relocated chart speaks about: the menu's planets, and Chiron
+// and Lilith when they are switched on.
+const chartBodies=()=>[...BODIES.filter(b=>st.lines.has(b)),...EXTRAS.filter(b=>st.extras.has(b))];
 // One resolver answers "what is this?", read from the element, never its position.
 function describe(el){
   const d=el.dataset, side=SIDE[d.side];
@@ -597,6 +624,7 @@ function paint(){
   for(const el of document.querySelectorAll("#parans [data-side]"))
     el.classList.toggle("off",!(sideOk(el.dataset)&&pairOk(el.dataset)&&(st.angles.has(el.dataset.angle)||st.angles.has(el.dataset.angle2))));
   for(const c of document.querySelectorAll(".opt[data-kind]"))c.classList.toggle("on",st[c.dataset.kind].has(c.dataset.chip));
+  for(const x of EXTRAS)document.body.classList.toggle("x-"+x,st.extras.has(x));
   for(const k in ALL)document.querySelector('[data-dd="'+k+'"] .n').textContent=st[k].size===ALL[k].length?"All":st[k].size?st[k].size:"None";
   draw();
   if(typeof renderHere==="function"){renderHere();renderCompare();if(finding)renderFind()}
@@ -755,9 +783,13 @@ function fetchReloc(pl,wheels,done){
 }
 const fmtDeg=v=>{let d=Math.floor(v),m=Math.round((v-d)*60);if(m===60){d++;m=0}return d+"°"+(m<10?"0":"")+m+"'"};
 // Whose gate a relocated angle lands in, from this chart's own activations.
+// Whose gate a relocated angle lands in, from this chart's own activations,
+// among the bodies in view.
 function ownGate(g){
-  const who=[];for(const sd of ["personality","design"])for(const [pl,gl] of Object.entries(GATE_OF[sd]))if(+gl.split(".")[0]===g)who.push(SIDE[sd]+" "+pl+" "+gl);
-  return who.length?'<div class="ang own"><span>Your gate: '+who.join(", ")+'</span></div>':"";
+  const on=new Set(chartBodies()),who=[];
+  for(const sd of ["personality","design"])for(const [pl,gl] of Object.entries(GATE_OF[sd]))
+    if(on.has(pl)&&+gl.split(".")[0]===g)who.push(SIDE[sd]+" "+pl+" "+gl);
+  return who;
 }
 function relocHtml(){
   if(!live)return"";
@@ -769,16 +801,26 @@ function relocHtml(){
   const sides=st.side==="both"?["personality","design"]:[st.side];
   const ANGULAR=new Set([1,4,7,10]);
   let h=head+'<div class="rel"><button class="wheelbtn" data-wheel="1">View Chart</button>';
-  for(const sd of sides)for(const a of ["ASC","DSC","MC","IC"]){const R=r[sd].angles[a],N=NATAL[sd].angles[a];
-    h+='<div class="ang"><b>'+SIDE[sd]+" "+ANGLE_NAME[a]+'</b><span class="av">'+R.sign+" "+fmtDeg(R.deg)+' <span class="ap">Gate '+R.gate+"."+R.line+'</span></span></div>'+
-       ownGate(R.gate)+
-       '<div class="ang"><span>was '+N.text+" · Gate "+N.gate+"."+N.line+'</span></div>'}
+  // Angles: here and natal side by side, each with its gate as plain text.
+  // A gate this chart carries is gold, and the line beneath says whose.
+  const mine=[];
+  for(const sd of sides){
+    h+='<table class="rt"><tr><th>'+SIDE[sd]+'</th><th>Here</th><th>Gate</th><th class="n">Natal</th><th class="n">Gate</th></tr>';
+    for(const a of ["ASC","DSC","MC","IC"]){const R=r[sd].angles[a],N=NATAL[sd].angles[a],who=ownGate(R.gate);
+      if(who.length)mine.push({g:R.gate+"."+R.line,at:SIDE[sd]+" "+ANGLE_NAME[a],who});
+      h+='<tr><td>'+ANGLE_NAME[a]+'</td><td>'+R.sign+" "+fmtDeg(R.deg)+'</td><td class="g'+(who.length?" own":"")+'">'+R.gate+"."+R.line+'</td>'+
+        '<td class="n">'+N.text+'</td><td class="n g">'+N.gate+"."+N.line+'</td></tr>'}
+    h+='</table>';
+  }
+  if(mine.length)h+='<div class="mine"><b>In Your Chart</b>'+mine.map(m=>'<div><span class="own">'+m.g+'</span> '+m.at+' · '+m.who.join(", ")+'</div>').join("")+'</div>';
+  // Houses: only the bodies that move, natal to here; an angular house in gold.
   const moved=[];
-  for(const sd of sides)for(const b of BODIES){if(!st.lines.has(b))continue;
+  for(const sd of sides)for(const b of chartBodies()){
     const a=NATAL[sd].house[b],z=r[sd].house[b];if(a&&z&&a!==z)moved.push({sd,b,a,z})}
-  h+='<h3>Planets Changing House</h3>'+(moved.length?moved.map(m=>'<div class="hr" '+tag(m.sd,m.b,"")+'>'+
-    '<span class="gl '+m.sd+'">'+GLYPH[m.b]+'</span><span class="nm">'+SIDE[m.sd]+" "+m.b+'</span>'+
-    '<span class="was">'+ord(m.a)+' →</span> <b>'+ord(m.z)+'</b>'+(ANGULAR.has(m.z)?' <span class="gr g3">Angular</span>':'')+'</div>').join(""):'<div class="none">No planet changes house here.</div>');
+  h+='<h3>Planets Changing House</h3>'+(moved.length?'<table class="rt ht"><tr><th></th><th>Natal</th><th>Here</th></tr>'+moved.map(m=>
+    '<tr class="hr" '+tag(m.sd,m.b,"")+'><td><span class="gl '+m.sd+'">'+GLYPH[m.b]+'</span> '+SIDE[m.sd]+" "+m.b+'</td>'+
+    '<td class="n">'+ord(m.a)+'</td><td'+(ANGULAR.has(m.z)?' class="own" title="Angular house"':'')+'>'+ord(m.z)+'</td></tr>').join("")+'</table>'
+    :'<div class="none">No planet changes house here.</div>');
   return h+'</div>';
 }
 const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -1038,11 +1080,12 @@ function relocRows(){
   const cellOf=f=>R.map(r=>r==="loading"||!r?'<td class="mi">…</td>':r==="failed"?'<td class="mi"></td>':'<td>'+f(r)+'</td>').join("");
   let h='<tr class="sec"><td colspan="'+(saved.length+1)+'">Relocated Chart</td></tr>';
   for(const sd of sides)for(const a of ["ASC","DSC","MC","IC"]){const N=NATAL[sd].angles[a];
-    h+='<tr><td>'+SIDE[sd]+" "+ANGLE_NAME[a]+' <span class="was">was '+N.text+" · Gate "+N.gate+"."+N.line+'</span></td>'+
-      cellOf(r=>{const R=r[sd].angles[a];return R.sign+" "+fmtDeg(R.deg)+' <span class="ap">Gate '+R.gate+"."+R.line+'</span>'})+'</tr>'}
-  for(const sd of sides)for(const bd of BODIES){if(!st.lines.has(bd))continue;const n=NATAL[sd].house[bd];
+    h+='<tr><td>'+SIDE[sd]+" "+ANGLE_NAME[a]+' <span class="was">natal '+N.text+" · "+N.gate+"."+N.line+'</span></td>'+
+      cellOf(r=>{const R=r[sd].angles[a],who=ownGate(R.gate);
+        return R.sign+" "+fmtDeg(R.deg)+' <span class="'+(who.length?"own":"was")+'"'+(who.length?' title="'+who.join(", ")+'"':"")+'>'+R.gate+"."+R.line+'</span>'})+'</tr>'}
+  for(const sd of sides)for(const bd of chartBodies()){const n=NATAL[sd].house[bd];
     h+='<tr><td><span style="color:'+(sd==="design"?"var(--design)":"var(--ink)")+'">'+GLYPH[bd]+'</span> '+SIDE[sd]+" "+bd+' <span class="was">natal '+ord(n)+'</span></td>'+
-      cellOf(r=>{const z=r[sd].house[bd];return(z===n?'<span class="was">'+ord(z)+'</span>':'<b>'+ord(z)+'</b>')+(ANGULAR.has(z)?' <span class="gr g3">Angular</span>':'')})+'</tr>'}
+      cellOf(r=>{const z=r[sd].house[bd];return'<span class="'+(ANGULAR.has(z)?"own":z===n?"was":"")+'"'+(ANGULAR.has(z)?' title="Angular house"':'')+'>'+ord(z)+'</span>'})+'</tr>'}
   return h;
 }
 document.getElementById("cmpBtn").onclick=()=>{comparing=!comparing;renderCompare()};

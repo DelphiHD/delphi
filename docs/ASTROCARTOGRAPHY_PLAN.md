@@ -264,3 +264,12 @@ planet is marked good or bad anywhere; the person picks.
   gate" naming any of this chart's own activations in that gate. In the
   panel, in Compare Places, and on the relocated wheel's angle hovers.
   Lisbon: Personality MC Gate 12.2, the gate of her Personality Sun 12.4.
+- Kaycee found the gate pills messy (10 October). The relocated section is now
+  two plain tables: angles (Here, Gate, Natal, Gate) per side, and planets
+  changing house (Natal, Here). A gate the chart carries is gold with a dot,
+  explained once in an "In Your Chart" box (gate, angle, whose); an angular
+  house is gold with a dot. No pills. Compare Places follows the same rule.
+- **Chiron and Lilith** have their own switches at the foot of the Lines menu,
+  off to start, as the live charts open without them. They have no map lines
+  (our ephemeris has no right ascension for them); they control the relocated
+  wheels, the house table and the gate matches.
