@@ -277,3 +277,47 @@ planet is marked good or bad anywhere; the person picks.
   Horizons, Lilith from the provider's longitude on the mean lunar orbit; see
   DECISIONS.md for why and the checks. Their switches now draw lines, glyphs
   and parans too, and add them to Find My Places.
+
+## Going live: the plan for Kaycee's decision (10 October)
+
+Mapped from the live builder (`scripts/energy-flow-diagram.ts`), the serving
+route (`app/c/[token]/route.ts`) and `republish-all.ts`. Nothing below is built
+yet; each structural item waits for her call.
+
+**What changes, and where**
+
+1. **A fifth view in the chart's view dock**, beside Bodygraph, Circuits, The
+   Wheel and Astrology. Touches the dock markup, `applyView`, the view CSS
+   opt-outs, Save Image and Copy Chart Data in the builder. Offered only when
+   the birth time is exact (`DATA.client.time.exact`, which today counts
+   "document" and "told").
+2. **Map geometry as one shared file, not baked into each chart.** Charts are
+   already 3.0 to 3.2 MB and are streamed through a Vercel function, whose
+   response limit is about 4.5 MB. Coastline, borders and cities (~1.3 MB raw,
+   far less compressed) would go in `public/` and be fetched once, cached, when
+   the view first opens. The chart's own lines and parans (~150 KB) are baked
+   at build time like everything else on the page.
+3. **Chiron from NASA Horizons at build time.** Serverless functions cannot keep
+   a disk cache, so the chart build asks Horizons once per publish (two calls:
+   birth and design). Optionally stored on the chart row so a republish does
+   not ask again.
+4. **Two new API routes**, token-authenticated like `/api/transit-wheel`:
+   `/api/place` (coordinates for a place chosen from `/api/places`) and
+   `/api/relocate` (the relocated chart and its wheels).
+5. **Saved places**: per browser first (as in the preview), per account later
+   with the client portal. Per account needs a table and RLS migration.
+6. **Client copy**: every new sentence goes through `copy-check` and her
+   approval; the new module is added to its sources.
+7. **Checks before done**: `tooltip-sweep.js` extended to the map, run in both
+   sides; Save Image of the map; a test publish of her chart and the sandbox
+   charts on the branch preview.
+8. **Rollout**: existing links get the view only on a republish of all charts,
+   which needs her explicit say-so.
+
+**Known conflicts to settle**
+
+- `docs/ARCHITECTURE.md` says "13 traditional bodies only, never
+  Chiron/Lilith"; the live charts already offer Chiron and Lilith, off by
+  default, and she asked for the same here. The doc is out of date (it
+  predates energy-flow-diagram.ts) and needs refreshing.
+- Whether a "told" birth time counts as exact enough for the map.
