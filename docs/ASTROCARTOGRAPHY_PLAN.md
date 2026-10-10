@@ -108,3 +108,8 @@ Kaycee chose the **detailed coastline** (land-50m). Her changes:
 - Lines and parans each live in their own dropdown with round toggles. They
   are multi-select; true one-at-a-time radios are a small change if she wants
   them.
+- The round toggles are multi-select, as on the charts' planet lists; Kaycee
+  confirmed that is what she expects.
+- An **Angles** menu (Ascendant, Descendant, Midheaven, IC), each shown in its
+  own line style. It narrows lines and their edge glyphs; parans keep their
+  own menu.

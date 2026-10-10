@@ -191,11 +191,23 @@ function exits(runs: LonLat[][]): Anchor[] {
   for (let lat = -60; lat <= 60; lat += 30) graticule.push(`M0,${f(y(lat))}H${W}`);
 
   // Lines and parans each get their own menu, so switching one never moves
-  // the other.
-  const dropdown = (kind: string, title: string) =>
+  // the other. Angles narrow the lines: Kaycee, 10 October, "so a person
+  // could see only their ascendant lines".
+  type Item = { key: string; icon: string; name: string };
+  const planetItems: Item[] = HD_BODIES.map((b) => ({ key: b, icon: glyph(b), name: b }));
+  // Each angle is shown in its own line style, so the menu is the key too.
+  const swatch = (a: string) =>
+    `<svg width="26" height="8"><line class="ln personality ${a}" x1="2" x2="24" y1="4" y2="4"/></svg>`;
+  const angleItems: Item[] = [
+    { key: "ASC", icon: swatch("ASC"), name: "Ascendant" },
+    { key: "DSC", icon: swatch("DSC"), name: "Descendant" },
+    { key: "MC", icon: swatch("MC"), name: "Midheaven" },
+    { key: "IC", icon: swatch("IC"), name: "IC" },
+  ];
+  const dropdown = (kind: string, title: string, items: Item[]) =>
     `<div class="dd" data-dd="${kind}"><button>${title}<span class="n"></span></button><div class="menu">` +
-    HD_BODIES.map((b) => `<div class="opt" data-kind="${kind}" data-chip="${b}"><span class="radio"></span>` +
-      `<span class="gl">${glyph(b)}</span>${b}</div>`).join("") +
+    items.map((i) => `<div class="opt" data-kind="${kind}" data-chip="${i.key}"><span class="radio"></span>` +
+      `<span class="gl">${i.icon}</span>${i.name}</div>`).join("") +
     `<div class="foot"><button class="pill" data-all="${kind}">All</button><button class="pill" data-none="${kind}">None</button></div></div></div>`;
 
   const VW = ML + W + MR, VH = MT + H + MB;
@@ -250,13 +262,13 @@ svg{width:100%;height:auto;display:block}
 .opt:hover{background:#f6f0f9}
 .radio{width:14px;height:14px;border-radius:50%;border:1.5px solid #b7aec0;box-sizing:border-box;flex:none}
 .opt.on .radio{border:4px solid var(--purple)}
-.opt .gl{width:18px;text-align:center;font-size:15px}
+.opt .gl{min-width:18px;text-align:center;font-size:15px;display:flex;justify-content:center}
 .menu .foot{display:flex;gap:6px;border-top:1px solid #eee7f1;margin-top:6px;padding-top:8px}
 </style></head><body>
 <header><h1>${personName}</h1>
 <div class="sub">${row.birth_place} · ${row.birth_date} ${String(row.birth_time).slice(0, 5)} · design ${sides.design.toISOString().slice(0, 16).replace("T", " ")} UTC</div></header>
 <div class="bar"><span id="side" style="display:flex;gap:4px"><button class="pill on" data-v="both">Both</button><button class="pill" data-v="personality">Personality</button><button class="pill" data-v="design">Design</button></span>
-<span class="gap"></span>${dropdown("lines", "Lines")}${dropdown("parans", "Parans")}</div>
+<span class="gap"></span>${dropdown("lines", "Lines", planetItems)}${dropdown("angles", "Angles", angleItems)}${dropdown("parans", "Parans", planetItems)}</div>
 <div class="stage"><svg viewBox="0 0 ${VW} ${f(VH)}" id="map">
 <defs><clipPath id="clip"><rect width="${W}" height="${f(H)}"/></clipPath></defs>
 <g transform="translate(${ML},${MT})">
@@ -282,7 +294,9 @@ const LABELS=${JSON.stringify(labels.map((l) => ({ ...l, pos: +l.pos.toFixed(1) 
 const PERSON=${JSON.stringify(personName)};
 const ML=${ML},MT=${MT},W=${W},H=${f(H)};
 const BODIES=${JSON.stringify(HD_BODIES)};
-const st={side:"both",lines:new Set(BODIES),parans:new Set()};
+const ANGLES=["ASC","DSC","MC","IC"];
+const ALL={lines:BODIES,parans:BODIES,angles:ANGLES};
+const st={side:"both",lines:new Set(BODIES),angles:new Set(ANGLES),parans:new Set()};
 // One resolver answers "what is this?", read from the element, never its position.
 function describe(el){
   const d=el.dataset, side=SIDE[d.side];
@@ -298,7 +312,7 @@ const mk=(t,a)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAt
 /** Glyphs outside the frame, spread along each edge so none overlap. */
 function layoutLabels(){
   const g=document.getElementById("labels");g.replaceChildren();
-  const vis=LABELS.filter(l=>(st.side==="both"||l.side===st.side)&&st.lines.has(l.body));
+  const vis=LABELS.filter(l=>(st.side==="both"||l.side===st.side)&&st.lines.has(l.body)&&st.angles.has(l.angle));
   for(const edge of ["top","bottom","left","right"]){
     const row=vis.filter(l=>l.edge===edge).sort((a,b)=>a.pos-b.pos);
     const gap=edge==="top"||edge==="bottom"?22:16, max=edge==="top"||edge==="bottom"?W:H;
@@ -332,11 +346,11 @@ function layoutLabels(){
 function paint(){
   const sideOk=d=>st.side==="both"||d.side===st.side;
   for(const el of document.querySelectorAll("#lines [data-side]"))
-    el.classList.toggle("off",!(sideOk(el.dataset)&&st.lines.has(el.dataset.body)));
+    el.classList.toggle("off",!(sideOk(el.dataset)&&st.lines.has(el.dataset.body)&&st.angles.has(el.dataset.angle)));
   for(const el of document.querySelectorAll("#parans [data-side]"))
     el.classList.toggle("off",!(sideOk(el.dataset)&&(st.parans.has(el.dataset.body)||st.parans.has(el.dataset.body2))));
   for(const c of document.querySelectorAll(".opt"))c.classList.toggle("on",st[c.dataset.kind].has(c.dataset.chip));
-  for(const k of ["lines","parans"])document.querySelector('[data-dd="'+k+'"] .n').textContent=st[k].size===BODIES.length?"All":st[k].size?st[k].size:"None";
+  for(const k in ALL)document.querySelector('[data-dd="'+k+'"] .n').textContent=st[k].size===ALL[k].length?"All":st[k].size?st[k].size:"None";
   layoutLabels();
 }
 document.getElementById("side").onclick=e=>{const b=e.target.closest(".pill");if(!b)return;
@@ -346,7 +360,7 @@ document.body.addEventListener("click",e=>{
   for(const m of document.querySelectorAll(".dd.open"))if(m!==dd)m.classList.remove("open");
   if(dd&&e.target.closest(".dd>button")){dd.classList.toggle("open");return}
   const t=e.target.closest("button,.opt");if(!t)return;
-  if(t.dataset.all){st[t.dataset.all]=new Set(BODIES);return paint()}
+  if(t.dataset.all){st[t.dataset.all]=new Set(ALL[t.dataset.all]);return paint()}
   if(t.dataset.none){st[t.dataset.none].clear();return paint()}
   if(t.dataset.kind){const s=st[t.dataset.kind],b=t.dataset.chip;s.has(b)?s.delete(b):s.add(b);paint()}
 });
