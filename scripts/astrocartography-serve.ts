@@ -119,6 +119,11 @@ createServer(async (req, res) => {
       };
       return json(res, 200, { ok: true, personality: sum(p), design: sum(d), svg });
     }
+    // The shared world map, as the site serves it from public/.
+    if (url.pathname.startsWith("/world/") && url.pathname.endsWith(".json") && !url.pathname.includes("..")) {
+      res.writeHead(200, { "content-type": "application/json" });
+      return res.end(readFileSync(join("public", url.pathname)));
+    }
     // The page itself: the one asked for, or the only one there.
     const name = decodeURIComponent(url.pathname.slice(1)) ||
       readdirSync(DIR).find((f) => f.endsWith(".html")) || "";
