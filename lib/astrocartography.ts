@@ -14,6 +14,12 @@
  * are curves: the body is on the horizon where cos H = -tan(lat) tan(dec).
  * Past latitude 90 - |dec| the body never rises or never sets, so those curves
  * stop there. They are never closed across the gap.
+ *
+ * A paran is two bodies angular at once. Where one body's line crosses
+ * another's, both are angular at that spot; and because the whole sky turns
+ * past every place on that latitude once a day, everywhere along the latitude
+ * gets the same pair angular together at some moment of the day. So a paran is
+ * drawn as a latitude, and carries the crossing it came from.
  */
 
 import {
@@ -88,22 +94,28 @@ const LATS: number[] = (() => {
   return out;
 })();
 
+/** The horizon curves before they are split, sampled at LATS, for crossings. */
+function horizonCurves(mc: number, dec: number): { ASC: LonLat[]; DSC: LonLat[] } {
+  const ASC: LonLat[] = [];
+  const DSC: LonLat[] = [];
+  const tanDec = Math.tan(dec * RAD);
+  for (const lat of LATS) {
+    const c = -Math.tan(lat * RAD) * tanDec;
+    if (c < -1 || c > 1) continue;   // circumpolar or never up: no horizon crossing
+    const h0 = Math.acos(c) / RAD;
+    ASC.push([wrap180(mc - h0), lat]);
+    DSC.push([wrap180(mc + h0), lat]);
+  }
+  return { ASC, DSC };
+}
+
 export function linesFor(body: string, when: Date): BodyLines {
   const { ra, dec } = equatorial(body, when);
   const gast = SiderealTime(MakeTime(when)) * 15;
   const mc = wrap180(ra - gast);
   const ic = wrap180(mc + 180);
 
-  const asc: LonLat[] = [];
-  const dsc: LonLat[] = [];
-  const tanDec = Math.tan(dec * RAD);
-  for (const lat of LATS) {
-    const c = -Math.tan(lat * RAD) * tanDec;
-    if (c < -1 || c > 1) continue;   // circumpolar or never up: no horizon crossing
-    const h0 = Math.acos(c) / RAD;
-    asc.push([wrap180(mc - h0), lat]);
-    dsc.push([wrap180(mc + h0), lat]);
-  }
+  const { ASC: asc, DSC: dsc } = horizonCurves(mc, dec);
 
   return {
     body, ra, dec,
@@ -118,4 +130,82 @@ export function linesFor(body: string, when: Date): BodyLines {
 
 export function mapFor(when: Date, bodies: readonly string[] = HD_BODIES): BodyLines[] {
   return bodies.map((b) => linesFor(b, when));
+}
+
+export interface Paran {
+  a: string; angleA: Angle;
+  b: string; angleB: Angle;
+  /** The latitude the paran runs along, and the crossing it came from. */
+  lat: number;
+  lon: number;
+}
+
+/** Two ends of one axis are angular together everywhere, which is no paran. */
+const SAME_AXIS = new Set(["Sun|Earth", "Earth|Sun", "North Node|South Node", "South Node|North Node"]);
+
+/** Where a horizon curve passes a given longitude. */
+function curveAtLongitude(curve: LonLat[], lon: number): number[] {
+  const out: number[] = [];
+  for (let i = 1; i < curve.length; i++) {
+    const d0 = wrap180(curve[i - 1][0] - lon);
+    const d1 = wrap180(curve[i][0] - lon);
+    if (Math.abs(d0 - d1) > 180 || Math.sign(d0) === Math.sign(d1)) continue;
+    const t = d0 / (d0 - d1);
+    out.push(curve[i - 1][1] + t * (curve[i][1] - curve[i - 1][1]));
+  }
+  return out;
+}
+
+/** Where two horizon curves, sampled at the same latitudes, cross. */
+function curvesCross(p: LonLat[], q: LonLat[]): LonLat[] {
+  const qAt = new Map(q.map(([lon, lat]) => [lat, lon]));
+  const out: LonLat[] = [];
+  let prev: { d: number; lat: number; lon: number } | null = null;
+  for (const [lon, lat] of p) {
+    const qLon = qAt.get(lat);
+    if (qLon === undefined) { prev = null; continue; }
+    const d = wrap180(lon - qLon);
+    if (prev && Math.sign(d) !== Math.sign(prev.d) && Math.abs(d - prev.d) < 90) {
+      const t = prev.d / (prev.d - d);
+      out.push([wrap180(prev.lon + t * wrap180(lon - prev.lon)), prev.lat + t * (lat - prev.lat)]);
+    }
+    prev = { d, lat, lon };
+  }
+  return out;
+}
+
+/** Every paran among these bodies at one instant. */
+export function paransFor(when: Date, bodies: readonly string[] = HD_BODIES): Paran[] {
+  const gast = SiderealTime(MakeTime(when)) * 15;
+  const sky = bodies.map((body) => {
+    const { ra, dec } = equatorial(body, when);
+    const mc = wrap180(ra - gast);
+    return { body, MC: mc, IC: wrap180(mc + 180), ...horizonCurves(mc, dec) };
+  });
+  const out: Paran[] = [];
+  for (let i = 0; i < sky.length; i++) {
+    for (let j = 0; j < sky.length; j++) {
+      if (i === j) continue;
+      const A = sky[i], B = sky[j];
+      if (SAME_AXIS.has(`${A.body}|${B.body}`)) continue;
+      // A on a meridian, B on the horizon. Both orders come from the loop.
+      for (const angleA of ["MC", "IC"] as const) {
+        for (const angleB of ["ASC", "DSC"] as const) {
+          for (const lat of curveAtLongitude(B[angleB], A[angleA])) {
+            out.push({ a: A.body, angleA, b: B.body, angleB, lat, lon: A[angleA] });
+          }
+        }
+      }
+      // Both on the horizon. Once per pair.
+      if (j < i) continue;
+      for (const angleA of ["ASC", "DSC"] as const) {
+        for (const angleB of ["ASC", "DSC"] as const) {
+          for (const [lon, lat] of curvesCross(A[angleA], B[angleB])) {
+            out.push({ a: A.body, angleA, b: B.body, angleB, lat, lon });
+          }
+        }
+      }
+    }
+  }
+  return out;
 }

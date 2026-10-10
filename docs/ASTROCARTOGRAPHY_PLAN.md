@@ -57,3 +57,21 @@ is easy; the map, the projection and the interaction are the bulk.
 - Whether parans are in the first version.
 - Whether local space lines belong here or are their own module.
 - Whether clicking a location shows what the chart becomes there.
+
+## First look (2026-10-10)
+
+Kaycee's calls, 10 October: all thirteen bodies with toggles for the first
+look, and **parans are in**. Local space and relocation stay out for now.
+
+- Step 1 is built: `lib/astrocartography.ts`, lines and parans. Checked on her
+  chart against astronomy-engine's own horizon maths: every line point within
+  0.0001 degrees, every paran crossing within 0.05 degrees with both bodies
+  angular there.
+- A standalone preview, `scripts/astrocartography-preview.ts`, writes one page
+  to `~/Desktop/HD Reports/Astrocartography/`. Not wired into the chart.
+- Coastlines: world-atlas@2.0.2 (Natural Earth, public domain), `land-110m`
+  (55 KB) and `land-50m` (545 KB), both in the preview for her to choose.
+  Kept locally in `.cache/world-atlas/`; not in the repo until she picks one.
+- Parans are about 360 per map. The preview shows a focused planet's parans by
+  default, all on request. Land crossing the 180 meridian (Fiji, Chukotka) is
+  unwrapped and drawn on both edges, or it streaks across the map.
