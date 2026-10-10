@@ -219,3 +219,12 @@ relocated chart. All five are wanted eventually; 1 and 2 are built.
   Midheaven per place against natal, then every planet's house per place,
   changed houses bold, angular flagged. Check: Ogden's column equals the
   natal chart exactly, ascendant and all 26 houses.
+- **Hovers on the relocated wheels**, read from each glyph's own tags (body
+  and side), never its ring: side, body, sign and degree, the Astrology
+  view's modality and element pills, the house it lands in there, its gate,
+  Angular when it is, and her Delphi Basic. Angles read the wheel's own side.
+  Checked at Lisbon: Personality Sun 10th, Gate 12.4; Design Moon 7th, Gate 2.5.
+- **Save Chart Image** in the chart window and **Save Map Image** in the map
+  controls, by the live chart's method: the drawing as it stands, computed
+  styles baked in, Montserrat carried inside, twice the size, a footer naming
+  the person, what is shown and the brand marks, handed over as a file.

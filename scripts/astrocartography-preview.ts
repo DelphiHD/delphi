@@ -352,6 +352,14 @@ h1{margin:0;font-weight:600;font-size:22px;color:var(--purple)}
 .off{display:none}
 #tip{position:fixed;transform-origin:0 0;pointer-events:none;background:#fff;border:1px solid #d9d0e0;border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 4px 14px rgba(47,42,51,.12);display:none;max-width:280px}
 #tip b{color:var(--ink)}
+#tip{z-index:30}
+#tip .pill.fire{background:#845095}#tip .pill.water{background:#c9a7d4;color:#3a2b40}#tip .pill.earth{background:#9b9aa0}#tip .pill.air{background:#5f5a66}
+#tip .pill.cardinal{background:#c9971f}#tip .pill.fixed{background:#8a6a14}#tip .pill.mutable{background:#e3c05c;color:#3a2f10}
+#tip .pill.house{background:transparent;color:inherit;opacity:.65;border:1px solid currentColor}
+#tip .pill.ang{background:var(--gold)}
+#tip .tb{display:block;margin-top:6px;opacity:.8;line-height:1.45}
+#wheel [data-aplanet],#wheel [data-angle]{cursor:default}
+.wtabs .pill.snap{margin-left:auto}
 #tip .pill{display:inline-block;padding:2.5px 8px;border-radius:999px;font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin:5px 5px 1px 0;line-height:1.5;background:var(--purple);color:#fff}
 #tip .row{margin-top:4px}#tip .meta{opacity:.65;display:block;margin-top:4px}
 .dd{position:relative}
@@ -370,7 +378,7 @@ h1{margin:0;font-weight:600;font-size:22px;color:var(--purple)}
 <header><h1>${personName}</h1>
 <div class="sub">${row.birth_place} · ${row.birth_date} ${String(row.birth_time).slice(0, 5)} · design ${sides.design.toISOString().slice(0, 16).replace("T", " ")} UTC</div></header>
 <div class="bar"><span id="side" style="display:flex;gap:4px"><button class="pill on" data-v="both">Both</button><button class="pill" data-v="personality">Personality</button><button class="pill" data-v="design">Design</button></span>
-<span class="gap"></span>${dropdown("lines", "Lines", planetItems)}${dropdown("angles", "Angles", angleItems)}${dropdown("parans", "Parans", planetItems)}<button class="pill" id="cmpBtn">Compare Places</button><div class="search"><input id="q" placeholder="Search A City" autocomplete="off"><div class="results" id="results"></div></div><div class="zoom"><button data-z="in" title="Zoom In">+</button><button data-z="out" title="Zoom Out">&minus;</button><button data-z="reset">Reset</button></div></div>
+<span class="gap"></span>${dropdown("lines", "Lines", planetItems)}${dropdown("angles", "Angles", angleItems)}${dropdown("parans", "Parans", planetItems)}<button class="pill" id="cmpBtn">Compare Places</button><div class="search"><input id="q" placeholder="Search A City" autocomplete="off"><div class="results" id="results"></div></div><div class="zoom"><button data-z="in" title="Zoom In">+</button><button data-z="out" title="Zoom Out">&minus;</button><button data-z="reset">Reset</button></div><button class="pill" id="snapMap">Save Map Image</button></div>
 <div class="stage"><svg viewBox="0 0 ${VW} ${f(VH)}" preserveAspectRatio="xMidYMin meet" id="map">
 <defs><clipPath id="clip"><rect width="${W}" height="${f(H)}"/></clipPath></defs>
 <g transform="translate(${ML},${MT})">
@@ -393,6 +401,8 @@ h1{margin:0;font-weight:600;font-size:22px;color:var(--purple)}
 </g>
 <g id="labels"></g>
 </svg><div id="here"></div><div id="compare"></div></div>
+<img id="logo" hidden alt="" src="data:image/svg+xml;base64,${readFileSync(join("assets", "brand", "Delphi Logo.svg")).toString("base64")}">
+<img id="know" hidden alt="" src="data:image/svg+xml;base64,${readFileSync(join("assets", "brand", "Know Thyself.svg")).toString("base64")}">
 <div id="tip"></div><div id="wheel"><div class="box"></div></div>
 <script>
 const WHERE=${JSON.stringify(where)};
@@ -404,6 +414,14 @@ const PR=${JSON.stringify(PR)};
 const BIRTH=${JSON.stringify([place.lon, place.lat])};
 const BASIC=${JSON.stringify(basics)};
 const NATAL=${JSON.stringify(natal)};
+const GATE_OF=${JSON.stringify({
+  personality: Object.fromEntries(chart.activations.personality.map((a) => [a.planet, `${a.gate}.${a.line}`])),
+  design: Object.fromEntries(chart.activations.design.map((a) => [a.planet, `${a.gate}.${a.line}`])),
+})};
+// For Save Image: the font and the brand marks travel inside the picture, the
+// way the live chart's Save Image carries them.
+const FONTCSS=${JSON.stringify([400, 600].map((w) =>
+  `@font-face{font-family:Montserrat;font-weight:${w};src:url(data:font/ttf;base64,${readFileSync(join("assets", "fonts", `Montserrat-${w}.ttf`)).toString("base64")}) format('truetype');}`).join(""))};
 const GATES={pg:${JSON.stringify(chart.activations.personality.map((a) => a.gate).join(","))},dg:${JSON.stringify(chart.activations.design.map((a) => a.gate).join(","))}};
 const CAST={place:${JSON.stringify(String(row.birth_place))},p:${JSON.stringify(chart.birth.utcDate)},d:${JSON.stringify(chart.birth.designUtcDate)}};
 const CITIES=${JSON.stringify(cities(join(geoDir, "..", "natural-earth", "ne_50m_populated_places_simple.geojson")))};
@@ -743,17 +761,102 @@ function utcWhen(iso){const m=/^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-
 function showWheel(r,where,which){
   const w=document.getElementById("wheel");
   w.querySelector(".box").innerHTML='<button class="x" title="Close">&times;</button><h2>Relocated Chart · '+where+'</h2>'+
-    '<div class="wtabs">'+[["personality","Personality"],["design","Design"],["both","Both"]].map(([k,t])=>'<button class="pill'+(k===which?" on":"")+'" data-wtab="'+k+'">'+t+'</button>').join("")+'</div>'+
+    '<div class="wtabs">'+[["personality","Personality"],["design","Design"],["both","Both"]].map(([k,t])=>'<button class="pill'+(k===which?" on":"")+'" data-wtab="'+k+'">'+t+'</button>').join("")+'<button class="pill snap" data-snapwheel="1">Save Chart Image</button></div>'+
     // A one-sided wheel has no corner legend (that drawing is shared with the
     // live charts and left alone), so the window says which side it is.
     (which==="both"?"":'<div class="wsub" style="color:'+(which==="design"?"var(--design)":"var(--ink)")+'"><b>'+SIDE[which]+'</b> · '+utcWhen(which==="design"?CAST.d:CAST.p)+" · "+where+'</div>')+
     r.svg[which];
-  w.dataset.where=where;w.classList.add("open");
+  w.dataset.where=where;w.dataset.which=which;w.classList.add("open");
 }
 document.getElementById("wheel").addEventListener("click",e=>{
   if(e.target.id==="wheel"||e.target.closest(".x"))return e.currentTarget.classList.remove("open");
   const t=e.target.closest("[data-wtab]");if(t){const r=reloc.get(relocKey());if(r&&r.svg)showWheel(r,e.currentTarget.dataset.where,t.dataset.wtab)}
+  if(e.target.closest("[data-snapwheel]")){const w=e.currentTarget,which=w.dataset.which;
+    snapshot(w.querySelector(".box svg"),[PERSON,"Relocated Chart · "+w.dataset.where,
+      which==="both"?"Personality + Design":SIDE[which]+" · "+utcWhen(which==="design"?CAST.d:CAST.p)],
+      PERSON+" - Relocated Chart - "+w.dataset.where.split(",")[0]+" - "+(which==="both"?"Both":SIDE[which])+".png")}
 });
+// Hovers on the relocated wheel, read from the glyph's own tags: the side it
+// carries and the body it names. Same pills as the Astrology view, with the
+// house it lands in at this place and its gate.
+const WHEEL_NAME={True_Node:"North Node",Mean_Node:"South Node",Mean_Lilith:"Lilith"};
+const ANGLE_OF={As:["asc","Ascendant"],Ds:["asc","Descendant"],Mc:["mc","Midheaven"],Ic:["mc","IC"]};
+const opp=sd=>{const z=ZOD.indexOf(sd.sign);return {sign:ZOD[(z+6)%12],deg:sd.deg}};
+const ZOD=["Aries","Taurus","Gemini","Cancer","Leo","Virgo","Libra","Scorpio","Sagittarius","Capricorn","Aquarius","Pisces"];
+function wheelTip(el){
+  const r=reloc.get(relocKey());if(!r||!r.svg)return"";
+  const w=document.getElementById("wheel"),which=w.dataset.which;
+  const pill=(t,c)=>t?'<span class="pill '+(c||String(t).toLowerCase())+'">'+t+'</span>':"";
+  if(el.dataset.aplanet){
+    const sd=el.dataset.side==="design"?"design":"personality";
+    const pl=r[sd].planets[el.dataset.aplanet];if(!pl)return"";
+    const label=WHEEL_NAME[el.dataset.aplanet]||pl.label,gate=GATE_OF[sd][label];
+    return "<b>"+SIDE[sd]+" "+label+" in "+pl.sign+" "+fmtDeg(pl.deg)+"</b>"+
+      pill(pl.quality)+pill(pl.element)+(pl.house?pill("House "+pl.house,"house"):"")+(gate?pill("Gate "+gate,"house"):"")+
+      ([1,4,7,10].includes(pl.house)?pill("Angular","ang"):"")+
+      (BASIC[label]?'<span class="tb">'+BASIC[label]+'</span>':"");
+  }
+  const a=ANGLE_OF[el.dataset.angle];if(!a)return"";
+  const sd=which==="design"?"design":"personality",v=r[sd][a[0]];
+  const at=(a[1]==="Descendant"||a[1]==="IC")?opp(v):v;
+  return "<b>"+SIDE[sd]+" "+a[1]+"</b>"+at.sign+" "+fmtDeg(at.deg);
+}
+document.getElementById("wheel").addEventListener("mousemove",e=>{
+  const el=e.target.closest("[data-aplanet],[data-angle]");
+  const html=el?wheelTip(el):"";
+  if(!html){tip.style.display="none";return}
+  tip.innerHTML=html;tip.style.display="block";tip.style.transform="none";
+  const tw=tip.offsetWidth,th=tip.offsetHeight;
+  let tx=e.clientX+14,ty=e.clientY+14;if(tx+tw>innerWidth-8)tx=e.clientX-14-tw;if(ty+th>innerHeight-8)ty=e.clientY-14-th;
+  tip.style.left=Math.max(8,tx)+"px";tip.style.top=Math.max(8,ty)+"px";
+});
+document.getElementById("wheel").addEventListener("mouseleave",()=>tip.style.display="none");
+
+// ---- Save Image ------------------------------------------------------------
+// The live chart's method: copy the drawing as it stands, bake every computed
+// style into it, carry the font inside, draw it at twice the size, and add a
+// footer naming what it shows with the brand marks. Handed over as a file.
+const BAKE=["fill","fill-opacity","stroke","stroke-width","stroke-opacity","stroke-dasharray","stroke-linecap",
+  "stroke-linejoin","opacity","display","visibility","font-family","font-size","font-weight","letter-spacing","paint-order"];
+function bake(src,dst){
+  const a=src.querySelectorAll("*"),b=dst.querySelectorAll("*");
+  const apply=(from,to)=>{const cs=getComputedStyle(from);let css="";
+    for(const k of BAKE){const v=cs.getPropertyValue(k);if(v&&v!=="none"||k==="display"||k==="fill")css+=k+":"+v+";"}
+    to.setAttribute("style",css)};
+  apply(src,dst);for(let i=0;i<a.length&&i<b.length;i++)apply(a[i],b[i]);
+}
+function snapshot(svgEl,lines,filename){
+  if(!svgEl)return;
+  const vb=(svgEl.getAttribute("viewBox")||"").trim().split(/[ ,]+/).map(Number);
+  const vw=vb[2]||svgEl.clientWidth,vh=vb[3]||svgEl.clientHeight;
+  const clone=svgEl.cloneNode(true);bake(svgEl,clone);
+  clone.setAttribute("xmlns","http://www.w3.org/2000/svg");clone.setAttribute("width",vw);clone.setAttribute("height",vh);
+  clone.removeAttribute("class");clone.style.removeProperty("max-height");clone.style.removeProperty("max-width");
+  const sty=document.createElementNS("http://www.w3.org/2000/svg","style");sty.textContent=FONTCSS;clone.insertBefore(sty,clone.firstChild);
+  const xml=new XMLSerializer().serializeToString(clone);
+  const img=new Image();
+  img.onload=()=>{
+    const S=2,foot=150,cv=document.createElement("canvas");cv.width=vw*S;cv.height=vh*S+foot;
+    const g=cv.getContext("2d");g.fillStyle="#ffffff";g.fillRect(0,0,cv.width,cv.height);g.drawImage(img,0,0,vw*S,vh*S);
+    const y0=vh*S+8;g.strokeStyle="rgba(132,80,149,.35)";g.lineWidth=2;g.beginPath();g.moveTo(52,y0);g.lineTo(cv.width-52,y0);g.stroke();
+    const logo=document.getElementById("logo"),know=document.getElementById("know");
+    if(logo.complete)g.drawImage(logo,52,y0+28,132,66);
+    if(know.complete)g.drawImage(know,cv.width-52-170,y0+40,170,42);
+    g.fillStyle="#1c1a2e";g.font="600 24px Montserrat, sans-serif";g.fillText(lines[0],210,y0+50);
+    g.fillStyle="rgba(28,26,46,.6)";g.font="400 18px Montserrat, sans-serif";
+    lines.slice(1).forEach((t,i)=>g.fillText(t,210,y0+80+i*26));
+    const give=(href,revoke)=>{const a=document.createElement("a");a.download=filename;a.href=href;a.rel="noopener";document.body.appendChild(a);a.click();document.body.removeChild(a);if(revoke)setTimeout(()=>URL.revokeObjectURL(href),60000)};
+    if(cv.toBlob)cv.toBlob(b=>b&&window.URL?give(URL.createObjectURL(b),true):give(cv.toDataURL("image/png"),false),"image/png");
+    else give(cv.toDataURL("image/png"),false);
+  };
+  img.src="data:image/svg+xml;base64,"+btoa(unescape(encodeURIComponent(xml)));
+}
+function mapState(){
+  const n=k=>st[k].size===ALL[k].length?"All":st[k].size?[...st[k]].join(", "):"None";
+  return ["Astrocartography · "+(st.side==="both"?"Personality + Design":SIDE[st.side]),
+    "Lines: "+n("lines")+"  ·  Angles: "+n("angles")+"  ·  Parans: "+n("parans")];
+}
+document.getElementById("snapMap").onclick=()=>snapshot(document.getElementById("map"),[PERSON,...mapState()],PERSON+" - Astrocartography.png");
 function openHere(lat,lon,city){
   const c=city||nearestCity(lat,lon);
   here={lat,lon,name:city?city.n:(c?"Near "+c.n:null),country:c?c.c:null};

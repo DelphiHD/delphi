@@ -69,7 +69,18 @@ createServer(async (req, res) => {
         const sun = a.planets.find((x) => x.label === "Sun");
         if (sun) out.Earth = houseOf((sun.abs_pos + 180) % 360, cusps);
         const at = (v: number) => ({ sign: ZODIAC[Math.floor(v / 30)], deg: v % 30 });
-        return { asc: at(a.ascendant), mc: at(a.mc), house: out };
+        // What a hover on the relocated wheel reads, by the name the wheel tags
+        // each glyph with. Earth is placed opposite the Sun, as on the natal.
+        const planets: Record<string, { label: string; sign: string; deg: number; element: string; quality: string; house: number }> = {};
+        for (const pl of a.planets) planets[pl.name] = { label: pl.label, sign: pl.sign, deg: pl.position,
+          element: pl.element, quality: pl.quality, house: out[pl.label] ?? 0 };
+        if (sun) {
+          const e = (sun.abs_pos + 180) % 360;
+          const sign = ZODIAC[Math.floor(e / 30)];
+          planets.Earth = { label: "Earth", sign, deg: e % 30,
+            element: a.signs[sign]?.element ?? "", quality: a.signs[sign]?.quality ?? "", house: out.Earth };
+        }
+        return { asc: at(a.ascendant), mc: at(a.mc), house: out, planets };
       };
       if (g("wheels") === "0") return json(res, 200, { ok: true, personality: sum(p), design: sum(d) });
       // Three wheels, as the chart draws them. Each side on its OWN relocated
