@@ -652,25 +652,43 @@ document.querySelector(".zoom").onclick=e=>{const z=e.target.closest("button");i
 const q=document.getElementById("q"),res=document.getElementById("results");
 const norm=t=>t.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
 let hits=[],sel=0;
+// Search asks the chart provider's own place list, the one the chart forms
+// use, through the local server; a chosen place is then located the way a
+// birthplace is. Opened as a plain file there is no server, and the built-in
+// Natural Earth cities answer instead.
+let live=location.protocol.startsWith("http");
+async function choose(h){
+  if(!h.value)return goTo(h);
+  res.classList.remove("open");q.value=h.value;
+  try{const r=await (await fetch("/api/place?value="+encodeURIComponent(h.value))).json();
+    if(!r.ok)throw new Error(r.error);
+    goTo({n:h.name,c:h.region,lat:r.lat,lon:r.lon});
+  }catch(e){q.value="";q.placeholder="Could not place "+h.name}
+}
 function goTo(c){
-  res.classList.remove("open");q.value=c.n;
+  res.classList.remove("open");q.value=c.n+(c.c?", "+c.c:"");
   const k=Math.max(view.k,5);view.k=k;view.tx=W/2-((c.lon+180)/360*W)*k;view.ty=H/2-((TOP-c.lat)/(TOP-BOTTOM)*H)*k;clampView();
   openHere(c.lat,c.lon,c);
 }
 function showHits(){
-  res.innerHTML=hits.map((c,i)=>'<div class="'+(i===sel?"sel":"")+'" data-i="'+i+'">'+c.n+'<span>'+c.c+'</span></div>').join("");
+  res.innerHTML=hits.map((c,i)=>'<div class="'+(i===sel?"sel":"")+'" data-i="'+i+'">'+(c.value?c.name:c.n)+'<span>'+(c.value?c.region:c.c)+'</span></div>').join("");
   res.classList.toggle("open",hits.length>0);
 }
+let seq=0,timer=0;
 q.addEventListener("input",()=>{const t=norm(q.value.trim());sel=0;
   if(!t){hits=[];return showHits()}
+  if(live){clearTimeout(timer);const my=++seq;timer=setTimeout(async()=>{
+    try{const r=await (await fetch("/api/places?q="+encodeURIComponent(q.value.trim()))).json();
+      if(my!==seq)return;if(!r.ok)throw new Error(r.error);hits=r.places;showHits()}
+    catch(e){live=false;q.dispatchEvent(new Event("input"))}},200);return}
   const starts=CITIES.filter(c=>norm(c.n).startsWith(t)),has=CITIES.filter(c=>!norm(c.n).startsWith(t)&&norm(c.n).includes(t));
   hits=[...starts.sort((a,b)=>b.pop-a.pop),...has.sort((a,b)=>b.pop-a.pop)].slice(0,8);showHits()});
 q.addEventListener("keydown",e=>{
   if(e.key==="ArrowDown"){sel=Math.min(hits.length-1,sel+1);showHits();e.preventDefault()}
   else if(e.key==="ArrowUp"){sel=Math.max(0,sel-1);showHits();e.preventDefault()}
-  else if(e.key==="Enter"&&hits[sel])goTo(hits[sel]);
+  else if(e.key==="Enter"&&hits[sel])choose(hits[sel]);
   else if(e.key==="Escape")res.classList.remove("open")});
-res.addEventListener("mousedown",e=>{const d=e.target.closest("[data-i]");if(d){e.preventDefault();goTo(hits[+d.dataset.i])}});
+res.addEventListener("mousedown",e=>{const d=e.target.closest("[data-i]");if(d){e.preventDefault();choose(hits[+d.dataset.i])}});
 q.addEventListener("blur",()=>setTimeout(()=>res.classList.remove("open"),100));
 paint();
 </script></body></html>`;

@@ -165,3 +165,14 @@ relocated chart. All five are wanted eventually; 1 and 2 are built.
 - **Search**: names from the same 1,251 places, accent-insensitive, biggest
   first. Choosing one zooms there and opens its panel. Smaller towns are not
   in this set; a fuller list or a geocoder is the next step if she needs them.
+- **Search uses the chart provider's place list** (Kaycee, 10 October: "use
+  the location picker that comes with our API"; no third-party credit on the
+  map). It returns names and time zones, not coordinates, so a chosen place is
+  located the way a birthplace is, `locate()` in lib/astro.ts, cached. The
+  key cannot sit in a page, so `scripts/astrocartography-serve.ts` serves the
+  preview on localhost:8782 with /api/places and /api/place behind it, as the
+  site does. Opened as a plain file, search falls back to the built-in
+  Natural Earth cities. Those cities still draw the dots and name a click
+  ("Near Salt Lake City"); the provider cannot reverse-geocode.
+- When this moves into the chart, /api/places already exists on the site; it
+  needs a sibling that returns coordinates for a chosen place.
