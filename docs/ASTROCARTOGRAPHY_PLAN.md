@@ -94,3 +94,17 @@ Kaycee chose the **detailed coastline** (land-50m). Her changes:
   degree orb is a placeholder for her to set.
 - Cross-checked against astro-seek's map for her chart: Sun, Moon and Venus
   meridians agree to within a few tenths of a degree.
+
+### Third pass, same day
+
+- Paran orb: **1 degree confirmed** by Kaycee.
+- Land is grey, so the purple paran bands read against it.
+- Highlights are the chart's gold (`#c79a2e`, the mandala's lit-gate gold).
+  Hovering a paran lights its crossing and both lines that make it.
+- Hovers carry no name. A line reads "Personality Venus in Leo 11°07'" with an
+  angle pill (ASC, DSC, MC, IC); positions come from the provider's astrology
+  chart, the same numbers as the Astrology view. A paran names both bodies
+  with their angle pills and the latitude. Never "rising" or "setting".
+- Lines and parans each live in their own dropdown with round toggles. They
+  are multi-select; true one-at-a-time radios are a small change if she wants
+  them.

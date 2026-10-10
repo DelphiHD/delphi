@@ -19,7 +19,8 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { createClient } from "@supabase/supabase-js";
 import { getChart } from "../lib/mybodygraph";
-import { locate } from "../lib/astro";
+import { locate, getAstro } from "../lib/astro";
+import { ZODIAC } from "../lib/astro-extras";
 import { mapFor, paransFor, HD_BODIES, type LonLat } from "../lib/astrocartography";
 import { GLYPH } from "./astro-wheel";
 
@@ -136,6 +137,29 @@ function exits(runs: LonLat[][]): Anchor[] {
     design: new Date(chart.birth.designUtcDate),
   };
 
+  // Where each body is in the zodiac, from the provider's astrology chart, the
+  // same numbers the Astrology view's hovers read. Earth is the far end of the
+  // Sun's axis; the provider's astrology endpoint does not name it.
+  const deg = (v: number) => {
+    let d = Math.floor(v), m = Math.round((v - d) * 60);
+    if (m === 60) { d += 1; m = 0; }
+    return `${d}\u00b0${m < 10 ? "0" : ""}${m}'`;
+  };
+  const where: Record<string, Record<string, string>> = {};
+  for (const [side, astro] of [
+    ["personality", await getAstro({ birthDate: String(row.birth_date), birthTime: String(row.birth_time).slice(0, 5), place: String(row.birth_place) })],
+    ["design", await getAstro({ birthDate: String(row.birth_date), birthTime: String(row.birth_time).slice(0, 5), place: String(row.birth_place), atUtc: chart.birth.designUtcDate })],
+  ] as const) {
+    where[side] = {};
+    for (const p of astro.planets) where[side][p.label] = `${p.sign} ${deg(p.position)}`;
+    const sun = astro.planets.find((p) => p.label === "Sun");
+    if (sun) {
+      const e = (sun.abs_pos + 180) % 360;
+      where[side].Earth = `${ZODIAC[Math.floor(e / 30)]} ${deg(e % 30)}`;
+    }
+    for (const b of HD_BODIES) if (!where[side][b]) throw new Error(`no ${side} position for ${b}`);
+  }
+
   // Every mark carries person, side, body and angle on the element itself.
   const tag = (side: string, body: string, angle: string) =>
     `data-person="${personName}" data-side="${side}" data-body="${body}" data-angle="${angle}"`;
@@ -166,9 +190,13 @@ function exits(runs: LonLat[][]): Anchor[] {
   for (let lon = -150; lon <= 150; lon += 30) graticule.push(`M${f(x(lon))},0V${f(H)}`);
   for (let lat = -60; lat <= 60; lat += 30) graticule.push(`M0,${f(y(lat))}H${W}`);
 
-  const chipRow = (kind: string) => HD_BODIES.map((b) =>
-    `<button class="chip" data-kind="${kind}" data-chip="${b}" title="${b}">` +
-    `<span>${glyph(b)}</span>${b}</button>`).join("");
+  // Lines and parans each get their own menu, so switching one never moves
+  // the other.
+  const dropdown = (kind: string, title: string) =>
+    `<div class="dd" data-dd="${kind}"><button>${title}<span class="n"></span></button><div class="menu">` +
+    HD_BODIES.map((b) => `<div class="opt" data-kind="${kind}" data-chip="${b}"><span class="radio"></span>` +
+      `<span class="gl">${glyph(b)}</span>${b}</div>`).join("") +
+    `<div class="foot"><button class="pill" data-all="${kind}">All</button><button class="pill" data-none="${kind}">None</button></div></div></div>`;
 
   const VW = ML + W + MR, VH = MT + H + MB;
   const html = `<!doctype html><html><head><meta charset="utf-8">
@@ -176,48 +204,59 @@ function exits(runs: LonLat[][]): Anchor[] {
 <title>${personName} Astrocartography</title>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--ink:#2f2a33;--design:#e06666;--purple:#845095;--land:#efe8f3;--sea:#ffffff;--grid:#ece7ef;--muted:#6b6790}
+:root{--gold:#c79a2e;--ink:#2f2a33;--design:#e06666;--purple:#845095;--land:#e3e1e6;--sea:#ffffff;--grid:#ece7ef;--muted:#6b6790}
 body{margin:0;font-family:'Montserrat',-apple-system,sans-serif;color:var(--ink);background:#faf8fb}
 header{padding:20px 24px 8px}
 h1{margin:0;font-weight:600;font-size:22px;color:var(--purple)}
 .sub{color:var(--muted);font-size:13px;margin-top:4px}
 .bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 24px}
 .head{font-size:12px;font-weight:600;color:var(--purple);width:56px}
-.pill,.chip{font:inherit;font-size:12px;border:1px solid #d9d0e0;background:#fff;color:var(--ink);border-radius:999px;padding:5px 11px;cursor:pointer}
+.pill{font:inherit;font-size:12px;border:1px solid #d9d0e0;background:#fff;color:var(--ink);border-radius:999px;padding:5px 11px;cursor:pointer}
 .pill.on{background:var(--purple);border-color:var(--purple);color:#fff}
-.chip{color:#a59fb0}.chip.on{border-color:var(--purple);color:var(--ink);background:#f6f0f9}
-.chip span{font-size:15px;margin-right:4px}
 .gap{width:10px}
 .stage{padding:8px 24px 24px}
 svg{width:100%;height:auto;display:block}
 .frame{fill:var(--sea);stroke:#8d8396;stroke-width:1.5}
-.land{fill:var(--land);stroke:#cbbcd6;stroke-width:.6}
+.land{fill:var(--land);stroke:#c3bfc8;stroke-width:.6}
 .grat{stroke:var(--grid);stroke-width:1;fill:none}
 .ln{fill:none;stroke-width:1.7;stroke-linecap:round}
 .ln.MC{stroke-dasharray:14 4 2 4}
 .ln.IC{stroke-dasharray:0.1 4.5;stroke-width:2.6}
 .ln.DSC{stroke-dasharray:8 5}
 .ln.personality{stroke:var(--ink)}.ln.design{stroke:var(--design)}
-.ln.hot{stroke-width:4}.ln.IC.hot{stroke-width:5}
+.ln.hot{stroke:var(--gold);stroke-width:4}.ln.IC.hot{stroke-width:5}
 .lbl{cursor:default}
 .lbl .g{font-size:15px}.lbl .a{font-size:8px;font-weight:600;letter-spacing:.3px}
 .lbl.personality{fill:var(--ink)}.lbl.design{fill:var(--design)}
-.lbl.hot .g{font-size:19px}
+.lbl.hot{fill:var(--gold)}.lbl.hot .g{font-size:19px}
 .lead{stroke-width:.7;fill:none}.lead.personality{stroke:var(--ink)}.lead.design{stroke:var(--design)}
 .pr rect{opacity:.2}.pr circle{stroke:#fff;stroke-width:1}
 .pr.personality rect,.pr.personality circle{fill:var(--purple)}
 .pr.design rect,.pr.design circle{fill:var(--design)}
-.pr.hot rect{opacity:.38}
+.pr.hot rect{fill:var(--gold);opacity:.4}.pr.hot circle{fill:var(--gold);r:7;stroke-width:2}
 .birth{fill:var(--purple);stroke:#fff;stroke-width:2}
 .off{display:none}
 #tip{position:fixed;pointer-events:none;background:#fff;border:1px solid #d9d0e0;border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 4px 14px rgba(47,42,51,.12);display:none;max-width:280px}
-#tip b{color:var(--purple)}
+#tip b{color:var(--ink)}
+#tip .pill{display:inline-block;padding:2.5px 8px;border-radius:999px;font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin:5px 5px 1px 0;line-height:1.5;background:var(--purple);color:#fff}
+#tip .row{margin-top:4px}#tip .meta{opacity:.65;display:block;margin-top:4px}
+.dd{position:relative}
+.dd>button{font:inherit;font-size:12px;font-weight:600;border:1px solid #d9d0e0;background:#fff;color:var(--ink);border-radius:999px;padding:6px 14px;cursor:pointer}
+.dd>button .n{color:var(--muted);font-weight:400;margin-left:4px}
+.dd>button::after{content:"▾";margin-left:6px;color:var(--muted)}
+.menu{display:none;position:absolute;z-index:5;top:34px;left:0;background:#fff;border:1px solid #d9d0e0;border-radius:10px;box-shadow:0 8px 24px rgba(47,42,51,.14);padding:8px;min-width:210px}
+.dd.open .menu{display:block}
+.opt{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:13px;user-select:none}
+.opt:hover{background:#f6f0f9}
+.radio{width:14px;height:14px;border-radius:50%;border:1.5px solid #b7aec0;box-sizing:border-box;flex:none}
+.opt.on .radio{border:4px solid var(--purple)}
+.opt .gl{width:18px;text-align:center;font-size:15px}
+.menu .foot{display:flex;gap:6px;border-top:1px solid #eee7f1;margin-top:6px;padding-top:8px}
 </style></head><body>
 <header><h1>${personName}</h1>
 <div class="sub">${row.birth_place} · ${row.birth_date} ${String(row.birth_time).slice(0, 5)} · design ${sides.design.toISOString().slice(0, 16).replace("T", " ")} UTC</div></header>
-<div class="bar" id="side"><span class="head">Show</span><button class="pill on" data-v="both">Both</button><button class="pill" data-v="personality">Personality</button><button class="pill" data-v="design">Design</button></div>
-<div class="bar"><span class="head">Lines</span>${chipRow("lines")}<span class="gap"></span><button class="pill" data-all="lines">All</button><button class="pill" data-none="lines">None</button></div>
-<div class="bar"><span class="head">Parans</span>${chipRow("parans")}<span class="gap"></span><button class="pill" data-all="parans">All</button><button class="pill" data-none="parans">None</button></div>
+<div class="bar"><span id="side" style="display:flex;gap:4px"><button class="pill on" data-v="both">Both</button><button class="pill" data-v="personality">Personality</button><button class="pill" data-v="design">Design</button></span>
+<span class="gap"></span>${dropdown("lines", "Lines")}${dropdown("parans", "Parans")}</div>
 <div class="stage"><svg viewBox="0 0 ${VW} ${f(VH)}" id="map">
 <defs><clipPath id="clip"><rect width="${W}" height="${f(H)}"/></clipPath></defs>
 <g transform="translate(${ML},${MT})">
@@ -235,7 +274,8 @@ svg{width:100%;height:auto;display:block}
 </svg></div>
 <div id="tip"></div>
 <script>
-const ANGLE={MC:"Midheaven line",IC:"IC line",ASC:"Rising line",DSC:"Setting line"};
+const WHERE=${JSON.stringify(where)};
+const pill=a=>'<span class="pill">'+a+'</span>';
 const SIDE={personality:"Personality",design:"Design"};
 const GLYPH=${JSON.stringify(Object.fromEntries(HD_BODIES.map((b) => [b, glyph(b)])))};
 const LABELS=${JSON.stringify(labels.map((l) => ({ ...l, pos: +l.pos.toFixed(1) })))};
@@ -245,9 +285,13 @@ const BODIES=${JSON.stringify(HD_BODIES)};
 const st={side:"both",lines:new Set(BODIES),parans:new Set()};
 // One resolver answers "what is this?", read from the element, never its position.
 function describe(el){
-  const d=el.dataset, who=d.person+", "+SIDE[d.side];
-  if(d.body2) return "<b>"+who+" paran</b><br>"+d.body+" "+ANGLE[d.angle]+" with "+d.body2+" "+ANGLE[d.angle2]+"<br>Latitude "+(+d.lat).toFixed(1)+"°";
-  return "<b>"+who+"</b><br>"+d.body+" "+ANGLE[d.angle];
+  const d=el.dataset, side=SIDE[d.side];
+  if(d.body2){const lat=+d.lat;
+    return "<b>"+side+" Paran</b>"+
+      '<div class="row">'+side+" "+d.body+" "+pill(d.angle)+"</div>"+
+      '<div class="row">'+side+" "+d.body2+" "+pill(d.angle2)+"</div>"+
+      '<span class="meta">Latitude '+Math.abs(lat).toFixed(1)+"°"+(lat>=0?"N":"S")+"</span>";}
+  return "<b>"+side+" "+d.body+" in "+WHERE[d.side][d.body]+"</b><br>"+pill(d.angle);
 }
 const NS="http://www.w3.org/2000/svg";
 const mk=(t,a)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e};
@@ -291,32 +335,38 @@ function paint(){
     el.classList.toggle("off",!(sideOk(el.dataset)&&st.lines.has(el.dataset.body)));
   for(const el of document.querySelectorAll("#parans [data-side]"))
     el.classList.toggle("off",!(sideOk(el.dataset)&&(st.parans.has(el.dataset.body)||st.parans.has(el.dataset.body2))));
-  for(const c of document.querySelectorAll(".chip"))c.classList.toggle("on",st[c.dataset.kind].has(c.dataset.chip));
+  for(const c of document.querySelectorAll(".opt"))c.classList.toggle("on",st[c.dataset.kind].has(c.dataset.chip));
+  for(const k of ["lines","parans"])document.querySelector('[data-dd="'+k+'"] .n').textContent=st[k].size===BODIES.length?"All":st[k].size?st[k].size:"None";
   layoutLabels();
 }
 document.getElementById("side").onclick=e=>{const b=e.target.closest(".pill");if(!b)return;
   document.querySelectorAll("#side .pill").forEach(p=>p.classList.toggle("on",p===b));st.side=b.dataset.v;paint()};
 document.body.addEventListener("click",e=>{
-  const t=e.target.closest("button");if(!t)return;
+  const dd=e.target.closest(".dd");
+  for(const m of document.querySelectorAll(".dd.open"))if(m!==dd)m.classList.remove("open");
+  if(dd&&e.target.closest(".dd>button")){dd.classList.toggle("open");return}
+  const t=e.target.closest("button,.opt");if(!t)return;
   if(t.dataset.all){st[t.dataset.all]=new Set(BODIES);return paint()}
   if(t.dataset.none){st[t.dataset.none].clear();return paint()}
   if(t.dataset.kind){const s=st[t.dataset.kind],b=t.dataset.chip;s.has(b)?s.delete(b):s.add(b);paint()}
 });
 const tip=document.getElementById("tip");
 function hot(d,on){
-  for(const el of document.querySelectorAll('#lines [data-side="'+d.side+'"][data-body="'+d.body+'"][data-angle="'+d.angle+'"], #labels [data-side="'+d.side+'"][data-body="'+d.body+'"][data-angle="'+d.angle+'"]'))el.classList.toggle("hot",on);
+  const q=(b,a)=>'#lines [data-side="'+d.side+'"][data-body="'+b+'"][data-angle="'+a+'"], #labels [data-side="'+d.side+'"][data-body="'+b+'"][data-angle="'+a+'"]';
+  for(const el of document.querySelectorAll(q(d.body,d.angle)+(d.body2?", "+q(d.body2,d.angle2):"")))el.classList.toggle("hot",on);
 }
 let cur=null;
 document.getElementById("map").addEventListener("mousemove",e=>{
   const el=e.target.closest("[data-side]");
-  if(cur&&cur!==el){cur.dataset.body2?cur.classList.remove("hot"):hot(cur.dataset,false)}
+  if(cur&&cur!==el){cur.classList.remove("hot");hot(cur.dataset,false)}
   cur=el;
   if(!el){tip.style.display="none";return}
-  el.dataset.body2?el.classList.add("hot"):hot(el.dataset,true);
+  if(el.dataset.body2){el.classList.add("hot");el.parentNode.appendChild(el)}
+  hot(el.dataset,true);
   tip.innerHTML=describe(el);tip.style.display="block";
   tip.style.left=Math.min(e.clientX+14,innerWidth-300)+"px";tip.style.top=(e.clientY+14)+"px";
 });
-document.getElementById("map").addEventListener("mouseleave",()=>{tip.style.display="none";if(cur){cur.dataset.body2?cur.classList.remove("hot"):hot(cur.dataset,false);cur=null}});
+document.getElementById("map").addEventListener("mouseleave",()=>{tip.style.display="none";if(cur){cur.classList.remove("hot");hot(cur.dataset,false);cur=null}});
 paint();
 </script></body></html>`;
 
