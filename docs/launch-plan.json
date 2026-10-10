@@ -550,6 +550,14 @@
     {
       "on": "2026-10-10",
       "what": "The middle of the wheel is empty and the bands take the room. Aspect chords are drawn and held at nothing on every wheel; clicking a body shows the lines it makes and lights the bodies at their far ends. That freed the centre, so the house numbers and the chord circle moved inward (150 to 78, 132 to 62) and the bands spread into what they left. Each set is named in a corner in its own colour, with which wheel it is and when and where it was cast."
+    },
+    {
+      "on": "2026-10-10",
+      "what": "How astro-cartography would be built is written down in docs/ASTROCARTOGRAPHY_PLAN.md rather than re-derived: a pure compute layer from astronomy-engine, an equirectangular SVG map with bundled coastlines and nothing phoning out, the chart's own inks, and the identity-not-position tagging discipline in place BEFORE anything is drawn. Two to three days. Four questions need Kaycee first: which bodies, parans, local space, and whether clicking a place shows the relocated chart."
+    },
+    {
+      "on": "2026-10-10",
+      "what": "A new chat picks up the chart views from docs/HANDOFF_2026-10-10_CHART_VIEWS.md. All 83 charts were republished on 10 October and carry this round's work."
     }
   ],
   "open": [
