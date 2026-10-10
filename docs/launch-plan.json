@@ -1,7 +1,7 @@
 {
   "project": "Client Portal",
   "goal": "Free chart is the hook. Account required. Reports, extra charts and a subscription are what sells.",
-  "updated": "2026-10-05",
+  "updated": "2026-10-10",
   "event": {
     "label": "Kaycee's event",
     "date": "2026-09-16",
@@ -522,6 +522,34 @@
     {
       "on": "2026-10-05",
       "what": "Where to see what is built: the dashboard's Launch tab is the single answer, and it is kept current rather than written once. A chart-facing change is only on a chart after a republish, so the dashboard now shows when charts were last rebuilt beside when the site last deployed. Kaycee, 5 October: \"I need to be able to see all of this somewhere to fully understand what you are talking about.\""
+    },
+    {
+      "on": "2026-10-08",
+      "what": "The two side classes have one owner. Three things want a side hidden — the reader's own Personality and Design buttons, the astrology view's habit of opening on personality alone, and the transit type's cast over one side — and each now states what it wants while a single resolver works out the answer and sets the buttons from it. It also redraws when the answer changes: setting the classes without redrawing is how the design side went missing after leaving Relationship from the astrology view."
+    },
+    {
+      "on": "2026-10-08",
+      "what": "A connection can be cast against a chart the reader already has. The Relationship panel offers a signed-in reader their own saved charts, and an analyst their clients', as an alternative to typing birth details; /api/connection takes other=<token> and reads that chart's details server side. A saved chart belongs to the VIEWER, never to the page: a chart link is a public address, so other= requires a session and ownership, an analyst link, or admin. Creating someone new can also save them, which makes an ordinary chart with its own link, recorded as told about the birth time, after the connection is drawn rather than before."
+    },
+    {
+      "on": "2026-10-08",
+      "what": "A variation is a preview until it is saved. The Variations type offers the Bodygraph only and greys out the rest, because a variation is a reading of one moment of the birth day and no wheel, astrology or circuitry is cast for it. Selecting one puts it on the stage and the header block switches to that variation's own Profile, Type, Authority, Definition and Cross. Save this Variation opens a window of its own, name prefilled as <Person> HH:MM and editable, and the chart it makes opens there."
+    },
+    {
+      "on": "2026-10-08",
+      "what": "A connection is the individual pattern with another person in it. Personality is the personality chart on its own horizon with both people on it, Design the design chart on its own horizon, Synastry both sides together, and the perspective switch says whose horizon the whole thing is cast on. A design chart is a whole chart with its own ascendant and houses, so reading two designs together means casting the wheel ON the design horizon rather than laying them in a birth moment's frame. Four wheels cover it: either person as the base, on either horizon."
+    },
+    {
+      "on": "2026-10-08",
+      "what": "Identity, never position. Six faults in one day were the same one: a surface that knew which SIDE a mark was and not which PERSON, so it answered out of the wrong chart. The leak was inside planetTip, which took the person and dropped it one line later when asking for the gate, so every tooltip's Gate pill was read out of the base chart whoever was hovered. Glyphs are tagged by person rather than by the ring they sit in, because swapping perspective moves a person to a different ring. scripts/tooltip-sweep.js hovers every glyph, summary row, placement row and grid header in both views and both perspectives and compares each against the data it came from."
+    },
+    {
+      "on": "2026-10-10",
+      "what": "One ring per set, from one allocator: a bi-wheel with two, a tri-wheel with three. The chart whose HOUSES are drawn is innermost and everything read against it goes outward, with a divider between bands. A crowded glyph takes the next free ring in its own band, measured in glyph widths at that radius rather than in degrees. Angle is never nudged: radius is free, angle is what the wheel asserts. Every body's radius is worked out once into one map that the glyphs AND the aspect chords read, because chords reaching radii of their own is what left stubs hanging beside their bodies."
+    },
+    {
+      "on": "2026-10-10",
+      "what": "The middle of the wheel is empty and the bands take the room. Aspect chords are drawn and held at nothing on every wheel; clicking a body shows the lines it makes and lights the bodies at their far ends. That freed the centre, so the house numbers and the chord circle moved inward (150 to 78, 132 to 62) and the bands spread into what they left. Each set is named in a corner in its own colour, with which wheel it is and when and where it was cast."
     }
   ],
   "open": [
@@ -560,6 +588,12 @@
     },
     {
       "what": "Return charts, properly. Kaycee, 2026-09-12: 'we need to remove the return chart pills from the transit page, they still aren't entirely accurate and it will be important that they are for this part.' Three things a real return chart needs that a transit view cannot give it. The exact moment, not the date: 'The line on the sun/earth placements is incredibly important as it's a profile that sets the tone for the cycle', and a line is about a hundred minutes of solar travel. Its own design side, about 88 solar degrees before the return, exactly as a birth chart has. And probably its own drawing, closer to a relationship chart than a transit: the return laid over the natal, two states at once, which she first raised on 2026-09-10 about the Uranus Opposition cross. The moments are already computed to the second and verified against Swiss Ephemeris, so the arithmetic is done; the chart is not."
+    },
+    {
+      "what": "Dropdowns for wheel positions 1, 2 and 3 instead of the perspective pills. Kaycee's thinking, 10 October: an explicit designation per position would make the chart self-describing and would let a reader build readings we cannot currently express. The caveat is that position must stay a rendering detail: the code tags by person and side, because swapping perspective moves a person to another ring and position-as-identity is exactly the bug class that cost a day. Position 1 would also have to be stated as the one that defines the houses."
+    },
+    {
+      "what": "astro-wheel.ts is not covered by scripts/copy-check.ts, so words added to the wheel itself (the corner labels, Inner/Middle/Outer wheel) reach a client without the copy gate seeing them. Adding the file would surface a large backlog of existing strings for approval in one go."
     }
   ],
   "brief": "https://claude.ai/code/artifact/3428e24e-262a-4fd7-86a6-93468244cb44",
