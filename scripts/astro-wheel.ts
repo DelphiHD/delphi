@@ -232,7 +232,7 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
    *  A corner that says Design without saying WHICH moment leaves the reader
    *  to remember that it is 88 days before the birth. Kaycee, 2026-10-10:
    *  "can we add the relevant dates to the corner positions?" */
-  legendWhen: (string | null | undefined)[] = []): string {
+  legendWhen: (readonly (string | null | undefined)[] | null | undefined)[] = []): string {
   ANCHOR = anchor;
   const asc = chart.ascendant;
   const s: string[] = [];
@@ -786,11 +786,15 @@ export function renderWheel(chart: AstroChart, name: string, design?: AstroChart
         `font-weight="600" fill="${entry.ink}">${entry.name}</text>`);
       s.push(`<text x="${lx}" y="${ly + 17}" text-anchor="${anchor}" font-size="11.5" ` +
         `fill="#6b6790">${ringWord(i)}</text>`);
-      const when = legendWhen[i];
-      if (when) {
-        s.push(`<text x="${lx}" y="${ly + 33}" text-anchor="${anchor}" font-size="11" ` +
-          `fill="#6b6790">${when}</text>`);
-      }
+      // When and where this wheel was cast, a line each under its ring. Her
+      // reference bi-wheel carries the date, the hour and the place in the
+      // corner; on a tri-wheel especially, a ring that says only "Transit"
+      // says nothing about which transit. Kaycee, 2026-10-10: "we need to
+      // add the time and location to the tri-wheel corners."
+      (legendWhen[i] ?? []).filter(Boolean).forEach((line, k) => {
+        s.push(`<text x="${lx}" y="${ly + 33 + k * 15}" text-anchor="${anchor}" ` +
+          `font-size="11" fill="#6b6790">${line}</text>`);
+      });
     });
   }
 

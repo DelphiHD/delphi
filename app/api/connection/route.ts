@@ -260,6 +260,33 @@ export async function GET(request: Request) {
       // person purple, the second teal.
       const PERSON_A = "#845095";
       const PERSON_B = "#0d9488";
+      // When and where each person was born, for the corners, so a ring says
+      // whose it is AND which moment it was cast for. Kaycee, 2026-10-10:
+      // "Add the same info to the bi-wheel relationship view too."
+      // Written the way the chart writes a date everywhere else, rather than
+      // as the database holds it.
+      const MONTHS = ["January", "February", "March", "April", "May", "June", "July",
+        "August", "September", "October", "November", "December"];
+      const prettyDay = (iso: string) => {
+        const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+        return m ? `${MONTHS[Number(m[2]) - 1]} ${Number(m[3])}, ${m[1]}` : iso;
+      };
+      const prettyHour = (hm: string) => {
+        const m = /^(\d{2}):(\d{2})/.exec(hm);
+        if (!m) return hm;
+        const h = Number(m[1]);
+        return `${h % 12 === 0 ? 12 : h % 12}:${m[2]} ${h < 12 ? "AM" : "PM"}`;
+      };
+      const bornLine = (p: Person) =>
+        [`${prettyDay(p.birthDate)}${p.birthTime ? " \u00b7 " + prettyHour(p.birthTime) : ""}`,
+          p.birthPlace];
+      const designLine = (utc: string | undefined, p: Person) => utc
+        ? [`${prettyDay(String(utc))} \u00b7 ${prettyHour(String(utc).slice(11, 16))} UTC`,
+            p.birthPlace]
+        : bornLine(p);
+      const meBorn = bornLine(me), themBorn = bornLine(them);
+      const meDesign = designLine((conn.a as { designUtc?: string }).designUtc, me);
+      const themDesign = designLine((conn.b as { designUtc?: string }).designUtc, them);
       // Each person's design moment comes from their own HD response, which is
       // where the 88-degree instant is recorded.
       const designAt = async (utc: string | undefined, birthDate: string, birthTime: string, at: string) =>
@@ -277,6 +304,7 @@ export async function GET(request: Request) {
         PERSON_A,
         // the gate ring belongs to the two of them, not to personality and design
         { a: PERSON_A, b: PERSON_B },
+        null, "personality", null, null, null, false, [meBorn, themBorn],
       );
       // The same wheel from the other side: their houses and ascendant frame it,
       // and the two people keep their colours whichever of them is the base.
@@ -288,6 +316,7 @@ export async function GET(request: Request) {
         { personality: mine, design: myDesign, colour: PERSON_A, name: conn.a.name, who: "a" },
         PERSON_B,
         { a: PERSON_B, b: PERSON_A },
+        null, "personality", null, null, null, false, [themBorn, meBorn],
       );
       // The same pair read on a DESIGN horizon. A design chart is cast at its
       // own moment and carries its own ascendant and houses, so two designs
@@ -306,6 +335,7 @@ export async function GET(request: Request) {
           { a: PERSON_A, b: PERSON_B },
           null,
           "design",
+          null, null, null, false, [meDesign, themDesign],
         );
         wheelSvgBD = renderWheel(
           theirDesign, conn.b.name, theirs, "ascendant",
@@ -317,6 +347,7 @@ export async function GET(request: Request) {
           { a: PERSON_B, b: PERSON_A },
           null,
           "design",
+          null, null, null, false, [themDesign, meDesign],
         );
       }
       withEarth(theirDesign as never, conn.b.design);

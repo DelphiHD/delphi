@@ -180,11 +180,15 @@ export async function GET(request: Request): Promise<Response> {
         whole ? "personality" : side,
         designChart ? { chart: sky, side: "transit", colour: TRANSIT_COLOUR } : null,
         aspects, retroFor(sky.planets, date, time), false,
-        // the moment each ring was cast, for the corners
+        // When and where each ring was cast. A ring labelled only "Transit"
+        // says nothing about WHICH transit, which is the whole question on
+        // this view.
         [
-          String(chart.birth_date ?? "").slice(0, 10),
-          designChart ? String(designUtc ?? "").slice(0, 10) : `${date} ${time}`,
-          designChart ? `${date} ${time}` : "",
+          [`${born.birthDate} \u00b7 ${born.birthTime}`, born.place],
+          designChart
+            ? [String(designUtc ?? "").slice(0, 16).replace("T", " \u00b7 ") + " UTC", born.place]
+            : [`${date} \u00b7 ${time}`, place || "UTC"],
+          designChart ? [`${date} \u00b7 ${time}`, place || "UTC"] : null,
         ]),
       // The sky's OWN placements. Without these the page had nothing to say
       // about a transiting body and answered out of the birth chart instead:

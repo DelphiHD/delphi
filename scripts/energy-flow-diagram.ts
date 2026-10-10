@@ -12317,9 +12317,12 @@ export async function runBuilder(argv: string[] = process.argv.slice(2)): Promis
   const cross = scene.astroExtras?.synastry ?? [];
   // The moment each wheel was cast, for the corners. Only the date: the hour
   // is on the Dates tab and a corner is a label, not a record.
-  const dateOnly = (t: string) => t.split("\u00b7")[0].trim();
-  const whenBorn = dateOnly(scene.client?.subtitle.personality[0] ?? "");
-  const whenDesign = dateOnly(scene.client?.subtitle.design[0] ?? "");
+  // Each corner carries when and where its wheel was cast: the date and hour
+  // on one line, the place on the next, the way her reference bi-wheel does.
+  const whenBorn = [scene.client?.subtitle.personality[0] ?? "",
+    scene.client?.subtitle.personality[1] ?? ""];
+  const whenDesign = [scene.client?.subtitle.design[0] ?? "",
+    scene.client?.subtitle.design[1] ?? scene.client?.subtitle.personality[1] ?? ""];
   const bornThenDesign = [whenBorn, whenDesign];
   const designThenBorn = [whenDesign, whenBorn];
   const astroHtml = astroChart
