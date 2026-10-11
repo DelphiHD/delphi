@@ -127,6 +127,8 @@ h1 { font-weight: 400; font-size: clamp(22px, 4vw, 28px); letter-spacing: 0.02em
    Kaycee, 2026-10-11. */
 .perm { font: inherit; font-size: 11.5px; padding: 4px 10px; border-radius: 999px; cursor: pointer;
   border: 1px solid rgba(132, 80, 149, 0.28); background: #fff; color: var(--purple); white-space: nowrap; }
+.tbl tr.pinned td { background: rgba(199, 154, 46, 0.14); }
+.tbl tr.pinned td:first-child { box-shadow: inset 3px 0 0 var(--gold); }
 .shelf { display: flex; justify-content: flex-end; margin: 14px 0 6px; }
 .veil { position: fixed; inset: 0; background: rgba(28, 26, 46, 0.45); display: flex;
   align-items: center; justify-content: center; padding: 16px; z-index: 50; }

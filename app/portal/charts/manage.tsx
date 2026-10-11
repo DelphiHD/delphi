@@ -143,6 +143,8 @@ export function AddChart() {
  * Choosing asks first. On 2026-10-11 her own was found set to a chart called
  * "test", most likely one stray tap while scrolling eighty rows on a phone:
  * "we should probably make it a little more difficult to change My Chart."
+ * The same day she folded it into Manage and took the radio column away: the
+ * chart that is yours stays at the top of the list, in its own colour.
  *
  * Manage, on each row: archive (out of the list, link intact, undoable) or
  * delete (erased for good, after a window that says so and offers the chart's
@@ -165,7 +167,6 @@ export function ChartTable(
 
   const archivedCount = rows.filter((r) => r.archived === "yes").length;
   const shown = rows.filter((r) => (r.archived === "yes") === showArchived);
-  const nameOf = (id: string) => String(rows.find((r) => String(r.id) === id)?.name ?? "");
   const close = () => { setAsking(null); setError(""); setBusy(false); };
 
   async function post(url: string, body: object): Promise<boolean> {
@@ -202,15 +203,12 @@ export function ChartTable(
       )}
       <SortableTable
         initial={{ key: "name", dir: 1 }}
-        picked={choice}
-        onPick={(id) => setAsking({ kind: "mine", id, name: nameOf(id) })}
-        pickName="whoami"
+        pinned={choice}
         onAction={(id) => {
           const r = rows.find((x) => String(x.id) === id);
           if (r) setAsking({ kind: "manage", id, name: String(r.name), archived: r.archived === "yes", href: String(r.chartHref) });
         }}
         columns={[
-          { key: "mine", label: "You", radio: true },
           { key: "name", label: "Name" },
           { key: "chart", label: "Chart", link: "chartHref" },
           { key: "profile", label: "Profile" },
@@ -238,6 +236,9 @@ export function ChartTable(
             {asking.kind === "manage" && (<>
               <h2>{asking.name}</h2>
               <div className="btns">
+                {asking.id !== choice && (
+                  <button disabled={busy} onClick={() => setAsking({ kind: "mine", id: asking.id, name: asking.name })}>Make This My Chart</button>
+                )}
                 <button disabled={busy} onClick={() => archive(asking.id, !asking.archived)}>
                   {asking.archived ? "Restore" : "Archive"}
                 </button>

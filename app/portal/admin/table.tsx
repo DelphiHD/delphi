@@ -27,7 +27,7 @@ export interface Column {
 
 export type Row = Record<string, string | number | null>;
 
-export function SortableTable({ columns, rows, initial, empty, picked, onPick, pickName, onAction }: {
+export function SortableTable({ columns, rows, initial, empty, picked, onPick, pickName, onAction, pinned }: {
   columns: Column[];
   rows: Row[];
   initial?: { key: string; dir: 1 | -1 };
@@ -38,6 +38,8 @@ export function SortableTable({ columns, rows, initial, empty, picked, onPick, p
   pickName?: string;
   /** a button column was pressed on this row */
   onAction?: (id: string, key: string) => void;
+  /** this row always first, whatever the sort, and marked */
+  pinned?: string | null;
 }) {
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>(
     initial ?? { key: columns[0].key, dir: 1 },
@@ -57,8 +59,8 @@ export function SortableTable({ columns, rows, initial, empty, picked, onPick, p
       if (y === null || y === undefined || y === "") return -1;
       if (col?.numeric) return (Number(x) - Number(y)) * sort.dir;
       return String(x).localeCompare(String(y), undefined, { numeric: true }) * sort.dir;
-    });
-  }, [rows, sort, find, columns]);
+    }).sort((a, b) => Number(String(b.id) === pinned) - Number(String(a.id) === pinned));
+  }, [rows, sort, find, columns, pinned]);
 
   return (
     <>
@@ -88,7 +90,7 @@ export function SortableTable({ columns, rows, initial, empty, picked, onPick, p
               <tr><td colSpan={columns.length}>{empty ?? "Nothing here."}</td></tr>
             )}
             {shown.map((r, i) => (
-              <tr key={String(r.id ?? i)}>
+              <tr key={String(r.id ?? i)} className={pinned && String(r.id) === pinned ? "pinned" : undefined}>
                 {columns.map((c) => {
                   const v = r[c.key];
                   const href = c.link ? String(r[c.link] ?? "") : "";
