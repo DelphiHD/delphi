@@ -680,6 +680,9 @@ const want=new Set();let finding=false;
 // for any choice: across twelve charts, 56% of top-ten matches lay beyond 60
 // degrees against 5% of cities. The person sets how far to look; 60 to start.
 let latLimit=60;
+// Continents to look in; none chosen means everywhere. Kaycee, 2026-10-11.
+const CONTS=["Africa","Asia","Europe","North America","South America","Oceania"];
+const conts=new Set();
 const STEP=2,GC=Math.round(360/STEP),GR=Math.round((TOP-BOTTOM)/STEP);
 const dense=new Map();   // line -> points every 0.4 degrees
 function densePts(l){
@@ -723,7 +726,7 @@ function computeFind(){
   // Rank cities exactly, starting from the cells that score at all.
   const cell=(lat,lon)=>{const r=Math.min(GR-1,Math.max(0,Math.floor((TOP-lat)/STEP))),c=Math.min(GC-1,Math.max(0,Math.floor((lon+180)/STEP)));return score[r*GC+c]};
   const ranked=[];
-  if(groups.length)for(const c of CITIES){if(c.stn||Math.abs(c.lat)>latLimit||c.lat>TOP||c.lat<BOTTOM||cell(c.lat,c.lon)<=0)continue;
+  if(groups.length)for(const c of CITIES){if(c.stn||(conts.size&&!conts.has(c.ct))||Math.abs(c.lat)>latLimit||c.lat>TOP||c.lat<BOTTOM||cell(c.lat,c.lon)<=0)continue;
     let sc=0,sum=0;const per=[];
     for(const g2 of groups){const mi=Math.min(...g2.ls.map(l=>distTo(l,c.lat,c.lon)));const v=gradeVal(mi);sc+=v;sum+=Math.min(mi,700);per.push({sd:g2.sd,b:g2.b,mi,v})}
     if(sc>0)ranked.push({c,sc,sum,per})}
@@ -744,6 +747,7 @@ function renderFind(){
   const F=lastFind;
   box.innerHTML='<button class="x" title="Close">&times;</button><h2>Find My Places</h2>'+
     '<div class="grid">'+[...BODIES,...EXTRAS.filter(x=>st.extras.has(x))].map(b=>'<div class="w-opt'+(want.has(b)?" on":"")+'" data-want="'+b+'"><span class="radio"></span><span class="gl">'+GLYPH[b]+'</span>'+b+'</div>').join("")+'</div>'+
+    '<h3>Continent</h3><div class="lims">'+['All',...CONTS].map(t=>'<button class="w-pill'+((t==="All"?!conts.size:conts.has(t))?" on":"")+'" data-cont="'+t+'">'+t+'</button>').join("")+'</div>'+
     '<h3>Latitude Limit</h3><div class="lims">'+[[45,"45°"],[60,"60°"],[66.5,"Polar Circles"],[90,"No Limit"]].map(([v,t])=>'<button class="w-pill'+(v===latLimit?" on":"")+'" data-lim="'+v+'">'+t+'</button>').join("")+'</div>'+
     (F.groups.length?'<h3>Closest Matches</h3>'+(F.top.length?F.top.map((t,i)=>'<div class="fr" data-fi="'+i+'"><b>'+t.c.n+'</b> <span class="co">'+t.c.c+'</span>'+
       '<div class="mt">'+t.per.filter(p=>p.v).map(p=>'<span><span style="color:'+(p.sd==="design"?"var(--design)":"var(--ink)")+'">'+GLYPH[p.b]+'</span>'+gradePill(GRADES.find(g=>g[1]===p.v))+'</span>').join("")+'</div></div>').join(""):'<div class="none">No cities within 700 miles of these lines.</div>'):"");
@@ -752,6 +756,7 @@ function renderFind(){
 document.getElementById("w-findBtn").onclick=()=>{finding=!finding;renderFind()};
 document.getElementById("w-find").addEventListener("click",e=>{
   if(e.target.closest(".x")){finding=false;return renderFind()}
+  const ct=e.target.closest("[data-cont]");if(ct){const t=ct.dataset.cont;if(t==="All")conts.clear();else conts.has(t)?conts.delete(t):conts.add(t);return renderFind()}
   const lim=e.target.closest("[data-lim]");if(lim){latLimit=+lim.dataset.lim;return renderFind()}
   const w=e.target.closest("[data-want]");if(w){const b=w.dataset.want;want.has(b)?want.delete(b):want.add(b);return renderFind()}
   const r=e.target.closest("[data-fi]");if(r){const c=lastFind.top[+r.dataset.fi].c;
@@ -929,7 +934,7 @@ if(opts.planets){
 // The chart's Reset puts this view back as it opened, too.
 const resetWorld=()=>{view.k=1;view.tx=0;view.ty=0;clampView();here=null;pinned.clear();relOpen=false;
   st.lines=new Set(BODIES.filter(b=>!START_OFF.includes(b)));st.angles=new Set(ANGLES);st.extras=new Set();
-  finding=false;want.clear();comparing=false;st.parans.clear();renderFind();renderCompare();paint()};
+  finding=false;want.clear();conts.clear();comparing=false;st.parans.clear();renderFind();renderCompare();paint()};
 // For the checks (the tooltip sweep and the parity test): what this view drew
 // and how it names it.
 root.world = { D: D, LN: LN, PR: PR, describe: describe, state: st, reset: resetWorld };

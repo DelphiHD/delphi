@@ -11,6 +11,7 @@
  * Sources, all public domain, no credit needed on the map:
  *   world-atlas@2.0.2 land-50m.json and countries-50m.json (Natural Earth)
  *   Natural Earth ne_50m_populated_places_simple.geojson
+ *   Natural Earth ne_50m_admin_0_countries.geojson (continents only; not shipped)
  * kept in .cache/world-atlas and .cache/natural-earth. Rebuild with
  *   npx tsx scripts/build-world-geometry.ts
  * and bump the file name when the drawing changes, so cached copies refresh.
@@ -99,6 +100,31 @@ function bordersPath(file: string): string {
   return out.join("");
 }
 
+/**
+ * Each city's continent, for the Find My Places continent filter (Kaycee,
+ * 2026-10-11). From Natural Earth's countries, joined on ADM0_A3, with the
+ * few places that file leaves out or files under open ocean placed by hand,
+ * Russia split at the Urals (60E) so Vladivostok is not counted as Europe, and
+ * Turkey at the Bosphorus.
+ */
+const CONTINENT = new Map<string, string>();
+for (const f of JSON.parse(readFileSync(join(".cache", "natural-earth", "ne_50m_admin_0_countries.geojson"), "utf8")).features) {
+  CONTINENT.set(String(f.properties.ADM0_A3), String(f.properties.CONTINENT));
+}
+const BY_HAND: Record<string, string> = {
+  GIB: "Europe", SJM: "Europe", SSD: "Africa",          // not in the countries file under these codes
+  SHN: "Africa", SYC: "Africa", MUS: "Africa",          // filed under open ocean
+  MDV: "Asia", IOT: "Asia", SGS: "South America", ATF: "Africa", HMD: "Oceania",
+};
+function continentOf(adm0: string, lon: number): string {
+  if (adm0 === "RUS") return lon >= 60 ? "Asia" : "Europe";
+  // and Turkey at the Bosphorus, so Istanbul and Thrace are Europe
+  if (adm0 === "TUR") return lon < 29.1 ? "Europe" : "Asia";
+  const c = BY_HAND[adm0] ?? CONTINENT.get(adm0) ?? "";
+  if (!c) throw new Error(`no continent for country ${adm0}`);
+  return c;
+}
+
 /** Natural Earth's populated places: name, country, position, and the zoom
  *  at which a web map would first show it, which decides when it appears. */
 function cities(file: string) {
@@ -111,6 +137,7 @@ function cities(file: string) {
       // Research stations are places on the map but not places to live.
       stn: String(q.featurecla) === "Scientific station" ? 1 : 0,
       pop: Number(q.pop_max),
+      ct: continentOf(String(q.adm0_a3), Number(q.longitude)),
     };
   }).sort((a: { z: number; pop: number }, b: { z: number; pop: number }) => a.z - b.z || b.pop - a.pop);
 }
