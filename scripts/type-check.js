@@ -37,10 +37,13 @@
   const cols = document.querySelector('div.sidecols');
   const canvas = [...document.querySelectorAll('svg.canvas')].find(vis);
   if (cols && vis(cols) && canvas) {
-    const name = canvas.querySelector('.cname');
-    const ref = name ? { size: round(name.getBoundingClientRect().height), cs: getComputedStyle(name) } : null;
+    // the name over the columns is the reference for size, weight and font
+    const name = cols.querySelector('.sname > div') || canvas.querySelector('.cname');
+    const ref = name ? getComputedStyle(name) : null;
     const colStyle = getComputedStyle(cols);
-    if (ref && colStyle.fontWeight !== ref.cs.fontWeight) problems.push(`Columns weight ${colStyle.fontWeight}, the name ${ref.cs.fontWeight}`);
+    if (ref && colStyle.fontWeight !== ref.fontWeight) problems.push(`Columns weight ${colStyle.fontWeight}, the name ${ref.fontWeight}`);
+    if (ref && Math.abs(parseFloat(colStyle.fontSize) - parseFloat(ref.fontSize)) > 0.5) problems.push(`Columns ${colStyle.fontSize}, the name ${ref.fontSize}`);
+    if (name && name.closest('svg') && name.getBoundingClientRect().height < 11) problems.push(`The name renders at about ${round(name.getBoundingClientRect().height)}px tall, too small to read`);
     for (const col of cols.querySelectorAll('.scol')) {
       const side = col.classList.contains('left') ? 'left column' : 'right column';
       const parts = [...col.querySelectorAll('.shead, .sn span, .sn')].filter(vis);

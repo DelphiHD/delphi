@@ -4381,7 +4381,11 @@ body.view-world #relhome > details, body.view-world #relswap { display:none !imp
   .phonebar .circpill.on { background:#845095; border-color:#845095; color:#fff; }
   /* the drawing's own columns give way to the slim ones beside it */
   body.has-sidecols .wrap .stage svg.canvas > .ptable { visibility:hidden; }
-  .sidecols { position:absolute; left:0; right:0; pointer-events:none; display:flex; justify-content:space-between; align-items:stretch; padding:0 2px; }
+  .sidecols { position:absolute; left:0; right:0; pointer-events:none; display:flex; flex-direction:column; padding:0 2px; }
+  .sidecols .sname { text-align:center; color:#1c1a2e; padding:0 0 .5em; line-height:1.25; }
+  .sidecols .sname .sdate { color:#6b6790; }
+  .sidecols .scols { flex:1; display:flex; justify-content:space-between; align-items:stretch; }
+  body.has-sidecols .wrap .stage svg.canvas > .cname, body.has-sidecols .wrap .stage svg.canvas > .tname { visibility:hidden; }
   /* Every word in the columns in the name's own font, size and weight
      (set from the name, in buildCols); the headings too. Kaycee,
      2026-10-11: "fonts will be of similar styles and sizes and everything on
@@ -8545,8 +8549,8 @@ if (DATA.client) {
     if (!cols || !canvas) return;
     canvas.style.marginBottom = '';
     var s = cols.parentNode.getBoundingClientRect(), r = canvas.getBoundingClientRect();
-    cols.style.top = (r.top - s.top + r.height * 0.06) + 'px';
-    cols.style.minHeight = (r.height * 0.9) + 'px';
+    cols.style.top = (r.top - s.top) + 'px';
+    cols.style.minHeight = (r.height * 0.96) + 'px';
     // a narrowed bodygraph can be shorter than its columns: the drawing's
     // space grows to hold them, so they never run into the panel below
     var over = cols.getBoundingClientRect().bottom - r.bottom;
@@ -8564,6 +8568,18 @@ if (DATA.client) {
     var x = function (t) { return t.getBoundingClientRect().left; };
     tables.sort(function (a, b) { return x(a) - x(b); });
     cols = document.createElement('div'); cols.className = 'sidecols';
+    // The name, and a transit's moment under it, written over the drawing at
+    // the columns' own size: narrowing the bodygraph would otherwise shrink
+    // them to about 7px, half the size of the columns beside it.
+    var head = document.createElement('div'); head.className = 'sname';
+    [].forEach.call(canvas.querySelectorAll(':scope > .cname, :scope > .tname'), function (tx) {
+      if (!tx.textContent.trim() || getComputedStyle(tx).display === 'none') return;
+      var line = document.createElement('div'); line.textContent = tx.textContent.trim();
+      if (tx.classList.contains('tname')) line.className = 'sdate';
+      head.appendChild(line);
+    });
+    cols.appendChild(head);
+    var row = document.createElement('div'); row.className = 'scols'; cols.appendChild(row);
     // the name over the drawing sets the type for every word in the columns
     var nameEl = canvas.querySelector('.cname');
     var vbw = (canvas.getAttribute('viewBox') || '0 0 976').split(/[ ,]+/).map(Number)[2];
@@ -8616,7 +8632,7 @@ if (DATA.client) {
         d.appendChild(ncell); d.appendChild(acell);
         col.appendChild(d);
       });
-      cols.appendChild(col);
+      row.appendChild(col);
     });
     document.querySelector('.stage').appendChild(cols);
     document.body.classList.add('has-sidecols');
