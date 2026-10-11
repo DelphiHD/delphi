@@ -12,6 +12,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse, after } from "next/server";
 import { sendTeamEmail } from "@/lib/email";
+import { createClient as createServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -37,8 +38,17 @@ export async function POST(request: Request) {
     .eq("token", token).gte("created_at", new Date(Date.now() - 3600e3).toISOString());
   if ((count ?? 0) >= 10) return bad(429);
 
+  // Who sent it, if they are signed in: the verified session, in the request
+  // itself so any refreshed session reaches their browser.
+  let reporterId: string | null = null, reporterEmail: string | null = null;
+  try {
+    const session = await createServerClient();
+    const { data: { user } } = await session.auth.getUser();
+    if (user) { reporterId = user.id; reporterEmail = user.email ?? null; }
+  } catch { /* not signed in */ }
+
   const { data: row, error } = await db.from("problem_reports")
-    .insert({ token, person: link.client_name, what, context }).select("id").single();
+    .insert({ token, person: link.client_name, what, context, reporter_id: reporterId, reporter_email: reporterEmail }).select("id").single();
   if (error || !row) { console.error("report: not filed:", error?.message); return bad(500); }
 
   let imagePath = "";
@@ -62,8 +72,9 @@ export async function POST(request: Request) {
     const r = await sendTeamEmail({
       to,
       subject: `Problem report: ${link.client_name}${where ? ` · ${where}` : ""}`,
-      text: `${link.client_name} (${SITE}/c/${token})\n${where}\n\n${what}\n\nDashboard: ${SITE}/portal/admin`,
+      text: `${link.client_name} (${SITE}/c/${token})\n${where}\nFrom: ${reporterEmail ?? "not signed in"}\n\n${what}\n\nDashboard: ${SITE}/portal/admin`,
       html: `<p><b>${esc(String(link.client_name))}</b> · <a href="${SITE}/c/${token}">their chart</a>${where ? ` · ${esc(String(where))}` : ""}</p>` +
+        `<p style="color:#6b6790;font-size:12px">From: ${esc(reporterEmail ?? "not signed in")}</p>` +
         `<p style="white-space:pre-wrap">${esc(what)}</p>` +
         (pic ? `<p><a href="${pic}"><img src="${pic}" alt="" style="max-width:520px;border:1px solid #ddd;border-radius:8px"></a></p>` : "") +
         `<p style="color:#6b6790;font-size:12px">${esc([context.device, context.screen, context.browser].filter(Boolean).join(" · "))}</p>` +

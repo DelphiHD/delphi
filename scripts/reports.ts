@@ -29,6 +29,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
     }
     console.log(`\n── ${r.id}  ${String(r.created_at).slice(0, 16)}  [${r.status}]`);
     console.log(`${r.person} · ${[c.mode, c.view, c.transitAt].filter(Boolean).join(" · ")} · ${[c.device, c.screen].filter(Boolean).join(" ")}`);
+    console.log(`from: ${r.reporter_email ?? "not signed in"}`);
     console.log(`what: ${r.what}`);
     if (Array.isArray(c.errors) && c.errors.length) console.log(`errors:\n  ${(c.errors as string[]).join("\n  ")}`);
     if (c.browser) console.log(`browser: ${c.browser}`);

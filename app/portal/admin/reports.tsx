@@ -12,6 +12,8 @@ export interface Report {
   id: string; when: string; person: string; chartHref: string; what: string;
   where: string; device: string; errors: string[]; picture: string;
   status: string; notes: string; resolution: string;
+  /** the signed-in account that sent it; empty when nobody was signed in */
+  reporter: string;
 }
 
 const STATUS: [string, string][] = [
@@ -50,6 +52,7 @@ export function Reports({ reports }: { reports: Report[] }) {
               <div>
                 <b style={{ fontSize: 15, color: "var(--ink)" }}>{r.person}</b>{" "}
                 <a href={r.chartHref} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>chart</a>
+                <div style={{ fontSize: 12 }}>From {r.reporter ? <a href={`mailto:${r.reporter}`}>{r.reporter}</a> : <span className="dim">not signed in</span>}</div>
                 <div className="dim" style={{ fontSize: 12 }}>{r.when} UTC{r.where ? ` · ${r.where}` : ""}{r.device ? ` · ${r.device}` : ""}</div>
               </div>
               <select value={r.status} onChange={(e) => { edit(r.id, "status", e.target.value); save({ ...r, status: e.target.value }); }}

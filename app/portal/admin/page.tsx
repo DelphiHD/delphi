@@ -185,7 +185,7 @@ export default async function AdminPage() {
   // Problem reports from the chart pages, newest first, each picture behind a
   // link that lasts an hour (the bucket is private).
   const { data: reportRows } = await db.from("problem_reports")
-    .select("id, created_at, token, person, what, context, image_path, status, notes, resolution")
+    .select("id, created_at, token, person, what, context, image_path, status, notes, resolution, reporter_email")
     .order("created_at", { ascending: false }).limit(300);
   const paths = (reportRows ?? []).map((r) => r.image_path).filter(Boolean) as string[];
   const signed = paths.length ? (await db.storage.from("charts").createSignedUrls(paths, 3600)).data ?? [] : [];
@@ -200,6 +200,7 @@ export default async function AdminPage() {
       errors: Array.isArray(c.errors) ? (c.errors as unknown[]).map(String) : [],
       picture: r.image_path ? pictureOf.get(String(r.image_path)) ?? "" : "",
       status: String(r.status), notes: String(r.notes ?? ""), resolution: String(r.resolution ?? ""),
+      reporter: String(r.reporter_email ?? ""),
     };
   });
 
