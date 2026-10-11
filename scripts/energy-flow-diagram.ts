@@ -7318,7 +7318,7 @@ if (DATA.client) {
       window.DelphiWorld.mount(document.getElementById('worldview'), DATA.world, {
         geometry: '/world/world-v1.json',
         api: { places: '/api/places', place: '/api/place', relocate: '/api/relocate',
-          sky: '/api/world-sky', timeline: '/api/world-timeline' },
+          sky: '/api/world-sky', timeline: '/api/world-timeline', journal: '/api/journal' },
         token: wtok.length === 32 ? wtok : '',
         fontCss: FONTCSS,
         planets: DATA.planets,

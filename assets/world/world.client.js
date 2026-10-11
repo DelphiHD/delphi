@@ -531,7 +531,32 @@ const ANGLE_NAME={ASC:"Ascendant",DSC:"Descendant",MC:"Midheaven",IC:"IC",LS:"Lo
 // the account that saved them.
 const STORE="acg-places|"+PERSON;
 let saved=[];try{saved=JSON.parse(localStorage.getItem(STORE)||"[]")}catch(e){saved=[]}
-function persist(){try{localStorage.setItem(STORE,JSON.stringify(saved))}catch(e){}}
+function persist(){if(account)return;try{localStorage.setItem(STORE,JSON.stringify(saved))}catch(e){}}
+// Signed in, saved places live in the person's journal instead of this
+// browser, and any kept here move over on the first visit. Kaycee,
+// 2026-10-11: one journal per account; places are its first entries.
+let account=false;
+const fromEntry=e=>({id:e.id,n:(e.place&&e.place.name)||fmtLat(e.place.lat)+", "+fmtLon(e.place.lon),c:(e.place&&e.place.country)||"",lat:e.place.lat,lon:e.place.lon});
+const asPlace=s=>({name:s.n,country:s.c,lat:s.lat,lon:s.lon});
+async function journal(method,body,query){
+  const r=await fetch(API.journal+(query||""),{method,headers:body?{"content-type":"application/json"}:{},body:body?JSON.stringify(body):undefined});
+  if(r.status===401)return null;
+  const j=await r.json().catch(()=>({ok:false}));
+  if(!j.ok)throw new Error("journal");
+  return j;
+}
+async function joinAccount(){
+  if(!API.journal||!opts.token)return;
+  try{
+    const j=await journal("GET",null,"?kind=place&token="+opts.token);if(!j)return;
+    account=true;
+    let entries=j.entries;
+    if(saved.length){const k=await journal("POST",{token:opts.token,places:saved.map(asPlace)});if(k)entries=k.entries;
+      try{localStorage.removeItem(STORE)}catch(e){}}
+    saved=entries.filter(e=>e.place).map(fromEntry);
+    renderCompare();renderHere();redraw();
+  }catch(e){account=false}
+}
 /** What reaches one place, under the current menus. Shared by the panel and the comparison. */
 function analyze(lat,lon){
   const sideOk=s=>st.side==="both"||s===st.side;
@@ -957,8 +982,9 @@ document.getElementById("w-here").addEventListener("click",e=>{
   const wb=e.target.closest("[data-wheel]");if(wb){const who=wb.dataset.wheel;const r=reloc.get(relocKey()+(who==="b"?BK():""));if(r&&r.svg)showWheel(r,placeName(here),"personality",who);return}
   const un=e.target.closest("[data-un]");if(un){pinned.delete(un.dataset.un);renderHere();redraw();return}
   if(e.target.closest("[data-save]")&&here){
-    saved.push({n:here.name?here.name.replace(/^Near /,"Near "):fmtLat(here.lat)+", "+fmtLon(here.lon),c:here.country||"",lat:here.lat,lon:here.lon});
-    persist();renderHere();renderCompare();redraw()}
+    const one={n:here.name?here.name.replace(/^Near /,"Near "):fmtLat(here.lat)+", "+fmtLon(here.lon),c:here.country||"",lat:here.lat,lon:here.lon};
+    saved.push(one);persist();renderHere();renderCompare();redraw();
+    if(account)journal("POST",{token:opts.token,places:[asPlace(one)]}).then(j=>{if(j){saved=j.entries.filter(e=>e.place).map(fromEntry);renderCompare()}}).catch(()=>{})}
 });
 // ---- Find My Places ---------------------------------------------------------
 // The person chooses which planets they want close; the map shades where those
@@ -1139,7 +1165,9 @@ document.getElementById("w-compare").addEventListener("click",e=>{
   if(e.target.closest("[data-pdf=compare]"))return compareReport();
   if(e.target.closest(".x")){comparing=false;return renderCompare()}
   const f=e.target.closest("[data-fold]");if(f){const k=f.dataset.fold;cmpOpen.has(k)?cmpOpen.delete(k):cmpOpen.add(k);return renderCompare()}
-  const rm=e.target.closest("[data-rm]");if(rm){saved.splice(+rm.dataset.rm,1);persist();renderCompare();renderHere();return redraw()}
+  const rm=e.target.closest("[data-rm]");if(rm){const gone=saved.splice(+rm.dataset.rm,1)[0];persist();
+    if(account&&gone&&gone.id)journal("DELETE",null,"?id="+gone.id).catch(()=>{});
+    renderCompare();renderHere();return redraw()}
   const go=e.target.closest("[data-go]");if(go){const s=saved[+go.dataset.go];openHere(s.lat,s.lon,{n:s.n,c:s.c,lat:s.lat,lon:s.lon})}
 });
 document.getElementById("w-compare").addEventListener("mouseover",e=>{const r=e.target.closest("tr[data-side]");if(r)hot(r.dataset,true)});
@@ -1319,6 +1347,7 @@ requestAnimationFrame(fitOnce);setTimeout(fitOnce,300);
 
 // Local space last: it reads state declared further down than the map.
 buildLS();paint();
+joinAccount();
 
 root.world = { D: D, LN: LN, PR: PR, describe: describe, state: st, reset: resetWorld };
 }
