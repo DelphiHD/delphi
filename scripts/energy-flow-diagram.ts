@@ -4385,6 +4385,7 @@ body.view-world #relhome > details, body.view-world #relswap { display:none !imp
   .sidecols .sname { text-align:center; color:#1c1a2e; padding:0 0 .5em; line-height:1.25; }
   .sidecols .sname .sdate { color:#6b6790; }
   .sidecols .scols { flex:1; display:flex; justify-content:space-between; align-items:stretch; }
+  .sidecols .scol.right { margin-left:auto; }
   body.has-sidecols .wrap .stage svg.canvas > .cname, body.has-sidecols .wrap .stage svg.canvas > .tname { visibility:hidden; }
   /* Every word in the columns in the name's own font, size and weight
      (set from the name, in buildCols); the headings too. Kaycee,
@@ -8602,7 +8603,11 @@ if (DATA.client) {
       [].forEach.call(t.querySelectorAll('.pgl'), function (g) { var b = g.getBBox(); G = Math.max(G, b.width, b.height); });
       G += 2;
       var col = document.createElement('div');
-      col.className = 'scol ' + (i === 0 ? 'left' : 'right') + ' s-' + t.getAttribute('data-side');
+      // the side it sits on in the drawing, so a lone Transit column stays
+      // on the right as it is on a desktop
+      var cr = canvas.getBoundingClientRect(), tr = t.getBoundingClientRect();
+      var onLeft = tr.left + tr.width / 2 < cr.left + cr.width / 2;
+      col.className = 'scol ' + (onLeft ? 'left' : 'right') + ' s-' + t.getAttribute('data-side');
       var head = t.querySelector(':scope > text');
       var h = document.createElement('div'); h.className = 'shead';
       // Delphi's own column, as the desktop draws it: the heading in its
@@ -8677,7 +8682,7 @@ if (DATA.client) {
       alignNumbers(); used = widthOf();
     }
     var bg = Math.max(0.46, Math.min(BG, (sw - used - 8) / sw));
-    var leftW = cs.length ? cs[0].getBoundingClientRect().width : 0;
+    var lc = cols.querySelector('.scol.left'), leftW = lc ? lc.getBoundingClientRect().width : 0;
     // centred in the space between the two columns, which can differ in width
     var start = leftW + (sw - used - bg * sw) / 2;
     canvas.style.width = (146 * bg) + '%';
