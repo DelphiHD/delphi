@@ -8370,6 +8370,25 @@ if (DATA.client) {
         document.body.removeChild(ta);
       }
     };
+
+    // The whole chart's data, ready to save as a PDF: what Copy Chart Data
+    // gives, both halves, on a page of its own. Opened from the portal's
+    // delete window, so a person erasing a chart can keep its data first.
+    // Kaycee, 2026-10-11.
+    // After the rest of the page has set itself up, so nothing it does later
+    // trips over a page that has been replaced.
+    if (/[?&]export=data(&|$)/.test(location.search)) setTimeout(function () {
+      var esc = function (t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;'); };
+      var parts = [hdText()];
+      if (DATA.astro) parts.push(astroText());
+      document.title = (DATA.client || {}).name + ' - Chart Data';
+      document.body.className = '';
+      document.body.innerHTML = '<div style="max-width:760px;margin:0 auto;padding:28px 22px;font-family:Montserrat,-apple-system,sans-serif;color:#1c1a2e">' +
+        '<h1 style="font-size:22px;font-weight:600;color:#845095;margin:0 0 18px">' + esc((DATA.client || {}).name) + '</h1>' +
+        parts.map(function (t) { return '<pre style="white-space:pre-wrap;font:12px/1.55 Menlo,Consolas,monospace;margin:0 0 26px;page-break-inside:auto">' + esc(t) + '</pre>'; }).join('') +
+        '</div>';
+      setTimeout(function () { window.print(); }, 600);
+    }, 0);
   })();
 
   var va0 = document.getElementById('vAstro');

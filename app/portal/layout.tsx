@@ -122,6 +122,25 @@ h1 { font-weight: 400; font-size: clamp(22px, 4vw, 28px); letter-spacing: 0.02em
 .addbox .places button:hover { background: rgba(132, 80, 149, 0.08); }
 .addbox .go { border: 0; }
 .addbox .go[disabled] { opacity: .45; }
+
+/* Manage, archive, delete, and the window that asks before any of them.
+   Kaycee, 2026-10-11. */
+.perm { font: inherit; font-size: 11.5px; padding: 4px 10px; border-radius: 999px; cursor: pointer;
+  border: 1px solid rgba(132, 80, 149, 0.28); background: #fff; color: var(--purple); white-space: nowrap; }
+.shelf { display: flex; justify-content: flex-end; margin: 14px 0 6px; }
+.veil { position: fixed; inset: 0; background: rgba(28, 26, 46, 0.45); display: flex;
+  align-items: center; justify-content: center; padding: 16px; z-index: 50; }
+.ask { background: #fff; border-radius: 16px; padding: 20px 20px 18px; max-width: 420px; width: 100%;
+  box-shadow: 0 18px 50px rgba(28, 26, 46, 0.25); }
+.ask h2 { font-size: 17px; font-weight: 600; margin: 0 0 8px; color: var(--ink); }
+.ask p { font-size: 13.5px; line-height: 1.6; color: var(--ink); margin: 0 0 16px; }
+.ask .btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.ask button, .ask a.btn { font: inherit; font-size: 13px; font-weight: 600; padding: 9px 16px; border-radius: 999px;
+  cursor: pointer; border: 1px solid rgba(132, 80, 149, 0.3); background: #fff; color: var(--purple); text-decoration: none; }
+.ask .yes { background: var(--purple); border-color: var(--purple); color: #fff; }
+.ask .gone { background: #b03a2e; border-color: #b03a2e; color: #fff; }
+.ask button[disabled] { opacity: .5; cursor: default; }
+.ask .err { color: #b03a2e; font-size: 12.5px; margin: 10px 0 0; }
 `;
 
 export default async function PortalLayout({

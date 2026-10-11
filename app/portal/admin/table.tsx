@@ -21,11 +21,13 @@ export interface Column {
   numeric?: boolean;
   /** a radio in each cell, for choosing one row out of the table */
   radio?: boolean;
+  /** a button in each cell, labelled with the cell's value */
+  action?: boolean;
 }
 
 export type Row = Record<string, string | number | null>;
 
-export function SortableTable({ columns, rows, initial, empty, picked, onPick, pickName }: {
+export function SortableTable({ columns, rows, initial, empty, picked, onPick, pickName, onAction }: {
   columns: Column[];
   rows: Row[];
   initial?: { key: string; dir: 1 | -1 };
@@ -34,6 +36,8 @@ export function SortableTable({ columns, rows, initial, empty, picked, onPick, p
   picked?: string | null;
   onPick?: (id: string) => void;
   pickName?: string;
+  /** a button column was pressed on this row */
+  onAction?: (id: string, key: string) => void;
 }) {
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>(
     initial ?? { key: columns[0].key, dir: 1 },
@@ -43,7 +47,8 @@ export function SortableTable({ columns, rows, initial, empty, picked, onPick, p
   const shown = useMemo(() => {
     const needle = find.trim().toLowerCase();
     const kept = needle
-      ? rows.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(needle)))
+      ? rows.filter((r) => Object.entries(r).some(([k, v]) =>
+          !columns.some((c) => c.action && c.key === k) && String(v ?? "").toLowerCase().includes(needle)))
       : rows;
     const col = columns.find((c) => c.key === sort.key);
     return [...kept].sort((a, b) => {
@@ -71,9 +76,9 @@ export function SortableTable({ columns, rows, initial, empty, picked, onPick, p
                 <th
                   key={c.key}
                   className={(c.small ? "hide-sm " : "") + (sort.key === c.key ? "on" : "")}
-                  onClick={() => { if (!c.radio) setSort((s) => ({ key: c.key, dir: s.key === c.key ? (s.dir === 1 ? -1 : 1) : 1 })); }}
+                  onClick={() => { if (!c.radio && !c.action) setSort((s) => ({ key: c.key, dir: s.key === c.key ? (s.dir === 1 ? -1 : 1) : 1 })); }}
                 >
-                  {c.label}{!c.radio && sort.key === c.key ? (sort.dir === 1 ? " ↑" : " ↓") : ""}
+                  {c.label}{!c.radio && !c.action && sort.key === c.key ? (sort.dir === 1 ? " ↑" : " ↓") : ""}
                 </th>
               ))}
             </tr>
@@ -98,6 +103,8 @@ export function SortableTable({ columns, rows, initial, empty, picked, onPick, p
                             onChange={() => onPick?.(id)}
                             aria-label={String(r.name ?? id)}
                           />
+                        : c.action
+                          ? <button type="button" className="perm" onClick={() => onAction?.(id, c.key)}>{String(v ?? "")}</button>
                         : href
                           ? <a href={href} target="_blank" rel="noreferrer">{String(v ?? "open")}</a>
                           : (v === null || v === undefined || v === "" ? <span className="dim">—</span> : String(v))}

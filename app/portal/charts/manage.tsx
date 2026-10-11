@@ -139,44 +139,128 @@ export function AddChart() {
  * Kaycee's account was eighty-one of them: "This will work, but this looks
  * terrible." She is right, and right about the fix too: "Can we just add a
  * button or radio in the table?" The choice belongs on the row it is about.
+ *
+ * Choosing asks first. On 2026-10-11 her own was found set to a chart called
+ * "test", most likely one stray tap while scrolling eighty rows on a phone:
+ * "we should probably make it a little more difficult to change My Chart."
+ *
+ * Manage, on each row: archive (out of the list, link intact, undoable) or
+ * delete (erased for good, after a window that says so and offers the chart's
+ * data first). Kaycee, 2026-10-11.
  */
+type Asking =
+  | { kind: "mine"; id: string; name: string }
+  | { kind: "manage"; id: string; name: string; archived: boolean; href: string }
+  | { kind: "delete"; id: string; name: string; href: string };
+
 export function ChartTable(
   { rows, picked }: { rows: Row[]; picked: string | null },
 ) {
   const router = useRouter();
   const [choice, setChoice] = useState(picked);
+  const [asking, setAsking] = useState<Asking | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
 
-  async function pick(id: string) {
-    setChoice(id);
+  const archivedCount = rows.filter((r) => r.archived === "yes").length;
+  const shown = rows.filter((r) => (r.archived === "yes") === showArchived);
+  const nameOf = (id: string) => String(rows.find((r) => String(r.id) === id)?.name ?? "");
+  const close = () => { setAsking(null); setError(""); setBusy(false); };
+
+  async function post(url: string, body: object): Promise<boolean> {
+    setBusy(true); setError("");
     try {
-      await fetch("/api/portal/primary", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ chartId: id }),
-      });
+      const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const j = await r.json().catch(() => ({ ok: false }));
+      if (!j.ok) { setError("That did not work. Please try again."); setBusy(false); return false; }
       router.refresh();
-    } catch { setChoice(picked); }
+      return true;
+    } catch {
+      setError("That did not work. Please try again."); setBusy(false); return false;
+    }
+  }
+
+  async function makeMine(id: string) {
+    if (await post("/api/portal/primary", { chartId: id })) { setChoice(id); close(); }
+  }
+  async function archive(id: string, archived: boolean) {
+    if (await post("/api/portal/archive", { chartId: id, archived })) close();
+  }
+  async function erase(id: string) {
+    if (await post("/api/portal/delete", { chartId: id })) close();
   }
 
   return (
-    <SortableTable
-      initial={{ key: "name", dir: 1 }}
-      picked={choice}
-      onPick={pick}
-      pickName="whoami"
-      columns={[
-        { key: "mine", label: "You", radio: true },
-        { key: "name", label: "Name" },
-        { key: "chart", label: "Chart", link: "chartHref" },
-        { key: "profile", label: "Profile" },
-        { key: "type", label: "Type" },
-        { key: "authority", label: "Authority", small: true },
-        { key: "definition", label: "Definition", small: true },
-        { key: "sun", label: "Personality Sun", small: true },
-        { key: "born", label: "Birth data", small: true },
-      ]}
-      rows={rows}
-      empty="No charts on this account yet."
-    />
+    <>
+      {archivedCount > 0 && (
+        <div className="shelf">
+          <button className="linky" onClick={() => setShowArchived((v) => !v)}>
+            {showArchived ? "Hide Archived" : `Show Archived (${archivedCount})`}
+          </button>
+        </div>
+      )}
+      <SortableTable
+        initial={{ key: "name", dir: 1 }}
+        picked={choice}
+        onPick={(id) => setAsking({ kind: "mine", id, name: nameOf(id) })}
+        pickName="whoami"
+        onAction={(id) => {
+          const r = rows.find((x) => String(x.id) === id);
+          if (r) setAsking({ kind: "manage", id, name: String(r.name), archived: r.archived === "yes", href: String(r.chartHref) });
+        }}
+        columns={[
+          { key: "mine", label: "You", radio: true },
+          { key: "name", label: "Name" },
+          { key: "chart", label: "Chart", link: "chartHref" },
+          { key: "profile", label: "Profile" },
+          { key: "type", label: "Type" },
+          { key: "authority", label: "Authority", small: true },
+          { key: "definition", label: "Definition", small: true },
+          { key: "sun", label: "Personality Sun", small: true },
+          { key: "born", label: "Birth data", small: true },
+          { key: "manage", label: "", action: true },
+        ]}
+        rows={shown}
+        empty="No charts on this account yet."
+      />
+
+      {asking && (
+        <div className="veil" onClick={(e) => { if (e.target === e.currentTarget && !busy) close(); }}>
+          <div className="ask" role="dialog" aria-modal="true">
+            {asking.kind === "mine" && (<>
+              <h2>Make {asking.name} your chart?</h2>
+              <div className="btns">
+                <button className="yes" disabled={busy} onClick={() => makeMine(asking.id)}>Yes</button>
+                <button disabled={busy} onClick={close}>Cancel</button>
+              </div>
+            </>)}
+            {asking.kind === "manage" && (<>
+              <h2>{asking.name}</h2>
+              <div className="btns">
+                <button disabled={busy} onClick={() => archive(asking.id, !asking.archived)}>
+                  {asking.archived ? "Restore" : "Archive"}
+                </button>
+                <button disabled={busy} onClick={() => setAsking({ kind: "delete", id: asking.id, name: asking.name, href: asking.href })}>Delete</button>
+                <button disabled={busy} onClick={close}>Close</button>
+              </div>
+            </>)}
+            {asking.kind === "delete" && (<>
+              <h2>Delete {asking.name}&rsquo;s chart?</h2>
+              <p>
+                This erases the chart, its link and everything saved with it. It
+                cannot be undone. Download the chart data first if you want to keep it.
+              </p>
+              <div className="btns">
+                <a className="btn" href={`${asking.href}?export=data`} target="_blank" rel="noreferrer">Download Chart Data</a>
+                <button className="gone" disabled={busy} onClick={() => erase(asking.id)}>Delete Forever</button>
+                <button disabled={busy} onClick={close}>Cancel</button>
+              </div>
+            </>)}
+            {error && <p className="err">{error}</p>}
+          </div>
+        </div>
+      )}
+    </>
   );
 }

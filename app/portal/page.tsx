@@ -69,7 +69,7 @@ export default async function PortalPage() {
   // where she sees everybody's.
   const { data: charts, error } = await supabase
     .from("charts")
-    .select("id, person_name, birth_date, birth_time, birth_place, time_accuracy, tier, token, summary, created_at")
+    .select("id, person_name, birth_date, birth_time, birth_place, time_accuracy, tier, token, summary, created_at, archived_at")
     .eq("owner_id", user?.id ?? "")
     .order("person_name");
 
@@ -92,6 +92,8 @@ export default async function PortalPage() {
       sun: s.personalitySun ?? "",
       born: birthData(String(c.birth_date), c.birth_time as string | null,
         String(c.time_accuracy ?? ""), String(c.birth_place ?? "")),
+      manage: "Manage",
+      archived: c.archived_at ? "yes" : "",
     };
   });
 
