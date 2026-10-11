@@ -4382,14 +4382,24 @@ body.view-world #relhome > details, body.view-world #relswap { display:none !imp
   /* the drawing's own columns give way to the slim ones beside it */
   body.has-sidecols .wrap .stage svg.canvas > .ptable { visibility:hidden; }
   .sidecols { position:absolute; left:0; right:0; pointer-events:none; display:flex; justify-content:space-between; align-items:stretch; padding:0 2px; }
-  .sidecols .sgl { width:15px; height:15px; vertical-align:-2px; margin-right:4px; overflow:visible; }
-  .sidecols .scol.right .sgl { margin-right:4px; }
-  .sidecols .scol { width:auto; min-width:17%; display:flex; flex-direction:column; justify-content:space-between; pointer-events:auto; }
-  .sidecols .shead { font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; color:#6b6790; font-weight:600; padding:0 4px 2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  /* Every word in the columns in the name's own font, size and weight
+     (set from the name, in buildCols); the headings too. Kaycee,
+     2026-10-11: "fonts will be of similar styles and sizes and everything on
+     the page will be harmoniously aligned." Each row is a fixed grid of glyph,
+     number and arrow, so every glyph and every decimal lines up. */
+  .sidecols .scol { width:auto; display:flex; flex-direction:column; justify-content:space-between; pointer-events:auto; }
+  .sidecols .shead { color:#6b6790; padding:0 4px 3px; white-space:nowrap; }
   .sidecols .scol.right .shead { text-align:right; }
-  .sidecols .prow, .sidecols .trow { font-size:13px; font-weight:600; line-height:1; padding:4px 5px; border-radius:6px; white-space:nowrap; cursor:pointer; font-variant-numeric:tabular-nums; }
-  .sidecols .scol.right .prow, .sidecols .scol.right .trow { text-align:right; }
+  .sidecols .prow, .sidecols .trow { display:grid; grid-template-columns:1.15em auto .8em; align-items:center; column-gap:.4em;
+    line-height:1.15; padding:.18em .3em; border-radius:6px; white-space:nowrap; cursor:pointer; font-variant-numeric:tabular-nums; }
+  .sidecols .sg { display:flex; align-items:center; justify-content:center; width:1.15em; height:1.15em; }
+  .sidecols .sgl { width:100%; height:100%; overflow:visible; display:block; }
+  .sidecols .sn { text-align:right; }
+  .sidecols .sa { font-size:.7em; text-align:left; }
   .sidecols .prow.hi, .sidecols .trow.hi { background:rgba(132,80,149,.22); }
+  /* a gate's details sit along the bottom of the screen on a phone, never
+     over the bodygraph they explain */
+  .tip { position:fixed !important; left:8px !important; right:8px !important; top:auto !important; bottom:8px !important; max-width:none !important; z-index:45; }
   .phonetop { order:-1; width:100%; box-sizing:border-box; padding:0 4px; }
   .phonetop .datesec { margin:0 0 4px; padding-top:6px; }
   body:not(.mod-relation) .phonetop #relpick, body:not(.mod-relation) .phonetop #partyrow { display:none !important; }
@@ -8554,7 +8564,18 @@ if (DATA.client) {
     var x = function (t) { return t.getBoundingClientRect().left; };
     tables.sort(function (a, b) { return x(a) - x(b); });
     cols = document.createElement('div'); cols.className = 'sidecols';
+    // the name over the drawing sets the type for every word in the columns
+    var nameEl = canvas.querySelector('.cname');
+    var vbw = (canvas.getAttribute('viewBox') || '0 0 976').split(/[ ,]+/).map(Number)[2];
+    if (nameEl) {
+      var ncs = getComputedStyle(nameEl);
+      var px = parseFloat(nameEl.getAttribute('font-size') || ncs.fontSize) * canvas.getBoundingClientRect().width / vbw;
+      cols.style.fontFamily = ncs.fontFamily; cols.style.fontWeight = ncs.fontWeight; cols.style.fontSize = px.toFixed(2) + 'px';
+    }
     tables.forEach(function (t, i) {
+      var G = 0;
+      [].forEach.call(t.querySelectorAll('.pgl'), function (g) { var b = g.getBBox(); G = Math.max(G, b.width, b.height); });
+      G += 2;
       var col = document.createElement('div');
       col.className = 'scol ' + (i === 0 ? 'left' : 'right') + ' s-' + t.getAttribute('data-side');
       var head = t.querySelector(':scope > text');
@@ -8567,29 +8588,44 @@ if (DATA.client) {
         [].forEach.call(row.attributes, function (a) { if (a.name.indexOf('data-') === 0) d.setAttribute(a.name, a.value); });
         // the glyph as the chart draws it (Uranus, for one, is drawn in lines,
         // not a font character), then the numbers and any variable arrow
+        // every glyph at one scale, centred in the same square, so a small
+        // symbol is not blown up to the size of a large one
+        var gcell = document.createElement('span'); gcell.className = 'sg'; d.appendChild(gcell);
         var pg = row.querySelector('.pgl');
         if (pg) {
           var mini = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
           mini.setAttribute('class', 'sgl');
-          var gc = pg.cloneNode(true); mini.appendChild(gc); d.appendChild(mini);
-          var gb = pg.getBBox();
-          mini.setAttribute('viewBox', (gb.x - 1) + ' ' + (gb.y - 1) + ' ' + (gb.width + 2) + ' ' + (gb.height + 2));
+          mini.appendChild(pg.cloneNode(true)); gcell.appendChild(mini);
+          var gb = pg.getBBox(), cx = gb.x + gb.width / 2, cy = gb.y + gb.height / 2;
+          mini.setAttribute('viewBox', (cx - G / 2) + ' ' + (cy - G / 2) + ' ' + G + ' ' + G);
         }
         // each number in its own colour: a transit's combined column carries
         // the design and the personality side by side, red and black
+        var ncell = document.createElement('span'); ncell.className = 'sn';
+        var acell = document.createElement('span'); acell.className = 'sa';
         [].filter.call(row.querySelectorAll('text'), function (tx) { return !tx.closest('.pgl') && tx.textContent.trim(); })
-          .forEach(function (tx, k) {
+          .forEach(function (tx) {
+            var v = tx.textContent.trim();
+            // a variable's arrow has a cell of its own, so numbers line up
+            if (!/[0-9]/.test(v)) { acell.textContent = v; if (tx.getAttribute('fill')) acell.style.color = tx.getAttribute('fill'); return; }
             var sp = document.createElement('span');
-            sp.textContent = (k ? ' ' : '') + tx.textContent.trim();
+            sp.textContent = (ncell.childNodes.length ? ' ' : '') + v;
             if (tx.getAttribute('fill')) sp.style.color = tx.getAttribute('fill');
-            d.appendChild(sp);
+            ncell.appendChild(sp);
           });
+        d.appendChild(ncell); d.appendChild(acell);
         col.appendChild(d);
       });
       cols.appendChild(col);
     });
     document.querySelector('.stage').appendChild(cols);
     document.body.classList.add('has-sidecols');
+    // one width for every number in a column, so they line up on the decimal
+    [].forEach.call(cols.querySelectorAll('.scol'), function (c) {
+      var w = 0;
+      [].forEach.call(c.querySelectorAll('.sn'), function (n) { w = Math.max(w, n.getBoundingClientRect().width); });
+      [].forEach.call(c.querySelectorAll('.sn'), function (n) { n.style.width = Math.ceil(w) + 'px'; });
+    });
     // each column as wide as its rows need; the bodygraph takes what is left
     var sw = cols.getBoundingClientRect().width, cs = cols.querySelectorAll('.scol');
     var used = [].reduce.call(cs, function (a, c) { return a + c.getBoundingClientRect().width; }, 0);
