@@ -4358,7 +4358,7 @@ body.view-world #relhome > details, body.view-world #relswap { display:none !imp
      fills the phone and the planet columns either side fall outside it. They
      come back on a tap, from the bar above the drawing. */
   .stage { overflow-x:clip; }
-  .stage svg.canvas { width:141.4%; max-width:none; max-height:none; align-self:flex-start; margin-left:-21.7%; }
+  .wrap .stage svg.canvas { width:141.4%; max-width:none; max-height:none; align-self:flex-start; margin-left:-21.7%; }
   body:not(.view-astro):not(.view-world):not(.view-mandala) .phonebar { display:flex; }
   body.mod-transit #circpill, body.mod-variations .phonebar { display:none !important; }
   .phonebar { order:-1; width:100%; justify-content:space-between; align-items:center; gap:6px; padding:2px 4px 0; box-sizing:border-box; }
@@ -8497,7 +8497,7 @@ if (DATA.client) {
     [].forEach.call(canvas.querySelectorAll(':scope > .ptable'), function (t) {
       if (getComputedStyle(t).display === 'none') return;
       var head = t.querySelector(':scope > text');
-      var name = head ? head.textContent.trim().toLowerCase().replace(/\b\w/g, function (c) { return c.toUpperCase(); }) : t.getAttribute('data-side');
+      var name = (head ? head.textContent.trim() : t.getAttribute('data-side')).toLowerCase().split(' ').map(function (w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join(' ');
       var b = document.createElement('button');
       b.className = 'colpill'; b.textContent = name;
       b.onclick = function () { showColumn(t.getAttribute('data-side')); };
