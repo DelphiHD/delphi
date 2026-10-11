@@ -1068,9 +1068,9 @@ function redraw(){if(pending)return;pending=true;requestAnimationFrame(()=>{pend
 function zoomAt(fx,fy,k){const k0=view.k;view.k=Math.min(16,Math.max(1,k));
   view.tx=fx-(fx-view.tx)*view.k/k0;view.ty=fy-(fy-view.ty)*view.k/k0;clampView();redraw()}
 let gesturing=false;
-const touches=new Map();let pinch=null;
+const touches=new Map();let pinch=null,slide=null;
 const spread=()=>{const [a,b]=[...touches.values()];return {d:Math.hypot(a[0]-b[0],a[1]-b[1])||1,x:(a[0]+b[0])/2,y:(a[1]+b[1])/2}};
-const lift=e=>{touches.delete(e.pointerId);if(touches.size<2)pinch=null};
+const lift=e=>{touches.delete(e.pointerId);if(touches.size<2)pinch=null;if(!touches.size)slide=null};
 window.addEventListener("pointerup",lift);window.addEventListener("pointercancel",lift);
 svg.addEventListener("wheel",e=>{
   if(e.ctrlKey){if(gesturing)return;e.preventDefault();const [fx,fy]=frameAt(e.clientX,e.clientY);zoomAt(fx,fy,view.k*Math.exp(-e.deltaY*0.01));return}
@@ -1091,14 +1091,17 @@ let press=null;
 svg.addEventListener("pointerdown",e=>{if(e.button!==0)return;
   if(e.pointerType==="touch"){touches.set(e.pointerId,[e.clientX,e.clientY]);
     // A second finger makes it a pinch: whatever the first finger began is dropped.
-    if(touches.size>=2){press=null;drag=null;svg.classList.remove("grabbing");pinch={d:spread().d,k:view.k};return}}
+    if(touches.size>=2){press=null;drag=null;slide=null;svg.classList.remove("grabbing");pinch={d:spread().d,k:view.k};return}
+    // One finger on a phone, the whole map in view: it slides the map sideways.
+    if(view.k===1&&typeof phone==="function"&&phone())slide={x:e.clientX,left:stageEl.scrollLeft}}
   // What was pressed is read now: once the pointer is captured for a drag,
   // later events all report the map itself.
   press={x:e.clientX,y:e.clientY,moved:false,line:e.target.closest("#w-hits [data-side], #w-labels [data-side]")};
   if(view.k>1){drag={x:e.clientX,y:e.clientY,tx:view.tx,ty:view.ty};svg.setPointerCapture(e.pointerId)}});
 svg.addEventListener("pointermove",e=>{
   if(touches.has(e.pointerId)){touches.set(e.pointerId,[e.clientX,e.clientY]);
-    if(pinch&&touches.size>=2){const s=spread(),[fx,fy]=frameAt(s.x,s.y);zoomAt(fx,fy,pinch.k*s.d/pinch.d);return}}
+    if(pinch&&touches.size>=2){const s=spread(),[fx,fy]=frameAt(s.x,s.y);zoomAt(fx,fy,pinch.k*s.d/pinch.d);return}
+    if(slide&&touches.size===1){stageEl.scrollLeft=slide.left-(e.clientX-slide.x)}}
   if(press&&Math.hypot(e.clientX-press.x,e.clientY-press.y)>4)press.moved=true;
   if(!drag||!press||!press.moved)return;svg.classList.add("grabbing");const s=svg.getScreenCTM().a;view.tx=drag.tx+(e.clientX-drag.x)/s;view.ty=drag.ty+(e.clientY-drag.y)/s;clampView();redraw()});
 svg.addEventListener("pointerup",e=>{

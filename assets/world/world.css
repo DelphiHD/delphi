@@ -7,16 +7,22 @@
 @media (max-width:760px){
 .world{height:auto}
 .world .w-name{font-size:19px;padding:4px 0 2px}
-.world .w-bar{padding:4px 0 6px}
-.world .w-tools,.world .w-views{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding:0 2px}
+/* The bar is a layer above the map: on an iPhone each row that scrolls is a
+   layer of its own, and the menus and search results inside it were drawn
+   under the map that comes after it (Kaycee, 2026-10-11, from her phone). */
+.world .w-bar{padding:4px 0 6px;position:relative;z-index:25}
+.world .w-tools,.world .w-views{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:0 2px}
 .world .w-tools::-webkit-scrollbar,.world .w-views::-webkit-scrollbar{display:none}
 .world .w-tools>*,.world .w-views>*{flex:0 0 auto}
 .world .w-pill,.world .dd>button{white-space:nowrap}
-.world .search input{width:150px}
+/* 16px or more, or Safari zooms the whole page in when the box is tapped */
+.world .search input{width:160px;font-size:16px}
 .world .results{position:fixed;left:8px;right:8px;top:120px;z-index:40;min-width:0}
 .world .zoom{display:none}
-.world .w-stage{display:block;padding:0;overflow-x:auto;overflow-y:hidden;height:62vh;-webkit-overflow-scrolling:touch}
-.world #w-map{height:100%;width:auto;max-width:none;max-height:none;touch-action:pan-x}
+.world .w-stage{display:block;padding:0;overflow-x:auto;overflow-y:hidden;height:62vh;position:relative;z-index:1}
+/* Up and down scrolls the page; sideways and pinching are the map's own
+   (world.client.js), so Safari never takes a pinch over half way through. */
+.world #w-map{height:100%;width:auto;max-width:none;max-height:none;touch-action:pan-y}
 .world #w-map.grab{touch-action:none}
 .world #w-here,.world #w-compare,.world-side #w-find.open,.world .menu{position:fixed;left:0;right:0;top:auto;bottom:0;width:auto;max-height:52vh;overflow:auto;
   border-radius:18px 18px 0 0;padding-top:24px;z-index:30;box-sizing:border-box;box-shadow:0 -8px 30px rgba(47,42,51,.18)}
