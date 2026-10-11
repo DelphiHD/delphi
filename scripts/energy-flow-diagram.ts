@@ -8713,6 +8713,16 @@ if (DATA.client) {
   ['delphi:connection', 'delphi:transit'].forEach(function (name) {
     document.addEventListener(name, function () { setTimeout(phoneBar, 60); });
   });
+  // So is any change to what the page shows (Transit Only or over the chart,
+  // the people buttons, a side switched off), all of which are classes on the
+  // body. Its own marker is left out, or rebuilding would set it off again.
+  var lastState = '', stateTimer = 0;
+  new MutationObserver(function () {
+    var now = body.className.split(' ').filter(function (c) { return c && c !== 'has-sidecols'; }).join(' ');
+    if (now === lastState) return;
+    lastState = now;
+    clearTimeout(stateTimer); stateTimer = setTimeout(phoneBar, 60);
+  }).observe(body, { attributes: true, attributeFilter: ['class'] });
   // Pinch inside a wheel on a phone, by its viewBox, so the page itself never
   // zooms and every hover and tap keeps working on the drawing.
   var wheelZoom = function (svg) {
