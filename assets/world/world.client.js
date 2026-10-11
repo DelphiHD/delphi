@@ -593,7 +593,7 @@ function renderHere(){
     '<h2>'+(here.name||fmtLat(here.lat)+", "+fmtLon(here.lon))+'</h2>'+
     '<div class="co">'+(here.name?(here.country?here.country+" · ":"")+fmtLat(here.lat)+", "+fmtLon(here.lon):"")+'</div>'+
     (isSaved(here)?'<button class="save done">Saved</button>':'<button class="save" data-save="1">Save Place</button>')+
-    ' <button class="w-pill pdf" data-pdf="place">Save As PDF</button>'+
+    ' <button class="w-pill pdf" data-pdf="place">View Place Report</button>'+
     (st.ls.size?' <button class="w-pill pdf" data-lshere="1">Local Space From Here</button>':'')+
     relocHtml()+timelineHtml()+
     '<h3>Lines</h3>'+(rows.length?rows.map(r=>'<div class="hr" '+tag(r.l.side,r.l.body,r.l.angle,r.l.tr,isB(r.l))+'>'+
@@ -844,6 +844,7 @@ const RCSS='body{font-family:Montserrat,-apple-system,sans-serif;color:#1c1a2e;m
   '.rt td.own::after{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:#c79a2e;margin-left:4px;vertical-align:middle}'+
   '.mine{margin:8px 0 4px;padding:6px 8px;background:#fffbf0;border:1px solid #ecd9a4;border-radius:6px;font-size:10.5px;line-height:1.6}.mine b{display:block;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:#8a6a14}'+
   'h3{font-size:9.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#6b6790;margin:16px 0 4px}.n{color:#6b6790}.none{color:#6b6790;font-size:11px}'+
+  '.wh{page-break-inside:avoid;margin:14px 0 6px}.wh svg{width:100%;max-width:560px;height:auto;display:block;margin:4px auto 0}.wsub{font-size:11.5px;color:#4b4553}'+
   'tr{page-break-inside:avoid}@page{margin:14mm}';
 // win: a window already opened on the tap itself, for a report that has to
 // wait for something first (a browser refuses a window opened later).
@@ -899,13 +900,24 @@ async function placeReport(){
     '<td class="mi">'+r.d.toFixed(1)+'°</td><td>'+gradePill(r.g)+'</td></tr>').join("")+'</table>':'<div class="none">No parans within 1° of this latitude.</div>');
   const strip=h=>{const d=document.createElement("div");d.innerHTML=h;d.querySelectorAll("button").forEach(b=>b.remove());return d.innerHTML};
   const relocated=live?'<h3>Relocated Chart</h3>'+strip(people.map(w=>relocBlock(w)).join("")):"";
+  // The relocated wheel itself: one per side in view, Personality and Design
+  // each on its own horizon, for each person. Chiron and Lilith only when the
+  // Lines menu has them on, as on the map. Kaycee, 2026-10-11.
+  const sides=st.side==="both"?["personality","design"]:[st.side];
+  const wheel=(w,sd)=>{const r=reloc.get(keyOf(P)+(w==="b"?BK():""));if(!r||!r.svg||!r.svg[sd])return"";
+    const d=document.createElement("div");d.innerHTML=r.svg[sd];
+    if(!st.extras.has("Chiron"))d.querySelectorAll('[data-aplanet="Chiron"]').forEach(e=>e.remove());
+    if(!st.extras.has("Lilith"))d.querySelectorAll('[data-aplanet="Mean_Lilith"]').forEach(e=>e.remove());
+    const c=w==="b"&&PB?PB.cast:CAST;
+    return '<div class="wh"><div class="wsub"><b>'+(pairOn()?(w==="b"?PB.person:PERSON)+" · ":"")+SIDE[sd]+'</b> · '+utcWhen(sd==="design"?c.d:c.p)+'</div>'+d.innerHTML+'</div>'};
+  const wheels=live?people.map(w=>sides.map(sd=>wheel(w,sd)).join("")).join(""):"";
   const transits=tr.on&&API.timeline?'<h3>Upcoming Transits</h3>'+strip(timelineHtml()):"";
   tlOpen=wasTl;
   // The map close in on the place for the picture, then back as it was.
   const was={...view};
   const k=Math.max(view.k,4);view.k=k;view.tx=W/2-((P.lon+180)/360*W)*k;view.ty=H/2-((TOP-P.lat)/(TOP-BOTTOM)*H)*k;clampView();draw();
   const title=placeName(P);
-  openReport(title,[(P.name?fmtLat(P.lat)+", "+fmtLon(P.lon)+"  ·  ":"")+mapState().slice(-1)[0]],lines+parans+relocated+transits,win);
+  openReport(title,[(P.name?fmtLat(P.lat)+", "+fmtLon(P.lon)+"  ·  ":"")+mapState().slice(-1)[0]],lines+parans+relocated+wheels+transits,win);
   Object.assign(view,was);clampView();redraw();
 }
 function compareReport(){
