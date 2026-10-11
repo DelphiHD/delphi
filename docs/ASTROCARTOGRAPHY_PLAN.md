@@ -395,3 +395,15 @@ Kaycee's answers, to start after the 11 October republish finishes:
 
 Left out on purpose: lines for the sky of a single moment, which sweep the
 whole world daily and only mean something for event charts.
+- **Built (11 October), not yet live:** under the Transit chart type The World
+  draws teal transit lines (personality-based teal, design-based lighter teal)
+  following the date picker and Transit Only / Over the whole chart /
+  personality / design; Transit Only hides the natal lines and parans. The
+  transit Moon has its own switch, off. Hovers name the transiting body, its
+  sign and degree from the provider, and the natal angle. The place panel has
+  Upcoming Transits: a year from the picker's moment, her orbs, both sides, with
+  within-orb dates and exact dates. Routes: /api/world-sky, /api/world-timeline
+  (lib/world-transit.ts). Checked: transit Jupiter's MC line, relocated there,
+  gives an MC 13' from Jupiter (its latitude, in mundo as intended); Jupiter on
+  her Lisbon design MC exact 18 Oct 2026, matching an independent ephemeris
+  read; all 1,541 marks resolve.

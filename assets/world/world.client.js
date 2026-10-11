@@ -114,7 +114,8 @@ function markup(G, inChart, findHosted, person) {
     return '<div class="dd" data-dd="' + kind + '"><button>' + title + '<span class="n"></span></button><div class="menu">' + items + (extra || "") +
       '<div class="foot"><button class="w-pill" data-all="' + kind + '">All</button><button class="w-pill" data-none="' + kind + '">None</button></div></div></div>';
   };
-  var extras = '<div class="sep"></div>' + opt("extras", "Chiron", "⚷", "Chiron") + opt("extras", "Lilith", "⚸", "Lilith");
+  var extras = '<div class="sep"></div>' + opt("extras", "Chiron", "⚷", "Chiron") + opt("extras", "Lilith", "⚸", "Lilith") +
+    '<div class="trx">' + opt("trx", "Moon", "☽", "Transit Moon") + '</div>';
   var angles = [["ASC", "Ascendant"], ["DSC", "Descendant"], ["MC", "Midheaven"], ["IC", "IC"]].map(function (a) { return opt("angles", a[0], swatch(a[0]), a[1]); }).join("");
   // Inside a chart, the chart's own panel holds Personality and Design, and its
   // Save Image and Reset serve this view too. Lines and Angles stay here: they
@@ -189,15 +190,42 @@ const ALL={lines:BODIES,parans:BODIES,angles:ANGLES};
 // Earth and both Nodes start off: Kaycee, 10 October. They are still one
 // click away, and All includes them.
 const START_OFF=["Earth","North Node","South Node"];
-const st={side:"both",lines:new Set(BODIES.filter(b=>!START_OFF.includes(b))),angles:new Set(ANGLES),parans:new Set(),extras:new Set()};
+const st={side:"both",lines:new Set(BODIES.filter(b=>!START_OFF.includes(b))),angles:new Set(ANGLES),parans:new Set(),extras:new Set(),trx:new Set()};
 const EXTRAS=["Chiron","Lilith"];
 let bothOff=false;   // the chart's panel has both sides off
+// Transit (Kaycee, 2026-10-11): where each transiting body sits on this
+// chart's natal angles at the moment the chart's date picker shows. On under the
+// Transit chart type; Transit Only hides the natal lines.
+const tr={on:false,alone:false,at:opts.transitAt||"",sky:null,loading:""};
+let TWHERE={};
+// The transiting sky for tr.at, from the site; the lines are drawn here against
+// each side's natal sidereal time (lib/world-transit.ts says why).
+function loadSky(){
+  if(!tr.at||!API.sky)return;
+  const at=tr.at.slice(0,16);
+  if(tr.sky&&tr.sky.at.slice(0,16)===at||tr.loading===at)return;
+  tr.loading=at;
+  fetch(API.sky+"?date="+at.slice(0,10)+"&time="+at.slice(11,16)).then(r=>r.json()).then(j=>{
+    if(tr.loading!==at)return;tr.loading="";
+    if(!j.ok)throw new Error(j.error);
+    for(let i=LN.length-1;i>=0;i--)if(LN[i].tr){LN[i].el.remove();LN[i].hit.remove();LN.splice(i,1)}
+    for(const side of ["personality","design"])
+      for(const b of linesFromSky({gast:D.sky[side].gast,bodies:j.bodies}))
+        for(const angle of Object.keys(b.lines)){const l={side,body:b.body,angle,runs:b.lines[angle],tr:true};LN.push(l);lineEls(l)}
+    tr.sky=j;TWHERE=j.where||{};paint();
+  }).catch(e=>{tr.loading="";console.error(e)});
+}
 GLYPH.Chiron="⚷";GLYPH.Lilith="⚸";
 // The bodies the relocated chart speaks about: the menu's planets, and Chiron
 // and Lilith when they are switched on.
 // A body's lines are on when the Lines menu has it, or, for Chiron and
 // Lilith, when their own switch is on.
 const lineOn=b=>st.lines.has(b)||st.extras.has(b);
+// Whether a line shows: side, Lines menu, Angles, and for transit lines the
+// Transit chart type and the transit Moon switch (off to start: it crosses
+// every angle within a day). Natal lines step aside under Transit Only.
+const lineVisible=l=>!bothOff&&(st.side==="both"||l.side===st.side)&&lineOn(l.body)&&st.angles.has(l.angle)&&
+  (l.tr?(tr.on&&(l.body!=="Moon"||st.trx.has("Moon"))):!(tr.on&&tr.alone));
 const chartBodies=()=>[...BODIES.filter(b=>st.lines.has(b)),...EXTRAS.filter(b=>st.extras.has(b))];
 // One resolver answers "what is this?", read from the element, never its position.
 function describe(el){
@@ -207,6 +235,7 @@ function describe(el){
       '<div class="w-row">'+side+" "+d.body+" "+pill(d.angle)+"</div>"+
       '<div class="w-row">'+side+" "+d.body2+" "+pill(d.angle2)+"</div>"+
       '<span class="w-meta">Latitude '+Math.abs(lat).toFixed(1)+"°"+(lat>=0?"N":"S")+"</span>";}
+  if(d.transit)return "<b>Transit "+d.body+(TWHERE[d.body]?" in "+TWHERE[d.body]:"")+"</b><br>"+side+" "+pill(d.angle);
   return "<b>"+side+" "+d.body+" in "+WHERE[d.side][d.body]+"</b><br>"+pill(d.angle);
 }
 const NS="http://www.w3.org/2000/svg";
@@ -220,9 +249,11 @@ const gl=document.getElementById("w-lines"),gp=document.getElementById("w-parans
 // Each line also gets a wide invisible twin, so it can be hovered and clicked
 // without hunting for a 2 pixel stroke. The twin carries the same identity.
 const gh=document.getElementById("w-hits");
-for(const l of LN){const id={"data-person":PERSON,"data-side":l.side,"data-body":l.body,"data-angle":l.angle};
-  l.el=mk("path",{class:"ln "+l.side+" "+l.angle,...id});gl.append(l.el);
+function lineEls(l){const id={"data-person":PERSON,"data-side":l.side,"data-body":l.body,"data-angle":l.angle};
+  if(l.tr)id["data-transit"]="1";
+  l.el=mk("path",{class:"ln "+l.side+" "+l.angle+(l.tr?" transit":""),...id});gl.append(l.el);
   l.hit=mk("path",{class:"hit",...id});gh.append(l.hit)}
+for(const l of LN)lineEls(l);
 for(const p of PR){
   p.el=mk("g",{class:"pr "+p.side,"data-person":PERSON,"data-side":p.side,"data-body":p.a,"data-angle":p.angleA,"data-body2":p.b,"data-angle2":p.angleB,"data-lat":p.lat.toFixed(2)});
   p.rect=mk("rect",{x:0,width:W});p.dot=mk("circle",{r:3.5});p.el.append(p.rect,p.dot);gp.append(p.el)}
@@ -294,8 +325,8 @@ function anchors(l){
 function layoutLabels(){
   const g=document.getElementById("w-labels");g.replaceChildren();
   const LABELS=[];
-  for(const l of LN)if(!l.el.classList.contains("off"))for(const a of anchors(l))LABELS.push({side:l.side,body:l.body,angle:l.angle,...a});
-  const vis=LABELS.filter(l=>(st.side==="both"||l.side===st.side)&&lineOn(l.body)&&st.angles.has(l.angle));
+  for(const l of LN)if(!l.el.classList.contains("off"))for(const a of anchors(l))LABELS.push({side:l.side,body:l.body,angle:l.angle,tr:!!l.tr,...a});
+  const vis=LABELS;
   for(const edge of ["top","bottom","left","right"]){
     const row=vis.filter(l=>l.edge===edge).sort((a,b)=>a.pos-b.pos);
     const gap=edge==="top"||edge==="bottom"?30:22, max=edge==="top"||edge==="bottom"?W:H;
@@ -305,7 +336,8 @@ function layoutLabels(){
     if(over>0)for(let i=at.length-1;i>=0;i--){at[i]=Math.min(at[i],(i===at.length-1?max:at[i+1]-gap))}
     row.forEach((l,i)=>{
       const p=at[i];
-      const lab=mk("text",{class:"lbl "+l.side,"data-person":PERSON,"data-side":l.side,"data-body":l.body,"data-angle":l.angle});
+      const lab=mk("text",{class:"lbl "+l.side+(l.tr?" transit":""),"data-person":PERSON,"data-side":l.side,"data-body":l.body,"data-angle":l.angle});
+      if(l.tr)lab.setAttribute("data-transit","1");
       const gl=mk("tspan",{class:"g"});gl.textContent=GLYPH[l.body];
       const an=mk("tspan",{class:"a"});an.textContent=l.angle;
       let lead;
@@ -321,8 +353,8 @@ function layoutLabels(){
         if(left){an.setAttribute("dx","0");lab.append(an,gl);an.setAttribute("x",xx-26);an.setAttribute("y",MT+p+5);}
         else{lab.append(gl,an);an.setAttribute("dx","4");}
         lead=mk("path",{d:"M"+(left?ML-10:ML+W+10)+","+(MT+p)+"L"+(left?ML:ML+W)+","+(MT+l.pos)});}
-      if(pinned.has(l.side+"|"+l.body+"|"+l.angle))lab.classList.add("pinned");
-      lead.setAttribute("class","lead "+l.side);
+      if(pinned.has(key(l)))lab.classList.add("pinned");
+      lead.setAttribute("class","lead "+l.side+(l.tr?" transit":""));
       g.append(lead,lab);
     });
   }
@@ -334,10 +366,10 @@ function layoutLabels(){
 const pairOk=d=>(st.parans.has(d.body)||st.parans.has(d.body2))&&lineOn(d.body)&&lineOn(d.body2);
 function paint(){
   const sideOk=d=>!bothOff&&(st.side==="both"||d.side===st.side);
-  for(const el of document.querySelectorAll("#w-lines [data-side]"))
-    el.classList.toggle("off",!(sideOk(el.dataset)&&lineOn(el.dataset.body)&&st.angles.has(el.dataset.angle)));
+  for(const l of LN)l.el.classList.toggle("off",!lineVisible(l));
   for(const el of document.querySelectorAll("#w-parans [data-side]"))
-    el.classList.toggle("off",!(sideOk(el.dataset)&&pairOk(el.dataset)&&(st.angles.has(el.dataset.angle)||st.angles.has(el.dataset.angle2))));
+    el.classList.toggle("off",!(sideOk(el.dataset)&&pairOk(el.dataset)&&(st.angles.has(el.dataset.angle)||st.angles.has(el.dataset.angle2))&&!(tr.on&&tr.alone)));
+  root.classList.toggle("tr-on",tr.on);
   for(const c of document.querySelectorAll(".w-opt[data-kind]"))c.classList.toggle("on",st[c.dataset.kind].has(c.dataset.chip));
   for(const x of EXTRAS)root.classList.toggle("x-"+x,st.extras.has(x));
   for(const k in ALL){const nEl=root.querySelector('[data-dd="'+k+'"] .n');if(nEl)nEl.textContent=st[k].size===ALL[k].length?"All":st[k].size?st[k].size:"None";}
@@ -357,7 +389,8 @@ root.addEventListener("click",e=>{
 });
 const tip=document.getElementById("w-tip");
 function hot(d,on){
-  const q=(b,a)=>'#w-lines [data-side="'+d.side+'"][data-body="'+b+'"][data-angle="'+a+'"], #w-labels [data-side="'+d.side+'"][data-body="'+b+'"][data-angle="'+a+'"]';
+  const t=d.transit?'[data-transit]':':not([data-transit])';
+  const q=(b,a)=>'#w-lines [data-side="'+d.side+'"][data-body="'+b+'"][data-angle="'+a+'"]'+t+', #w-labels [data-side="'+d.side+'"][data-body="'+b+'"][data-angle="'+a+'"]'+t;
   for(const el of document.querySelectorAll(q(d.body,d.angle)+(d.body2?", "+q(d.body2,d.angle2):"")))el.classList.toggle("hot",on);
   if(d.body2)for(const p of PR)if(p.side===d.side&&p.a===d.body&&p.angleA===d.angle&&p.b===d.body2&&p.angleB===d.angle2&&!p.el.classList.contains("off"))p.el.classList.toggle("hot",on);
 }
@@ -413,7 +446,7 @@ function distTo(l,lat,lon){
 let here=null;   // {lat, lon, name, country}
 // Lines clicked to keep them lit, by identity: side, body and angle.
 const pinned=new Set();
-const key=l=>l.side+"|"+l.body+"|"+l.angle;
+const key=l=>(l.tr?"T|":"")+l.side+"|"+l.body+"|"+l.angle;
 const ANGLE_NAME={ASC:"Ascendant",DSC:"Descendant",MC:"Midheaven",IC:"IC"};
 // Saved places stay in this browser for now. In the live chart they belong to
 // the account that saved them.
@@ -425,10 +458,11 @@ function analyze(lat,lon){
   const sideOk=s=>st.side==="both"||s===st.side;
   const rows=[],prs=[];
   for(const l of LN){
-    if(!sideOk(l.side)||!lineOn(l.body)||!st.angles.has(l.angle))continue;
+    if(!lineVisible(l))continue;
     const mi=distTo(l,lat,lon),g=gradeMi(mi);if(g)rows.push({l,mi,g});
   }
   for(const p of PR){
+    if(tr.on&&tr.alone)continue;
     if(!sideOk(p.side)||!lineOn(p.a)||!lineOn(p.b)||!(st.angles.has(p.angleA)||st.angles.has(p.angleB)))continue;
     const d=Math.abs(p.lat-lat),g=gradeLat(d);if(g)prs.push({p,d,g});
   }
@@ -458,16 +492,17 @@ function drawHere(){
   }
 }
 const fmtLat=v=>Math.abs(v).toFixed(1)+"°"+(v>=0?"N":"S"),fmtLon=v=>Math.abs(v).toFixed(1)+"°"+(v>=0?"E":"W");
-const tag=(side,body,angle)=>'data-side="'+side+'" data-body="'+body+'" data-angle="'+angle+'"';
+const tag=(side,body,angle,isT)=>'data-side="'+side+'" data-body="'+body+'" data-angle="'+angle+'"'+(isT?' data-transit="1"':'');
 const gradePill=g=>'<span class="gr g'+g[1]+'">'+g[2]+'</span>';
 const isSaved=h=>saved.some(s=>Math.abs(s.lat-h.lat)<1e-4&&Math.abs(s.lon-h.lon)<1e-4);
 function renderHere(){
+  if(tlOpen&&tr.on&&here)fetchTimeline();
   const box=document.getElementById("w-here");
   if(!here&&!pinned.size){box.classList.remove("open");return}
   // A pinned line: her Delphi Basic for the planet, and the angle by name.
-  const cards=[...pinned].map(k=>{const [side,body,angle]=k.split("|");
-    return '<div class="w-card" '+tag(side,body,angle)+'><button class="un" data-un="'+k+'" title="Unpin">&times;</button>'+
-      '<b>'+SIDE[side]+" "+body+" · "+ANGLE_NAME[angle]+'</b><div class="deg">'+body+" in "+WHERE[side][body]+' <span class="ap">'+angle+'</span></div>'+
+  const cards=[...pinned].map(k=>{const isT=k.startsWith("T|"),[side,body,angle]=k.replace(/^T\|/,"").split("|");
+    return '<div class="w-card" '+tag(side,body,angle,isT)+'><button class="un" data-un="'+k+'" title="Unpin">&times;</button>'+
+      '<b>'+(isT?"Transit "+body+" · "+SIDE[side]+" ":SIDE[side]+" "+body+" · ")+ANGLE_NAME[angle]+'</b><div class="deg">'+body+" in "+((isT?TWHERE:WHERE[side])[body]||"")+' <span class="ap">'+angle+'</span></div>'+
       (BASIC[body]?'<p>'+BASIC[body]+'</p>':'')+'</div>'}).join("");
   if(!here){box.innerHTML='<button class="x" title="Close">&times;</button>'+cards;box.classList.add("open");return}
   const {rows,prs}=analyze(here.lat,here.lon);
@@ -475,9 +510,9 @@ function renderHere(){
     '<h2>'+(here.name||fmtLat(here.lat)+", "+fmtLon(here.lon))+'</h2>'+
     '<div class="co">'+(here.name?(here.country?here.country+" · ":"")+fmtLat(here.lat)+", "+fmtLon(here.lon):"")+'</div>'+
     (isSaved(here)?'<button class="save done">Saved</button>':'<button class="save" data-save="1">Save Place</button>')+
-    relocHtml()+
-    '<h3>Lines</h3>'+(rows.length?rows.map(r=>'<div class="hr" '+tag(r.l.side,r.l.body,r.l.angle)+'>'+
-      '<span class="gl '+r.l.side+'">'+GLYPH[r.l.body]+'</span><span class="nm">'+SIDE[r.l.side]+" "+r.l.body+' <span class="ap">'+r.l.angle+'</span></span>'+
+    relocHtml()+timelineHtml()+
+    '<h3>Lines</h3>'+(rows.length?rows.map(r=>'<div class="hr" '+tag(r.l.side,r.l.body,r.l.angle,r.l.tr)+'>'+
+      '<span class="gl '+r.l.side+(r.l.tr?" transit":"")+'">'+GLYPH[r.l.body]+'</span><span class="nm">'+(r.l.tr?"Transit "+r.l.body+' <span class="was">'+SIDE[r.l.side]+'</span>':SIDE[r.l.side]+" "+r.l.body)+' <span class="ap">'+r.l.angle+'</span></span>'+
       '<span class="mi">'+Math.round(r.mi)+' mi</span>'+gradePill(r.g)+'</div>').join(""):'<div class="none">No lines within 700 miles.</div>')+
     '<h3>Parans</h3>'+(prs.length?prs.map(r=>'<div class="hr" '+tag(r.p.side,r.p.a,r.p.angleA)+' data-body2="'+r.p.b+'" data-angle2="'+r.p.angleB+'">'+
       '<span class="nm">'+SIDE[r.p.side]+" "+r.p.a+' <span class="ap">'+r.p.angleA+'</span> '+r.p.b+' <span class="ap">'+r.p.angleB+'</span></span>'+
@@ -493,6 +528,39 @@ const keyOf=pl=>pl.lat.toFixed(4)+","+pl.lon.toFixed(4);
 function relocKey(){return keyOf(here)}
 const placeName=pl=>pl.name?pl.name.replace(/^Near /,"")+(pl.country?", "+pl.country:""):fmtLat(pl.lat)+", "+fmtLon(pl.lon);
 let relOpen=false;   // the section starts closed
+// ---- Upcoming transits to a place --------------------------------------------
+// Under the Transit chart type: when each transiting body comes within her
+// orbs (one degree, three for the Sun and the Moon) of this place's relocated
+// angles, for a year from the moment on the date picker. Kaycee, 2026-10-11.
+let tlOpen=false;
+const tlCache=new Map();
+const tlBodies=()=>[...BODIES.filter(b=>st.lines.has(b)&&(b!=="Moon"||st.trx.has("Moon"))),...EXTRAS.filter(b=>st.extras.has(b))];
+const tlKey=()=>keyOf(here)+"|"+tr.at.slice(0,16)+"|"+tlBodies().join(",");
+function fetchTimeline(){
+  if(!API.timeline||!here||!tr.at)return;const k=tlKey();if(tlCache.has(k))return;
+  tlCache.set(k,"loading");const at=tr.at.slice(0,16);
+  const q=new URLSearchParams({lat:here.lat,lon:here.lon,date:at.slice(0,10),time:at.slice(11,16),bodies:tlBodies().join(","),...CAST});
+  fetch(withToken(API.timeline+"?"+q)).then(r=>r.json()).then(r=>{tlCache.set(k,r.ok?r.events:"failed");if(here)renderHere()})
+    .catch(()=>{tlCache.set(k,"failed");if(here)renderHere()});
+}
+const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const shortDay=iso=>{const d=new Date(iso);return MON[d.getUTCMonth()]+" "+d.getUTCDate()+", "+d.getUTCFullYear()};
+function timelineHtml(){
+  if(!tr.on||!API.timeline)return"";
+  const head='<button class="reltog'+(tlOpen?" open":"")+'" data-tltog="1">Upcoming Transits</button>';
+  if(!tlOpen)return head;
+  const r=tlCache.get(tlKey());
+  if(!r||r==="loading")return head+'<div class="none">Working it out…</div>';
+  if(r==="failed")return head+'<div class="none">Could not work out the transits here.</div>';
+  const sides=st.side==="both"?["personality","design"]:[st.side];
+  const ev=r.filter(e=>sides.includes(e.side)&&st.angles.has(e.angle));
+  if(!ev.length)return head+'<div class="none">No transits to these angles in the coming year.</div>';
+  return head+'<table class="rt tl"><tr><th></th><th>Angle</th><th>Within Orb</th><th>Exact</th></tr>'+ev.map(e=>
+    '<tr class="hr" '+tag(e.side,e.body,e.angle,true)+'><td><span class="gl">'+GLYPH[e.body]+'</span> Transit '+e.body+'</td>'+
+    '<td>'+SIDE[e.side]+" "+ANGLE_NAME[e.angle]+'</td>'+
+    '<td class="when">'+(e.start?shortDay(e.start):"Now")+" to "+(e.end?shortDay(e.end):"beyond")+'</td>'+
+    '<td class="when">'+(e.exact.length?e.exact.map(shortDay).join(", "):"")+'</td></tr>').join("")+'</table>';
+}
 /** Cast a place; with wheels for the panel, without for the comparison. */
 function fetchReloc(pl,wheels,done){
   if(!live)return;const k=keyOf(pl),have=reloc.get(k);
@@ -717,6 +785,7 @@ function mapState(){
   const dates=[];
   if(st.side!=="design")dates.push("Personality: "+born);
   if(st.side!=="personality")dates.push("Design: "+utcWhen(CAST.d));
+  if(tr.on&&tr.sky)dates.push("Transit: "+utcWhen(tr.at)+(tr.alone?"  ·  Transit Only":""));
   return ["The World · "+(st.side==="both"?"Personality + Design":SIDE[st.side]),...dates,
     "Lines: "+n("lines")+"  ·  Angles: "+n("angles")+"  ·  Parans: "+n("parans")];
 }
@@ -729,6 +798,7 @@ function openHere(lat,lon,city){
 }
 document.getElementById("w-here").addEventListener("click",e=>{
   if(e.target.closest(".x")){here=null;pinned.clear();renderHere();redraw();return}
+  if(e.target.closest("[data-tltog]")){tlOpen=!tlOpen;if(tlOpen)fetchTimeline();renderHere();return}
   if(e.target.closest("[data-reltog]")){relOpen=!relOpen;if(relOpen&&here)fetchReloc(here,true,renderHere);renderHere();return}
   if(e.target.closest("[data-wheel]")){const r=reloc.get(relocKey());if(r&&r.svg)showWheel(r,placeName(here),"personality");return}
   const un=e.target.closest("[data-un]");if(un){pinned.delete(un.dataset.un);renderHere();redraw();return}
@@ -765,7 +835,7 @@ function chosenLines(){
   const sides=st.side==="both"?["personality","design"]:[st.side];
   const groups=[];
   for(const sd of sides)for(const b of want){
-    const ls=LN.filter(l=>l.side===sd&&l.body===b&&st.angles.has(l.angle));if(ls.length)groups.push({sd,b,ls})}
+    const ls=LN.filter(l=>!l.tr&&l.side===sd&&l.body===b&&st.angles.has(l.angle));if(ls.length)groups.push({sd,b,ls})}
   return groups;
 }
 const gradeVal=mi=>mi<=300?3:mi<=500?2:mi<=700?1:0;
@@ -862,7 +932,7 @@ function renderCompare(){
     '<tr class="sum"><td>Mild</td>'+A.map(a=>'<td>'+count(a,1)+'</td>').join("")+'</tr>'+
     relocRows()+
     '<tr class="w-sec"><td colspan="'+(saved.length+1)+'">Lines</td></tr>'+
-    [...lines.values()].sort((a,b)=>a.best-b.best).map(e=>'<tr '+tag(e.l.side,e.l.body,e.l.angle)+'><td><span class="gl '+e.l.side+'" style="color:'+(e.l.side==="design"?"var(--design)":"var(--ink)")+'">'+GLYPH[e.l.body]+'</span> '+SIDE[e.l.side]+" "+e.l.body+' <span class="ap">'+e.l.angle+'</span></td>'+saved.map((s,i)=>cell(e.at[i])).join("")+'</tr>').join("")+
+    [...lines.values()].sort((a,b)=>a.best-b.best).map(e=>'<tr '+tag(e.l.side,e.l.body,e.l.angle,e.l.tr)+'><td><span class="gl '+e.l.side+'" style="color:'+(e.l.tr?"#0d9488":e.l.side==="design"?"var(--design)":"var(--ink)")+'">'+GLYPH[e.l.body]+'</span> '+(e.l.tr?"Transit "+e.l.body+' <span class="was">'+SIDE[e.l.side]+'</span>':SIDE[e.l.side]+" "+e.l.body)+' <span class="ap">'+e.l.angle+'</span></td>'+saved.map((s,i)=>cell(e.at[i])).join("")+'</tr>').join("")+
     '<tr class="w-sec"><td colspan="'+(saved.length+1)+'">Parans</td></tr>'+
     [...pars.values()].sort((a,b)=>a.best-b.best).map(e=>{const p=e.p;return '<tr '+tag(p.side,p.a,p.angleA)+' data-body2="'+p.b+'" data-angle2="'+p.angleB+'"><td>'+SIDE[p.side]+" "+p.a+' <span class="ap">'+p.angleA+'</span> '+p.b+' <span class="ap">'+p.angleB+'</span></td>'+saved.map((s,i)=>cell(e.at[i])).join("")+'</tr>'}).join("")+
     '</table>';
@@ -932,7 +1002,7 @@ svg.addEventListener("pointermove",e=>{if(press&&Math.hypot(e.clientX-press.x,e.
   if(!drag||!press||!press.moved)return;svg.classList.add("grabbing");const s=svg.getScreenCTM().a;view.tx=drag.tx+(e.clientX-drag.x)/s;view.ty=drag.ty+(e.clientY-drag.y)/s;clampView();redraw()});
 svg.addEventListener("pointerup",e=>{
   const onLine=press&&!press.moved&&press.line;
-  if(onLine){const d=onLine.dataset,k=d.side+"|"+d.body+"|"+d.angle;pinned.has(k)?pinned.delete(k):pinned.add(k);renderHere();redraw();press=null;drag=null;return}
+  if(onLine){const d=onLine.dataset,k=(d.transit?"T|":"")+d.side+"|"+d.body+"|"+d.angle;pinned.has(k)?pinned.delete(k):pinned.add(k);renderHere();redraw();press=null;drag=null;return}
   if(press&&!press.moved){const [fx,fy]=frameAt(e.clientX,e.clientY);
     if(fx>=0&&fx<=W&&fy>=0&&fy<=H){const lon=((fx-view.tx)/view.k)/W*360-180,lat=TOP-((fy-view.ty)/view.k)/H*(TOP-BOTTOM);openHere(lat,lon)}}
   press=null;drag=null;svg.classList.remove("grabbing")});
@@ -993,7 +1063,12 @@ if(opts.planets){
     const offP=c.contains("off-s-personality"),offD=c.contains("off-s-design");
     st.side=offP&&!offD?"design":offD&&!offP?"personality":"both";
     bothOff=offP&&offD;
+    tr.on=c.contains("mod-transit");tr.alone=c.contains("tr-alone");
+    if(tr.on)loadSky();
   };
+  // A new moment on the date picker: new transit lines, and the place's
+  // timeline counted again from it, at once rather than when the lines land.
+  document.addEventListener("delphi:transit",e=>{tr.at=e.detail.iso;if(tr.on){loadSky();if(here)renderHere()}});
   readChart();
   // Follow at once, not on the next frame: a browser tab in the background
   // runs no frames, and the view would sit out of step with the panel.
@@ -1004,7 +1079,7 @@ if(opts.planets){
 }
 // The chart's Reset puts this view back as it opened, too.
 const resetWorld=()=>{view.k=1;view.tx=0;view.ty=0;clampView();here=null;pinned.clear();relOpen=false;
-  st.lines=new Set(BODIES.filter(b=>!START_OFF.includes(b)));st.angles=new Set(ANGLES);st.extras=new Set();
+  st.lines=new Set(BODIES.filter(b=>!START_OFF.includes(b)));st.angles=new Set(ANGLES);st.extras=new Set();st.trx=new Set();
   finding=false;want.clear();conts.clear();comparing=false;st.parans.clear();renderFind();renderCompare();paint()};
 // For the checks (the tooltip sweep and the parity test): what this view drew
 // and how it names it.

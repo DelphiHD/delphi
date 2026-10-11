@@ -19,6 +19,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { locate } from "../lib/astro";
 import { relocate } from "../lib/world-relocate";
+import { transitSky, placeTimeline } from "../lib/world-transit";
 
 const PORT = Number(process.env.ACG_PORT ?? 8782);
 const DIR = join(homedir(), "Desktop", "HD Reports", "Astrocartography");
@@ -69,6 +70,19 @@ createServer(async (req, res) => {
     if (url.pathname.startsWith("/world/") && url.pathname.endsWith(".json") && !url.pathname.includes("..")) {
       res.writeHead(200, { "content-type": "application/json" });
       return res.end(readFileSync(join("public", url.pathname)));
+    }
+    // The World's transits, the same shape as the site's routes. Local only,
+    // so the timeline takes the birth from the page rather than a chart record.
+    if (url.pathname === "/api/world-sky") {
+      const when = new Date(`${url.searchParams.get("date")}T${url.searchParams.get("time") ?? "12:00"}:00Z`);
+      return json(res, 200, { ok: true, ...(await transitSky(when)) });
+    }
+    if (url.pathname === "/api/world-timeline") {
+      const g = (k: string) => url.searchParams.get(k) ?? "";
+      const events = await placeTimeline({ place: g("place"), utc: g("p"), designUtc: g("d"),
+        lat: Number(g("lat")), lon: Number(g("lon")), from: new Date(`${g("date")}T${g("time") || "12:00"}:00Z`),
+        days: 365, bodies: g("bodies").split(",").filter(Boolean) });
+      return json(res, 200, { ok: true, events });
     }
     // A chart built locally (not published), at the address the site uses,
     // so The World can be tried inside the real chart. CHART_HTML names it.

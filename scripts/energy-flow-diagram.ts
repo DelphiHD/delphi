@@ -6717,6 +6717,8 @@ if (DATA.client) {
 
     // ── painting one moment onto the chart ───────────────────────────────────
     function repaint(d, t, positions) {
+      // The World draws its transit lines for this moment too.
+      document.dispatchEvent(new CustomEvent('delphi:transit', { detail: { iso: instant(d, t).toISOString() } }));
       // The stats count whatever is on the stage, and this is the sky that is
       // on it. Kept on the window so the stats tab can read it without this
       // function knowing anything about the stats.
@@ -7269,10 +7271,11 @@ if (DATA.client) {
   var applyView = function () {
     // and the one view it does have is the one it opens on
     if (curMod === 'variations' && curView !== 'plain') curView = 'plain';
-    // The World is the person's own map. Transit and Relationship are not wired
-    // into it yet, so it is greyed out there rather than showing a natal map a
-    // reader could take for the transit or the pair. Kaycee, 2026-10-11.
-    if ((curMod === 'transit' || curMod === 'relation') && curView === 'world') curView = 'plain';
+    // The World is the person's own map. Relationship is not wired into it yet,
+    // so it is greyed out there rather than showing a natal map a reader could
+    // take for the pair. Kaycee, 2026-10-11. Transit is wired: the transit
+    // lines are drawn over the chart's own.
+    if (curMod === 'relation' && curView === 'world') curView = 'plain';
     var v = curView;
     // Circuits mean nothing over a transit: the button is disabled rather than
     // hidden, and the drawing falls back to the plain body.
@@ -7294,11 +7297,14 @@ if (DATA.client) {
       var wtok = (location.pathname.split('/c/')[1] || '').split('/')[0];
       window.DelphiWorld.mount(document.getElementById('worldview'), DATA.world, {
         geometry: '/world/world-v1.json',
-        api: { places: '/api/places', place: '/api/place', relocate: '/api/relocate' },
+        api: { places: '/api/places', place: '/api/place', relocate: '/api/relocate',
+          sky: '/api/world-sky', timeline: '/api/world-timeline' },
         token: wtok.length === 32 ? wtok : '',
         fontCss: FONTCSS,
         planets: DATA.planets,
         findHost: document.getElementById('worldside'),
+        // the moment the file was built, until the date picker says otherwise
+        transitAt: DATA.sky ? DATA.sky.date + 'T' + DATA.sky.time + ':00Z' : '',
       });
     }
     body.classList.toggle('view-mandala', v === 'mandala');
@@ -7317,7 +7323,7 @@ if (DATA.client) {
         // should be greyed out when Variations is selected, if someone wants
         // to explore a timepoint more closely they can save that chart."
         var off = (curMod === 'variations' && pair[0] !== 'plain') ||
-          (pair[0] === 'world' && (curMod === 'transit' || curMod === 'relation'));
+          (pair[0] === 'world' && curMod === 'relation');
         b.disabled = off;
         b.classList.toggle('disabled', off);
       });
