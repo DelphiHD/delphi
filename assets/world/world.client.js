@@ -881,7 +881,10 @@ q.addEventListener("input",()=>{const t=norm(q.value.trim());sel=0;
   if(!t){hits=[];return showHits()}
   if(live){clearTimeout(timer);const my=++seq;timer=setTimeout(async()=>{
     try{const r=await (await fetch(API.places+"?q="+encodeURIComponent(q.value.trim()))).json();
-      if(my!==seq)return;if(!r.ok)throw new Error(r.error);hits=r.places;showHits()}
+      if(my!==seq)return;if(!r.ok)throw new Error(r.error);hits=r.places.map(p=>{const parts=String(p.value).split(",").map(x=>x.trim());
+        // The site's place list gives the provider's full name only, "Lisbon, Portugal":
+        // the first part is the place, the rest where it is.
+        return {value:p.value,name:p.name||parts[0],region:p.region||parts.slice(1).join(", ")}});showHits()}
     catch(e){live=false;q.dispatchEvent(new Event("input"))}},200);return}
   const starts=CITIES.filter(c=>norm(c.n).startsWith(t)),has=CITIES.filter(c=>!norm(c.n).startsWith(t)&&norm(c.n).includes(t));
   hits=[...starts.sort((a,b)=>b.pop-a.pop),...has.sort((a,b)=>b.pop-a.pop)].slice(0,8);showHits()});

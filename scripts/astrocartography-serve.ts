@@ -39,9 +39,12 @@ createServer(async (req, res) => {
       u.searchParams.set("query", q.slice(0, 80));
       const r = await fetch(u);
       if (!r.ok) return json(res, 502, { ok: false, error: `provider ${r.status}` });
-      const raw = (await r.json()) as { value?: string; asciiname?: string; admin1?: string; country?: string }[];
+      // The same shape as the site's /api/places, value and timezone only, so
+      // the page is tested against what it will really be given. Sending more
+      // here hid a fault that only showed on the live site (11 October).
+      const raw = (await r.json()) as { value?: string; timezone?: string }[];
       const places = (Array.isArray(raw) ? raw : []).filter((p) => p.value).slice(0, 8)
-        .map((p) => ({ value: p.value, name: p.asciiname ?? p.value, region: [p.admin1, p.country].filter(Boolean).join(", ") }));
+        .map((p) => ({ value: p.value, timezone: p.timezone ?? "" }));
       return json(res, 200, { ok: true, places });
     }
     if (url.pathname === "/api/place") {
