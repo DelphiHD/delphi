@@ -4330,6 +4330,17 @@ body.view-world #worldside { display:block; }
    the map shows. The pair's bodygraph drawers and the wheel's Swap
    Perspective have nothing to say on a map. Kaycee, 2026-10-11. */
 body.view-world #relhome > details, body.view-world #relswap { display:none !important; }
+/* The World on a phone: the chart controls in two compact rows above the
+   map, with nothing between them and it. Kaycee approved the mockup,
+   2026-10-11. Reset, Save Image and Copy Chart Data stay in the other views. */
+@media (max-width: 760px) {
+  body.view-world .viewdock.docked .sec, body.view-world #actrow { display:none !important; }
+  body.view-world .viewdock.docked { padding:6px 8px; }
+  body.view-world .viewdock.docked .row { margin:2px 0; }
+  body.view-world .viewdock.docked button { padding:6px 11px; font-size:12px; }
+  body.view-world .brandmark.logo { width:84px; }
+  body.view-world .stage { gap:4px; }
+}
 #worldside #w-find { position:static; width:auto; max-height:none; overflow:visible; box-shadow:none;
   border:0; border-radius:0; padding:4px 0 12px; margin:0 0 10px; border-bottom:1px solid rgba(132,80,149,.18);
   background:transparent; }

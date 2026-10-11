@@ -856,6 +856,7 @@ function openHere(lat,lon,city){
   here={lat,lon,name:city?city.n:(c?"Near "+c.n:null),country:c?c.c:null};
   if(city){here.lat=city.lat;here.lon=city.lon}
   if(relOpen){fetchReloc(here,true,renderHere);if(pairOn())fetchReloc(here,true,renderHere,"b")}renderHere();redraw();
+  if(typeof centerOn==="function")centerOn(here.lon);
 }
 document.getElementById("w-here").addEventListener("click",e=>{
   if(e.target.closest(".x")){here=null;pinned.clear();renderHere();redraw();return}
@@ -1190,6 +1191,34 @@ const resetWorld=()=>{view.k=1;view.tx=0;view.ty=0;clampView();here=null;pinned.
   finding=false;want.clear();conts.clear();findMode="each";comparing=false;st.parans.clear();renderFind();renderCompare();paint()};
 // For the checks (the tooltip sweep and the parity test): what this view drew
 // and how it names it.
+// ---- On a phone ------------------------------------------------------------
+// The map keeps its full height and the screen travels across it: the stage
+// scrolls sideways, filling the phone below the controls, and opens on the
+// birthplace. A place chosen is brought into view, and its details come up
+// from the bottom (world.css). Kaycee, 2026-10-11, on the mockup: "that looks
+// much better."
+const stageEl=root.querySelector(".w-stage");
+const phone=()=>window.matchMedia("(max-width: 760px)").matches;
+function centerOn(lon){
+  if(!phone())return;
+  const s=svg.getBoundingClientRect().width/(ML+W+MR);
+  stageEl.scrollLeft=Math.max(0,(ML+X(lon))*s-stageEl.clientWidth/2);
+}
+function fitPhone(){
+  if(!phone()){stageEl.style.height="";return}
+  const top=stageEl.getBoundingClientRect().top+window.scrollY;
+  stageEl.style.height=Math.max(340,window.innerHeight-top-8)+"px";
+}
+let fitted=false;
+function fitOnce(){if(fitted||!root.offsetParent)return;fitted=true;fitPhone();centerOn(BIRTH[0])}
+window.addEventListener("resize",fitPhone);
+window.addEventListener("orientationchange",()=>setTimeout(fitPhone,300));
+// Search results float over everything on a phone, under the box they belong
+// to, because the row they sit in scrolls sideways and would cut them off.
+q.addEventListener("input",()=>{if(!phone()){res.style.top="";return}res.style.top=(q.getBoundingClientRect().bottom+6)+"px"});
+new MutationObserver(fitOnce).observe(root.closest("body")||document.body,{attributes:true,attributeFilter:["class"]});
+requestAnimationFrame(fitOnce);setTimeout(fitOnce,300);
+
 root.world = { D: D, LN: LN, PR: PR, describe: describe, state: st, reset: resetWorld };
 }
 
