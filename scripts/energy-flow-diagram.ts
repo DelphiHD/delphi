@@ -4384,7 +4384,7 @@ body.view-world #relhome > details, body.view-world #relswap { display:none !imp
   .sidecols { position:absolute; left:0; right:0; pointer-events:none; display:flex; justify-content:space-between; padding:0 2px; }
   .sidecols .sgl { width:15px; height:15px; vertical-align:-2px; margin-right:4px; overflow:visible; }
   .sidecols .scol.right .sgl { margin-right:4px; }
-  .sidecols .scol { width:18%; display:flex; flex-direction:column; justify-content:space-between; pointer-events:auto; }
+  .sidecols .scol { width:auto; min-width:17%; display:flex; flex-direction:column; justify-content:space-between; pointer-events:auto; }
   .sidecols .shead { font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; color:#6b6790; font-weight:600; padding:0 4px 2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .sidecols .scol.right .shead { text-align:right; }
   .sidecols .prow, .sidecols .trow { font-size:13px; font-weight:600; line-height:1; padding:4px 5px; border-radius:6px; white-space:nowrap; cursor:pointer; font-variant-numeric:tabular-nums; }
@@ -8570,19 +8570,30 @@ if (DATA.client) {
           var gb = pg.getBBox();
           mini.setAttribute('viewBox', (gb.x - 1) + ' ' + (gb.y - 1) + ' ' + (gb.width + 2) + ' ' + (gb.height + 2));
         }
-        var texts = [].filter.call(row.querySelectorAll('text'), function (tx) { return !tx.closest('.pgl'); })
-          .map(function (tx) { return tx.textContent.trim(); }).filter(Boolean);
-        d.appendChild(document.createTextNode(texts.join(' ')));
-        var num = row.querySelector('text[fill]');
-        if (num) d.style.color = num.getAttribute('fill');
+        // each number in its own colour: a transit's combined column carries
+        // the design and the personality side by side, red and black
+        [].filter.call(row.querySelectorAll('text'), function (tx) { return !tx.closest('.pgl') && tx.textContent.trim(); })
+          .forEach(function (tx, k) {
+            var sp = document.createElement('span');
+            sp.textContent = (k ? ' ' : '') + tx.textContent.trim();
+            if (tx.getAttribute('fill')) sp.style.color = tx.getAttribute('fill');
+            d.appendChild(sp);
+          });
         col.appendChild(d);
       });
       cols.appendChild(col);
     });
     document.querySelector('.stage').appendChild(cols);
     document.body.classList.add('has-sidecols');
-    canvas.style.width = (146 * BG) + '%';
-    canvas.style.marginLeft = ((100 - 100 * BG) / 2 - 22.4 * BG) + '%';
+    // each column as wide as its rows need; the bodygraph takes what is left
+    var sw = cols.getBoundingClientRect().width, cs = cols.querySelectorAll('.scol');
+    var used = [].reduce.call(cs, function (a, c) { return a + c.getBoundingClientRect().width; }, 0);
+    var bg = Math.max(0.46, Math.min(BG, (sw - used - 8) / sw));
+    var leftW = cs.length ? cs[0].getBoundingClientRect().width : 0;
+    // centred in the space between the two columns, which can differ in width
+    var start = leftW + (sw - used - bg * sw) / 2;
+    canvas.style.width = (146 * bg) + '%';
+    canvas.style.marginLeft = (start / sw * 100 - 22.4 * bg) + '%';
     placeCols();
   };
   document.addEventListener('click', function (e) {
