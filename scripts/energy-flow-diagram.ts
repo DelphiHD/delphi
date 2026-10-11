@@ -4340,6 +4340,8 @@ body.view-world #relhome > details, body.view-world #relswap { display:none !imp
   body.view-world .viewdock.docked button { padding:6px 11px; font-size:12px; }
   body.view-world .brandmark.logo { width:84px; }
   body.view-world .stage { gap:4px; }
+  /* room for the side panel on a desktop; on a phone the panel is above */
+  body.view-world .world .w-bar.in-chart { padding-left:0; }
 }
 #worldside #w-find { position:static; width:auto; max-height:none; overflow:visible; box-shadow:none;
   border:0; border-radius:0; padding:4px 0 12px; margin:0 0 10px; border-bottom:1px solid rgba(132,80,149,.18);
@@ -4752,7 +4754,7 @@ body.view-mandala svg.canvas { display:none !important; }
     padding: 8px; backdrop-filter: none; background: rgba(255,255,255,.96);
   }
   .viewdock.docked .row {
-    flex-direction: row; overflow-x: auto; gap: 6px;
+    flex-direction: row; flex-wrap: nowrap; overflow-x: auto; gap: 6px;
     scrollbar-width: none; -webkit-overflow-scrolling: touch;
   }
   .viewdock.docked .row::-webkit-scrollbar { display: none; }
