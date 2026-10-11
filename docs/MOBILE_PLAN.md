@@ -47,3 +47,15 @@ Done 11 October; see `docs/ASTROCARTOGRAPHY_PLAN.md`. The Transit date picker is
 5. Variations, which needs its own design.
 
 The Visits tab, recording since 11 October, will show which views phones actually use. It can reorder this list once there is enough data.
+
+## Done 2026-10-11 (on Kaycee's chart, awaiting her review)
+
+All five steps are built, phone-only (under 760px), and checked at iPhone size. The desktop layout is unchanged: checked at 1440px.
+
+1. **Slim top on every view.** Show opens as a sheet with Reset, Save Image and Copy Chart Data in it.
+2. **Wheels.** Astrology's blank gap is gone. The Wheel and Astrology zoom inside themselves: pinch to zoom, one finger to move, double tap to reset. Her name sits over The Wheel.
+3. **Bodygraph and Circuits.** The bodygraph fills the phone. The columns open from buttons named by their own headings (Design and Personality; under Transit, her name and Transit). Circuits is a switch in that bar, hidden under Transit.
+4. **Transit and Relationship.** The date, the person picker and the people buttons sit under the chart type. A pair's readings start folded.
+5. **Variations.** In the page under the controls, one card at a time, swiped sideways.
+
+Noticed, left for her review: the Transit block up top is tall (date, location, Transit Only, Transit Placements, about 230px). Location and Transit Placements could stay down in the panel.
