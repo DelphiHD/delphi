@@ -348,8 +348,11 @@ the right; second row Lines, Angles, Parans. Find My Places opens on the right.
 
 **Not yet done**
 
-- Client charts carry The World only when republished. Kaycee's say-so needed
-  for a republish of all charts.
+- **Republished 11 October with Kaycee's say-so: all 83 charts.** 81 on the
+  first pass; Joe Goodin and Sandbox Generator Single stopped (correctly, by
+  the no-missing-sections rule) on a Horizons request bug at :59, fixed and
+  published. Exact-time charts carry The World; charts without an exact time
+  (e.g. Christa Pike) carry no button.
 - **Publish from code that has The World.** Any chart published from a checkout
   older than this (for instance ~/delphi-fix on chart-variations at 29e97ea)
   goes out without it. Bring that checkout up to main first.
