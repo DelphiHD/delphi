@@ -327,3 +327,34 @@ world-map file and NASA Horizons in the chart build. A "told" birth time is
 exact enough for the map. The view is called **The World**. The Chiron/Lilith
 line in ARCHITECTURE.md belonged to the deprecated reports; the whole doc needs
 a total revision and is not a constraint on this work.
+
+## Live (11 October)
+
+The World is merged to main and deployed (main at 7f3fd20 or later). Live:
+`public/world/world-v1.json`, `/api/place`, `/api/relocate`, and the builder
+draws The World into every exact-time chart it publishes. Kaycee approved
+the client wording (docs/CLIENT_COPY.json).
+
+Tested end to end on the live site with the sandbox chart "Sandbox Projector
+Triple Split" (Bogota), published twice with her OK: map, lines, parans,
+click, search (provider list), relocated chart and its three wheels. Every
+mark resolves to the right side, body and angle.
+
+Layout she settled, 11 October: the chart's left panel owns Personality,
+Design, Save Image and Reset; The World keeps its own Lines and Angles (so
+Earth and the Nodes start off here without turning off in other views), and
+Parans. Toolbar: first row search, Find My Places (and Compare Places), zoom on
+the right; second row Lines, Angles, Parans. Find My Places opens on the right.
+
+**Not yet done**
+
+- Client charts carry The World only when republished. Kaycee's say-so needed
+  for a republish of all charts.
+- **Publish from code that has The World.** Any chart published from a checkout
+  older than this (for instance ~/delphi-fix on chart-variations at 29e97ea)
+  goes out without it. Bring that checkout up to main first.
+- The Vercel preview environment has no MYBODYGRAPH_API_KEY, so search and the
+  relocated chart cannot be tested on preview builds; Kaycee is adding it.
+- tooltip-sweep.js does not cover The World yet; the checks so far were run by
+  hand in the console (every mark resolves via root.world.describe).
+- Safari's pinch path is untested.
