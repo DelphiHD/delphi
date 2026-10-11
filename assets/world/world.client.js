@@ -100,8 +100,8 @@ var HD_BODIES = ["Sun", "Earth", "North Node", "South Node", "Moon", "Mercury", 
 var GLYPHS = { Sun: "☉", Earth: "⊕", "North Node": "☊", "South Node": "☋", Moon: "☽", Mercury: "☿",
   Venus: "♀", Mars: "♂", Jupiter: "♃", Saturn: "♄", Uranus: "⛢", Neptune: "♆", Pluto: "♇", Chiron: "⚷", Lilith: "⚸" };
 
-function markup(G) {
-  var ML = 64, MR = 64, MT = 46, MB = 46, VW = ML + G.W + MR, VH = MT + G.H + MB, f = function (n) { return n.toFixed(1); };
+function markup(G, inChart) {
+  var ML = 84, MR = 84, MT = 60, MB = 60, VW = ML + G.W + MR, VH = MT + G.H + MB, f = function (n) { return n.toFixed(1); };
   var grat = [];
   for (var lon = -150; lon <= 150; lon += 30) grat.push("M" + f((lon + 180) / 360 * G.W) + ",0V" + f(G.H));
   for (var lat = -60; lat <= 60; lat += 30) grat.push("M0," + f((G.TOP - lat) / (G.TOP - G.BOTTOM) * G.H) + "H" + G.W);
@@ -116,12 +116,18 @@ function markup(G) {
   };
   var extras = '<div class="sep"></div>' + opt("extras", "Chiron", "⚷", "Chiron") + opt("extras", "Lilith", "⚸", "Lilith");
   var angles = [["ASC", "Ascendant"], ["DSC", "Descendant"], ["MC", "Midheaven"], ["IC", "IC"]].map(function (a) { return opt("angles", a[0], swatch(a[0]), a[1]); }).join("");
-  return '<div class="w-bar"><span id="w-side" style="display:flex;gap:4px"><button class="w-pill on" data-v="both">Both</button><button class="w-pill" data-v="personality">Personality</button><button class="w-pill" data-v="design">Design</button></span>' +
-    '<span class="gap"></span>' + dd("lines", "Lines", planets("lines"), extras) + dd("angles", "Angles", angles) + dd("parans", "Parans", planets("parans")) +
+  // Inside a chart, the chart's own panel holds the sides, the planets and the
+  // angles, and its Save Image and Reset serve this view too. Kaycee,
+  // 2026-10-11: "move the controls for personality, design and the lines to the
+  // left hand control panel like all of the other views." Standalone, the view
+  // carries its own.
+  var own = inChart ? '' : '<span id="w-side" style="display:flex;gap:4px"><button class="w-pill on" data-v="both">Both</button><button class="w-pill" data-v="personality">Personality</button><button class="w-pill" data-v="design">Design</button></span>' +
+    '<span class="gap"></span>' + dd("lines", "Lines", planets("lines"), extras) + dd("angles", "Angles", angles);
+  return '<div class="w-bar' + (inChart ? ' in-chart' : '') + '">' + own + dd("parans", "Parans", planets("parans")) +
     '<button class="w-pill" id="w-findBtn">Find My Places</button><button class="w-pill" id="w-cmpBtn">Compare Places</button>' +
     '<div class="search"><input id="w-q" placeholder="Search A City" autocomplete="off"><div class="results" id="w-results"></div></div>' +
-    '<div class="zoom"><button data-z="in" title="Zoom In">+</button><button data-z="out" title="Zoom Out">&minus;</button><button data-z="reset">Reset</button></div>' +
-    '<button class="w-pill" id="w-snapMap">Save Map Image</button></div>' +
+    '<div class="zoom"><button data-z="in" title="Zoom In">+</button><button data-z="out" title="Zoom Out">&minus;</button>' + (inChart ? '' : '<button data-z="reset">Reset</button>') + '</div>' +
+    '<button class="w-pill" id="w-snapMap"' + (inChart ? ' hidden' : '') + '>Save Map Image</button></div>' +
     '<div class="w-stage"><svg viewBox="0 0 ' + VW + ' ' + f(VH) + '" preserveAspectRatio="xMidYMin meet" id="w-map">' +
     '<defs><clipPath id="w-clip"><rect width="' + G.W + '" height="' + f(G.H) + '"/></clipPath></defs>' +
     '<g transform="translate(' + ML + ',' + MT + ')"><rect class="frame" width="' + G.W + '" height="' + f(G.H) + '"/>' +
@@ -166,7 +172,7 @@ const CAST = D.cast;
 const CITIES = G.cities;
 const TOP = G.TOP, BOTTOM = G.BOTTOM, ORB = 1;
 const PERSON = D.person;
-const ML = 64, MT = 46, MR = 64, W = G.W, H = G.H;
+const ML = 84, MT = 60, MR = 84, W = G.W, H = G.H;
 const BODIES = HD_BODIES;
 const ANGLES=["ASC","DSC","MC","IC"];
 const ALL={lines:BODIES,parans:BODIES,angles:ANGLES};
@@ -234,12 +240,12 @@ function drawCities(){
   for(const c of CITIES){
     if(c.z>zoom)break;
     const x=X(c.lon),y=Y(c.lat);if(x<0||x>W||y<0||y>H)continue;
-    const box=[x-3,y-6,x+6+c.n.length*5.6,y+6];
+    const box=[x-4,y-8,x+8+c.n.length*7.8,y+8];
     if(taken.some(t=>box[0]<t[2]&&box[2]>t[0]&&box[1]<t[3]&&box[3]>t[1]))continue;
     taken.push(box);
     const e=mk("g",{class:"city"+(c.cap?" cap":"")});
-    e.append(mk("circle",{cx:x,cy:y,r:c.cap?3:2.2}));
-    const t=mk("text",{x:x+5,y:y+3.5});t.textContent=c.n;e.append(t);g.append(e);
+    e.append(mk("circle",{cx:x,cy:y,r:c.cap?3.8:3}));
+    const t=mk("text",{x:x+7,y:y+5});t.textContent=c.n;e.append(t);g.append(e);
   }
 }
 /**
@@ -279,7 +285,7 @@ function layoutLabels(){
   const vis=LABELS.filter(l=>(st.side==="both"||l.side===st.side)&&lineOn(l.body)&&st.angles.has(l.angle));
   for(const edge of ["top","bottom","left","right"]){
     const row=vis.filter(l=>l.edge===edge).sort((a,b)=>a.pos-b.pos);
-    const gap=edge==="top"||edge==="bottom"?22:16, max=edge==="top"||edge==="bottom"?W:H;
+    const gap=edge==="top"||edge==="bottom"?30:22, max=edge==="top"||edge==="bottom"?W:H;
     const at=row.map(l=>l.pos);
     for(let i=1;i<at.length;i++)at[i]=Math.max(at[i],at[i-1]+gap);
     const over=at.length?at[at.length-1]-max:0;
@@ -291,17 +297,17 @@ function layoutLabels(){
       const an=mk("tspan",{class:"a"});an.textContent=l.angle;
       let lead;
       if(edge==="top"){lab.setAttribute("text-anchor","middle");
-        an.setAttribute("x",ML+p);an.setAttribute("y",11);gl.setAttribute("x",ML+p);gl.setAttribute("y",29);lab.append(an,gl);
-        lead=mk("path",{d:"M"+(ML+p)+","+(MT-12)+"L"+(ML+l.pos)+","+MT});}
+        an.setAttribute("x",ML+p);an.setAttribute("y",15);gl.setAttribute("x",ML+p);gl.setAttribute("y",40);lab.append(an,gl);
+        lead=mk("path",{d:"M"+(ML+p)+","+(MT-14)+"L"+(ML+l.pos)+","+MT});}
       else if(edge==="bottom"){lab.setAttribute("text-anchor","middle");
-        gl.setAttribute("x",ML+p);gl.setAttribute("y",MT+H+27);an.setAttribute("x",ML+p);an.setAttribute("y",MT+H+39);lab.append(gl,an);
-        lead=mk("path",{d:"M"+(ML+p)+","+(MT+H+12)+"L"+(ML+l.pos)+","+(MT+H)});}
+        gl.setAttribute("x",ML+p);gl.setAttribute("y",MT+H+35);an.setAttribute("x",ML+p);an.setAttribute("y",MT+H+51);lab.append(gl,an);
+        lead=mk("path",{d:"M"+(ML+p)+","+(MT+H+14)+"L"+(ML+l.pos)+","+(MT+H)});}
       else{const left=edge==="left";lab.setAttribute("text-anchor",left?"end":"start");
-        const xx=left?ML-10:ML+W+10;
-        gl.setAttribute("x",xx);gl.setAttribute("y",MT+p+5);an.setAttribute("dx",left?-0:0);
-        if(left){an.setAttribute("dx","0");lab.append(an,gl);an.setAttribute("x",xx-19);an.setAttribute("y",MT+p+4);}
-        else{lab.append(gl,an);an.setAttribute("dx","3");}
-        lead=mk("path",{d:"M"+(left?ML-8:ML+W+8)+","+(MT+p)+"L"+(left?ML:ML+W)+","+(MT+l.pos)});}
+        const xx=left?ML-12:ML+W+12;
+        gl.setAttribute("x",xx);gl.setAttribute("y",MT+p+7);an.setAttribute("dx",left?-0:0);
+        if(left){an.setAttribute("dx","0");lab.append(an,gl);an.setAttribute("x",xx-26);an.setAttribute("y",MT+p+5);}
+        else{lab.append(gl,an);an.setAttribute("dx","4");}
+        lead=mk("path",{d:"M"+(left?ML-10:ML+W+10)+","+(MT+p)+"L"+(left?ML:ML+W)+","+(MT+l.pos)});}
       if(pinned.has(l.side+"|"+l.body+"|"+l.angle))lab.classList.add("pinned");
       lead.setAttribute("class","lead "+l.side);
       g.append(lead,lab);
@@ -321,11 +327,11 @@ function paint(){
     el.classList.toggle("off",!(sideOk(el.dataset)&&pairOk(el.dataset)&&(st.angles.has(el.dataset.angle)||st.angles.has(el.dataset.angle2))));
   for(const c of document.querySelectorAll(".w-opt[data-kind]"))c.classList.toggle("on",st[c.dataset.kind].has(c.dataset.chip));
   for(const x of EXTRAS)root.classList.toggle("x-"+x,st.extras.has(x));
-  for(const k in ALL)document.querySelector('[data-dd="'+k+'"] .n').textContent=st[k].size===ALL[k].length?"All":st[k].size?st[k].size:"None";
+  for(const k in ALL){const nEl=root.querySelector('[data-dd="'+k+'"] .n');if(nEl)nEl.textContent=st[k].size===ALL[k].length?"All":st[k].size?st[k].size:"None";}
   draw();
   if(typeof renderHere==="function"){renderHere();renderCompare();if(finding)renderFind()}
 }
-document.getElementById("w-side").onclick=e=>{const b=e.target.closest(".w-pill");if(!b)return;
+if(document.getElementById("w-side"))document.getElementById("w-side").onclick=e=>{const b=e.target.closest(".w-pill");if(!b)return;
   document.querySelectorAll("#w-side .w-pill").forEach(p=>p.classList.toggle("on",p===b));st.side=b.dataset.v;paint()};
 root.addEventListener("click",e=>{
   const dd=e.target.closest(".dd");
@@ -712,6 +718,10 @@ function computeFind(){
 function renderFind(){
   const box=document.getElementById("w-find"),btn=document.getElementById("w-findBtn");
   btn.classList.toggle("on",finding);
+  // Find My Places opens on the right, clear of the chart's panel on the left
+  // (Kaycee, 2026-10-11: it "gets lost behind the left hand control panel");
+  // an open place panel moves over beside it.
+  root.classList.toggle("finding",finding);
   if(!finding){box.classList.remove("open");document.getElementById("w-heat").setAttribute("href","");return}
   computeFind();
   const F=lastFind;
@@ -879,9 +889,35 @@ q.addEventListener("keydown",e=>{
 res.addEventListener("mousedown",e=>{const d=e.target.closest("[data-i]");if(d){e.preventDefault();choose(hits[+d.dataset.i])}});
 q.addEventListener("blur",()=>setTimeout(()=>res.classList.remove("open"),100));
 paint();
+// Inside a chart, the panel is the one set of switches: the sides are the
+// body's off-s-* classes, each planet its off-p-<id> class (Chiron and Lilith
+// included, off until switched on, as the chart opens), and the angles the
+// off-a-* classes set by the Angles row the chart shows for this view.
+if(opts.planets){
+  const readChart=()=>{
+    const c=document.body.classList;
+    const offP=c.contains("off-s-personality"),offD=c.contains("off-s-design");
+    st.side=offP&&!offD?"design":offD&&!offP?"personality":"both";
+    // Both sides off: draw neither, by switching every line off.
+    const none=offP&&offD;
+    st.lines=new Set();st.extras=new Set();
+    for(const p of opts.planets){if(none||c.contains("off-p-"+p.id))continue;(EXTRAS.includes(p.name)?st.extras:st.lines).add(p.name)}
+    st.angles=new Set(ANGLES.filter(a=>!c.contains("off-a-"+a)));
+  };
+  readChart();
+  // Follow at once, not on the next frame: a browser tab in the background
+  // runs no frames, and the view would sit out of step with the panel.
+  let last="";
+  new MutationObserver(()=>{const k=document.body.className;if(k===last)return;last=k;readChart();paint()})
+    .observe(document.body,{attributes:true,attributeFilter:["class"]});
+  paint();
+}
+// The chart's Reset puts this view back as it opened, too.
+const resetWorld=()=>{view.k=1;view.tx=0;view.ty=0;clampView();here=null;pinned.clear();relOpen=false;
+  finding=false;want.clear();comparing=false;st.parans.clear();renderFind();renderCompare();paint()};
 // For the checks (the tooltip sweep and the parity test): what this view drew
 // and how it names it.
-root.world = { D: D, LN: LN, PR: PR, describe: describe, state: st };
+root.world = { D: D, LN: LN, PR: PR, describe: describe, state: st, reset: resetWorld };
 }
 
 window.DelphiWorld = {
@@ -892,7 +928,7 @@ window.DelphiWorld = {
     if (root.dataset.mounted) return;
     root.dataset.mounted = "1";
     root.classList.add("world");
-    var go = function (G) { root.innerHTML = markup(G); init(root, D, G, opts); };
+    var go = function (G) { root.innerHTML = markup(G, !!opts.planets); init(root, D, G, opts); };
     if (this._geo) return go(this._geo);
     var self = this;
     fetch(opts.geometry).then(function (r) { if (!r.ok) throw new Error("world " + r.status); return r.json(); })
