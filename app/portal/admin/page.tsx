@@ -182,7 +182,11 @@ export default async function AdminPage() {
   const deployedSha = (process.env.VERCEL_GIT_COMMIT_SHA ?? "").slice(0, 7);
 
   const ourChartIds = new Set((ourProfiles ?? []).map((p) => p.primary_chart_id).filter(Boolean).map(String));
-  const ourTokens = new Set(rows.filter((r) => ourChartIds.has(String((r as { id?: string }).id))).map((r) => String(r.token)));
+  // By name as well: on 2026-10-11 her account's own chart was set to "test",
+  // and her real chart is where every feature is tried first.
+  const OUR_PEOPLE = new Set(["Kaycee Vandenberg"]);
+  const ourTokens = new Set(rows.filter((r) => ourChartIds.has(String((r as { id?: string }).id)) || OUR_PEOPLE.has(String(r.person_name)))
+    .map((r) => String(r.token)));
   const allVisits = visitRows ?? [];
   const visits = allVisits.filter((v) => !v.own && !ourTokens.has(String(v.token)));
   const leftOut = allVisits.length - visits.length;
