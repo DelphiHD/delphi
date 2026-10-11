@@ -1399,3 +1399,34 @@ These are Kaycee's calls from 10 and 11 October, from the preview through to the
 - A backslash in a regular expression inside the page script is eaten by the TypeScript template literal. Write such code without regexes.
 - The body must never carry a class that a cleanup selector removes. A marker named like the columns could have removed the page.
 - A pair's columns are built differently from a single chart's. Check the browser version before assuming.
+
+---
+
+## 2026-10-11 — Report A Problem: the bug hunt, semi-automated
+
+Kaycee: "would it be possible to semi-automate the bug hunt? ... it automatically captures an image of what's on the stage, but also gives a text box." Her decisions:
+- Reports go to the dashboard plus an email: "I think this will be more useful ultimately and we both work out of it already."
+- The dashboard keeps columns for notes and resolution: "put your project and account manager hat on."
+- The link is for everyone.
+- The wording as proposed.
+- The reporter's account is logged when they are signed in.
+
+**What it is:**
+- **Report A Problem** sits under the sessions on every chart.
+- Its panel holds a picture of the stage (made as Save Image makes one, so it includes the columns), a box, and Send.
+- With the report go:
+  - the chart type and view
+  - the transit date
+  - the device, screen size and browser
+  - the site version
+  - the page's own errors since it loaded
+  - the signed-in account, from the verified session
+- The table is `problem_reports`, service role only. Pictures are kept privately at `charts/reports/<id>.jpg`.
+- Each report emails every admin.
+- Statuses: New, Looking Into It, Fixed, Not A Bug, Duplicate.
+
+**Working through them:**
+- The dashboard's Reports tab has an Open reports card.
+- `npx tsx scripts/reports.ts` lists the open ones for a session to work through, with the pictures saved to `.cache/reports/`. Status, notes and resolution are then kept on the dashboard.
+
+Tested on her chart with one report marked TEST. It arrived with its picture and details, and was then marked Fixed with a note.
