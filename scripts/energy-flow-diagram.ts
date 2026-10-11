@@ -4325,7 +4325,11 @@ body.view-world .world .w-bar.in-chart { padding-left:160px; }
 /* Find My Places lives in the right-hand panel, under its tabs, in The World
    only. Kaycee, 2026-10-11: the box "still covers up too much of the map". */
 #worldside { display:none; }
-body.view-world #worldside { display:block; order:-1; }
+body.view-world #worldside { display:block; }
+/* Under the date picker and the people, not above them: those decide what
+   the map shows. The pair's bodygraph drawers and the wheel's Swap
+   Perspective have nothing to say on a map. Kaycee, 2026-10-11. */
+body.view-world #relhome > details, body.view-world #relswap { display:none !important; }
 #worldside #w-find { position:static; width:auto; max-height:none; overflow:visible; box-shadow:none;
   border:0; border-radius:0; padding:4px 0 12px; margin:0 0 10px; border-bottom:1px solid rgba(132,80,149,.18);
   background:transparent; }
@@ -4775,7 +4779,6 @@ ${d.client ? "" : `<h1 id="ptitle">Centers, function, and flow</h1>
       <button class="tabbtn" data-tab="dates">Dates</button>
       <button class="tabbtn" data-tab="stats">Stats</button>
     </div>
-${d.world ? `<div class="world-side" id="worldside"></div>` : ""}
 
 ${d.client ? "" : viewControls}
 
@@ -4852,6 +4855,7 @@ ${d.client ? "" : viewControls}
         <div id="relcentres"></div>
       </details>
     </div>
+${d.world ? `<div class="world-side" id="worldside"></div>` : ""}
 
     <div id="pmeta"></div>
 

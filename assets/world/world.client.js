@@ -570,6 +570,9 @@ function renderHere(){
 const reloc=new Map();   // "lat,lon" -> result, or "loading" / "failed"
 const ord=n=>n+(n%100>10&&n%100<14?"th":["th","st","nd","rd"][n%10]||"th");
 const keyOf=pl=>pl.lat.toFixed(4)+","+pl.lon.toFixed(4);
+// The second person's casts are kept under their own birth, so a different
+// second person never borrows the last one's.
+const BK=()=>"|b|"+(PB?PB.cast.p:"");
 function relocKey(){return keyOf(here)}
 const placeName=pl=>pl.name?pl.name.replace(/^Near /,"")+(pl.country?", "+pl.country:""):fmtLat(pl.lat)+", "+fmtLon(pl.lon);
 let relOpen=false;   // the section starts closed
@@ -611,7 +614,7 @@ function timelineHtml(){
 // carries (who=b); the chart's own person from the chart link alone.
 const gatesOf=g=>({pg:Object.values(g.personality).map(x=>x.split(".")[0]).join(","),dg:Object.values(g.design).map(x=>x.split(".")[0]).join(",")});
 function fetchReloc(pl,wheels,done,who){
-  if(!live||(who==="b"&&!PB))return;const k=keyOf(pl)+(who==="b"?"|b":""),have=reloc.get(k);
+  if(!live||(who==="b"&&!PB))return;const k=keyOf(pl)+(who==="b"?BK():""),have=reloc.get(k);
   if(have==="loading"||(have&&have.ok&&(have.svg||!wheels)))return;
   reloc.set(k,"loading");
   const q=who==="b"?{who:"b",lat:pl.lat,lon:pl.lon,name:PB.person,at:placeName(pl),wheels:wheels?"1":"0",place:PB.cast.place,p:PB.cast.p,d:PB.cast.d,...gatesOf(PB.gateOf)}
@@ -640,7 +643,7 @@ function relocHtml(){
 // that person carries in gold, named once beneath), then the planets that
 // change house. On a Relationship each person has their own, under their name.
 function relocBlock(who){
-  const isb=who==="b",r=reloc.get(relocKey()+(isb?"|b":""));
+  const isb=who==="b",r=reloc.get(relocKey()+(isb?BK():""));
   const NAT=isb?PB.natal:NATAL,GO=isb?PB.gateOf:GATE_OF,name=isb?PB.person:PERSON;
   const top=pairOn()?'<div class="relwho '+(isb?"pb":"pa")+'">'+name+'</div>':"";
   if(!r||r==="loading")return top+'<div class="none">Casting…</div>';
@@ -685,7 +688,7 @@ function showWheel(r,where,which,who){
 }
 document.getElementById("w-wheel").addEventListener("click",e=>{
   if(e.target.id==="wheel"||e.target.closest(".x"))return e.currentTarget.classList.remove("open");
-  const t=e.target.closest("[data-wtab]");if(t){const who=e.currentTarget.dataset.who;const r=reloc.get(relocKey()+(who==="b"?"|b":""));if(r&&r.svg)showWheel(r,e.currentTarget.dataset.where,t.dataset.wtab,who)}
+  const t=e.target.closest("[data-wtab]");if(t){const who=e.currentTarget.dataset.who;const r=reloc.get(relocKey()+(who==="b"?BK():""));if(r&&r.svg)showWheel(r,e.currentTarget.dataset.where,t.dataset.wtab,who)}
   if(e.target.closest("[data-snapwheel]")){const w=e.currentTarget,which=w.dataset.which;
     const who=w.dataset.who;snapshot(w.querySelector(".box svg"),[who==="b"&&PB?PB.person:PERSON,"Relocated Chart · "+w.dataset.where,
       which==="both"?"Personality + Design":SIDE[which]+" · "+utcWhen(which==="design"?(who==="b"&&PB?PB.cast:CAST).d:(who==="b"&&PB?PB.cast:CAST).p)],
@@ -700,7 +703,7 @@ const opp=sd=>{const z=ZOD.indexOf(sd.sign);return {sign:ZOD[(z+6)%12],deg:sd.de
 const ZOD=["Aries","Taurus","Gemini","Cancer","Leo","Virgo","Libra","Scorpio","Sagittarius","Capricorn","Aquarius","Pisces"];
 function wheelTip(el){
   const w=document.getElementById("w-wheel"),which=w.dataset.which,isb=w.dataset.who==="b";
-  const r=reloc.get(relocKey()+(isb?"|b":""));if(!r||!r.svg)return"";
+  const r=reloc.get(relocKey()+(isb?BK():""));if(!r||!r.svg)return"";
   const GO=isb&&PB?PB.gateOf:GATE_OF;
   const pill=(t,c)=>t?'<span class="w-pill '+(c||String(t).toLowerCase())+'">'+t+'</span>':"";
   if(el.dataset.aplanet){
@@ -858,7 +861,7 @@ document.getElementById("w-here").addEventListener("click",e=>{
   if(e.target.closest(".x")){here=null;pinned.clear();renderHere();redraw();return}
   if(e.target.closest("[data-tltog]")){tlOpen=!tlOpen;if(tlOpen)fetchTimeline();renderHere();return}
   if(e.target.closest("[data-reltog]")){relOpen=!relOpen;if(relOpen&&here){fetchReloc(here,true,renderHere);if(pairOn())fetchReloc(here,true,renderHere,"b")}renderHere();return}
-  const wb=e.target.closest("[data-wheel]");if(wb){const who=wb.dataset.wheel;const r=reloc.get(relocKey()+(who==="b"?"|b":""));if(r&&r.svg)showWheel(r,placeName(here),"personality",who);return}
+  const wb=e.target.closest("[data-wheel]");if(wb){const who=wb.dataset.wheel;const r=reloc.get(relocKey()+(who==="b"?BK():""));if(r&&r.svg)showWheel(r,placeName(here),"personality",who);return}
   const un=e.target.closest("[data-un]");if(un){pinned.delete(un.dataset.un);renderHere();redraw();return}
   if(e.target.closest("[data-save]")&&here){
     saved.push({n:here.name?here.name.replace(/^Near /,"Near "):fmtLat(here.lat)+", "+fmtLon(here.lon),c:here.country||"",lat:here.lat,lon:here.lon});
@@ -981,11 +984,17 @@ function drawSaved(){
     const t=mk("text",{class:"spin-l",x:x+8,y:y-6});t.textContent=s.n.replace(/^Near /,"");g.append(t)}
 }
 let comparing=false;
+// Folding sections: a pair's comparison runs long. The grade counts always
+// show; Lines open, the rest folded. Kaycee, 2026-10-11: "It's a lot of info
+// for two people and it's only showing one person's houses."
+const cmpOpen=new Set(["lines"]);
+// On a Relationship, the people in view, from the people buttons.
+const cmpWho=()=>pairOn()?["a","b"].filter(w=>party[w]):["a"];
 function renderCompare(){
   const b=document.getElementById("w-cmpBtn");b.classList.toggle("has",saved.length>0);b.textContent="Compare Places ("+saved.length+")";
   const box=document.getElementById("w-compare");
   if(!comparing||!saved.length){box.classList.remove("open");return}
-  for(const s of saved)fetchReloc({lat:s.lat,lon:s.lon,name:s.n,country:s.c},false,renderCompare);
+  if(cmpOpen.has("reloc"))for(const s of saved)for(const w of cmpWho())fetchReloc({lat:s.lat,lon:s.lon,name:s.n,country:s.c},false,renderCompare,w);
   const A=saved.map(s=>analyze(s.lat,s.lon));
   // Every line or paran that reaches any saved place, best first.
   const lines=new Map(),pars=new Map();
@@ -994,35 +1003,41 @@ function renderCompare(){
     for(const r of a.prs){const p=r.p,k=[p.who||"",p.side,p.a,p.angleA,p.b,p.angleB].join("|");if(!pars.has(k))pars.set(k,{p,at:[],best:9});const e=pars.get(k);e.at[i]=r;e.best=Math.min(e.best,r.d)}
   });
   const cell=r=>r?'<td class="mi">'+(r.mi!==undefined?Math.round(r.mi)+" mi":r.d.toFixed(1)+"°")+" "+gradePill(r.g)+"</td>":"<td></td>";
-  const count=(a,n)=>a.rows.filter(r=>r.g[1]===n).length+a.prs.filter(r=>r.g[1]===n).length;
+  const count=(a,n,w)=>a.rows.filter(r=>r.g[1]===n&&(!w||isB(r.l)===(w==="b"))).length+a.prs.filter(r=>r.g[1]===n&&(!w||isB(r.p)===(w==="b"))).length;
+  const W=cmpWho(),cols=saved.length+1;
+  // A pair's counts name each person in their own colour.
+  const sumCell=(a,n)=>'<td>'+(pairOn()?W.map(w=>'<span class="p'+w+'">'+first(w==="b"?PB.person:PERSON)+" "+count(a,n,w)+'</span>').join(" · "):count(a,n))+'</td>';
+  const sec=(k,t)=>'<tr class="w-sec fold'+(cmpOpen.has(k)?" open":"")+'" data-fold="'+k+'"><td colspan="'+cols+'">'+t+'</td></tr>';
+  const whoRow=w=>pairOn()?'<tr class="w-who"><td class="p'+w+'" colspan="'+cols+'">'+(w==="b"?PB.person:PERSON)+'</td></tr>':"";
+  // On a pair, each person's lines and parans under their own name.
+  const byWho=(list,isb,row)=>W.map(w=>{const mine=list.filter(e=>(isb(e)?"b":"a")===w);return mine.length?whoRow(w)+mine.map(row).join(""):""}).join("");
   box.innerHTML='<button class="x" title="Close">&times;</button><h2>Compare Places <button class="w-pill pdf" data-pdf="compare">Save As PDF</button></h2><table>'+
     '<tr><th></th>'+saved.map((s,i)=>'<th><span class="pl" data-go="'+i+'">'+s.n+'</span> <button class="rm" data-rm="'+i+'" title="Remove">&times;</button></th>').join("")+'</tr>'+
-    '<tr class="sum"><td>Strong</td>'+A.map(a=>'<td>'+count(a,3)+'</td>').join("")+'</tr>'+
-    '<tr class="sum"><td>Moderate</td>'+A.map(a=>'<td>'+count(a,2)+'</td>').join("")+'</tr>'+
-    '<tr class="sum"><td>Mild</td>'+A.map(a=>'<td>'+count(a,1)+'</td>').join("")+'</tr>'+
-    relocRows()+
-    '<tr class="w-sec"><td colspan="'+(saved.length+1)+'">Lines</td></tr>'+
-    [...lines.values()].sort((a,b)=>a.best-b.best).map(e=>'<tr '+tag(e.l.side,e.l.body,e.l.angle,e.l.tr,isB(e.l))+'><td><span class="gl '+e.l.side+(isB(e.l)?" who-b":"")+(e.l.tr?" transit":"")+'">'+GLYPH[e.l.body]+'</span> '+(e.l.tr?"Transit "+e.l.body+' <span class="was">'+SIDE[e.l.side]+'</span>':whoName(e.l)+SIDE[e.l.side]+" "+e.l.body)+' <span class="ap">'+e.l.angle+'</span></td>'+saved.map((s,i)=>cell(e.at[i])).join("")+'</tr>').join("")+
-    '<tr class="w-sec"><td colspan="'+(saved.length+1)+'">Parans</td></tr>'+
-    [...pars.values()].sort((a,b)=>a.best-b.best).map(e=>{const p=e.p;return '<tr '+tag(p.side,p.a,p.angleA,false,isB(p))+' data-body2="'+p.b+'" data-angle2="'+p.angleB+'"><td>'+whoName(p)+SIDE[p.side]+" "+p.a+' <span class="ap">'+p.angleA+'</span> '+p.b+' <span class="ap">'+p.angleB+'</span></td>'+saved.map((s,i)=>cell(e.at[i])).join("")+'</tr>'}).join("")+
+    '<tr class="sum"><td>Strong</td>'+A.map(a=>sumCell(a,3)).join("")+'</tr>'+
+    '<tr class="sum"><td>Moderate</td>'+A.map(a=>sumCell(a,2)).join("")+'</tr>'+
+    '<tr class="sum"><td>Mild</td>'+A.map(a=>sumCell(a,1)).join("")+'</tr>'+
+    (live?sec("reloc","Relocated Chart")+(cmpOpen.has("reloc")?W.map(w=>whoRow(w)+relocRows(w)).join(""):""):"")+
+    sec("lines","Lines")+(!cmpOpen.has("lines")?"":byWho([...lines.values()].sort((a,b)=>a.best-b.best),e=>isB(e.l),e=>'<tr '+tag(e.l.side,e.l.body,e.l.angle,e.l.tr,isB(e.l))+'><td><span class="gl '+e.l.side+(isB(e.l)?" who-b":"")+(e.l.tr?" transit":"")+'">'+GLYPH[e.l.body]+'</span> '+(e.l.tr?"Transit "+e.l.body+' <span class="was">'+SIDE[e.l.side]+'</span>':whoName(e.l)+SIDE[e.l.side]+" "+e.l.body)+' <span class="ap">'+e.l.angle+'</span></td>'+saved.map((s,i)=>cell(e.at[i])).join("")+'</tr>'))+
+    sec("parans","Parans")+(!cmpOpen.has("parans")?"":byWho([...pars.values()].sort((a,b)=>a.best-b.best),e=>isB(e.p),e=>{const p=e.p;return '<tr '+tag(p.side,p.a,p.angleA,false,isB(p))+' data-body2="'+p.b+'" data-angle2="'+p.angleB+'"><td>'+whoName(p)+SIDE[p.side]+" "+p.a+' <span class="ap">'+p.angleA+'</span> '+p.b+' <span class="ap">'+p.angleB+'</span></td>'+saved.map((s,i)=>cell(e.at[i])).join("")+'</tr>'}))+
     '</table>';
   box.classList.add("open");
 }
 // The relocated chart for every saved place: angles for each side in view,
 // then each planet's house there, natal house beside its name.
-function relocRows(){
+function relocRows(who){
   if(!live)return"";
-  const R=saved.map(s=>reloc.get(keyOf(s)));
+  const isb=who==="b",NATAL_=isb?PB.natal:NATAL,GO=isb?PB.gateOf:GATE_OF;
+  const R=saved.map(s=>reloc.get(keyOf(s)+(isb?BK():"")));
   const sides=st.side==="both"?["personality","design"]:[st.side];
   const ANGULAR=new Set([1,4,7,10]);
   const cellOf=f=>R.map(r=>r==="loading"||!r?'<td class="mi">…</td>':r==="failed"?'<td class="mi"></td>':'<td>'+f(r)+'</td>').join("");
-  let h='<tr class="w-sec"><td colspan="'+(saved.length+1)+'">Relocated Chart</td></tr>';
-  for(const sd of sides)for(const a of ["ASC","DSC","MC","IC"]){const N=NATAL[sd].angles[a];
+  let h="";
+  for(const sd of sides)for(const a of ["ASC","DSC","MC","IC"]){const N=NATAL_[sd].angles[a];
     h+='<tr><td>'+SIDE[sd]+" "+ANGLE_NAME[a]+' <span class="was">natal '+N.text+" · "+N.gate+"."+N.line+'</span></td>'+
-      cellOf(r=>{const R=r[sd].angles[a],who=ownGate(R.gate,GATE_OF);
+      cellOf(r=>{const R=r[sd].angles[a],who=ownGate(R.gate,GO);
         return R.sign+" "+fmtDeg(R.deg)+' <span class="'+(who.length?"own":"was")+'"'+(who.length?' title="'+who.join(", ")+'"':"")+'>'+R.gate+"."+R.line+'</span>'})+'</tr>'}
-  for(const sd of sides)for(const bd of chartBodies()){const n=NATAL[sd].house[bd];
-    h+='<tr><td><span style="color:'+(sd==="design"?"var(--design)":"var(--ink)")+'">'+GLYPH[bd]+'</span> '+SIDE[sd]+" "+bd+' <span class="was">natal '+ord(n)+'</span></td>'+
+  for(const sd of sides)for(const bd of chartBodies()){const n=NATAL_[sd].house[bd];
+    h+='<tr><td><span class="gl '+sd+(isb?" who-b":"")+'" style="color:'+(isb?(sd==="design"?"#5fb3a8":"#0d9488"):sd==="design"?"var(--design)":"var(--ink)")+'">'+GLYPH[bd]+'</span> '+SIDE[sd]+" "+bd+' <span class="was">natal '+ord(n)+'</span></td>'+
       cellOf(r=>{const z=r[sd].house[bd];return'<span class="'+(ANGULAR.has(z)?"own":z===n?"was":"")+'"'+(ANGULAR.has(z)?' title="Angular house"':'')+'>'+ord(z)+'</span>'})+'</tr>'}
   return h;
 }
@@ -1030,6 +1045,7 @@ document.getElementById("w-cmpBtn").onclick=()=>{comparing=!comparing;renderComp
 document.getElementById("w-compare").addEventListener("click",e=>{
   if(e.target.closest("[data-pdf=compare]"))return compareReport();
   if(e.target.closest(".x")){comparing=false;return renderCompare()}
+  const f=e.target.closest("[data-fold]");if(f){const k=f.dataset.fold;cmpOpen.has(k)?cmpOpen.delete(k):cmpOpen.add(k);return renderCompare()}
   const rm=e.target.closest("[data-rm]");if(rm){saved.splice(+rm.dataset.rm,1);persist();renderCompare();renderHere();return redraw()}
   const go=e.target.closest("[data-go]");if(go){const s=saved[+go.dataset.go];openHere(s.lat,s.lon,{n:s.n,c:s.c,lat:s.lat,lon:s.lon})}
 });
