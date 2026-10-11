@@ -1257,3 +1257,24 @@ The detail and the measurements are in `docs/ASTROCARTOGRAPHY_PLAN.md`.
 - **Next features go to the live charts**, not the preview: transits on the
   map, relationship map, place report, local space. They must work within the
   existing chart code.
+
+## 2026-10-11 — The journal: one table for everything a person keeps
+
+**Decided by Kaycee:**
+- One journal per account, not one per chart.
+- Entries are tagged by person, place and date, plus the person's own tags, so they can slice it any way they like. Custom fields start as plain tags.
+- Completely private: no admin access, nothing on the dashboard.
+- Places saved in a browser move into the account on first sign-in.
+- Entries must export to the journaling and editing tools people already use.
+
+**Why one table:** saved places, snapshots of a view and journal notes are the same thing underneath: something a signed-in person kept, tied to a chart. So `journal_entries` holds them all, with `kind` telling them apart. Saved places are its first use. Snapshots and notes add kinds, not tables.
+
+**Why these shapes:**
+- Text is Markdown, tags are plain lists, a picture is an ordinary image file in storage, and date, people and place are plain fields. Day One, Obsidian, Notion and Apple Notes all take that, so export is a conversion, not a rebuild.
+- `view` holds everything needed to reopen the chart exactly as it was. Saved places and snapshots both need it.
+- An entry outlives the chart it was made on: `chart_token` is not a foreign key, and the person's name is kept on the entry. It goes when the account goes.
+- A signed-in person who saves a place on someone else's chart link keeps it in their own journal, tagged with that person's name.
+
+**Size:** entries live in the database and are fetched only when a signed-in person opens a chart. The journal browser belongs in the portal, so chart pages grow by a few kilobytes at most.
+
+**Privacy is tested:** `scripts/test-journal-rls.ts` runs in the database as real roles, in a transaction that always rolls back. It checks that people see only their own entries, that an admin cannot read anyone else's, and that a browser that is not signed in gets nothing.
