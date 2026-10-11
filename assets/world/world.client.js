@@ -244,6 +244,8 @@ function drawCities(){
   const px=svg.getBoundingClientRect().width*W/(ML+W+MR);
   const zoom=Math.log2(px*view.k/256)+0.6;
   const taken=[];
+  // The chosen city's own label has the first claim on its spot.
+  if(here&&here.name&&!/^Near /.test(here.name)){const hx=X(here.lon),hy=Y(here.lat);taken.push([hx-10,hy-12,hx+14+here.name.length*9.5,hy+10])}
   for(const c of CITIES){
     if(c.z>zoom)break;
     const x=X(c.lon),y=Y(c.lat);if(x<0||x>W||y<0||y>H)continue;
@@ -443,7 +445,13 @@ function drawHere(){
   drawSaved();
   if(!here)return;
   r.append(mk("path",{class:"ring",d:ringPath(here.lat,here.lon,700)}),mk("path",{class:"ring inner",d:ringPath(here.lat,here.lon,300)}));
-  p.append(mk("circle",{class:"pin",cx:X(here.lon),cy:Y(here.lat),r:6}));
+  p.append(mk("circle",{class:"pin",cx:X(here.lon),cy:Y(here.lat),r:7}));
+  // A chosen city is named beside its pin, whatever the zoom: a small town is
+  // not one of the map's own city labels, and the pin alone had to be hunted
+  // for. Kaycee, 2026-10-11. A plain click stays a pin.
+  if(here.name&&!/^Near /.test(here.name)){
+    const t=mk("text",{class:"pin-l",x:X(here.lon)+11,y:Y(here.lat)+5});t.textContent=here.name;p.append(t);
+  }
 }
 const fmtLat=v=>Math.abs(v).toFixed(1)+"°"+(v>=0?"N":"S"),fmtLon=v=>Math.abs(v).toFixed(1)+"°"+(v>=0?"E":"W");
 const tag=(side,body,angle)=>'data-side="'+side+'" data-body="'+body+'" data-angle="'+angle+'"';
