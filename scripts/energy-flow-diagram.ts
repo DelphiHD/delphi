@@ -4392,8 +4392,11 @@ body.view-world #relhome > details, body.view-world #relswap { display:none !imp
      the page will be harmoniously aligned." Each row is a fixed grid of glyph,
      number and arrow, so every glyph and every decimal lines up. */
   .sidecols .scol { width:auto; display:flex; flex-direction:column; justify-content:flex-start; gap:.15em; pointer-events:auto; }
+  /* the heading wraps to the column's width rather than widening it: a long
+     name stretched a transit's column and pulled its numbers away from their
+     glyphs (Kaycee, 2026-10-11) */
   .sidecols .shead { color:#6b6790; letter-spacing:.16em; text-align:center; padding:0 .2em .45em; margin-bottom:.35em;
-    border-bottom:1px solid rgba(132,80,149,.4); white-space:nowrap; }
+    border-bottom:1px solid rgba(132,80,149,.4); width:0; min-width:100%; box-sizing:border-box; white-space:normal; }
   .sidecols .prow, .sidecols .trow { display:grid; grid-template-columns:1.15em auto .8em; align-items:center; column-gap:.4em;
     line-height:1.2; padding:.32em .45em; border-radius:.55em; white-space:nowrap; cursor:pointer; font-variant-numeric:tabular-nums; }
   .sidecols .sg { display:flex; align-items:center; justify-content:center; width:1.15em; height:1.15em; }
@@ -8697,6 +8700,14 @@ if (DATA.client) {
     buildCols();
   };
   phoneBar();
+  // The drawing repaints its columns after the view opens: a second person's
+  // pair columns arrive once their chart loads, and a transit's numbers change
+  // with the date. The slim columns are rebuilt each time, just after the
+  // drawing has finished. Kaycee, 2026-10-11: "in relationship view it still
+  // only shows my placements."
+  ['delphi:connection', 'delphi:transit'].forEach(function (name) {
+    document.addEventListener(name, function () { setTimeout(phoneBar, 60); });
+  });
   // Pinch inside a wheel on a phone, by its viewBox, so the page itself never
   // zooms and every hover and tap keeps working on the drawing.
   var wheelZoom = function (svg) {
