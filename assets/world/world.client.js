@@ -1069,7 +1069,10 @@ function zoomAt(fx,fy,k){const k0=view.k;view.k=Math.min(16,Math.max(1,k));
   view.tx=fx-(fx-view.tx)*view.k/k0;view.ty=fy-(fy-view.ty)*view.k/k0;clampView();redraw()}
 let gesturing=false;
 const touches=new Map();let pinch=null,slide=null;
-const spread=()=>{const [a,b]=[...touches.values()];return {d:Math.hypot(a[0]-b[0],a[1]-b[1])||1,x:(a[0]+b[0])/2,y:(a[1]+b[1])/2}};
+// Two fingers that start close together (pointer and middle, side by side)
+// made every small movement a big zoom. Counting the spread from a floor of
+// 120px makes a pinch feel the same with any two fingers. Kaycee, 2026-10-11.
+const spread=()=>{const [a,b]=[...touches.values()];return {d:Math.max(120,Math.hypot(a[0]-b[0],a[1]-b[1])),x:(a[0]+b[0])/2,y:(a[1]+b[1])/2}};
 const lift=e=>{touches.delete(e.pointerId);if(touches.size<2)pinch=null;if(!touches.size)slide=null};
 window.addEventListener("pointerup",lift);window.addEventListener("pointercancel",lift);
 svg.addEventListener("wheel",e=>{
