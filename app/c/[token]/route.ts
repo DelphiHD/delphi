@@ -17,7 +17,8 @@
 // softer message than Not Found."
 
 import { createClient } from "@supabase/supabase-js";
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
+import { isPerson, deviceOf, isOurs, recordVisit } from "@/lib/visits";
 
 export const dynamic = "force-dynamic";
 
@@ -89,7 +90,7 @@ async function withRetry<T extends { error: unknown }>(read: () => PromiseLike<T
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ token: string }> },
 ) {
   const { token } = await params;
@@ -115,6 +116,15 @@ export async function GET(
   // the event this chart was made through, if any
   const { data: rec } = await db.from("charts").select("source").eq("token", token).maybeSingle();
   const event = String(rec?.source ?? "");
+  // One row for the open, written after the chart has gone out so it never
+  // slows or breaks a client's page. Kaycee, 2026-10-11: phones first, and
+  // her own opens left out of the counts. See lib/visits.ts.
+  const ua = request.headers.get("user-agent") ?? "";
+  if (isPerson(ua)) {
+    const cookie = request.headers.get("cookie") ?? "";
+    after(async () => recordVisit({ token, kind: "open", device: deviceOf(ua), own: await isOurs(cookie) }));
+  }
+
   const body = EVENT_BADGE[event] ? withEventBadge(await file.data.text(), event) : await file.data.arrayBuffer();
 
   return new NextResponse(body, {

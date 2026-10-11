@@ -7329,6 +7329,31 @@ if (DATA.client) {
         b.disabled = off;
         b.classList.toggle('disabled', off);
       });
+    if (typeof reportView === 'function') reportView();
+  };
+
+  // Which view a reader is on, for the dashboard's Visits tab: one small
+  // beacon each time it changes, nothing waits on it and nothing shows.
+  // Kaycee, 2026-10-11, for the mobile work. Only from a chart link: a saved
+  // copy of the page has no token and says nothing.
+  var lastReported = '';
+  var reportCount = 0;
+  var reportView = function () {
+    var tok = (location.pathname.split('/c/')[1] || '').split('/')[0];
+    if (tok.length !== 32 || !navigator.sendBeacon || reportCount > 60) return;
+    var MODE_NAME = { self: 'Individual', variations: 'Variations', transit: 'Transit', relation: 'Relationship' };
+    var VIEW_NAME = { plain: 'Bodygraph', body: 'Circuits', mandala: 'The Wheel', astro: 'Astrology', world: 'The World' };
+    var what = MODE_NAME[curMod] + ' \u00b7 ' + VIEW_NAME[curView];
+    if (what === lastReported) return;
+    lastReported = what; reportCount++;
+    // An iPad asks for the desktop site, so its own word for itself is a Mac
+    // with a touch screen.
+    var touch = navigator.maxTouchPoints > 1 || (window.matchMedia && matchMedia('(pointer: coarse)').matches);
+    var small = Math.min(screen.width, screen.height) < 600;
+    var device = touch ? (small ? 'phone' : 'tablet') : 'computer';
+    try {
+      navigator.sendBeacon('/api/chart-visit', new Blob([JSON.stringify({ token: tok, what: what, device: device })], { type: 'text/plain' }));
+    } catch (e) { /* never in the reader's way */ }
   };
 
   var setModule = function (id) {

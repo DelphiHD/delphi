@@ -61,7 +61,7 @@ export default async function AdminPage() {
   if (!isAdmin) redirect("/portal");
 
   const [{ data: charts }, { data: links }, { data: profiles }, transits, admins, lastBuilt, mine] = await Promise.all([
-    db.from("charts").select("person_name, source, tier, time_accuracy, token, created_at, for_email, owner_id").order("created_at", { ascending: false }),
+    db.from("charts").select("id, person_name, source, tier, time_accuracy, token, created_at, for_email, owner_id").order("created_at", { ascending: false }),
     db.from("client_charts").select("token, client_name, revoked_at"),
     db.from("profiles").select("id, email, account_type, created_at"),
     db.storage.from("charts").list("transits", { limit: 90, sortBy: { column: "name", order: "desc" } }),
@@ -72,6 +72,15 @@ export default async function AdminPage() {
     // charts are two different ages and the dashboard should say both.
     db.from("client_charts").select("updated_at").order("updated_at", { ascending: false }).limit(1),
     db.from("analyst_clients").select("client_id").eq("analyst_id", user.id).is("ended_at", null),
+  ]);
+
+  // Visits: who opens a chart link on what, and which views they use.
+  // Kaycee, 2026-10-11, for the mobile work: her own opens left out, both
+  // those made signed in and any of the charts that are ours.
+  const since = new Date(Date.now() - 90 * 86400e3).toISOString();
+  const [{ data: visitRows }, { data: ourProfiles }] = await Promise.all([
+    db.from("chart_visits").select("token, at, kind, what, device, own").gte("at", since).order("at", { ascending: false }).limit(20000),
+    db.from("profiles").select("primary_chart_id").in("id", (await db.from("delphi_admins").select("user_id")).data?.map((a) => a.user_id) ?? []),
   ]);
 
   // The 5 AM health check publishes its answer here, so Status is not a thing
@@ -172,6 +181,33 @@ export default async function AdminPage() {
   const builtAt = String(lastBuilt.data?.[0]?.updated_at ?? "").slice(0, 16).replace("T", " ");
   const deployedSha = (process.env.VERCEL_GIT_COMMIT_SHA ?? "").slice(0, 7);
 
+  const ourChartIds = new Set((ourProfiles ?? []).map((p) => p.primary_chart_id).filter(Boolean).map(String));
+  const ourTokens = new Set(rows.filter((r) => ourChartIds.has(String((r as { id?: string }).id))).map((r) => String(r.token)));
+  const allVisits = visitRows ?? [];
+  const visits = allVisits.filter((v) => !v.own && !ourTokens.has(String(v.token)));
+  const leftOut = allVisits.length - visits.length;
+  const opens = visits.filter((v) => v.kind === "open");
+  const nameOf = new Map(rows.map((r) => [String(r.token), fileAs(String(r.person_name))]));
+  const pct = (n: number, of: number) => (of ? `${Math.round((n / of) * 100)}%` : "");
+  const byDevice = (list: typeof visits, d: string) => list.filter((v) => v.device === d).length;
+  const perChart = new Map<string, typeof visits>();
+  for (const v of opens) perChart.set(String(v.token), [...(perChart.get(String(v.token)) ?? []), v]);
+  const openRows: Row[] = [...perChart.entries()].map(([token, list]) => ({
+    id: token,
+    name: nameOf.get(token) ?? token.slice(0, 6),
+    opens: list.length,
+    phone: byDevice(list, "phone"),
+    tablet: byDevice(list, "tablet"),
+    computer: byDevice(list, "computer"),
+    last: String(list[0]?.at ?? "").slice(0, 16).replace("T", " "),
+  }));
+  const perView = new Map<string, typeof visits>();
+  for (const v of visits.filter((x) => x.kind === "view")) perView.set(String(v.what), [...(perView.get(String(v.what)) ?? []), v]);
+  const viewRows: Row[] = [...perView.entries()].map(([what, list]) => ({
+    id: what, what, times: list.length,
+    phone: byDevice(list, "phone"), tablet: byDevice(list, "tablet"), computer: byDevice(list, "computer"),
+  }));
+
   const cards: [string, number, string][] = [
     ["People", people.length, "charts that belong to somebody"],
     ["Signed up", signups.length, "through the website or an event"],
@@ -229,7 +265,7 @@ export default async function AdminPage() {
         ))}
       </div>
 
-      <Tabs names={["Everyone", "New chart", "Status", "Transits", "Changes", "Accounts", "Decided", "Launch"]}>
+      <Tabs names={["Everyone", "New chart", "Visits", "Status", "Transits", "Changes", "Accounts", "Decided", "Launch"]}>
         <SortableTable
           initial={{ key: "since", dir: -1 }}
           columns={[
@@ -243,6 +279,41 @@ export default async function AdminPage() {
           rows={everyone}
         />
         <CreateChart events={events} />
+        <div>
+          <p className="sub">
+            {opens.length
+              ? `Last 90 days: ${opens.length} chart opens. Phone ${pct(byDevice(opens, "phone"), opens.length)}, tablet ${pct(byDevice(opens, "tablet"), opens.length)}, computer ${pct(byDevice(opens, "computer"), opens.length)}.`
+              : "No chart opens recorded yet. Recording started 11 October 2026."}
+            {leftOut > 0 && ` ${leftOut} of yours left out.`}
+            {" "}An iPad counts as a computer in opens; views tell them apart.
+          </p>
+          <SortableTable
+            initial={{ key: "opens", dir: -1 }}
+            columns={[
+              { key: "name", label: "Chart" },
+              { key: "opens", label: "Opens", numeric: true },
+              { key: "phone", label: "Phone", numeric: true },
+              { key: "tablet", label: "Tablet", numeric: true, small: true },
+              { key: "computer", label: "Computer", numeric: true },
+              { key: "last", label: "Last opened (UTC)", small: true },
+            ]}
+            rows={openRows}
+            empty="Nothing yet."
+          />
+          <p className="sub" style={{ marginTop: 18 }}>Views chosen, every time someone switches to one.</p>
+          <SortableTable
+            initial={{ key: "times", dir: -1 }}
+            columns={[
+              { key: "what", label: "View" },
+              { key: "times", label: "Times", numeric: true },
+              { key: "phone", label: "Phone", numeric: true },
+              { key: "tablet", label: "Tablet", numeric: true },
+              { key: "computer", label: "Computer", numeric: true },
+            ]}
+            rows={viewRows}
+            empty="Nothing yet."
+          />
+        </div>
         <div>
           <p className="sub">
             {health.at
