@@ -371,3 +371,24 @@ the right; second row Lines, Angles, Parans. Find My Places opens on the right.
   design dates, the settings, the map as it stands, the results table) and the
   browser's print, where Save as PDF is built in. No PDF library is shipped in
   the charts.
+
+## Transit in The World: decided 11 October, not built yet
+
+Kaycee's answers, to start after the 11 October republish finishes:
+
+1. **Transits to the chart (Cyclo*Carto*Graphy) first**, then a **place
+   timeline**. CCG: for a chosen date, where on Earth each transiting body sits
+   on the person's natal angles, i.e. lines drawn from the transiting bodies'
+   right ascension and declination against the natal moment's sidereal time.
+   They move only as fast as the transiting body. Drawn in the transit teal,
+   using the Transit chart type's existing date picker. The timeline: for a
+   saved or clicked place, upcoming transits to that place's relocated angles
+   over the next year, with dates (crossingsIn in lib/hd/ephemeris finds the
+   moments).
+2. **Personality and design** each measured against their own chart, following
+   the panel's Personality and Design switches, as elsewhere.
+3. **Bodies:** all transiting bodies, Moon off by default.
+4. **Timeline orbs:** her transit orbs, 1 degree, Sun and Moon 3.
+
+Left out on purpose: lines for the sky of a single moment, which sweep the
+whole world daily and only mean something for event charts.
