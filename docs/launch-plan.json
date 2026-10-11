@@ -145,8 +145,8 @@
         },
         {
           "title": "Mobile overhaul, view by view",
-          "status": "doing",
-          "note": "The World is done for phones. A review of every view in every chart type comes first, then the changes."
+          "status": "done",
+          "note": "Every view and chart type redone for phones and republished 11 October. Kaycee is asking others to hunt for bugs. Details: docs/MOBILE_PLAN.md and DECISIONS.md (Charts on a phone)."
         }
       ]
     },
@@ -607,6 +607,18 @@
     {
       "on": "2026-10-11",
       "what": "Chart opens and views are recorded by device type only, her own left out, to steer the mobile work. Mobile overhaul before new features, starting with a view-by-view review."
+    },
+    {
+      "on": "2026-10-11",
+      "what": "On a phone the placement columns stay beside the bodygraph in Delphi's own style (spaced capitals over a coloured rule, alternating tints, red Design, black Personality), small type, the bodygraph the star. Tapping a row lights its gate. A sheet and a drawer were tried and turned down."
+    },
+    {
+      "on": "2026-10-11",
+      "what": "The Wheel and Astrology use Safari's own pinch; The World keeps its own but moves the picture during a pinch and redraws on lift."
+    },
+    {
+      "on": "2026-10-11",
+      "what": "Anything visual is run through scripts/type-check.js (fonts, sizes, alignment, overlaps) before it goes to Kaycee."
     }
   ],
   "open": [

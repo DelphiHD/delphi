@@ -73,3 +73,7 @@ Step 3 first took the columns off the drawing: buttons opened them, first as a f
 - The headings are the columns' own: Design and Personality; under Transit, her name and Transit.
 
 **Trap found:** the body must never carry a class that a cleanup selector removes. It was `sidecols`, the same name as the columns, so clearing old columns could have removed the page. The marker on the body is now `has-sidecols`.
+
+## Published to every chart (2026-10-11)
+
+Kaycee approved publishing ahead of her full review, because part of the review is other people hunting for bugs. All charts were republished that evening. Her reports from the bug hunt come next.

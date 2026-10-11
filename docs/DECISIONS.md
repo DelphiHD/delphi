@@ -1355,3 +1355,47 @@ These are Kaycee's calls from 10 and 11 October, from the preview through to the
 - Her own opens and her own chart are left out of the counts.
 - They show on the dashboard's Visits tab. The point is to steer the mobile work.
 
+
+---
+
+## 2026-10-11 — Charts on a phone: what was decided
+
+**Background:** most clients open their charts on phones. Kaycee: "I keep telling people it's better in a browser, but I don't think anyone looks at it there." So mobile comes before new features. A view-by-view review (`docs/MOBILE_PLAN.md`) set the list, and she reviewed the result on her iPhone. Everything here applies under 760px only; the desktop layout is unchanged.
+
+**Every view.**
+- Chart Type and View are two slim rows.
+- Show is one slim row that opens as a sheet from the bottom, with Reset, Save Image and Copy Chart Data inside it.
+- Anything that opens slides up from the bottom.
+- A gate's details sit along the bottom of the screen at about a third of its height, never over the bodygraph they explain.
+
+**Bodygraph and the placement columns.** This took her four rounds, and the reasons matter.
+- They stay columns beside the bodygraph, always on screen. "They need to be columns unfortunately, that's the traditional way that people are used to seeing them."
+- The link she teaches with must stay visible: "if someone clicks the gate in the placement table it highlights it in the bodygraph". A sheet and a drawer both broke it and were turned down.
+- Delphi's own style, not the competitors'. "We are Delphi and we want our style to stand out." Her screenshots of other apps were an example of the idea only.
+  - Headings in capitals, spaced out, in their side's colour, over a rule of the same colour.
+  - Every other row tinted lavender.
+  - Red for Design, black for Personality.
+  - All of it read from the desktop columns, so the two can't drift apart.
+- Rows sit close together under the heading.
+- The type, the name included, is about half the name's full-width size. "The bodygraph image is SUPER small and it really needs to be the star of the show."
+- Harmonious alignment is the standard. Every glyph is drawn at one scale and every row is a fixed grid. "My expectation is that fonts will be of similar styles and sizes and that everything on the page will be harmoniously aligned."
+- A tap on a row lights its gate, and a gate lights its row.
+- Columns rebuild whenever the drawing repaints: a pair loading, the transit date, Transit Only or over the chart, the people buttons, a side switched off.
+- Transit: the combined column keeps Design and Personality side by side, red and black. Under Transit Only, the Transit column sits alone on the right.
+- Relationship: one column per person, as the browser version draws it, with PERS and DESIGN in that person's two colours. The names come off the columns; the names over the drawing are coloured to say whose is whose (her suggestion).
+- Circuits is a switch on Bodygraph rather than a view of its own.
+- Save Image still saves the whole chart, columns and name included.
+
+**The other views.**
+- **The Wheel and Astrology:** Safari's own pinch, as the bodygraph has always had. Our own zoom redrew thousands of elements on every finger movement and was "sooo challenging". Her name sits over The Wheel. The blank space around the Astrology wheel is gone.
+- **The World:** keeps its own pinch, because the edge glyphs and controls must stay put. During the pinch it moves the picture as it stands and redraws on lift. The pinch counts finger spread from a 120px floor, so fingers held close together still zoom smoothly.
+- **Transit:** the date sits just under the chart type, not 740px down the page.
+- **Relationship:** the person picker and the people buttons sit just under the chart type.
+- **Variations:** in the page under the controls, one variation at a time, swiped sideways.
+
+**Process.** `scripts/type-check.js` runs before anything visual goes to her. It checks fonts, sizes, weights, glyph sizes and centre lines, numbers on one line, row spacing and overlaps. She asked for it "so I don't have to tell you this every single time".
+
+**Traps found:**
+- A backslash in a regular expression inside the page script is eaten by the TypeScript template literal. Write such code without regexes.
+- The body must never carry a class that a cleanup selector removes. A marker named like the columns could have removed the page.
+- A pair's columns are built differently from a single chart's. Check the browser version before assuming.
