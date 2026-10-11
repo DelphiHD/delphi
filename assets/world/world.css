@@ -33,3 +33,9 @@
 .world #w-wheel .box{padding:12px 10px}
 .world #w-wheel .box svg{width:100%}
 }
+
+/* Local space: thin and long-dashed, under the angle lines' weight. */
+.world .ln.LS,.world-side .ln.LS{stroke-width:1.2;stroke-dasharray:10 3 2 3;opacity:.85}
+.world .ln.LS.hot,.world .ln.LS.pinned{opacity:1;stroke-width:3}
+.world .lsfrom .w-opt{font-size:12px;color:var(--muted)}
+.world .lsfrom .was{color:var(--purple)}

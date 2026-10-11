@@ -116,7 +116,11 @@ function markup(G, inChart, findHosted, person) {
   };
   var extras = '<div class="sep"></div>' + opt("extras", "Chiron", "⚷", "Chiron") + opt("extras", "Lilith", "⚸", "Lilith") +
     '<div class="trx">' + opt("trx", "Moon", "☽", "Transit Moon") + '</div>';
-  var angles = [["ASC", "Ascendant"], ["DSC", "Descendant"], ["MC", "Midheaven"], ["IC", "IC"]].map(function (a) { return opt("angles", a[0], swatch(a[0]), a[1]); }).join("");
+  var angles = [["ASC", "Ascendant"], ["DSC", "Descendant"], ["MC", "Midheaven"], ["IC", "IC"]].map(function (a) { return opt("angles", a[0], swatch(a[0]), a[1]); }).join("") +
+    // Local space, each side on its own, off to begin with; drawn from the
+    // birthplace or any place chosen. Kaycee, 2026-10-11.
+    '<div class="sep"></div>' + opt("ls", "personality", swatch("LS"), "Personality Local Space") + opt("ls", "design", swatch("LS"), "Design Local Space") +
+    '<div class="lsfrom"></div>';
   // Inside a chart, the chart's own panel holds Personality and Design, and its
   // Save Image and Reset serve this view too. Lines and Angles stay here: they
   // work in a way only this view does, and The World opens with Earth and the
@@ -190,7 +194,7 @@ const ALL={lines:BODIES,parans:BODIES,angles:ANGLES};
 // Earth and both Nodes start off: Kaycee, 10 October. They are still one
 // click away, and All includes them.
 const START_OFF=["Earth","North Node","South Node"];
-const st={side:"both",lines:new Set(BODIES.filter(b=>!START_OFF.includes(b))),angles:new Set(ANGLES),parans:new Set(),extras:new Set(),trx:new Set()};
+const st={side:"both",lines:new Set(BODIES.filter(b=>!START_OFF.includes(b))),angles:new Set(ANGLES),parans:new Set(),extras:new Set(),trx:new Set(),ls:new Set()};
 const EXTRAS=["Chiron","Lilith"];
 let bothOff=false;   // the chart's panel has both sides off
 // Transit (Kaycee, 2026-10-11): where each transiting body sits on this
@@ -237,7 +241,7 @@ const lineOn=b=>st.lines.has(b)||st.extras.has(b);
 // Whether a line shows: side, Lines menu, Angles, and for transit lines the
 // Transit chart type and the transit Moon switch (off to start: it crosses
 // every angle within a day). Natal lines step aside under Transit Only.
-const lineVisible=l=>!bothOff&&(st.side==="both"||l.side===st.side)&&lineOn(l.body)&&st.angles.has(l.angle)&&
+const lineVisible=l=>!bothOff&&(st.side==="both"||l.side===st.side)&&lineOn(l.body)&&(l.angle==="LS"?st.ls.has(l.side):st.angles.has(l.angle))&&
   (isB(l)||l.tr?party.b:party.a)&&
   (isB(l)?rel.on&&!!PB:true)&&
   (l.tr?(tr.on&&(l.body!=="Moon"||st.trx.has("Moon"))):!(tr.on&&tr.alone));
@@ -271,6 +275,7 @@ function lineEls(l){const id={"data-person":isB(l)?PB.person:PERSON,"data-side":
   l.el=mk("path",{class:"ln "+l.side+" "+l.angle+(l.tr?" transit":"")+(isB(l)?" who-b":""),...id});gl.append(l.el);
   l.hit=mk("path",{class:"hit",...id});gh.append(l.hit)}
 for(const l of LN)lineEls(l);
+buildLS();
 function paranEls(p){
   p.el=mk("g",{class:"pr "+p.side+(isB(p)?" who-b":""),"data-person":isB(p)?PB.person:PERSON,"data-side":p.side,"data-body":p.a,"data-angle":p.angleA,"data-body2":p.b,"data-angle2":p.angleB,"data-lat":p.lat.toFixed(2)});
   if(isB(p))p.el.setAttribute("data-who","b");
@@ -285,11 +290,44 @@ function setPartner(B,name){
     for(const b of linesFromSky(PB.sky[side]))for(const angle of Object.keys(b.lines)){const l={side,body:b.body,angle,runs:b.lines[angle],who:"b"};LN.push(l);lineEls(l)}
     for(const p of paransFromSky(PB.sky[side])){if(p.lat>TOP||p.lat<BOTTOM)continue;const q={side,a:p.a,angleA:p.angleA,b:p.b,angleB:p.angleB,lat:p.lat,lon:p.lon,who:"b"};PR.push(q);paranEls(q)}
   }
+  buildLS();
   renderName();
   if(typeof paint==="function")paint();
 }
 // The person's name over the view; on a Relationship both, as the chart shows
 // a pair, or a word that the other's time is not exact enough for a map.
+// ---- Local space -------------------------------------------------------------
+// Each body's compass direction at the birth moment, seen from one place, drawn
+// as the great circle through that place on that bearing. From the birthplace
+// unless the person draws it from a place they choose. Graded in a place's
+// panel like any line; Find My Places keeps to the angles. Kaycee, 2026-10-11:
+// "any place they choose", both sides each with an on and off, on the same
+// map, graded.
+let lsFrom=null;   // {lat,lon,name}; null is the birthplace
+function lsLines(sky,lat,lon){
+  // its own degree constant: this runs as the map is first built, before RAD exists
+  const DEG=Math.PI/180,out=[],f=lat*DEG;
+  for(const body of Object.keys(sky.bodies)){
+    const b=sky.bodies[body],H=(sky.gast+lon-b.ra)*DEG,d=b.dec*DEG;
+    const az=Math.atan2(Math.sin(H),Math.cos(H)*Math.sin(f)-Math.tan(d)*Math.cos(f))+Math.PI;
+    const pts=[];
+    for(let k=0;k<=360;k+=1){const a=k*DEG;
+      const la=Math.asin(Math.sin(f)*Math.cos(a)+Math.cos(f)*Math.sin(a)*Math.cos(az));
+      const lo=lon+Math.atan2(Math.sin(az)*Math.sin(a)*Math.cos(f),Math.cos(a)-Math.sin(f)*Math.sin(la))/DEG;
+      pts.push([((lo+540)%360)-180,la/DEG])}
+    out.push({body,runs:splitAtDateline(pts),az:az/DEG});
+  }
+  return out;
+}
+function buildLS(){
+  for(let i=LN.length-1;i>=0;i--)if(LN[i].angle==="LS"){LN[i].el.remove();LN[i].hit.remove();LN.splice(i,1)}
+  const at=lsFrom||{lat:BIRTH[1],lon:BIRTH[0]};
+  const skies=[["a",D]].concat(PB?[["b",PB]]:[]);
+  for(const [who,src] of skies)for(const side of ["personality","design"])
+    for(const x of lsLines(src.sky[side],at.lat,at.lon)){const l={side,body:x.body,angle:"LS",runs:x.runs,az:x.az};if(who==="b")l.who="b";LN.push(l);lineEls(l)}
+  const f=root.querySelector(".lsfrom");
+  if(f)f.innerHTML=lsFrom?'<div class="w-opt" data-lsback="1">From '+lsFrom.name+' <span class="was">· Use Birthplace</span></div>':'<div class="w-opt was">From Birthplace</div>';
+}
 function renderName(){
   const n=root.querySelector(".w-name");if(!n)return;
   const e=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -426,7 +464,8 @@ root.addEventListener("click",e=>{
   const t=e.target.closest("button,.w-opt");if(!t)return;
   if(t.dataset.all){st[t.dataset.all]=new Set(ALL[t.dataset.all]);return paint()}
   if(t.dataset.none){st[t.dataset.none].clear();return paint()}
-  if(t.dataset.kind){const s=st[t.dataset.kind],b=t.dataset.chip;s.has(b)?s.delete(b):s.add(b);paint()}
+  if(t.dataset.lsback){lsFrom=null;buildLS();return paint()}
+  if(t.dataset.kind){const s=st[t.dataset.kind],b=t.dataset.chip;s.has(b)?s.delete(b):s.add(b);paint();if(t.dataset.kind==="ls"&&here)renderHere()}
 });
 const tip=document.getElementById("w-tip");
 function hot(d,on){
@@ -488,7 +527,7 @@ let here=null;   // {lat, lon, name, country}
 // Lines clicked to keep them lit, by identity: side, body and angle.
 const pinned=new Set();
 const key=l=>(isB(l)?"B|":"")+(l.tr?"T|":"")+l.side+"|"+l.body+"|"+l.angle;
-const ANGLE_NAME={ASC:"Ascendant",DSC:"Descendant",MC:"Midheaven",IC:"IC"};
+const ANGLE_NAME={ASC:"Ascendant",DSC:"Descendant",MC:"Midheaven",IC:"IC",LS:"Local Space"};
 // Saved places stay in this browser for now. In the live chart they belong to
 // the account that saved them.
 const STORE="acg-places|"+PERSON;
@@ -556,6 +595,7 @@ function renderHere(){
     '<div class="co">'+(here.name?(here.country?here.country+" · ":"")+fmtLat(here.lat)+", "+fmtLon(here.lon):"")+'</div>'+
     (isSaved(here)?'<button class="save done">Saved</button>':'<button class="save" data-save="1">Save Place</button>')+
     ' <button class="w-pill pdf" data-pdf="place">Save As PDF</button>'+
+    (st.ls.size?' <button class="w-pill pdf" data-lshere="1">Local Space From Here</button>':'')+
     relocHtml()+timelineHtml()+
     '<h3>Lines</h3>'+(rows.length?rows.map(r=>'<div class="hr" '+tag(r.l.side,r.l.body,r.l.angle,r.l.tr,isB(r.l))+'>'+
       '<span class="gl '+r.l.side+(r.l.tr?" transit":"")+(isB(r.l)?" who-b":"")+'">'+GLYPH[r.l.body]+'</span><span class="nm">'+(r.l.tr?"Transit "+r.l.body+' <span class="was">'+SIDE[r.l.side]+'</span>':whoName(r.l)+SIDE[r.l.side]+" "+r.l.body)+' <span class="ap">'+r.l.angle+'</span></span>'+
@@ -886,7 +926,8 @@ function mapState(){
   if(tr.on&&tr.sky)dates.push("Transit: "+utcWhen(tr.at)+(tr.alone?"  ·  Transit Only":""));
   if(pairOn())dates.push("With "+PB.person);
   return ["The World · "+(st.side==="both"?"Personality + Design":SIDE[st.side]),...dates,
-    "Lines: "+n("lines")+"  ·  Angles: "+n("angles")+"  ·  Parans: "+n("parans")];
+    "Lines: "+n("lines")+"  ·  Angles: "+n("angles")+"  ·  Parans: "+n("parans")+
+      (st.ls.size?"  ·  Local Space: "+[...st.ls].map(x=>SIDE[x]).join(", ")+" from "+(lsFrom?lsFrom.name:"Birthplace"):"")];
 }
 document.getElementById("w-snapMap").onclick=()=>snapshot(document.getElementById("w-map"),[PERSON,...mapState()],PERSON+" - The World.png");
 function openHere(lat,lon,city){
@@ -899,6 +940,7 @@ function openHere(lat,lon,city){
 document.getElementById("w-here").addEventListener("click",e=>{
   if(e.target.closest(".x")){here=null;pinned.clear();renderHere();redraw();return}
   if(e.target.closest("[data-pdf=place]"))return placeReport();
+  if(e.target.closest("[data-lshere]")&&here){lsFrom={lat:here.lat,lon:here.lon,name:(here.name||fmtLat(here.lat)+", "+fmtLon(here.lon)).replace(/^Near /,"")};buildLS();paint();return renderHere()}
   if(e.target.closest("[data-tltog]")){tlOpen=!tlOpen;if(tlOpen)fetchTimeline();renderHere();return}
   if(e.target.closest("[data-reltog]")){relOpen=!relOpen;if(relOpen&&here){fetchReloc(here,true,renderHere);if(pairOn())fetchReloc(here,true,renderHere,"b")}renderHere();return}
   const wb=e.target.closest("[data-wheel]");if(wb){const who=wb.dataset.wheel;const r=reloc.get(relocKey()+(who==="b"?BK():""));if(r&&r.svg)showWheel(r,placeName(here),"personality",who);return}
