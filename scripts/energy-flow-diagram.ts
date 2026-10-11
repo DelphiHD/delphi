@@ -4381,7 +4381,7 @@ body.view-world #relhome > details, body.view-world #relswap { display:none !imp
   .phonebar .circpill.on { background:#845095; border-color:#845095; color:#fff; }
   /* the drawing's own columns give way to the slim ones beside it */
   body.has-sidecols .wrap .stage svg.canvas > .ptable { visibility:hidden; }
-  .sidecols { position:absolute; left:0; right:0; pointer-events:none; display:flex; justify-content:space-between; padding:0 2px; }
+  .sidecols { position:absolute; left:0; right:0; pointer-events:none; display:flex; justify-content:space-between; align-items:stretch; padding:0 2px; }
   .sidecols .sgl { width:15px; height:15px; vertical-align:-2px; margin-right:4px; overflow:visible; }
   .sidecols .scol.right .sgl { margin-right:4px; }
   .sidecols .scol { width:auto; min-width:17%; display:flex; flex-direction:column; justify-content:space-between; pointer-events:auto; }
@@ -8533,14 +8533,19 @@ if (DATA.client) {
   var placeCols = function () {
     var canvas = visibleCanvas();
     if (!cols || !canvas) return;
+    canvas.style.marginBottom = '';
     var s = cols.parentNode.getBoundingClientRect(), r = canvas.getBoundingClientRect();
-    cols.style.top = (r.top - s.top + r.height * 0.085) + 'px';
-    cols.style.height = (r.height * 0.86) + 'px';
+    cols.style.top = (r.top - s.top + r.height * 0.06) + 'px';
+    cols.style.minHeight = (r.height * 0.9) + 'px';
+    // a narrowed bodygraph can be shorter than its columns: the drawing's
+    // space grows to hold them, so they never run into the panel below
+    var over = cols.getBoundingClientRect().bottom - r.bottom;
+    if (over > 0) canvas.style.marginBottom = (over + 10) + 'px';
   };
   var buildCols = function () {
     [].forEach.call(document.querySelectorAll('div.sidecols'), function (c) { c.remove(); }); cols = null;
     document.body.classList.remove('has-sidecols');
-    [].forEach.call(document.querySelectorAll('svg.canvas'), function (c) { c.style.width = ''; c.style.marginLeft = ''; });
+    [].forEach.call(document.querySelectorAll('svg.canvas'), function (c) { c.style.width = ''; c.style.marginLeft = ''; c.style.marginBottom = ''; });
     if (!phoneMQ.matches) return;
     var canvas = visibleCanvas();
     if (!canvas) return;
