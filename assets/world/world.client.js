@@ -203,6 +203,11 @@ let TWHERE={};
 // PB is their sky from the connection the chart casts; null when there is none
 // or their time is not exact enough, and then this chart's person shows alone.
 const rel={on:false,name:""};let PB=null;
+// The chart's two party buttons (the names in the right-hand panel): on a
+// Relationship each person, under Transit the chart and the sky. Either can be
+// taken off the map. Kaycee, 2026-10-11: "the buttons for removing one person
+// from the map don't do anything. I can see them being useful."
+const party={a:true,b:true};
 const first=n=>String(n||"").split(" ")[0];
 const isB=l=>l.who==="b";
 const whoName=l=>rel.on&&PB?first(isB(l)?PB.person:PERSON)+" · ":"";
@@ -233,6 +238,7 @@ const lineOn=b=>st.lines.has(b)||st.extras.has(b);
 // Transit chart type and the transit Moon switch (off to start: it crosses
 // every angle within a day). Natal lines step aside under Transit Only.
 const lineVisible=l=>!bothOff&&(st.side==="both"||l.side===st.side)&&lineOn(l.body)&&st.angles.has(l.angle)&&
+  (isB(l)||l.tr?party.b:party.a)&&
   (isB(l)?rel.on&&!!PB:true)&&
   (l.tr?(tr.on&&(l.body!=="Moon"||st.trx.has("Moon"))):!(tr.on&&tr.alone));
 const chartBodies=()=>[...BODIES.filter(b=>st.lines.has(b)),...EXTRAS.filter(b=>st.extras.has(b))];
@@ -402,7 +408,7 @@ function paint(){
   const sideOk=d=>!bothOff&&(st.side==="both"||d.side===st.side);
   for(const l of LN)l.el.classList.toggle("off",!lineVisible(l));
   for(const el of document.querySelectorAll("#w-parans [data-side]"))
-    el.classList.toggle("off",!(sideOk(el.dataset)&&pairOk(el.dataset)&&(st.angles.has(el.dataset.angle)||st.angles.has(el.dataset.angle2))&&!(tr.on&&tr.alone)&&(el.dataset.who!=="b"||rel.on)));
+    el.classList.toggle("off",!(sideOk(el.dataset)&&pairOk(el.dataset)&&(st.angles.has(el.dataset.angle)||st.angles.has(el.dataset.angle2))&&!(tr.on&&tr.alone)&&(el.dataset.who!=="b"||rel.on)&&(el.dataset.who==="b"?party.b:party.a)));
   root.classList.toggle("tr-on",tr.on);
   root.classList.toggle("rel-on",rel.on&&!!PB);
   for(const c of document.querySelectorAll(".w-opt[data-kind]"))c.classList.toggle("on",st[c.dataset.kind].has(c.dataset.chip));
@@ -499,6 +505,7 @@ function analyze(lat,lon){
   for(const p of PR){
     if(tr.on&&tr.alone)continue;
     if(isB(p)&&!rel.on)continue;
+    if(!(isB(p)?party.b:party.a))continue;
     if(!sideOk(p.side)||!lineOn(p.a)||!lineOn(p.b)||!(st.angles.has(p.angleA)||st.angles.has(p.angleB)))continue;
     const d=Math.abs(p.lat-lat),g=gradeLat(d);if(g)prs.push({p,d,g});
   }
@@ -627,7 +634,7 @@ function relocHtml(){
   if(!live)return"";
   const head='<button class="reltog'+(relOpen?" open":"")+'" data-reltog="1">Relocated Chart</button>';
   if(!relOpen)return head;
-  return head+relocBlock("a")+(pairOn()?relocBlock("b"):"");
+  return head+(party.a||!pairOn()?relocBlock("a"):"")+(pairOn()&&party.b?relocBlock("b"):"");
 }
 // One person's relocated chart: angles here and natal with their gates (a gate
 // that person carries in gold, named once beneath), then the planets that
@@ -889,7 +896,8 @@ let findMode="each";
 function chosenLines(){
   const sides=st.side==="both"?["personality","design"]:[st.side];
   const groups=[];
-  for(const who of pairOn()?["a","b"]:["a"])for(const sd of sides)for(const b of want){
+  const whos=(pairOn()?["a","b"]:["a"]).filter(w=>w==="b"?party.b:party.a);
+  for(const who of whos)for(const sd of sides)for(const b of want){
     const ls=LN.filter(l=>!l.tr&&(who==="b")===isB(l)&&l.side===sd&&l.body===b&&st.angles.has(l.angle));if(ls.length)groups.push({who,sd,b,ls})}
   return groups;
 }
@@ -898,7 +906,7 @@ let lastFind=null;
 function computeFind(){
   const groups=chosenLines();
   const score=new Float32Array(GC*GR),sA=new Float32Array(GC*GR),sB=new Float32Array(GC*GR);
-  const each=pairOn()&&findMode==="each";
+  const each=pairOn()&&party.a&&party.b&&findMode==="each";
   for(const g of groups){
     const best=new Float32Array(GC*GR).fill(Infinity);
     for(const l of g.ls)for(const [plon,plat] of densePts(l)){
@@ -946,7 +954,7 @@ function renderFind(){
   const F=lastFind;
   box.innerHTML='<button class="x" title="Close">&times;</button><h2>Find My Places</h2>'+
     '<div class="grid">'+[...BODIES,...EXTRAS.filter(x=>st.extras.has(x))].map(b=>'<div class="w-opt'+(want.has(b)?" on":"")+'" data-want="'+b+'"><span class="radio"></span><span class="gl">'+GLYPH[b]+'</span>'+b+'</div>').join("")+'</div>'+
-    (pairOn()?'<h3>Match</h3><div class="lims">'+[["each","Each Person"],["combined","Combined"]].map(([k,t])=>'<button class="w-pill'+(findMode===k?" on":"")+'" data-fmode="'+k+'">'+t+'</button>').join("")+'</div>':"")+
+    (pairOn()&&party.a&&party.b?'<h3>Match</h3><div class="lims">'+[["each","Each Person"],["combined","Combined"]].map(([k,t])=>'<button class="w-pill'+(findMode===k?" on":"")+'" data-fmode="'+k+'">'+t+'</button>').join("")+'</div>':"")+
     '<h3>Continent</h3><div class="lims">'+['All',...CONTS].map(t=>'<button class="w-pill'+((t==="All"?!conts.size:conts.has(t))?" on":"")+'" data-cont="'+t+'">'+t+'</button>').join("")+'</div>'+
     '<h3>Latitude Limit</h3><div class="lims">'+[[45,"45°"],[60,"60°"],[66.5,"Polar Circles"],[90,"No Limit"]].map(([v,t])=>'<button class="w-pill'+(v===latLimit?" on":"")+'" data-lim="'+v+'">'+t+'</button>').join("")+'</div>'+
     (F.groups.length?'<h3>Closest Matches</h3>'+(F.top.length?'<button class="w-pill pdf" data-pdf="find">Save As PDF</button>':'')+(F.top.length?F.top.map((t,i)=>'<div class="fr" data-fi="'+i+'"><b>'+t.c.n+'</b> <span class="co">'+t.c.c+'</span>'+
@@ -1127,6 +1135,9 @@ if(opts.planets){
     bothOff=offP&&offD;
     tr.on=c.contains("mod-transit");tr.alone=c.contains("tr-alone");
     const relNow=c.contains("mod-relation");if(relNow!==rel.on){rel.on=relNow;renderName()}
+    // only where the buttons mean something: a pair, or a chart and its sky
+    const pm=relNow||c.contains("mod-transit");
+    party.a=!pm||!c.contains("off-party-a");party.b=!pm||!c.contains("off-party-b");
     if(tr.on)loadSky();
   };
   // A new moment on the date picker: new transit lines, and the place's

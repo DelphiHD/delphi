@@ -7361,6 +7361,9 @@ if (DATA.client) {
     if (typeof partyBtns !== 'undefined' && partyBtns) {
       partyBtns.forEach(function (x) { if (x) x.classList.add('on'); });
     }
+    // and the page with them: the buttons came back on while the classes that
+    // actually hide a person stayed, so the drawings disagreed with the buttons
+    body.classList.remove('off-party-a', 'off-party-b');
     if (window.__variations) window.__variations(id === 'variations');
     if (id !== 'variations' && window.__varMetaBack) window.__varMetaBack();
     // The chart type is the hub: it says whether there is a transit at all,
