@@ -4391,11 +4391,11 @@ body.view-world #relhome > details, body.view-world #relswap { display:none !imp
      2026-10-11: "fonts will be of similar styles and sizes and everything on
      the page will be harmoniously aligned." Each row is a fixed grid of glyph,
      number and arrow, so every glyph and every decimal lines up. */
-  .sidecols .scol { width:auto; display:flex; flex-direction:column; justify-content:space-between; pointer-events:auto; }
-  .sidecols .shead { color:#6b6790; padding:0 4px 3px; white-space:nowrap; }
-  .sidecols .scol.right .shead { text-align:right; }
+  .sidecols .scol { width:auto; display:flex; flex-direction:column; justify-content:flex-start; gap:.15em; pointer-events:auto; }
+  .sidecols .shead { color:#6b6790; letter-spacing:.16em; text-align:center; padding:0 .2em .45em; margin-bottom:.35em;
+    border-bottom:1px solid rgba(132,80,149,.4); white-space:nowrap; }
   .sidecols .prow, .sidecols .trow { display:grid; grid-template-columns:1.15em auto .8em; align-items:center; column-gap:.4em;
-    line-height:1.15; padding:.18em .3em; border-radius:6px; white-space:nowrap; cursor:pointer; font-variant-numeric:tabular-nums; }
+    line-height:1.2; padding:.32em .45em; border-radius:.55em; white-space:nowrap; cursor:pointer; font-variant-numeric:tabular-nums; }
   .sidecols .sg { display:flex; align-items:center; justify-content:center; width:1.15em; height:1.15em; }
   .sidecols .sgl { width:100%; height:100%; overflow:visible; display:block; }
   .sidecols .sn { text-align:right; }
@@ -8550,7 +8550,7 @@ if (DATA.client) {
     canvas.style.marginBottom = '';
     var s = cols.parentNode.getBoundingClientRect(), r = canvas.getBoundingClientRect();
     cols.style.top = (r.top - s.top) + 'px';
-    cols.style.minHeight = (r.height * 0.96) + 'px';
+    cols.style.minHeight = '';
     // a narrowed bodygraph can be shorter than its columns: the drawing's
     // space grows to hold them, so they never run into the panel below
     var over = cols.getBoundingClientRect().bottom - r.bottom;
@@ -8599,11 +8599,20 @@ if (DATA.client) {
       col.className = 'scol ' + (i === 0 ? 'left' : 'right') + ' s-' + t.getAttribute('data-side');
       var head = t.querySelector(':scope > text');
       var h = document.createElement('div'); h.className = 'shead';
-      h.textContent = head ? head.textContent.trim().toLowerCase().split(' ').map(function (w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join(' ') : '';
+      // Delphi's own column, as the desktop draws it: the heading in its
+      // side's colour over a rule of the same colour (Kaycee, 2026-10-11: "We
+      // are Delphi and we want our style to stand out")
+      if (head && head.getAttribute('fill')) h.style.color = head.getAttribute('fill');
+      var rule = t.querySelector(':scope > line');
+      if (rule && rule.getAttribute('stroke')) h.style.borderBottomColor = rule.getAttribute('stroke');
+      h.textContent = head ? head.textContent.trim() : '';
       col.appendChild(h);
       [].forEach.call(t.querySelectorAll('.prow, .trow'), function (row) {
         var d = document.createElement('div');
         d.className = row.getAttribute('class');
+        // the row's own tint, every other row, as on the desktop
+        var bgr = row.querySelector(':scope > rect');
+        if (bgr && bgr.getAttribute('fill') && bgr.getAttribute('fill') !== 'transparent') d.style.background = bgr.getAttribute('fill');
         [].forEach.call(row.attributes, function (a) { if (a.name.indexOf('data-') === 0) d.setAttribute(a.name, a.value); });
         // the glyph as the chart draws it (Uranus, for one, is drawn in lines,
         // not a font character), then the numbers and any variable arrow
