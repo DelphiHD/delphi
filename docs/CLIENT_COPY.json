@@ -1,6 +1,6 @@
 {
  "what": "Every sentence a client can read, approved by Kaycee. scripts/copy-check.ts fails a push on anything not listed here. Adding a line means she has seen those words.",
- "updated": "2026-10-08",
+ "updated": "2026-10-11",
  "copy": [
   "(Gates not part of a complete channel)",
   "A Human Design chart, cast and drawn by Delphi.",
@@ -33,6 +33,7 @@
   "Jump to right now",
   "Loading the reading for",
   "No gate is activated more than once.",
+  "No planet changes house here.",
   "No two planets share a gate on the same side.",
   "No written read for this day.",
   "None in this chart.",
@@ -93,6 +94,7 @@
   "Two planets at the same degree, 0 degrees apart.",
   "Two planets facing each other across the wheel, 180 degrees apart.",
   "Variations open on a published chart.",
+  "Where on Earth each of your planets was on the Ascendant, Descendant, Midheaven or IC when you were born.",
   "Which part of the day?",
   "You both carry these.",
   "Your Human Design chart",

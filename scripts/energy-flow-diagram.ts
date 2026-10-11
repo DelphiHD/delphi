@@ -3219,7 +3219,7 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
       <button id="vBody" data-help="Your channels by circuit, the families of energy they belong to: Individual, Tribal, Collective and Integration." data-help-label="Circuits">Circuits</button>
       <button id="vMandala" data-help="The wheel your chart comes from: all 64 gates in zodiac order, with your planets where they fall." data-help-label="The Wheel">The Wheel</button>
       <button id="vAstro" data-help="Your natal astrology chart: signs, houses, planets and the aspects between them." data-help-label="Astrology">Astrology</button>
-      ${d.world ? `<button id="vWorld" data-help="Where on Earth each of your planets was rising, setting or overhead when you were born." data-help-label="The World">The World</button>` : ""}
+      ${d.world ? `<button id="vWorld" data-help="Where on Earth each of your planets was on the Ascendant, Descendant, Midheaven or IC when you were born." data-help-label="The World">The World</button>` : ""}
     </div>
     <details class="drop showdrop" id="placements" hidden>
       <summary>Show<span class="offcount" id="offcount" hidden></span></summary>
@@ -3227,12 +3227,6 @@ function buildHtml(d: SceneData, canvases: string, mandala: string, astro: strin
         <button id="sideP" class="on" data-help="The conscious side, calculated from the moment of birth. What you know about yourself and can talk about. Shown in black." data-help-label="Personality">Personality</button>
         <button id="sideD" class="on" data-help="The unconscious side, calculated about 88 days before birth. The body you were given rather than the self you know. Shown in red." data-help-label="Design">Design</button>
       </div>
-      ${d.world ? `<div class="row" id="worldangles">
-        <button class="on" data-wangle="ASC" data-help-label="Ascendant">Ascendant</button>
-        <button class="on" data-wangle="DSC" data-help-label="Descendant">Descendant</button>
-        <button class="on" data-wangle="MC" data-help-label="Midheaven">Midheaven</button>
-        <button class="on" data-wangle="IC" data-help-label="IC">IC</button>
-      </div>` : ""}
       <div class="row" id="hangrow">
         <button id="defined" class="on" data-help="The channels you carry completely, both gates. These are fixed and always on." data-help-label="Defined Channels">Defined Channels</button>
         <button id="hang" class="on" data-help="Gates where you hold one end of a channel but not the other. They look for the missing gate in the people around you." data-help-label="Hanging Gates">Hanging Gates</button>
@@ -4306,16 +4300,18 @@ body.view-world .world { display:flex !important; flex-direction:column; width:1
   background:#faf8fb; overflow:hidden; }
 body.view-world svg.canvas, body.view-world .mandala, body.view-world .astro { display:none !important; }
 body.view-world { background:#ffffff; color:#1c1a2e; }
-#worldangles { display:none; }
-body.view-world #worldangles { display:flex; }
 /* channels, hanging gates and the placement columns are the bodygraph's */
 body.view-world #hangrow { display:none; }
+/* The World's planets are its own Lines menu, so the panel's planet list,
+   which would do nothing here, steps aside. */
+body.view-world #pgroups, body.view-world #planets, body.view-world .pgrouplab,
+body.view-world .pallnone { display:none !important; }
 /* The logo sits over the stage's top left; the map's tools keep to the right
    of it and the map starts below it. Kaycee, 2026-10-11: "We lost the Delphi
    logo when The World is clicked." */
 body.view-world .brandmark.logo { z-index:6; }
 body.view-world .world { background:transparent !important; }
-body.view-world .world .w-bar.in-chart { justify-content:flex-end; padding-left:160px; min-height:40px; }
+body.view-world .world .w-bar.in-chart { padding-left:160px; }
 /* The dock owns the stage's lower left. A square wheel leaves that corner
    empty; a world map is wide and ran under it, so the map keeps clear of the
    dock's column. */
@@ -5440,10 +5436,8 @@ if (DATA.client) {
     });
     sync();
     document.getElementById('planets').dispatchEvent(new Event('change', { bubbles: true }));
-    ['off-s-personality', 'off-s-design', 'nodefined', 'nohang', 'notables', 'show-bridges',
-      'off-a-ASC', 'off-a-DSC', 'off-a-MC', 'off-a-IC']
+    ['off-s-personality', 'off-s-design', 'nodefined', 'nohang', 'notables', 'show-bridges']
       .forEach(function (c) { body.classList.remove(c); });
-    [].forEach.call(document.querySelectorAll('#worldangles button'), function (b) { b.classList.add('on'); });
     var wv = document.getElementById('worldview');
     if (wv && wv.world) wv.world.reset();
     ['defined', 'hang', 'sideP', 'sideD', 'tables'].forEach(function (id) {
@@ -8322,15 +8316,7 @@ if (DATA.client) {
   if (va0) va0.onclick = function () { view('astro'); };
   var vw0 = document.getElementById('vWorld');
   if (vw0) vw0.onclick = function () { view('world'); };
-  // The World's angles: a class per angle that is off, which the view reads.
-  var wang = document.getElementById('worldangles');
-  if (wang) wang.addEventListener('click', function (e) {
-    var b = e.target.closest('button[data-wangle]');
-    if (!b) return;
-    var on = !b.classList.contains('on');
-    b.classList.toggle('on', on);
-    body.classList.toggle('off-a-' + b.dataset.wangle, !on);
-  });
+
 
   // The Astrology view answers with astrology. The Human Design sections of the
   // home tab are hidden by CSS in this view and these stand in their place, so

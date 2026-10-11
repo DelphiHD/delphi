@@ -116,18 +116,21 @@ function markup(G, inChart) {
   };
   var extras = '<div class="sep"></div>' + opt("extras", "Chiron", "⚷", "Chiron") + opt("extras", "Lilith", "⚸", "Lilith");
   var angles = [["ASC", "Ascendant"], ["DSC", "Descendant"], ["MC", "Midheaven"], ["IC", "IC"]].map(function (a) { return opt("angles", a[0], swatch(a[0]), a[1]); }).join("");
-  // Inside a chart, the chart's own panel holds the sides, the planets and the
-  // angles, and its Save Image and Reset serve this view too. Kaycee,
-  // 2026-10-11: "move the controls for personality, design and the lines to the
-  // left hand control panel like all of the other views." Standalone, the view
-  // carries its own.
-  var own = inChart ? '' : '<span id="w-side" style="display:flex;gap:4px"><button class="w-pill on" data-v="both">Both</button><button class="w-pill" data-v="personality">Personality</button><button class="w-pill" data-v="design">Design</button></span>' +
-    '<span class="gap"></span>' + dd("lines", "Lines", planets("lines"), extras) + dd("angles", "Angles", angles);
-  return '<div class="w-bar' + (inChart ? ' in-chart' : '') + '">' + own + dd("parans", "Parans", planets("parans")) +
-    '<button class="w-pill" id="w-findBtn">Find My Places</button><button class="w-pill" id="w-cmpBtn">Compare Places</button>' +
+  // Inside a chart, the chart's own panel holds Personality and Design, and its
+  // Save Image and Reset serve this view too. Lines and Angles stay here: they
+  // work in a way only this view does, and The World opens with Earth and the
+  // Nodes off without switching them off in the chart's other views. Kaycee,
+  // 2026-10-11. Standalone, the view carries its own sides as well.
+  var own = (inChart ? '' : '<span id="w-side" style="display:flex;gap:4px"><button class="w-pill on" data-v="both">Both</button><button class="w-pill" data-v="personality">Personality</button><button class="w-pill" data-v="design">Design</button></span>' +
+    '<span class="gap"></span>') + dd("lines", "Lines", planets("lines"), extras) + dd("angles", "Angles", angles);
+  // Two rows (Kaycee, 2026-10-11): finding places first, search then Find My
+  // Places, with zoom at the right; the view's own switches together beneath.
+  return '<div class="w-bar' + (inChart ? ' in-chart' : '') + '"><div class="w-tools">' +
     '<div class="search"><input id="w-q" placeholder="Search A City" autocomplete="off"><div class="results" id="w-results"></div></div>' +
-    '<div class="zoom"><button data-z="in" title="Zoom In">+</button><button data-z="out" title="Zoom Out">&minus;</button>' + (inChart ? '' : '<button data-z="reset">Reset</button>') + '</div>' +
-    '<button class="w-pill" id="w-snapMap"' + (inChart ? ' hidden' : '') + '>Save Map Image</button></div>' +
+    '<button class="w-pill" id="w-findBtn">Find My Places</button><button class="w-pill" id="w-cmpBtn">Compare Places</button>' +
+    '<button class="w-pill" id="w-snapMap"' + (inChart ? ' hidden' : '') + '>Save Map Image</button>' +
+    '<div class="zoom"><button data-z="in" title="Zoom In">+</button><button data-z="out" title="Zoom Out">&minus;</button>' + (inChart ? '' : '<button data-z="reset">Reset</button>') + '</div></div>' +
+    '<div class="w-views">' + own + dd("parans", "Parans", planets("parans")) + '</div></div>' +
     '<div class="w-stage"><svg viewBox="0 0 ' + VW + ' ' + f(VH) + '" preserveAspectRatio="xMidYMin meet" id="w-map">' +
     '<defs><clipPath id="w-clip"><rect width="' + G.W + '" height="' + f(G.H) + '"/></clipPath></defs>' +
     '<g transform="translate(' + ML + ',' + MT + ')"><rect class="frame" width="' + G.W + '" height="' + f(G.H) + '"/>' +
@@ -181,6 +184,7 @@ const ALL={lines:BODIES,parans:BODIES,angles:ANGLES};
 const START_OFF=["Earth","North Node","South Node"];
 const st={side:"both",lines:new Set(BODIES.filter(b=>!START_OFF.includes(b))),angles:new Set(ANGLES),parans:new Set(),extras:new Set()};
 const EXTRAS=["Chiron","Lilith"];
+let bothOff=false;   // the chart's panel has both sides off
 GLYPH.Chiron="⚷";GLYPH.Lilith="⚸";
 // The bodies the relocated chart speaks about: the menu's planets, and Chiron
 // and Lilith when they are switched on.
@@ -320,7 +324,7 @@ function layoutLabels(){
 // only the partner left Earth in whenever Parans was set to All.
 const pairOk=d=>(st.parans.has(d.body)||st.parans.has(d.body2))&&lineOn(d.body)&&lineOn(d.body2);
 function paint(){
-  const sideOk=d=>st.side==="both"||d.side===st.side;
+  const sideOk=d=>!bothOff&&(st.side==="both"||d.side===st.side);
   for(const el of document.querySelectorAll("#w-lines [data-side]"))
     el.classList.toggle("off",!(sideOk(el.dataset)&&lineOn(el.dataset.body)&&st.angles.has(el.dataset.angle)));
   for(const el of document.querySelectorAll("#w-parans [data-side]"))
@@ -889,20 +893,14 @@ q.addEventListener("keydown",e=>{
 res.addEventListener("mousedown",e=>{const d=e.target.closest("[data-i]");if(d){e.preventDefault();choose(hits[+d.dataset.i])}});
 q.addEventListener("blur",()=>setTimeout(()=>res.classList.remove("open"),100));
 paint();
-// Inside a chart, the panel is the one set of switches: the sides are the
-// body's off-s-* classes, each planet its off-p-<id> class (Chiron and Lilith
-// included, off until switched on, as the chart opens), and the angles the
-// off-a-* classes set by the Angles row the chart shows for this view.
+// Inside a chart, the panel's Personality and Design are the sides: the body's
+// off-s-* classes. Both off draws neither side (bothOff, declared with st).
 if(opts.planets){
   const readChart=()=>{
     const c=document.body.classList;
     const offP=c.contains("off-s-personality"),offD=c.contains("off-s-design");
     st.side=offP&&!offD?"design":offD&&!offP?"personality":"both";
-    // Both sides off: draw neither, by switching every line off.
-    const none=offP&&offD;
-    st.lines=new Set();st.extras=new Set();
-    for(const p of opts.planets){if(none||c.contains("off-p-"+p.id))continue;(EXTRAS.includes(p.name)?st.extras:st.lines).add(p.name)}
-    st.angles=new Set(ANGLES.filter(a=>!c.contains("off-a-"+a)));
+    bothOff=offP&&offD;
   };
   readChart();
   // Follow at once, not on the next frame: a browser tab in the background
@@ -914,6 +912,7 @@ if(opts.planets){
 }
 // The chart's Reset puts this view back as it opened, too.
 const resetWorld=()=>{view.k=1;view.tx=0;view.ty=0;clampView();here=null;pinned.clear();relOpen=false;
+  st.lines=new Set(BODIES.filter(b=>!START_OFF.includes(b)));st.angles=new Set(ANGLES);st.extras=new Set();
   finding=false;want.clear();comparing=false;st.parans.clear();renderFind();renderCompare();paint()};
 // For the checks (the tooltip sweep and the parity test): what this view drew
 // and how it names it.
