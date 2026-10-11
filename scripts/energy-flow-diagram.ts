@@ -3965,6 +3965,19 @@ body.mod-variations #tip, body.mod-variations #card { display:none !important; }
 .vkey .vkeynote { opacity:.75; }
 .vkey .gatechg, .vkey .linechg { font-size:11px; font-variant-numeric:tabular-nums; }
 @media (max-width: 760px) { .varpanel { padding-left:8px; } .varfocus { grid-template-columns:1fr; } }
+/* Variations on a phone (Kaycee, 2026-10-11, the view-by-view review): the
+   panel was pinned over the stage and slid under the Chart Type card, with a
+   2,100px grid scrolling inside a 600px box. Here it is part of the page
+   under the controls, and the variations are one at a time, swiped sideways,
+   the next one showing at the edge so it reads as something to swipe. */
+@media (max-width: 760px) {
+  .varpanel { position:static; width:100%; box-sizing:border-box; overflow:visible; padding:4px 0 12px; }
+  body.mod-variations .wrap .stage svg.canvas { display:none !important; }
+  .vargrid { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; gap:10px; padding:2px 2px 10px;
+    scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+  .vargrid::-webkit-scrollbar { display:none; }
+  .vargrid > .varcard { flex:0 0 84%; scroll-snap-align:center; }
+}
 .viewdock.docked #viewrow { gap:0; }
 .viewdock.docked #viewrow button { border-radius:0; }
 .viewdock.docked #viewrow button:first-child { border-radius:10px 10px 0 0; }
@@ -4349,6 +4362,7 @@ body.view-world #relhome > details, body.view-world #relswap { display:none !imp
   .viewdock.docked .showdrop[open] { position:fixed; left:0; right:0; bottom:0; top:auto; z-index:40; margin:0;
     max-height:72vh; overflow:auto; background:#fff; border-radius:18px 18px 0 0; padding:16px 16px 22px;
     box-shadow:0 -8px 30px rgba(47,42,51,.22); }
+  .viewdock.docked .showdrop .row { flex-wrap:wrap; overflow:visible; }
   .viewdock.docked .showdrop #actrow { margin-top:14px; padding-top:12px; border-top:1px solid rgba(132,80,149,.15); }
   /* the columns are off the drawing on a phone, so their switch has nothing to do */
   #tables { display:none !important; }
@@ -4358,7 +4372,7 @@ body.view-world #relhome > details, body.view-world #relswap { display:none !imp
      fills the phone and the planet columns either side fall outside it. They
      come back on a tap, from the bar above the drawing. */
   .stage { overflow-x:clip; }
-  .wrap .stage svg.canvas { width:141.4%; max-width:none; max-height:none; align-self:flex-start; margin-left:-21.7%; }
+  .wrap .stage svg.canvas { width:146%; max-width:none; max-height:none; align-self:flex-start; margin-left:-22.4%; }
   body:not(.view-astro):not(.view-world):not(.view-mandala) .phonebar { display:flex; }
   body.mod-transit #circpill, body.mod-variations .phonebar { display:none !important; }
   .phonebar { order:-1; width:100%; justify-content:space-between; align-items:center; gap:6px; padding:2px 4px 0; box-sizing:border-box; }
@@ -4368,7 +4382,14 @@ body.view-world #relhome > details, body.view-world #relswap { display:none !imp
   .phonebar .circpill.on { background:#845095; border-color:#845095; color:#fff; }
   .colsheet.open { display:block; position:fixed; left:0; right:0; bottom:0; z-index:40; max-height:78vh; overflow:auto;
     background:#fff; border-radius:18px 18px 0 0; padding:26px 18px 18px; box-shadow:0 -8px 30px rgba(47,42,51,.22); }
-  .colsheet svg { width:100%; max-width:420px; height:auto; display:block; margin:0 auto; }
+  .colsheet svg { height:min(64vh, 520px); width:auto; max-width:100%; display:block; margin:0 auto; }
+  .phonetop { order:-1; width:100%; box-sizing:border-box; padding:0 4px; }
+  .phonetop .datesec { margin:0 0 4px; padding-top:6px; }
+  body:not(.mod-relation) .phonetop #relpick, body:not(.mod-relation) .phonetop #partyrow { display:none !important; }
+  .phonetop #relpick { margin:4px 0 6px; }
+  .phonetop #partyrow { margin:2px 0 6px; display:flex; gap:6px; flex-wrap:wrap; }
+  .phonetop #partyrow[hidden] { display:none; }
+  .phonetop #partyrow button { font-size:12px; padding:6px 11px; }
   .colsheet .x { position:absolute; top:8px; right:12px; border:0; background:none; font-size:22px; color:#6b6790; cursor:pointer; }
   /* Astrology: the desktop's fixed-height box left about 140px blank above
      and below the wheel on a phone. The wheel sets the height here. */
@@ -4831,7 +4852,7 @@ body.view-mandala .mandala svg { max-height:calc(100vh - 28px); width:auto; heig
 <body class="skin-paper${d.client ? " chart" : ""}">
 <div class="wrap">
   ${logoSrc ? `<img class="brandmark logo" src="${logoSrc}" alt="Delphi">` : ""}
-  <div class="stage">${canvases}${mandala}${astro}${d.world ? `<div class="world" id="worldview"></div>` : ""}<div class="tip" id="tip" hidden></div><div class="card" id="card" hidden></div>${knowSrc ? `<img class="brandmark know" src="${knowSrc}" alt="Know thyself">` : ""}${d.client ? `<div class="varpanel" id="varpanel"></div><div class="viewdock docked">${viewControls}</div><div class="phonebar" id="phonebar"><button id="circpill" class="circpill">Circuits</button><span id="colpills"></span></div><div class="colsheet" id="colsheet"></div>` : ""}</div>
+  <div class="stage">${canvases}${mandala}${astro}${d.world ? `<div class="world" id="worldview"></div>` : ""}<div class="tip" id="tip" hidden></div><div class="card" id="card" hidden></div>${knowSrc ? `<img class="brandmark know" src="${knowSrc}" alt="Know thyself">` : ""}${d.client ? `<div class="varpanel" id="varpanel"></div><div class="viewdock docked">${viewControls}</div><div class="phonebar" id="phonebar"><button id="circpill" class="circpill">Circuits</button><span id="colpills"></span></div><div class="colsheet" id="colsheet"></div><div class="phonetop" id="phonetop"></div>` : ""}</div>
   <aside class="panel">
 ${d.client ? "" : `<h1 id="ptitle">Centers, function, and flow</h1>
     <p class="sub" id="psub">Nine centers, each labeled with what it does. The moving light follows every channel toward the Throat, the only center that turns energy into expression.</p>`}
@@ -8465,8 +8486,28 @@ if (DATA.client) {
     if (phoneMQ.matches) { if (act.parentNode !== sh) sh.appendChild(act); }
     else if (act.parentNode === sh) sh.parentNode.insertBefore(act, sh.nextSibling);
   };
-  if (phoneMQ.addEventListener) phoneMQ.addEventListener('change', function () { placeActions(); phoneBar(); });
-  placeActions();
+  // What changes the chart goes up top on a phone: the Transit date, and the
+  // Relationship person and people buttons, which sat 700px down the panel.
+  // A marker keeps each one's place in the panel for when it is wider again.
+  var topMoves = ['datesec', 'relpick', 'partyrow'].map(function (id) {
+    var el = document.getElementById(id);
+    if (!el) return null;
+    var mark = document.createComment(id);
+    el.parentNode.insertBefore(mark, el);
+    return { el: el, mark: mark };
+  }).filter(Boolean);
+  var placeTop = function () {
+    var top = document.getElementById('phonetop');
+    if (!top) return;
+    topMoves.forEach(function (m) {
+      if (phoneMQ.matches) { if (m.el.parentNode !== top) top.appendChild(m.el); }
+      else if (m.el.parentNode === top) m.mark.parentNode.insertBefore(m.el, m.mark.nextSibling);
+    });
+  };
+  // A pair's long readings start folded on a phone.
+  if (phoneMQ.matches) [].forEach.call(document.querySelectorAll('#relhome > details'), function (d) { d.open = false; });
+  if (phoneMQ.addEventListener) phoneMQ.addEventListener('change', function () { placeActions(); placeTop(); phoneBar(); });
+  placeActions(); placeTop();
   var circ = document.getElementById('circpill');
   if (circ) circ.onclick = function () { view(curView === 'body' ? 'plain' : 'body'); };
   var sheet = document.getElementById('colsheet');
