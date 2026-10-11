@@ -339,6 +339,52 @@ function checkEnv(): Check {
   return { name: "Critical env vars present", pass: true, detail: `all ${required.length} present` };
 }
 
+// Supabase's free plan, watched instead of paid for. Kaycee, 2026-10-11:
+// staying on the free plan until Delphi is earning ("I promised myself that I
+// would stop shelling out money for human design until I'm actually making
+// some money on it"), with a warning at 80% so the upgrade happens when the
+// numbers say so. Storage is measured; bandwidth is estimated from this
+// month's recorded chart opens times the average page size, since serving a
+// chart link fetches its page from storage. See DECISIONS.md, 2026-10-11,
+// "Storage: staying on the free plan until launch".
+const FREE_STORAGE = 1.1e9, FREE_EGRESS = 5e9, WARN = 0.8;
+async function checkFreePlan(): Promise<Check> {
+  const name = "Supabase free plan";
+  try {
+    const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+    let bytes = 0, pages = 0, pageBytes = 0;
+    const walk = async (bucket: string, prefix: string): Promise<void> => {
+      for (let off = 0; ; off += 1000) {
+        const { data } = await db.storage.from(bucket).list(prefix, { limit: 1000, offset: off });
+        if (!data || !data.length) break;
+        for (const f of data) {
+          const path = prefix ? `${prefix}/${f.name}` : f.name;
+          if (!f.id) { await walk(bucket, path); continue; }
+          const size = Number((f.metadata as { size?: number } | null)?.size ?? 0);
+          bytes += size;
+          if (path.endsWith(".html") && !path.includes("/versions/") && !path.startsWith("transits/")) { pages++; pageBytes += size; }
+        }
+        if (data.length < 1000) break;
+      }
+    };
+    const { data: buckets } = await db.storage.listBuckets();
+    for (const b of buckets ?? []) await walk(b.name, "");
+    const monthStart = new Date(); monthStart.setUTCDate(1); monthStart.setUTCHours(0, 0, 0, 0);
+    const { count: opens } = await db.from("chart_visits").select("id", { count: "exact", head: true })
+      .eq("kind", "open").gte("at", monthStart.toISOString());
+    const egress = (opens ?? 0) * (pages ? pageBytes / pages : 3.4e6);
+    const gb = (n: number) => (n / 1e9).toFixed(2);
+    const sPct = bytes / FREE_STORAGE, ePct = egress / FREE_EGRESS;
+    const detail = `storage ${gb(bytes)} of 1.1 GB (${Math.round(sPct * 100)}%) · bandwidth this month about ${gb(egress)} of 5 GB (${Math.round(ePct * 100)}%, from ${opens ?? 0} chart opens)`;
+    if (sPct >= WARN || ePct >= WARN) {
+      return { name, pass: false, detail, fix: "Time to upgrade Supabase to Pro ($25/month): supabase.com/dashboard, DelphiHD organization, Billing, Change Plan. Or ask Claude to store the live chart pages compressed (cuts both by about 3.5x)." };
+    }
+    return { name, pass: true, detail };
+  } catch (e) {
+    return { name, pass: false, detail: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // main
 // ────────────────────────────────────────────────────────────────────────────
@@ -349,6 +395,7 @@ async function main() {
   const checks: Check[] = [
     checkEnv(),
     await checkSupabase(),
+    await checkFreePlan(),
     await checkMetadata(),
     await checkChartApis(),
     await checkCrossLibrary(),
