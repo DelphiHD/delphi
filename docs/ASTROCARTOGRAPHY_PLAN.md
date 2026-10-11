@@ -410,7 +410,7 @@ whole world daily and only mean something for event charts.
 - **Transits live for everyone:** all 83 charts republished 11 October with
   transits in The World (15.6 minutes, no failures).
 
-## Relationship in The World (11 October), built, awaiting copy approval
+## Relationship in The World (11 October), live on Kaycee's chart
 
 Kaycee's design calls: both people's lines on one map in the Relationship
 view's person colours (first purple, second teal), design a lighter shade of
@@ -428,3 +428,10 @@ second person (who=b) from the birth the page has, still behind a chart link.
 The page tags every mark of the second person with data-who="b" as well as
 side, so hovers, pins and labels never cross people. The chart announces the
 pair with a delphi:connection event.
+
+Copy approved; deployed; published to Kaycee's own chart only. Tested live with
+Bob Dylan's birth (from the roster) through /api/connection, no form submitted:
+80 lines each, all 2,396 marks resolve to the right person, side and body; his
+Sun MC line at 147.9E matches the hand reckoning (apparent noon at 02:05 UT);
+place panel, both relocated charts and Find My Places (both modes) work.
+Client charts get it at the next republish, on Kaycee's say-so.
