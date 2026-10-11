@@ -3891,7 +3891,10 @@ button.disabled:hover, button:disabled:hover { background:var(--paper); color:in
      the bottom: the top of it went off the edge and could not be reached.
      Kaycee, 2026-09-12: "is it possible to still be able to scroll to the top
      of the panel with the Show toggle open?" */
-  max-height:calc(100% - 6px); overflow-y:auto; overscroll-behavior:contain; }
+  /* and it stops below the logo, scrolling for the rest, rather than growing
+     up into it. Kaycee, 2026-10-11: "the left hand control panel crowds the
+     logo when the Show box is open." */
+  max-height:calc(100% - 96px); overflow-y:auto; overscroll-behavior:contain; }
 .viewdock.docked::-webkit-scrollbar { width:6px; }
 .viewdock.docked::-webkit-scrollbar-thumb { background:rgba(132,80,149,.28); border-radius:3px; }
 .viewdock.docked .sec { margin:0 0 7px; }
@@ -4316,6 +4319,17 @@ body.view-world .world .w-bar.in-chart { padding-left:160px; }
    empty; a world map is wide and ran under it, so the map keeps clear of the
    dock's column. */
 @media (min-width: 900px) { body.view-world .world .w-stage { padding-left:172px; } }
+/* Compare Places spans the map, so it starts where the map does, clear of the
+   panel and dock on the left. Kaycee, 2026-10-11. */
+@media (min-width: 900px) { body.view-world .world #w-compare { left:196px; } }
+/* Find My Places lives in the right-hand panel, under its tabs, in The World
+   only. Kaycee, 2026-10-11: the box "still covers up too much of the map". */
+#worldside { display:none; }
+body.view-world #worldside { display:block; order:-1; }
+#worldside #w-find { position:static; width:auto; max-height:none; overflow:visible; box-shadow:none;
+  border:0; border-radius:0; padding:4px 0 12px; margin:0 0 10px; border-bottom:1px solid rgba(132,80,149,.18);
+  background:transparent; }
+#worldside #w-find .grid { grid-template-columns:1fr 1fr; }
 /* the classic set on opening; the rest is a click away rather than a deletion */
 body:not(.astro-all) .astro .asp.extra { display:none; }
 .astro [data-asign], .astro [data-aplanet], .astro [data-house], .astro [data-angle] { cursor:pointer; }
@@ -4761,6 +4775,7 @@ ${d.client ? "" : `<h1 id="ptitle">Centers, function, and flow</h1>
       <button class="tabbtn" data-tab="dates">Dates</button>
       <button class="tabbtn" data-tab="stats">Stats</button>
     </div>
+${d.world ? `<div class="world-side" id="worldside"></div>` : ""}
 
 ${d.client ? "" : viewControls}
 
@@ -7279,6 +7294,7 @@ if (DATA.client) {
         token: wtok.length === 32 ? wtok : '',
         fontCss: FONTCSS,
         planets: DATA.planets,
+        findHost: document.getElementById('worldside'),
       });
     }
     body.classList.toggle('view-mandala', v === 'mandala');

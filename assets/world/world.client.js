@@ -100,7 +100,7 @@ var HD_BODIES = ["Sun", "Earth", "North Node", "South Node", "Moon", "Mercury", 
 var GLYPHS = { Sun: "☉", Earth: "⊕", "North Node": "☊", "South Node": "☋", Moon: "☽", Mercury: "☿",
   Venus: "♀", Mars: "♂", Jupiter: "♃", Saturn: "♄", Uranus: "⛢", Neptune: "♆", Pluto: "♇", Chiron: "⚷", Lilith: "⚸" };
 
-function markup(G, inChart) {
+function markup(G, inChart, findHosted) {
   var ML = 84, MR = 84, MT = 60, MB = 60, VW = ML + G.W + MR, VH = MT + G.H + MB, f = function (n) { return n.toFixed(1); };
   var grat = [];
   for (var lon = -150; lon <= 150; lon += 30) grat.push("M" + f((lon + 180) / 360 * G.W) + ",0V" + f(G.H));
@@ -142,12 +142,15 @@ function markup(G, inChart) {
     '<g id="w-cities"></g><g id="w-rings"></g><g id="w-parans"></g><g id="w-lines"></g><g id="w-hits"></g>' +
     '<circle class="birth" id="w-birth" r="5"></circle><g id="w-pin"></g></g>' +
     '<rect width="' + G.W + '" height="' + f(G.H) + '" fill="none" stroke="#8d8396" stroke-width="1.5"/></g>' +
-    '<g id="w-labels"></g></svg><div id="w-here"></div><div id="w-compare"></div><div id="w-find"></div></div>' +
+    '<g id="w-labels"></g></svg><div id="w-here"></div><div id="w-compare"></div>' + (findHosted ? '' : '<div id="w-find"></div>') + '</div>' +
     '<div id="w-tip"></div><div id="w-wheel"><div class="box"></div></div>';
 }
 
 function init(root, D, G, opts) {
 const API = opts.api || {};
+if (opts.findHost && !document.getElementById("w-find")) {
+  const fb = document.createElement("div"); fb.id = "w-find"; opts.findHost.appendChild(fb);
+}
 const withToken = function (u) { return opts.token ? u + (u.indexOf("?") < 0 ? "?" : "&") + "token=" + encodeURIComponent(opts.token) : u; };
 const WHERE = D.where;
 const pill = a => '<span class="w-pill">' + a + '</span>';
@@ -725,7 +728,9 @@ function renderFind(){
   // Find My Places opens on the right, clear of the chart's panel on the left
   // (Kaycee, 2026-10-11: it "gets lost behind the left hand control panel");
   // an open place panel moves over beside it.
-  root.classList.toggle("finding",finding);
+  // In a chart it lives in the right-hand panel instead (Kaycee, 2026-10-11:
+  // it "still covers up too much of the map"), where nothing overlaps.
+  if(!opts.findHost)root.classList.toggle("finding",finding);
   if(!finding){box.classList.remove("open");document.getElementById("w-heat").setAttribute("href","");return}
   computeFind();
   const F=lastFind;
@@ -930,7 +935,7 @@ window.DelphiWorld = {
     if (root.dataset.mounted) return;
     root.dataset.mounted = "1";
     root.classList.add("world");
-    var go = function (G) { root.innerHTML = markup(G, !!opts.planets); init(root, D, G, opts); };
+    var go = function (G) { root.innerHTML = markup(G, !!opts.planets, !!opts.findHost); init(root, D, G, opts); };
     if (this._geo) return go(this._geo);
     var self = this;
     fetch(opts.geometry).then(function (r) { if (!r.ok) throw new Error("world " + r.status); return r.json(); })
