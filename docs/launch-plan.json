@@ -1,7 +1,7 @@
 {
   "project": "Client Portal",
   "goal": "Free chart is the hook. Account required. Reports, extra charts and a subscription are what sells.",
-  "updated": "2026-10-10",
+  "updated": "2026-10-11",
   "event": {
     "label": "Kaycee's event",
     "date": "2026-09-16",
@@ -122,6 +122,31 @@
           "title": "Pick a saved chart instead of typing birth details",
           "status": "doing",
           "note": "The pieces exist as of 5 October: primary_chart_id on the profile, /api/my-charts answering from the session alone, and the chart page proven to share an origin with it so the sign-in reaches it. Still to build: the picker itself, feeding the relationship view and the transit views."
+        },
+        {
+          "title": "The World: astro-cartography on every exact-time chart",
+          "status": "done",
+          "note": "Lines, parans, places with grades, relocated chart and wheels, Find My Places, Compare Places, place report, local space, Transit and Relationship on the map. Live on all charts 11 October."
+        },
+        {
+          "title": "Chart visits recorded, by device",
+          "status": "done",
+          "note": "Opens and views chosen, phone / tablet / computer, her own left out. Dashboard: Visits tab."
+        },
+        {
+          "title": "Archive, delete and My Chart in the portal",
+          "status": "done",
+          "note": "Delete really erases after a can't-be-undone window that offers the chart data as a PDF first."
+        },
+        {
+          "title": "The journal: saved places first",
+          "status": "doing",
+          "note": "One private journal per account. Saved places follow the account now; the journal page, snapshots, notes and export come after the mobile overhaul."
+        },
+        {
+          "title": "Mobile overhaul, view by view",
+          "status": "doing",
+          "note": "The World is done for phones. A review of every view in every chart type comes first, then the changes."
         }
       ]
     },
@@ -558,6 +583,30 @@
     {
       "on": "2026-10-10",
       "what": "A new chat picks up the chart views from docs/HANDOFF_2026-10-10_CHART_VIEWS.md. All 83 charts were republished on 10 October and carry this round's work."
+    },
+    {
+      "on": "2026-10-11",
+      "what": "Astro-cartography is called The World and is on every chart with an exact birth time, with Transit and Relationship on the map. Every decision taken building it is in docs/DECISIONS.md (2026-10-11, The World)."
+    },
+    {
+      "on": "2026-10-11",
+      "what": "Local space lines: drawn from the birthplace or any place the person chooses, each side with its own switch, on the same map, graded in a place's panel."
+    },
+    {
+      "on": "2026-10-11",
+      "what": "Place report: one place on a page, with relocated wheels for each side in view. The button reads View Place Report."
+    },
+    {
+      "on": "2026-10-11",
+      "what": "One private journal per account, tagged by person, place, date and the person's own tags, exportable to journaling tools. Saved places are its first entries and follow the account when signed in. Saved places and Compare Places are to become two separate things."
+    },
+    {
+      "on": "2026-10-11",
+      "what": "Delete in the portal really erases a chart, after a warning that offers the chart data as a PDF first. Archive hides a chart and can be undone. My Chart lives in Manage and stays at the top of the list."
+    },
+    {
+      "on": "2026-10-11",
+      "what": "Chart opens and views are recorded by device type only, her own left out, to steer the mobile work. Mobile overhaul before new features, starting with a view-by-view review."
     }
   ],
   "open": [

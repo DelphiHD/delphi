@@ -1258,6 +1258,64 @@ The detail and the measurements are in `docs/ASTROCARTOGRAPHY_PLAN.md`.
   map, relationship map, place report, local space. They must work within the
   existing chart code.
 
+## 2026-10-11 — The World: every decision taken building it
+
+These are Kaycee's calls from 10 and 11 October, from the preview through to the live charts. They follow on from the 2026-10-10 preview entry above. The detail, the measurements and the history are in `docs/ASTROCARTOGRAPHY_PLAN.md`. The code is `assets/world/world.client.js`, `assets/world/world.css`, `lib/world*.ts` and `lib/astrocartography.ts`.
+
+**Name and place.**
+- It is called **The World**: a view on every chart with an exact birth time ("document" or "told"), beside Bodygraph, Circuits, The Wheel and Astrology. "Told is fine for a map."
+- A chart carries only its own sky (about 8 KB). The page draws the lines and parans itself. The coast, borders and cities are one shared file (`public/world/world-v1.json`), fetched once.
+
+**How it draws.**
+- Line styles: ASC solid, DSC dashed, MC a dash pattern, IC dotted.
+- Glyphs sit outside the frame, travel with zoom, and are spread out so none overlap.
+- Personality lines are ink and Design lines are the design red.
+- The map is grey on white. Hovers and pins are solid gold, never a glow.
+- Parans are solid bands with a 1 degree orb.
+- Earth and both Nodes start off here without being turned off in the chart's other views. Chiron and Lilith start off.
+- Tooltips do not zoom with the page. The stage keeps the controls in view when zoomed.
+- Faint country borders. Cities appear as you zoom, most important first.
+
+**Places.**
+- Clicking a place lists the lines within 700 miles and the parans within the orb, graded Strong (within 300 miles), Moderate (to 500) and Mild (to 700). Parans are graded in thirds of the orb.
+- Search uses the provider's own place list, so the map carries no outside credit.
+- Pinning a line shows her Delphi Basic for the planet and names the angle. Her own words for each planet on each angle are still to come, and she writes them.
+- The relocated chart is a fold-out, closed to begin with. It gives each side's angles with their gates (gates she carries in gold, as plain tables, not pills), the planets that change house, and a View Chart wheel with Personality, Design and Both, hovers and Save Chart Image.
+- Saved places, Compare Places, and Save As PDF reports for Find My Places and Compare Places, each with the map image and its dates.
+- Find My Places: the person chooses the planets, a Continent filter, and a Latitude Limit starting at 60 degrees. It lives in the right panel, and choosing a city drops a dot on the map. It never says a planet is good or bad.
+
+**On the live chart.**
+- Personality, Design and Show live in the chart's own left panel. Lines, Angles and Parans stay on the map.
+- The toolbar has two rows: city search and Find My Places, with zoom on the right; then Lines, Angles and Parans.
+- The chart's own Save Image and Reset serve The World as well.
+- The person's name sits over the map, as on every view.
+- In The World, the right panel puts the date picker or the people buttons first and Find My Places under them. Between You, Side by Side, Placements, Centers and Swap Perspective are hidden there.
+
+**Transit.**
+- Transiting bodies' lines against the natal sidereal time, so they answer "where on Earth is this transit on my angles".
+- Teal, with lighter teal for the design side. Transit Only shows the sky alone, and the transit Moon has its own switch.
+- The date picker drives it. Orbs are 1 degree, 3 for the Sun and Moon.
+- A place gets Upcoming Transits: a year of transits to its relocated angles, with dates within orb and the exact moments.
+
+**Relationship.**
+- Both people on one map. The first person is purple, with light purple for design. The second person is teal, with light teal for design.
+- Find My Places offers both modes: "Each Person" (somewhere good for both) and "Combined".
+- If the second person's birth time is not exact, the map shows the first person only and says why.
+- The people buttons take either person off the map.
+- Compare Places for a pair: grade counts per person, each person's relocated chart, and their lines and parans under their own name. Sections fold: Lines open, Relocated Chart and Parans folded.
+
+**Added after.**
+- **Place report:** View Place Report on a place gives one page with the map close in, lines and parans with grades, each person's relocated chart, a relocated wheel per side in view (Personality and Design, or just one), and under Transit the year's transits.
+- **Local space:** from the birthplace or any place chosen (Local Space From Here, Use Birthplace). Each side has its own switch in the Angles menu, off to begin with. The lines are thin and long-dashed on the same map, and graded in a place's panel. Find My Places keeps to the four angles.
+- **On a phone:** controls in rows that swipe sideways, the map at full height sliding sideways, and everything that opens comes up from the bottom. Pinch is handled by the map itself, from a 120px floor so fingers close together still zoom smoothly. The search box is 16px so Safari does not zoom the page.
+- **Checks:** `scripts/world-sweep.js` hovers every mark and row in Individual, Transit, Transit Only and Relationship and compares them with the chart's data. It ran 1,176 checks on 11 October with none failing.
+
+**Two things open.**
+- Saved places and Compare Places are to become two things: keepers, and a working list for one decision. See the plan.
+- Saved places now live in the account's journal when signed in (the entry below).
+
+---
+
 ## 2026-10-11 — The journal: one table for everything a person keeps
 
 **Decided by Kaycee:**
@@ -1278,3 +1336,22 @@ The detail and the measurements are in `docs/ASTROCARTOGRAPHY_PLAN.md`.
 **Size:** entries live in the database and are fetched only when a signed-in person opens a chart. The journal browser belongs in the portal, so chart pages grow by a few kilobytes at most.
 
 **Privacy is tested:** `scripts/test-journal-rls.ts` runs in the database as real roles, in a transaction that always rolls back. It checks that people see only their own entries, that an admin cannot read anyone else's, and that a browser that is not signed in gets nothing.
+
+---
+
+## 2026-10-11 — Portal: My Chart, archive and delete; recording chart visits
+
+**My Chart.**
+- One stray tap on a radio button set hers to a chart called "test". Choosing My Chart now lives in Manage (Make This My Chart) and asks "Make <name> your chart?" first.
+- That chart always sits at the top of the list, gold-tinted.
+
+**Archive and delete.**
+- Archive takes a chart out of the owner's list. The link keeps working, and Restore undoes it.
+- Delete is "really erased", after a window that says it cannot be undone and offers Download Chart Data first (the chart page with `?export=data`, saved as a PDF).
+- `lib/erase-chart.ts` removes the file and every earlier version first, then visit counts, daily reads and the link, which takes the chart row and its edits with it. Owner only. Tested on a throwaway chart.
+
+**Visits.**
+- Opens of every chart link, and each view chosen on it, are recorded with the device type only (phone, tablet or computer). No cookies, no IP address.
+- Her own opens and her own chart are left out of the counts.
+- They show on the dashboard's Visits tab. The point is to steer the mobile work.
+
