@@ -8637,14 +8637,27 @@ if (DATA.client) {
     document.querySelector('.stage').appendChild(cols);
     document.body.classList.add('has-sidecols');
     // one width for every number in a column, so they line up on the decimal
-    [].forEach.call(cols.querySelectorAll('.scol'), function (c) {
-      var w = 0;
-      [].forEach.call(c.querySelectorAll('.sn'), function (n) { w = Math.max(w, n.getBoundingClientRect().width); });
-      [].forEach.call(c.querySelectorAll('.sn'), function (n) { n.style.width = Math.ceil(w) + 'px'; });
-    });
+    var alignNumbers = function () {
+      [].forEach.call(cols.querySelectorAll('.scol'), function (c) {
+        var w = 0;
+        [].forEach.call(c.querySelectorAll('.sn'), function (n) { n.style.width = ''; });
+        [].forEach.call(c.querySelectorAll('.sn'), function (n) { w = Math.max(w, n.getBoundingClientRect().width); });
+        [].forEach.call(c.querySelectorAll('.sn'), function (n) { n.style.width = Math.ceil(w) + 'px'; });
+      });
+    };
+    alignNumbers();
     // each column as wide as its rows need; the bodygraph takes what is left
     var sw = cols.getBoundingClientRect().width, cs = cols.querySelectorAll('.scol');
-    var used = [].reduce.call(cs, function (a, c) { return a + c.getBoundingClientRect().width; }, 0);
+    var widthOf = function () { return [].reduce.call(cs, function (a, c) { return a + c.getBoundingClientRect().width; }, 0); };
+    var used = widthOf();
+    // Too wide to leave the bodygraph its room (a transit's two-number
+    // column): everything in the columns, the name included, comes down in
+    // size together, so it all stays one size.
+    var room = sw * (1 - 0.46) - 8;
+    if (used > room) {
+      cols.style.fontSize = (parseFloat(getComputedStyle(cols).fontSize) * room / used).toFixed(2) + 'px';
+      alignNumbers(); used = widthOf();
+    }
     var bg = Math.max(0.46, Math.min(BG, (sw - used - 8) / sw));
     var leftW = cs.length ? cs[0].getBoundingClientRect().width : 0;
     // centred in the space between the two columns, which can differ in width
