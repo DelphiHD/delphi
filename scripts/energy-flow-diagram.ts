@@ -8543,7 +8543,7 @@ if (DATA.client) {
   // lay it out (her screenshots) keeps it. Each row is the drawing's own row
   // retold: same data-side and data-planet, so a tap reads exactly as a hover
   // does on a desktop and a gate lights its row here through litGate.
-  var cols = null, BG = 0.66;
+  var cols = null, BG = 0.82;
   var placeCols = function () {
     var canvas = visibleCanvas();
     if (!cols || !canvas) return;
@@ -8586,7 +8586,10 @@ if (DATA.client) {
     if (nameEl) {
       var ncs = getComputedStyle(nameEl);
       var px = parseFloat(nameEl.getAttribute('font-size') || ncs.fontSize) * canvas.getBoundingClientRect().width / vbw;
-      cols.style.fontFamily = ncs.fontFamily; cols.style.fontWeight = ncs.fontWeight; cols.style.fontSize = px.toFixed(2) + 'px';
+      // half the name's full-width size: the bodygraph is the star (Kaycee,
+      // 2026-10-11: "make the text in the tables and the name about half that
+      // size. The bodygraph image is SUPER small")
+      cols.style.fontFamily = ncs.fontFamily; cols.style.fontWeight = ncs.fontWeight; cols.style.fontSize = (px * 0.55).toFixed(2) + 'px';
     }
     tables.forEach(function (t, i) {
       var G = 0;
