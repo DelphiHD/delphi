@@ -84,6 +84,17 @@ createServer(async (req, res) => {
         days: 365, bodies: g("bodies").split(",").filter(Boolean) });
       return json(res, 200, { ok: true, events });
     }
+    // Every other website route the chart page calls (/api/sky for the date
+    // picker, /api/transit-wheel, /api/read and the rest) goes to the live site,
+    // so a chart tried here behaves as it will there. Without this the date
+    // picker could not move: Kaycee, 11 October, "No matter what I do it stays
+    // the current moment."
+    if (url.pathname.startsWith("/api/")) {
+      const live = await fetch(`https://charts.delphihd.com${url.pathname}${url.search}`,
+        { method: req.method, headers: { accept: "application/json" } });
+      res.writeHead(live.status, { "content-type": live.headers.get("content-type") ?? "application/json" });
+      return res.end(Buffer.from(await live.arrayBuffer()));
+    }
     // A chart built locally (not published), at the address the site uses,
     // so The World can be tried inside the real chart. CHART_HTML names it.
     if (url.pathname.startsWith("/c/") && process.env.CHART_HTML) {
