@@ -3092,7 +3092,7 @@ function mandalaView(d: SceneData): string {
     const cy0 = oy + (a.y - 3.5) * sc;
     return `<g class="hubring" data-gate="${g}">${goldRing(cx0, cy0, 9 * sc)}</g>`;
   }).join("");
-  return `<div class="mandala">${svg.replace(/<\/svg>\s*$/, `<g class="hubrings">${rings}</g></svg>`)}</div>`;
+  return `<div class="mname">${esc(d.client?.name ?? "")}</div><div class="mandala">${svg.replace(/<\/svg>\s*$/, `<g class="hubrings">${rings}</g></svg>`)}</div>`;
 }
 
 /**
@@ -4334,12 +4334,53 @@ body.view-world #relhome > details, body.view-world #relswap { display:none !imp
    map, with nothing between them and it. Kaycee approved the mockup,
    2026-10-11. Reset, Save Image and Copy Chart Data stay in the other views. */
 @media (max-width: 760px) {
-  body.view-world .viewdock.docked .sec, body.view-world #actrow { display:none !important; }
-  body.view-world .viewdock.docked { padding:6px 8px; }
-  body.view-world .viewdock.docked .row { margin:2px 0; }
-  body.view-world .viewdock.docked button { padding:6px 11px; font-size:12px; }
-  body.view-world .brandmark.logo { width:84px; }
-  body.view-world .stage { gap:4px; }
+  /* Every view on a phone, as The World was first (Kaycee, 2026-10-11, from
+     the view-by-view review): the top card took a third of the screen. Chart
+     Type and View are two slim rows; Show is one slim row that opens as a
+     sheet from the bottom, and Reset, Save Image and Copy Chart Data move
+     into it (placeActions, in the page script). */
+  .viewdock.docked .sec { display:none !important; }
+  .viewdock.docked { padding:6px 8px; }
+  .viewdock.docked .row { margin:2px 0; }
+  .viewdock.docked button { padding:6px 11px; font-size:12px; }
+  .brandmark.logo { width:84px; }
+  .stage { gap:4px; }
+  .viewdock.docked .showdrop { margin-top:4px; padding-top:6px; }
+  .viewdock.docked .showdrop[open] { position:fixed; left:0; right:0; bottom:0; top:auto; z-index:40; margin:0;
+    max-height:72vh; overflow:auto; background:#fff; border-radius:18px 18px 0 0; padding:16px 16px 22px;
+    box-shadow:0 -8px 30px rgba(47,42,51,.22); }
+  .viewdock.docked .showdrop #actrow { margin-top:14px; padding-top:12px; border-top:1px solid rgba(132,80,149,.15); }
+  /* the columns are off the drawing on a phone, so their switch has nothing to do */
+  #tables { display:none !important; }
+  /* Circuits is a switch on the Bodygraph on a phone, not a view of its own */
+  #vBody { display:none !important; }
+  /* The bodygraph takes the full width: the drawing is widened so its centre
+     fills the phone and the planet columns either side fall outside it. They
+     come back on a tap, from the bar above the drawing. */
+  .stage { overflow-x:clip; }
+  .stage svg.canvas { width:141.4%; max-width:none; max-height:none; align-self:flex-start; margin-left:-21.7%; }
+  body:not(.view-astro):not(.view-world):not(.view-mandala) .phonebar { display:flex; }
+  body.mod-transit #circpill, body.mod-variations .phonebar { display:none !important; }
+  .phonebar { order:-1; width:100%; justify-content:space-between; align-items:center; gap:6px; padding:2px 4px 0; box-sizing:border-box; }
+  .phonebar #colpills { display:flex; gap:6px; margin-left:auto; }
+  .phonebar button { font:inherit; font-size:12px; padding:6px 12px; border-radius:999px; border:1px solid rgba(132,80,149,.3);
+    background:#fff; color:var(--ink, #1c1a2e); cursor:pointer; }
+  .phonebar .circpill.on { background:#845095; border-color:#845095; color:#fff; }
+  .colsheet.open { display:block; position:fixed; left:0; right:0; bottom:0; z-index:40; max-height:78vh; overflow:auto;
+    background:#fff; border-radius:18px 18px 0 0; padding:26px 18px 18px; box-shadow:0 -8px 30px rgba(47,42,51,.22); }
+  .colsheet svg { width:100%; max-width:420px; height:auto; display:block; margin:0 auto; }
+  .colsheet .x { position:absolute; top:8px; right:12px; border:0; background:none; font-size:22px; color:#6b6790; cursor:pointer; }
+  /* Astrology: the desktop's fixed-height box left about 140px blank above
+     and below the wheel on a phone. The wheel sets the height here. */
+  body.view-astro .astro { height:auto; }
+  body.view-astro .astro svg { height:auto; width:100%; }
+  /* The wheels zoom inside themselves (wheelZoom, in the page script): up and
+     down still scrolls the page, two fingers zoom, one finger moves a zoomed
+     wheel, a double tap puts it back. */
+  .mandala > svg, .astro > svg { touch-action:pan-y; }
+  .mandala > svg.zoomed, .astro > svg.zoomed { touch-action:none; }
+  /* the person's name over The Wheel, as every other view carries it */
+  body.view-mandala:not(.mod-relation) .mname { display:block; }
   /* room for the side panel on a desktop; on a phone the panel is above */
   body.view-world .world .w-bar.in-chart { padding-left:0; }
   /* Find My Places lives in the panel on a desktop; on a phone that is below
@@ -4348,6 +4389,8 @@ body.view-world #relhome > details, body.view-world #relswap { display:none !imp
     max-height:52vh; overflow:auto; background:#fff; border-radius:18px 18px 0 0; margin:0;
     padding:24px 16px 16px; border:1px solid #d9d0e0; box-shadow:0 -8px 30px rgba(47,42,51,.18); }
 }
+.phonebar, .colsheet, .mname { display:none; }
+.mname { text-align:center; font-size:19px; font-weight:600; color:#1c1a2e; padding:4px 0 0; width:100%; }
 #worldside #w-find { position:static; width:auto; max-height:none; overflow:visible; box-shadow:none;
   border:0; border-radius:0; padding:4px 0 12px; margin:0 0 10px; border-bottom:1px solid rgba(132,80,149,.18);
   background:transparent; }
@@ -4788,7 +4831,7 @@ body.view-mandala .mandala svg { max-height:calc(100vh - 28px); width:auto; heig
 <body class="skin-paper${d.client ? " chart" : ""}">
 <div class="wrap">
   ${logoSrc ? `<img class="brandmark logo" src="${logoSrc}" alt="Delphi">` : ""}
-  <div class="stage">${canvases}${mandala}${astro}${d.world ? `<div class="world" id="worldview"></div>` : ""}<div class="tip" id="tip" hidden></div><div class="card" id="card" hidden></div>${knowSrc ? `<img class="brandmark know" src="${knowSrc}" alt="Know thyself">` : ""}${d.client ? `<div class="varpanel" id="varpanel"></div><div class="viewdock docked">${viewControls}</div>` : ""}</div>
+  <div class="stage">${canvases}${mandala}${astro}${d.world ? `<div class="world" id="worldview"></div>` : ""}<div class="tip" id="tip" hidden></div><div class="card" id="card" hidden></div>${knowSrc ? `<img class="brandmark know" src="${knowSrc}" alt="Know thyself">` : ""}${d.client ? `<div class="varpanel" id="varpanel"></div><div class="viewdock docked">${viewControls}</div><div class="phonebar" id="phonebar"><button id="circpill" class="circpill">Circuits</button><span id="colpills"></span></div><div class="colsheet" id="colsheet"></div>` : ""}</div>
   <aside class="panel">
 ${d.client ? "" : `<h1 id="ptitle">Centers, function, and flow</h1>
     <p class="sub" id="psub">Nine centers, each labeled with what it does. The moving light follows every channel toward the Throat, the only center that turns energy into expression.</p>`}
@@ -7348,6 +7391,7 @@ if (DATA.client) {
         b.classList.toggle('disabled', off);
       });
     if (typeof reportView === 'function') reportView();
+    if (typeof phoneBar === 'function') phoneBar();
   };
 
   // Which view a reader is on, for the dashboard's Visits tab: one small
@@ -8408,6 +8452,112 @@ if (DATA.client) {
       setTimeout(function () { window.print(); }, 600);
     }, 0);
   })();
+
+  // ---- On a phone: the slim top, Circuits as a switch, columns on a tap ----
+  // Kaycee, 2026-10-11, from the view-by-view review: "1- yes, great idea"
+  // (Circuits a switch on Bodygraph), "2- tap to see" (the planet columns off
+  // the drawing). Nothing here touches a desktop: every piece is phone-only
+  // by CSS, and the moved buttons go back where they were when wider.
+  var phoneMQ = window.matchMedia ? window.matchMedia('(max-width: 760px)') : { matches: false };
+  var placeActions = function () {
+    var act = document.getElementById('actrow'), sh = document.getElementById('placements');
+    if (!act || !sh) return;
+    if (phoneMQ.matches) { if (act.parentNode !== sh) sh.appendChild(act); }
+    else if (act.parentNode === sh) sh.parentNode.insertBefore(act, sh.nextSibling);
+  };
+  if (phoneMQ.addEventListener) phoneMQ.addEventListener('change', function () { placeActions(); phoneBar(); });
+  placeActions();
+  var circ = document.getElementById('circpill');
+  if (circ) circ.onclick = function () { view(curView === 'body' ? 'plain' : 'body'); };
+  var sheet = document.getElementById('colsheet');
+  var showColumn = function (side) {
+    var canvas = [].filter.call(document.querySelectorAll('svg.canvas'), function (c) { return getComputedStyle(c).display !== 'none'; })[0];
+    var src = canvas && canvas.querySelector('.ptable[data-side="' + side + '"]');
+    if (!src || !sheet) return;
+    var NS = 'http://www.w3.org/2000/svg', t = document.createElementNS(NS, 'svg');
+    var g = src.cloneNode(true); g.removeAttribute('transform'); g.style.display = '';
+    t.appendChild(g);
+    sheet.innerHTML = '<button class="x" aria-label="Close">&times;</button>';
+    sheet.appendChild(t); sheet.classList.add('open');
+    var b = g.getBBox();
+    t.setAttribute('viewBox', (b.x - 4) + ' ' + (b.y - 4) + ' ' + (b.width + 8) + ' ' + (b.height + 8));
+  };
+  if (sheet) sheet.addEventListener('click', function (e) { if (e.target.closest('.x')) sheet.classList.remove('open'); });
+  // One button per column the drawing carries, named by the column's own
+  // heading, so a transit or a pair gets its own without new words.
+  var phoneBar = function () {
+    var pills = document.getElementById('colpills');
+    if (circ) circ.classList.toggle('on', curView === 'body');
+    if (!pills) return;
+    pills.innerHTML = '';
+    if (sheet) sheet.classList.remove('open');
+    if (!phoneMQ.matches) return;
+    var canvas = [].filter.call(document.querySelectorAll('svg.canvas'), function (c) { return getComputedStyle(c).display !== 'none'; })[0];
+    if (!canvas) return;
+    [].forEach.call(canvas.querySelectorAll(':scope > .ptable'), function (t) {
+      if (getComputedStyle(t).display === 'none') return;
+      var head = t.querySelector(':scope > text');
+      var name = head ? head.textContent.trim().toLowerCase().replace(/\b\w/g, function (c) { return c.toUpperCase(); }) : t.getAttribute('data-side');
+      var b = document.createElement('button');
+      b.className = 'colpill'; b.textContent = name;
+      b.onclick = function () { showColumn(t.getAttribute('data-side')); };
+      pills.appendChild(b);
+    });
+  };
+  phoneBar();
+  // Pinch inside a wheel on a phone, by its viewBox, so the page itself never
+  // zooms and every hover and tap keeps working on the drawing.
+  var wheelZoom = function (svg) {
+    if (!svg || svg.getAttribute('data-zoom')) return;
+    svg.setAttribute('data-zoom', '1');
+    var base = (svg.getAttribute('viewBox') || '').split(/[ ,]+/).map(Number);
+    if (base.length !== 4) return;
+    var vb = base.slice(), pts = {}, pinch = null, drag = null, lastTap = 0;
+    var set = function () {
+      var k = base[2] / vb[2];
+      if (k <= 1.001) { vb = base.slice(); }
+      vb[0] = Math.min(Math.max(vb[0], base[0]), base[0] + base[2] - vb[2]);
+      vb[1] = Math.min(Math.max(vb[1], base[1]), base[1] + base[3] - vb[3]);
+      svg.setAttribute('viewBox', vb.join(' '));
+      svg.classList.toggle('zoomed', k > 1.001);
+    };
+    var at = function (x, y) { var r = svg.getBoundingClientRect(); return [vb[0] + (x - r.left) / r.width * vb[2], vb[1] + (y - r.top) / r.height * vb[3]]; };
+    svg.addEventListener('pointerdown', function (e) {
+      if (e.pointerType !== 'touch' || !phoneMQ.matches) return;
+      pts[e.pointerId] = [e.clientX, e.clientY];
+      var ids = Object.keys(pts);
+      if (ids.length === 2) {
+        var a = pts[ids[0]], b = pts[ids[1]];
+        pinch = { d: Math.max(120, Math.hypot(a[0] - b[0], a[1] - b[1])), w: vb[2], h: vb[3] }; drag = null;
+      } else if (ids.length === 1) {
+        var now = Date.now();
+        if (now - lastTap < 300) { vb = base.slice(); set(); }
+        lastTap = now;
+        if (svg.classList.contains('zoomed')) drag = { x: e.clientX, y: e.clientY, vb: vb.slice() };
+      }
+    });
+    svg.addEventListener('pointermove', function (e) {
+      if (!pts[e.pointerId]) return;
+      pts[e.pointerId] = [e.clientX, e.clientY];
+      var ids = Object.keys(pts);
+      if (pinch && ids.length >= 2) {
+        var a = pts[ids[0]], b = pts[ids[1]], d = Math.max(120, Math.hypot(a[0] - b[0], a[1] - b[1]));
+        var mid = at((a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+        var k = Math.min(6, Math.max(1, (base[2] / pinch.w) * d / pinch.d));
+        var w = base[2] / k, h = base[3] / k;
+        vb = [mid[0] - (mid[0] - vb[0]) * w / vb[2], mid[1] - (mid[1] - vb[1]) * h / vb[3], w, h];
+        set();
+      } else if (drag) {
+        var r = svg.getBoundingClientRect();
+        vb[0] = drag.vb[0] - (e.clientX - drag.x) / r.width * vb[2];
+        vb[1] = drag.vb[1] - (e.clientY - drag.y) / r.height * vb[3];
+        set();
+      }
+    });
+    var lift = function (e) { delete pts[e.pointerId]; if (Object.keys(pts).length < 2) pinch = null; if (!Object.keys(pts).length) drag = null; };
+    window.addEventListener('pointerup', lift); window.addEventListener('pointercancel', lift);
+  };
+  [].forEach.call(document.querySelectorAll('.mandala > svg, .astro > svg'), wheelZoom);
 
   var va0 = document.getElementById('vAstro');
   if (va0) va0.onclick = function () { view('astro'); };
