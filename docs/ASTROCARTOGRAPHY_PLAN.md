@@ -366,3 +366,8 @@ the right; second row Lines, Angles, Parans. Find My Places opens on the right.
   The World lands on Bodygraph), so no reader takes the natal map for a transit
   or a pair. Recommended to Kaycee: republish all charts with The World now,
   wire Transit and Relationship next, then republish again.
+- **Reports** (Kaycee, 11 October, before the republish): Save As PDF in Find
+  My Places and in Compare Places opens a branded page (logo, name, birth and
+  design dates, the settings, the map as it stands, the results table) and the
+  browser's print, where Save as PDF is built in. No PDF library is shipped in
+  the charts.

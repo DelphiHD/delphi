@@ -643,6 +643,71 @@ function snapshot(svgEl,lines,filename){
   };
   img.src="data:image/svg+xml;base64,"+btoa(unescape(encodeURIComponent(xml)));
 }
+// ---- Reports ------------------------------------------------------------------
+// Find My Places and Compare Places as a page to save as PDF, with the map as
+// it stands. Kaycee, 2026-10-11. Opened in its own window with the browser's
+// print, whose Save as PDF every browser has, so no PDF library rides along in
+// every chart.
+function mapPng(cb){
+  const svgEl=document.getElementById("w-map");
+  const vb=(svgEl.getAttribute("viewBox")||"").trim().split(/[ ,]+/).map(Number);
+  const vw=vb[2],vh=vb[3];
+  const clone=svgEl.cloneNode(true);bake(svgEl,clone);
+  clone.setAttribute("xmlns","http://www.w3.org/2000/svg");clone.setAttribute("width",vw);clone.setAttribute("height",vh);
+  clone.removeAttribute("class");
+  const sty=document.createElementNS("http://www.w3.org/2000/svg","style");sty.textContent=FONTCSS;clone.insertBefore(sty,clone.firstChild);
+  const img=new Image();
+  img.onload=()=>{const S=2,cv=document.createElement("canvas");cv.width=vw*S;cv.height=vh*S;
+    const g=cv.getContext("2d");g.fillStyle="#ffffff";g.fillRect(0,0,cv.width,cv.height);g.drawImage(img,0,0,vw*S,vh*S);cb(cv.toDataURL("image/png"))};
+  img.onerror=()=>cb("");
+  img.src="data:image/svg+xml;base64,"+btoa(unescape(encodeURIComponent(new XMLSerializer().serializeToString(clone))));
+}
+const RCSS='body{font-family:Montserrat,-apple-system,sans-serif;color:#1c1a2e;margin:0;padding:28px 34px}'+
+  '.hd{display:flex;align-items:center;gap:20px;border-bottom:2px solid rgba(132,80,149,.35);padding-bottom:12px;margin-bottom:14px}'+
+  '.hd img{width:120px}.hd .nm{font-size:22px;font-weight:600}.hd .dt{font-size:12px;color:#6b6790;margin-top:3px}'+
+  'h1{font-size:18px;color:#845095;margin:6px 0 4px}.set{font-size:11.5px;color:#6b6790;margin:2px 0}'+
+  '.map{width:100%;border:1px solid #e4dce9;border-radius:6px;margin:12px 0 16px}'+
+  'table{border-collapse:collapse;width:100%;font-size:11px}th,td{text-align:left;padding:4px 6px;border-bottom:1px solid #eee7f1;vertical-align:top}'+
+  'th{font-size:10.5px;color:#6b6790;font-weight:600}tr.w-sec td,.sec{font-size:9.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#6b6790;padding-top:12px}'+
+  'tr.sum td{font-weight:600}.ap,.gr{display:inline-block;padding:1px 6px;border-radius:999px;font-size:8.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}'+
+  '.ap{background:#845095;color:#fff}.gr.g3{background:#c79a2e;color:#fff}.gr.g2{background:#ecd9a4;color:#6b5210}.gr.g1{border:1px solid #d8c48c;color:#8a6a14}'+
+  '.own{color:#9c7415;font-weight:600}.was{color:#6b6790;font-weight:400}.mi{color:#4b4553}'+
+  'tr{page-break-inside:avoid}@page{margin:14mm}';
+function openReport(title,settings,table){
+  const w=window.open("","_blank");
+  if(!w)return;
+  w.document.write('<!doctype html><title>'+PERSON+' - '+title+'</title><p style="font-family:sans-serif;padding:30px">…</p>');
+  mapPng(png=>{
+    const logo=document.querySelector(".brandmark.logo");
+    const st=mapState();
+    w.document.open();
+    w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+PERSON+' - '+title+'</title><style>'+FONTCSS+RCSS+'</style></head><body>'+
+      '<div class="hd">'+(logo?'<img src="'+logo.src+'" alt="">':'')+'<div><div class="nm">'+PERSON+'</div>'+
+      st.slice(1,st.length-1).map(t=>'<div class="dt">'+t+'</div>').join("")+'</div></div>'+
+      '<h1>'+title+'</h1>'+settings.map(t=>'<div class="set">'+t+'</div>').join("")+
+      (png?'<img class="map" src="'+png+'" alt="">':'')+table+'</body></html>');
+    w.document.close();
+    const go=()=>{w.focus();w.print()};
+    const im=w.document.querySelector("img.map");
+    if(im&&!im.complete)im.onload=go;else setTimeout(go,300);
+  });
+}
+function findReport(){
+  const F=lastFind;if(!F||!F.top.length)return;
+  const head=F.groups.map(g=>'<th>'+SIDE[g.sd]+" "+g.b+'</th>').join("");
+  const table='<table><tr><th></th><th>City</th>'+head+'</tr>'+F.top.map((t,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+t.c.n+'</b><br><span class="was">'+t.c.c+'</span></td>'+
+    t.per.map(p=>'<td class="mi">'+(p.v?Math.round(p.mi)+" mi "+gradePill(GRADES.find(g=>g[1]===p.v)):'')+'</td>').join("")+'</tr>').join("")+'</table>';
+  openReport("Find My Places",[
+    "Planets: "+[...want].join(", "),
+    "Continent: "+(conts.size?[...conts].join(", "):"All")+"  ·  Latitude Limit: "+(latLimit>=90?"No Limit":latLimit===66.5?"Polar Circles":latLimit+"°"),
+    mapState().slice(-1)[0],
+  ],'<h1 style="font-size:14px">Closest Matches</h1>'+table);
+}
+function compareReport(){
+  const t=document.querySelector("#w-compare table");if(!t)return;
+  const c=t.cloneNode(true);c.querySelectorAll("button").forEach(b=>b.remove());
+  openReport("Compare Places",[mapState().slice(-1)[0]],c.outerHTML);
+}
 function mapState(){
   const n=k=>st[k].size===ALL[k].length?"All":st[k].size?[...st[k]].join(", "):"None";
   // The moment each map was cast, for the sides on it. Kaycee, 10 October:
@@ -753,7 +818,7 @@ function renderFind(){
     '<div class="grid">'+[...BODIES,...EXTRAS.filter(x=>st.extras.has(x))].map(b=>'<div class="w-opt'+(want.has(b)?" on":"")+'" data-want="'+b+'"><span class="radio"></span><span class="gl">'+GLYPH[b]+'</span>'+b+'</div>').join("")+'</div>'+
     '<h3>Continent</h3><div class="lims">'+['All',...CONTS].map(t=>'<button class="w-pill'+((t==="All"?!conts.size:conts.has(t))?" on":"")+'" data-cont="'+t+'">'+t+'</button>').join("")+'</div>'+
     '<h3>Latitude Limit</h3><div class="lims">'+[[45,"45°"],[60,"60°"],[66.5,"Polar Circles"],[90,"No Limit"]].map(([v,t])=>'<button class="w-pill'+(v===latLimit?" on":"")+'" data-lim="'+v+'">'+t+'</button>').join("")+'</div>'+
-    (F.groups.length?'<h3>Closest Matches</h3>'+(F.top.length?F.top.map((t,i)=>'<div class="fr" data-fi="'+i+'"><b>'+t.c.n+'</b> <span class="co">'+t.c.c+'</span>'+
+    (F.groups.length?'<h3>Closest Matches</h3>'+(F.top.length?'<button class="w-pill pdf" data-pdf="find">Save As PDF</button>':'')+(F.top.length?F.top.map((t,i)=>'<div class="fr" data-fi="'+i+'"><b>'+t.c.n+'</b> <span class="co">'+t.c.c+'</span>'+
       '<div class="mt">'+t.per.filter(p=>p.v).map(p=>'<span><span style="color:'+(p.sd==="design"?"var(--design)":"var(--ink)")+'">'+GLYPH[p.b]+'</span>'+gradePill(GRADES.find(g=>g[1]===p.v))+'</span>').join("")+'</div></div>').join(""):'<div class="none">No cities within 700 miles of these lines.</div>'):"");
   box.classList.add("open");
 }
@@ -761,6 +826,7 @@ document.getElementById("w-findBtn").onclick=()=>{finding=!finding;renderFind()}
 document.getElementById("w-find").addEventListener("click",e=>{
   if(e.target.closest(".x")){finding=false;return renderFind()}
   const ct=e.target.closest("[data-cont]");if(ct){const t=ct.dataset.cont;if(t==="All")conts.clear();else conts.has(t)?conts.delete(t):conts.add(t);return renderFind()}
+  if(e.target.closest("[data-pdf=find]"))return findReport();
   const lim=e.target.closest("[data-lim]");if(lim){latLimit=+lim.dataset.lim;return renderFind()}
   const w=e.target.closest("[data-want]");if(w){const b=w.dataset.want;want.has(b)?want.delete(b):want.add(b);return renderFind()}
   const r=e.target.closest("[data-fi]");if(r){const c=lastFind.top[+r.dataset.fi].c;
@@ -789,7 +855,7 @@ function renderCompare(){
   });
   const cell=r=>r?'<td class="mi">'+(r.mi!==undefined?Math.round(r.mi)+" mi":r.d.toFixed(1)+"°")+" "+gradePill(r.g)+"</td>":"<td></td>";
   const count=(a,n)=>a.rows.filter(r=>r.g[1]===n).length+a.prs.filter(r=>r.g[1]===n).length;
-  box.innerHTML='<button class="x" title="Close">&times;</button><h2>Compare Places</h2><table>'+
+  box.innerHTML='<button class="x" title="Close">&times;</button><h2>Compare Places <button class="w-pill pdf" data-pdf="compare">Save As PDF</button></h2><table>'+
     '<tr><th></th>'+saved.map((s,i)=>'<th><span class="pl" data-go="'+i+'">'+s.n+'</span> <button class="rm" data-rm="'+i+'" title="Remove">&times;</button></th>').join("")+'</tr>'+
     '<tr class="sum"><td>Strong</td>'+A.map(a=>'<td>'+count(a,3)+'</td>').join("")+'</tr>'+
     '<tr class="sum"><td>Moderate</td>'+A.map(a=>'<td>'+count(a,2)+'</td>').join("")+'</tr>'+
@@ -822,6 +888,7 @@ function relocRows(){
 }
 document.getElementById("w-cmpBtn").onclick=()=>{comparing=!comparing;renderCompare()};
 document.getElementById("w-compare").addEventListener("click",e=>{
+  if(e.target.closest("[data-pdf=compare]"))return compareReport();
   if(e.target.closest(".x")){comparing=false;return renderCompare()}
   const rm=e.target.closest("[data-rm]");if(rm){saved.splice(+rm.dataset.rm,1);persist();renderCompare();renderHere();return redraw()}
   const go=e.target.closest("[data-go]");if(go){const s=saved[+go.dataset.go];openHere(s.lat,s.lon,{n:s.n,c:s.c,lat:s.lat,lon:s.lon})}
