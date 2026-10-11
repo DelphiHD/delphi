@@ -28,6 +28,7 @@
  *       npx tsx scripts/energy-flow-diagram.ts bryan      # that client's own chart
  */
 
+import { gzipSync, gunzipSync } from "node:zlib";
 import { config as loadEnv } from "dotenv";
 loadEnv({ path: ".env.local", override: true });
 
@@ -12436,9 +12437,13 @@ async function publishChart(client: ClientCtx, html: string): Promise<string> {
       // token as its slug, which filed its history in a second folder and
       // split it in two.
       const folder = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : slug;
-      rolledFrom = `${folder}/versions/${token}-${stamp}.html`;
-      const kept = await db.storage.from("charts").upload(rolledFrom, Buffer.from(previousHtml, "utf8"), {
-        contentType: "text/html; charset=utf-8",
+      // Compressed: a chart page is about 3.4 MB and under 1 MB gzipped, and
+      // uncompressed copies took the project past the free plan's storage on
+      // 2026-10-11 (2.65 GB of copies against 0.29 GB of live charts). Kaycee
+      // is staying on the free plan until launch.
+      rolledFrom = `${folder}/versions/${token}-${stamp}.html.gz`;
+      const kept = await db.storage.from("charts").upload(rolledFrom, gzipSync(Buffer.from(previousHtml, "utf8"), { level: 9 }), {
+        contentType: "application/gzip",
         upsert: true,
       });
       if (kept.error) {
@@ -12446,7 +12451,7 @@ async function publishChart(client: ClientCtx, html: string): Promise<string> {
         console.warn(`  ! could not keep a rollback copy: ${kept.error.message}`);
         rolledFrom = "";
       } else {
-        await pruneVersions(db, slug, token);
+        await pruneVersions(db, folder, token);
       }
     }
   }
@@ -12502,8 +12507,12 @@ async function publishChart(client: ClientCtx, html: string): Promise<string> {
 }
 
 /** Keep the newest five rollback copies per chart; older ones are removed. */
-async function pruneVersions(db: SupabaseClient, slug: string, token: string): Promise<void> {
-  const listed = await db.storage.from("charts").list(`${slug}/versions`, { limit: 100 });
+// The folder the copies are actually kept in, beside the published file. It
+// was the slug, which for any chart filed under its token or a renamed slug
+// pointed at a folder nobody wrote to: nothing was ever cleared there, and
+// charts averaged nine copies against five (found 2026-10-11).
+async function pruneVersions(db: SupabaseClient, folder: string, token: string): Promise<void> {
+  const listed = await db.storage.from("charts").list(`${folder}/versions`, { limit: 1000 });
   if (listed.error || !listed.data) return;
   const mine = listed.data
     .filter((f: { name: string }) => f.name.startsWith(`${token}-`))
@@ -12511,7 +12520,7 @@ async function pruneVersions(db: SupabaseClient, slug: string, token: string): P
     .sort();                                  // ISO stamps sort chronologically
   const stale = mine.slice(0, Math.max(0, mine.length - KEEP_VERSIONS));
   if (stale.length) {
-    await db.storage.from("charts").remove(stale.map((n) => `${slug}/versions/${n}`));
+    await db.storage.from("charts").remove(stale.map((n) => `${folder}/versions/${n}`));
   }
 }
 
@@ -12621,7 +12630,11 @@ async function rollbackChart(brief: { slug: string; name: string }, version?: st
     .maybeSingle();
   if (!rec) throw new Error(`${brief.name} has no published chart`);
 
-  const listed = await db.storage.from("charts").list(`${brief.slug}/versions`, { limit: 100 });
+  // the copies sit beside the published file, as publishChart keeps them
+  const sp = String(rec.storage_path ?? "");
+  const folder = sp.includes("/") ? sp.slice(0, sp.lastIndexOf("/")) : brief.slug;
+  const listed = await db.storage.from("charts").list(`${folder}/versions`, { limit: 1000 });
+  const stampOf = (n: string) => n.slice(rec.token.length + 1).replace(/\.html(\.gz)?$/, "");
   const mine = (listed.data ?? [])
     .filter((f) => f.name.startsWith(`${rec.token}-`))
     .map((f) => f.name)
@@ -12636,26 +12649,25 @@ async function rollbackChart(brief: { slug: string; name: string }, version?: st
   if (!version) {
     console.log(`kept versions for ${brief.name}, newest first:`);
     for (const n of mine) {
-      const when = n.slice(rec.token.length + 1).replace(".html", "");
-      console.log(`  ${when}`);
+      console.log(`  ${stampOf(n)}`);
     }
-    console.log(`\nrestore one with:  --rollback ${mine[0].slice(rec.token.length + 1).replace(".html", "")}`);
+    console.log(`\nrestore one with:  --rollback ${stampOf(mine[0])}`);
     return;
   }
 
-  const name = version.endsWith(".html") ? version : `${rec.token}-${version}.html`;
-  const target = mine.find((n) => n === name || n.includes(version));
+  const target = mine.find((n) => n === version || stampOf(n) === version || n.includes(version));
   if (!target) throw new Error(`no kept version matching "${version}" for ${brief.name}`);
 
-  const got = await db.storage.from("charts").download(`${brief.slug}/versions/${target}`);
+  const got = await db.storage.from("charts").download(`${folder}/versions/${target}`);
   if (!got.data) throw new Error(`could not read ${target}`);
-  const html = await got.data.text();
+  const raw = Buffer.from(await got.data.arrayBuffer());
+  const html = (target.endsWith(".gz") ? gunzipSync(raw) : raw).toString("utf8");
 
   await publishChart(
     { slug: brief.slug, name: brief.name } as ClientCtx,
     html,
   );
-  console.log(`✓ ${brief.name} rolled back to ${target.slice(rec.token.length + 1).replace(".html", "")}`);
+  console.log(`✓ ${brief.name} rolled back to ${stampOf(target)}`);
   console.log(`  ${SITE}/c/${rec.token}`);
 }
 
