@@ -1067,24 +1067,38 @@ function redraw(){if(pending)return;pending=true;requestAnimationFrame(()=>{pend
 function zoomAt(fx,fy,k){const k0=view.k;view.k=Math.min(16,Math.max(1,k));
   view.tx=fx-(fx-view.tx)*view.k/k0;view.ty=fy-(fy-view.ty)*view.k/k0;clampView();redraw()}
 let gesturing=false;
+const touches=new Map();let pinch=null;
+const spread=()=>{const [a,b]=[...touches.values()];return {d:Math.hypot(a[0]-b[0],a[1]-b[1])||1,x:(a[0]+b[0])/2,y:(a[1]+b[1])/2}};
+const lift=e=>{touches.delete(e.pointerId);if(touches.size<2)pinch=null};
+window.addEventListener("pointerup",lift);window.addEventListener("pointercancel",lift);
 svg.addEventListener("wheel",e=>{
   if(e.ctrlKey){if(gesturing)return;e.preventDefault();const [fx,fy]=frameAt(e.clientX,e.clientY);zoomAt(fx,fy,view.k*Math.exp(-e.deltaY*0.01));return}
   if(view.k>1){e.preventDefault();const s=svg.getScreenCTM().a;view.tx-=e.deltaX/s;view.ty-=e.deltaY/s;clampView();redraw()}
 },{passive:false});
 let g0=1;
-svg.addEventListener("gesturestart",e=>{e.preventDefault();gesturing=true;g0=view.k});
-svg.addEventListener("gesturechange",e=>{e.preventDefault();const [fx,fy]=frameAt(e.clientX,e.clientY);zoomAt(fx,fy,g0*e.scale)});
+// Safari's gesture events are kept for a trackpad. A pinch on a touch screen
+// is read from the two fingers below instead, on every phone alike: Android
+// sends neither gesture events nor a ctrl-wheel, and on an iPhone the two
+// fingers also arrived as presses that panned against the zoom.
+svg.addEventListener("gesturestart",e=>{e.preventDefault();if(touches.size)return;gesturing=true;g0=view.k});
+svg.addEventListener("gesturechange",e=>{e.preventDefault();if(touches.size||!gesturing)return;const [fx,fy]=frameAt(e.clientX,e.clientY);zoomAt(fx,fy,g0*e.scale)});
 svg.addEventListener("gestureend",e=>{e.preventDefault();gesturing=false});
 let drag=null;
 // A press that barely moves is a click: it asks what is here. One that moves
 // is a drag, which pans once zoomed in.
 let press=null;
 svg.addEventListener("pointerdown",e=>{if(e.button!==0)return;
+  if(e.pointerType==="touch"){touches.set(e.pointerId,[e.clientX,e.clientY]);
+    // A second finger makes it a pinch: whatever the first finger began is dropped.
+    if(touches.size>=2){press=null;drag=null;svg.classList.remove("grabbing");pinch={d:spread().d,k:view.k};return}}
   // What was pressed is read now: once the pointer is captured for a drag,
   // later events all report the map itself.
   press={x:e.clientX,y:e.clientY,moved:false,line:e.target.closest("#w-hits [data-side], #w-labels [data-side]")};
   if(view.k>1){drag={x:e.clientX,y:e.clientY,tx:view.tx,ty:view.ty};svg.setPointerCapture(e.pointerId)}});
-svg.addEventListener("pointermove",e=>{if(press&&Math.hypot(e.clientX-press.x,e.clientY-press.y)>4)press.moved=true;
+svg.addEventListener("pointermove",e=>{
+  if(touches.has(e.pointerId)){touches.set(e.pointerId,[e.clientX,e.clientY]);
+    if(pinch&&touches.size>=2){const s=spread(),[fx,fy]=frameAt(s.x,s.y);zoomAt(fx,fy,pinch.k*s.d/pinch.d);return}}
+  if(press&&Math.hypot(e.clientX-press.x,e.clientY-press.y)>4)press.moved=true;
   if(!drag||!press||!press.moved)return;svg.classList.add("grabbing");const s=svg.getScreenCTM().a;view.tx=drag.tx+(e.clientX-drag.x)/s;view.ty=drag.ty+(e.clientY-drag.y)/s;clampView();redraw()});
 svg.addEventListener("pointerup",e=>{
   const onLine=press&&!press.moved&&press.line;
