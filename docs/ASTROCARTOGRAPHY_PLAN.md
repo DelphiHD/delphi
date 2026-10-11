@@ -358,3 +358,11 @@ the right; second row Lines, Angles, Parans. Find My Places opens on the right.
 - tooltip-sweep.js does not cover The World yet; the checks so far were run by
   hand in the console (every mark resolves via root.world.describe).
 - Safari's pinch path is untested.
+- The person's name sits over The World as over every other view (25 px,
+  600, the chart's ink, centred on the stage), so several open charts can be
+  told apart. Kaycee, 11 October.
+- **Transit and Relationship are not wired into The World yet.** Until they
+  are, The World is greyed out under those chart types (switching to one from
+  The World lands on Bodygraph), so no reader takes the natal map for a transit
+  or a pair. Recommended to Kaycee: republish all charts with The World now,
+  wire Transit and Relationship next, then republish again.

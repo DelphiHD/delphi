@@ -100,7 +100,7 @@ var HD_BODIES = ["Sun", "Earth", "North Node", "South Node", "Moon", "Mercury", 
 var GLYPHS = { Sun: "☉", Earth: "⊕", "North Node": "☊", "South Node": "☋", Moon: "☽", Mercury: "☿",
   Venus: "♀", Mars: "♂", Jupiter: "♃", Saturn: "♄", Uranus: "⛢", Neptune: "♆", Pluto: "♇", Chiron: "⚷", Lilith: "⚸" };
 
-function markup(G, inChart, findHosted) {
+function markup(G, inChart, findHosted, person) {
   var ML = 84, MR = 84, MT = 60, MB = 60, VW = ML + G.W + MR, VH = MT + G.H + MB, f = function (n) { return n.toFixed(1); };
   var grat = [];
   for (var lon = -150; lon <= 150; lon += 30) grat.push("M" + f((lon + 180) / 360 * G.W) + ",0V" + f(G.H));
@@ -125,7 +125,11 @@ function markup(G, inChart, findHosted) {
     '<span class="gap"></span>') + dd("lines", "Lines", planets("lines"), extras) + dd("angles", "Angles", angles);
   // Two rows (Kaycee, 2026-10-11): finding places first, search then Find My
   // Places, with zoom at the right; the view's own switches together beneath.
-  return '<div class="w-bar' + (inChart ? ' in-chart' : '') + '"><div class="w-tools">' +
+  // The person's name over the view, as every other view carries it, so a
+  // reader with several charts open can tell them apart. Kaycee, 2026-10-11.
+  var esc = function (t) { return String(t).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+  return (inChart && person ? '<div class="w-name">' + esc(person) + '</div>' : '') +
+    '<div class="w-bar' + (inChart ? ' in-chart' : '') + '"><div class="w-tools">' +
     '<div class="search"><input id="w-q" placeholder="Search A City" autocomplete="off"><div class="results" id="w-results"></div></div>' +
     '<button class="w-pill" id="w-findBtn">Find My Places</button><button class="w-pill" id="w-cmpBtn">Compare Places</button>' +
     '<button class="w-pill" id="w-snapMap"' + (inChart ? ' hidden' : '') + '>Save Map Image</button>' +
@@ -948,7 +952,7 @@ window.DelphiWorld = {
     if (root.dataset.mounted) return;
     root.dataset.mounted = "1";
     root.classList.add("world");
-    var go = function (G) { root.innerHTML = markup(G, !!opts.planets, !!opts.findHost); init(root, D, G, opts); };
+    var go = function (G) { root.innerHTML = markup(G, !!opts.planets, !!opts.findHost, D.person); init(root, D, G, opts); };
     if (this._geo) return go(this._geo);
     var self = this;
     fetch(opts.geometry).then(function (r) { if (!r.ok) throw new Error("world " + r.status); return r.json(); })

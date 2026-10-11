@@ -7269,6 +7269,10 @@ if (DATA.client) {
   var applyView = function () {
     // and the one view it does have is the one it opens on
     if (curMod === 'variations' && curView !== 'plain') curView = 'plain';
+    // The World is the person's own map. Transit and Relationship are not wired
+    // into it yet, so it is greyed out there rather than showing a natal map a
+    // reader could take for the transit or the pair. Kaycee, 2026-10-11.
+    if ((curMod === 'transit' || curMod === 'relation') && curView === 'world') curView = 'plain';
     var v = curView;
     // Circuits mean nothing over a transit: the button is disabled rather than
     // hidden, and the drawing falls back to the plain body.
@@ -7312,7 +7316,8 @@ if (DATA.client) {
         // cast for it. Kaycee, 2026-10-08: "All views except for Bodygraph
         // should be greyed out when Variations is selected, if someone wants
         // to explore a timepoint more closely they can save that chart."
-        var off = curMod === 'variations' && pair[0] !== 'plain';
+        var off = (curMod === 'variations' && pair[0] !== 'plain') ||
+          (pair[0] === 'world' && (curMod === 'transit' || curMod === 'relation'));
         b.disabled = off;
         b.classList.toggle('disabled', off);
       });
