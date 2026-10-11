@@ -103,3 +103,23 @@ export async function sendChartEmail(args: {
     return { sent: false, reason: e instanceof Error ? e.message : String(e) };
   }
 }
+
+/**
+ * A note to the people who run Delphi: a problem report from a chart page.
+ * Same sender as the chart email; never throws.
+ */
+export async function sendTeamEmail(args: { to: string[]; subject: string; html: string; text: string }): Promise<SendResult> {
+  if (!canSendEmail() || !args.to.length) return { sent: false, reason: "email is not configured" };
+  try {
+    const res = await fetch(ENDPOINT, {
+      method: "POST",
+      headers: { authorization: `Bearer ${process.env.RESEND_API_KEY}`, "content-type": "application/json" },
+      body: JSON.stringify({ from: process.env.RESEND_FROM_EMAIL, to: args.to, reply_to: "hello@delphihd.com",
+        subject: args.subject, html: args.html, text: args.text }),
+    });
+    if (!res.ok) return { sent: false, reason: `${res.status} ${(await res.text()).slice(0, 200)}` };
+    return { sent: true };
+  } catch (e) {
+    return { sent: false, reason: e instanceof Error ? e.message : String(e) };
+  }
+}

@@ -4438,6 +4438,20 @@ body.view-world #relhome > details, body.view-world #relswap { display:none !imp
     padding:24px 16px 16px; border:1px solid #d9d0e0; box-shadow:0 -8px 30px rgba(47,42,51,.18); }
 }
 .phonebar, .mname { display:none; }
+/* Report A Problem: a quiet link under the sessions, and its panel */
+.reportlink { display:block; margin:12px 0 0; padding:0; border:0; background:none; font:inherit; font-size:11.5px;
+  color:#6b6790; text-decoration:underline; text-underline-offset:2px; cursor:pointer; }
+.reportbox { position:fixed; inset:0; background:rgba(28,26,46,.45); z-index:60; display:flex; align-items:center; justify-content:center; padding:16px; }
+.reportbox[hidden] { display:none; }
+.reportbox .rbin { background:#fff; border-radius:16px; padding:16px; width:100%; max-width:440px; box-shadow:0 18px 50px rgba(28,26,46,.25); }
+.reportbox .rbpic { display:block; width:100%; max-height:34vh; object-fit:contain; border:1px solid rgba(132,80,149,.2); border-radius:10px; margin:0 0 10px; background:#faf8fb; min-height:60px; }
+.reportbox textarea { width:100%; box-sizing:border-box; font:inherit; font-size:16px; padding:10px; border:1px solid rgba(132,80,149,.3); border-radius:10px; resize:vertical; }
+.reportbox .rbrow { display:flex; gap:8px; margin-top:10px; }
+.reportbox .rbrow button { font:inherit; font-size:13px; font-weight:600; padding:8px 16px; border-radius:999px; border:1px solid rgba(132,80,149,.3); background:#fff; color:#845095; cursor:pointer; }
+.reportbox .rbrow button.gold { background:#c79a2e; border-color:#c79a2e; color:#fff; }
+.reportbox .rbrow button[disabled] { opacity:.5; }
+.reportbox .rbnote { font-size:12.5px; color:#3d3644; margin-top:8px; min-height:1em; }
+@media (max-width: 760px) { .reportbox { align-items:flex-end; padding:0; } .reportbox .rbin { max-width:none; border-radius:18px 18px 0 0; } }
 .mname { text-align:center; font-size:19px; font-weight:600; color:#1c1a2e; padding:4px 0 0; width:100%; }
 #worldside #w-find { position:static; width:auto; max-height:none; overflow:visible; box-shadow:none;
   border:0; border-radius:0; padding:4px 0 12px; margin:0 0 10px; border-bottom:1px solid rgba(132,80,149,.18);
@@ -5040,10 +5054,19 @@ ${d.world ? `<div class="world-side" id="worldside"></div>` : ""}
     </div>
 ${d.client ? `<div class="booknote"><div class="booklab">Book a session</div>${(d.client.established ? [...BOOKING_SESSIONS, DROP_IN] : BOOKING_SESSIONS).map(
       (s) => `<a href="${BOOKING_URL}/${s.slug}" target="_blank" rel="noopener"><span>${s.name}</span><em>${s.meta}</em></a>`,
-    ).join("")}</div>` : ""}
+    ).join("")}<button class="reportlink" id="reportlink" type="button">Report A Problem</button></div>
+<div class="reportbox" id="reportbox" hidden><div class="rbin">
+  <img class="rbpic" id="rbpic" alt="">
+  <textarea id="rbtext" rows="4" placeholder="What happened, and what did you expect?"></textarea>
+  <div class="rbrow"><button class="gold" id="rbsend" type="button">Send</button><button id="rbcancel" type="button">Cancel</button></div>
+  <div class="rbnote" id="rbnote"></div>
+</div></div>` : ""}
 ${d.client ? "" : `<div class="readout" id="readout"></div>`}
   </aside>
 </div>
+${d.client ? `<script>window.__pageErrors = []; (function () { var keep = function (m) { if (window.__pageErrors.length < 25) window.__pageErrors.push(new Date().toISOString().slice(11, 19) + ' ' + String(m).slice(0, 300)); };
+  addEventListener('error', function (e) { keep((e.message || 'error') + (e.filename ? ' @' + e.lineno + ':' + e.colno : '')); });
+  addEventListener('unhandledrejection', function (e) { keep('promise: ' + (e.reason && e.reason.message || e.reason)); }); })();</script>` : ""}
 ${d.world ? `<script>${readFileSync(join(process.cwd(), "assets", "world", "world.client.js"), "utf8").replace(/<\/script/gi, "<\\/script")}</script>` : ""}
 <script>
 var DATA = ${JSON.stringify(payload)};
@@ -5463,6 +5486,81 @@ if (DATA.client) {
     if (body.classList.contains('show-bridges')) bits.push('bridge gates');
     return bits.join('  ·  ');
   }
+  // ---- Report A Problem ----------------------------------------------------
+  // Kaycee, 2026-10-11, to semi-automate the bug hunt: a picture of what is on
+  // the stage, made as Save Image makes one, a box for what went wrong, and
+  // what the page knew, to the dashboard's Reports tab and her inbox.
+  var stagePicture = function (done) {
+    try {
+      var svg = body.classList.contains('view-world') ? document.getElementById('w-map') : activeSvg();
+      if (!svg) return done('');
+      var vb = (svg.getAttribute('viewBox') || '').trim().split(/[ ,]+/).map(Number);
+      var vw = vb[2] || svg.clientWidth, vh = vb[3] || svg.clientHeight;
+      var clone = svg.cloneNode(true);
+      var phoneCols = body.classList.contains('has-sidecols');
+      if (phoneCols) body.classList.remove('has-sidecols');
+      bake(svg, clone);
+      if (phoneCols) body.classList.add('has-sidecols');
+      clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      clone.setAttribute('width', vw); clone.setAttribute('height', vh);
+      var st = document.createElementNS('http://www.w3.org/2000/svg', 'style'); st.textContent = FONTCSS; clone.insertBefore(st, clone.firstChild);
+      var img = new Image();
+      img.onload = function () {
+        var S = Math.min(1.5, 1600 / vw), cv = document.createElement('canvas');
+        cv.width = vw * S; cv.height = vh * S;
+        var g = cv.getContext('2d'); g.fillStyle = '#ffffff'; g.fillRect(0, 0, cv.width, cv.height);
+        g.drawImage(img, 0, 0, cv.width, cv.height);
+        done(cv.toDataURL('image/jpeg', 0.82));
+      };
+      img.onerror = function () { done(''); };
+      img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(new XMLSerializer().serializeToString(clone))));
+    } catch (err) { done(''); }
+  };
+  var reportPic = '';
+  var rb = document.getElementById('reportbox'), rl = document.getElementById('reportlink');
+  if (rb && rl) {
+    var rbtext = document.getElementById('rbtext'), rbsend = document.getElementById('rbsend'), rbnote = document.getElementById('rbnote'), rbpic = document.getElementById('rbpic');
+    var closeReport = function () { rb.hidden = true; rbnote.textContent = ''; rbsend.disabled = false; };
+    rl.onclick = function () {
+      rb.hidden = false; rbnote.textContent = ''; rbsend.disabled = false; reportPic = ''; rbpic.removeAttribute('src');
+      stagePicture(function (url) { reportPic = url; if (url) rbpic.src = url; });
+      setTimeout(function () { rbtext.focus(); }, 50);
+    };
+    document.getElementById('rbcancel').onclick = closeReport;
+    rb.addEventListener('click', function (e) { if (e.target === rb) closeReport(); });
+    rbsend.onclick = function () {
+      var what = rbtext.value.trim();
+      if (!what) { rbtext.focus(); return; }
+      var tok = (location.pathname.split('/c/')[1] || '').split('/')[0];
+      var MODE_N = { self: 'Individual', variations: 'Variations', transit: 'Transit', relation: 'Relationship' };
+      var VIEW_N = { plain: 'Bodygraph', body: 'Circuits', mandala: 'The Wheel', astro: 'Astrology', world: 'The World' };
+      var touch = navigator.maxTouchPoints > 1 || (window.matchMedia && matchMedia('(pointer: coarse)').matches);
+      var df = document.getElementById('dfield'), tf = document.getElementById('tfield');
+      var context = {
+        mode: MODE_N[curMod], view: VIEW_N[curView],
+        transitAt: curMod === 'transit' && df ? (df.value + ' ' + (tf ? tf.value : '')).trim() : '',
+        device: touch ? (Math.min(screen.width, screen.height) < 600 ? 'phone' : 'tablet') : 'computer',
+        screen: innerWidth + 'x' + innerHeight, browser: navigator.userAgent.slice(0, 200),
+        page: document.lastModified, errors: (window.__pageErrors || []).slice(-25),
+        classes: body.className.slice(0, 400)
+      };
+      rbsend.disabled = true;
+      var go = function (version) {
+        context.version = version || '';
+        fetch('/api/report', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: tok, what: what, context: context, image: reportPic }) })
+          .then(function (r) { return r.json(); })
+          .then(function (j) {
+            if (!j.ok) throw new Error('not filed');
+            rbnote.textContent = 'Thank you. Your report is on its way, with a picture of your screen.';
+            rbtext.value = ''; setTimeout(closeReport, 2600);
+          })
+          .catch(function () { rbnote.textContent = 'The server did not answer. Please try again shortly.'; rbsend.disabled = false; });
+      };
+      fetch('/api/version').then(function (r) { return r.json(); }).then(function (v) { go(v.commit || v.deploymentId); }, function () { go(''); });
+    };
+  }
+
   document.getElementById('snap').onclick = function () {
     // The World saves its own map, with its own footer of dates and settings.
     if (body.classList.contains('view-world')) {

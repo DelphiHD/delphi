@@ -26,6 +26,7 @@ import launchPlan from "@/docs/launch-plan.json";
 import { SortableTable, Tabs, type Row } from "./table";
 import { People, type Person } from "./people";
 import { CreateChart } from "./create";
+import { Reports, type Report } from "./reports";
 
 export const metadata = { title: "Dashboard — Delphi Human Design" };
 export const dynamic = "force-dynamic";
@@ -181,6 +182,27 @@ export default async function AdminPage() {
   const builtAt = String(lastBuilt.data?.[0]?.updated_at ?? "").slice(0, 16).replace("T", " ");
   const deployedSha = (process.env.VERCEL_GIT_COMMIT_SHA ?? "").slice(0, 7);
 
+  // Problem reports from the chart pages, newest first, each picture behind a
+  // link that lasts an hour (the bucket is private).
+  const { data: reportRows } = await db.from("problem_reports")
+    .select("id, created_at, token, person, what, context, image_path, status, notes, resolution")
+    .order("created_at", { ascending: false }).limit(300);
+  const paths = (reportRows ?? []).map((r) => r.image_path).filter(Boolean) as string[];
+  const signed = paths.length ? (await db.storage.from("charts").createSignedUrls(paths, 3600)).data ?? [] : [];
+  const pictureOf = new Map(signed.map((x) => [x.path, x.signedUrl]));
+  const reports: Report[] = (reportRows ?? []).map((r) => {
+    const c = (r.context ?? {}) as Record<string, unknown>;
+    return {
+      id: String(r.id), when: String(r.created_at).slice(0, 16).replace("T", " "), person: String(r.person ?? ""),
+      chartHref: `${SITE}/c/${r.token}`, what: String(r.what ?? ""),
+      where: [c.mode, c.view, c.transitAt].filter(Boolean).join(" · "),
+      device: [c.device, c.screen, c.browser].filter(Boolean).join(" · "),
+      errors: Array.isArray(c.errors) ? (c.errors as unknown[]).map(String) : [],
+      picture: r.image_path ? pictureOf.get(String(r.image_path)) ?? "" : "",
+      status: String(r.status), notes: String(r.notes ?? ""), resolution: String(r.resolution ?? ""),
+    };
+  });
+
   const ourChartIds = new Set((ourProfiles ?? []).map((p) => p.primary_chart_id).filter(Boolean).map(String));
   // By name as well: on 2026-10-11 her account's own chart was set to "test",
   // and her real chart is where every feature is tried first.
@@ -213,6 +235,7 @@ export default async function AdminPage() {
   }));
 
   const cards: [string, number, string][] = [
+    ["Open reports", reports.filter((r) => r.status === "new" || r.status === "looking").length, "problems people sent"],
     ["People", people.length, "charts that belong to somebody"],
     ["Signed up", signups.length, "through the website or an event"],
     ["Accounts", accountList.length, "can sign in"],
@@ -269,7 +292,7 @@ export default async function AdminPage() {
         ))}
       </div>
 
-      <Tabs names={["Everyone", "New chart", "Visits", "Status", "Transits", "Changes", "Accounts", "Decided", "Launch"]}>
+      <Tabs names={["Everyone", "New chart", "Reports", "Visits", "Status", "Transits", "Changes", "Accounts", "Decided", "Launch"]}>
         <SortableTable
           initial={{ key: "since", dir: -1 }}
           columns={[
@@ -283,6 +306,7 @@ export default async function AdminPage() {
           rows={everyone}
         />
         <CreateChart events={events} />
+        <Reports reports={reports} />
         <div>
           <p className="sub">
             {opens.length
