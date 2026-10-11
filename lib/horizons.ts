@@ -33,10 +33,14 @@ export async function chironEquatorial(when: Date): Promise<{ ra: number; dec: n
   const cache = readCache();
   if (cache[key]) return cache[key];
   const at = key.replace("T", " ");
+  // One minute later, worked out as a time: at :59 the old string arithmetic
+  // asked for ":60", Horizons refused it, and two charts with a 20:59 design
+  // moment could not be published (11 October).
+  const stop = new Date(Date.parse(`${key}:00Z`) + 60_000).toISOString().slice(0, 16).replace("T", " ");
   const q = (v: string) => encodeURIComponent(`'${v}'`);
   const url = "https://ssd.jpl.nasa.gov/api/horizons.api?format=json" +
     `&COMMAND=${q("2060;")}&OBJ_DATA=${q("NO")}&MAKE_EPHEM=${q("YES")}&EPHEM_TYPE=${q("OBSERVER")}` +
-    `&CENTER=${q("500@399")}&START_TIME=${q(at)}&STOP_TIME=${q(at.slice(0, 14) + String(Number(at.slice(14, 16)) + 1).padStart(2, "0"))}` +
+    `&CENTER=${q("500@399")}&START_TIME=${q(at)}&STOP_TIME=${q(stop)}` +
     `&STEP_SIZE=${q("1 m")}&QUANTITIES=${q("2")}&ANG_FORMAT=${q("DEG")}&EXTRA_PREC=${q("YES")}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Horizons failed: ${res.status}`);
