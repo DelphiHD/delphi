@@ -4382,7 +4382,9 @@ body.view-world #relhome > details, body.view-world #relswap { display:none !imp
   /* the drawing's own columns give way to the slim ones beside it */
   body.sidecols .wrap .stage svg.canvas > .ptable { visibility:hidden; }
   .sidecols { position:absolute; left:0; right:0; pointer-events:none; display:flex; justify-content:space-between; padding:0 2px; }
-  .sidecols .scol { width:19%; display:flex; flex-direction:column; justify-content:space-between; pointer-events:auto; }
+  .sidecols .sgl { width:15px; height:15px; vertical-align:-2px; margin-right:4px; overflow:visible; }
+  .sidecols .scol.right .sgl { margin-right:4px; }
+  .sidecols .scol { width:18%; display:flex; flex-direction:column; justify-content:space-between; pointer-events:auto; }
   .sidecols .shead { font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; color:#6b6790; font-weight:600; padding:0 4px 2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .sidecols .scol.right .shead { text-align:right; }
   .sidecols .prow, .sidecols .trow { font-size:13px; font-weight:600; line-height:1; padding:4px 5px; border-radius:6px; white-space:nowrap; cursor:pointer; font-variant-numeric:tabular-nums; }
@@ -8527,7 +8529,7 @@ if (DATA.client) {
   // lay it out (her screenshots) keeps it. Each row is the drawing's own row
   // retold: same data-side and data-planet, so a tap reads exactly as a hover
   // does on a desktop and a gate lights its row here through litGate.
-  var cols = null, BG = 0.6;
+  var cols = null, BG = 0.66;
   var placeCols = function () {
     var canvas = visibleCanvas();
     if (!cols || !canvas) return;
@@ -8536,7 +8538,7 @@ if (DATA.client) {
     cols.style.height = (r.height * 0.86) + 'px';
   };
   var buildCols = function () {
-    if (cols) { cols.remove(); cols = null; }
+    [].forEach.call(document.querySelectorAll('.sidecols'), function (c) { c.remove(); }); cols = null;
     document.body.classList.remove('sidecols');
     [].forEach.call(document.querySelectorAll('svg.canvas'), function (c) { c.style.width = ''; c.style.marginLeft = ''; });
     if (!phoneMQ.matches) return;
@@ -8558,15 +8560,26 @@ if (DATA.client) {
         var d = document.createElement('div');
         d.className = row.getAttribute('class');
         [].forEach.call(row.attributes, function (a) { if (a.name.indexOf('data-') === 0) d.setAttribute(a.name, a.value); });
-        var texts = [].map.call(row.querySelectorAll('text'), function (tx) { return tx.textContent.trim(); }).filter(Boolean);
-        d.textContent = texts.join(' ');
+        // the glyph as the chart draws it (Uranus, for one, is drawn in lines,
+        // not a font character), then the numbers and any variable arrow
+        var pg = row.querySelector('.pgl');
+        if (pg) {
+          var mini = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          mini.setAttribute('class', 'sgl');
+          var gc = pg.cloneNode(true); mini.appendChild(gc); d.appendChild(mini);
+          var gb = pg.getBBox();
+          mini.setAttribute('viewBox', (gb.x - 1) + ' ' + (gb.y - 1) + ' ' + (gb.width + 2) + ' ' + (gb.height + 2));
+        }
+        var texts = [].filter.call(row.querySelectorAll('text'), function (tx) { return !tx.closest('.pgl'); })
+          .map(function (tx) { return tx.textContent.trim(); }).filter(Boolean);
+        d.appendChild(document.createTextNode(texts.join(' ')));
         var num = row.querySelector('text[fill]');
         if (num) d.style.color = num.getAttribute('fill');
         col.appendChild(d);
       });
       cols.appendChild(col);
     });
-    canvas.parentNode.appendChild(cols);
+    document.querySelector('.stage').appendChild(cols);
     document.body.classList.add('sidecols');
     canvas.style.width = (146 * BG) + '%';
     canvas.style.marginLeft = ((100 - 100 * BG) / 2 - 22.4 * BG) + '%';
