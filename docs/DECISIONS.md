@@ -1408,7 +1408,7 @@ Kaycee: "would it be possible to semi-automate the bug hunt? ... it automaticall
 - Reports go to the dashboard plus an email: "I think this will be more useful ultimately and we both work out of it already."
 - The dashboard keeps columns for notes and resolution: "put your project and account manager hat on."
 - The link is for everyone.
-- The wording as proposed.
+- The wording as proposed, except the box, which she rewrote: "What happened, and how did that differ from what you were expecting? Please be as descriptive as possible."
 - The reporter's account is logged when they are signed in.
 
 **What it is:**
@@ -1422,7 +1422,7 @@ Kaycee: "would it be possible to semi-automate the bug hunt? ... it automaticall
   - the page's own errors since it loaded
   - the signed-in account, from the verified session
 - The table is `problem_reports`, service role only. Pictures are kept privately at `charts/reports/<id>.jpg`.
-- Each report emails every admin.
+- Each report is emailed to hello@delphihd.com, not anyone's own inbox (Kaycee, same day).
 - Statuses: New, Looking Into It, Fixed, Not A Bug, Duplicate.
 
 **Working through them:**

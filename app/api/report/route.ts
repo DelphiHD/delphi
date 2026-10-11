@@ -17,6 +17,7 @@ import { createClient as createServerClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 const SITE = process.env.NEXT_PUBLIC_CHARTS_URL ?? "https://charts.delphihd.com";
+const REPORTS_TO = "hello@delphihd.com";
 const bad = (status: number) => NextResponse.json({ ok: false }, { status });
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -63,10 +64,8 @@ export async function POST(request: Request) {
 
   // The email goes after the reply, so the person is never kept waiting on it.
   after(async () => {
-    const { data: admins } = await db.from("delphi_admins").select("user_id");
-    const ids = (admins ?? []).map((a) => a.user_id);
-    const { data: people } = ids.length ? await db.from("profiles").select("email").in("id", ids) : { data: [] };
-    const to = (people ?? []).map((p) => String(p.email ?? "")).filter(Boolean);
+    // To the business inbox, not anyone's own. Kaycee, 2026-10-11.
+    const to = [REPORTS_TO];
     const pic = imagePath ? (await db.storage.from("charts").createSignedUrl(imagePath, 7 * 86400)).data?.signedUrl ?? "" : "";
     const where = [context.mode, context.view].filter(Boolean).join(" · ");
     const r = await sendTeamEmail({

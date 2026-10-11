@@ -5057,7 +5057,7 @@ ${d.client ? `<div class="booknote"><div class="booklab">Book a session</div>${(
     ).join("")}<button class="reportlink" id="reportlink" type="button">Report A Problem</button></div>
 <div class="reportbox" id="reportbox" hidden><div class="rbin">
   <img class="rbpic" id="rbpic" alt="">
-  <textarea id="rbtext" rows="4" placeholder="What happened, and what did you expect?"></textarea>
+  <textarea id="rbtext" rows="4" placeholder="What happened, and how did that differ from what you were expecting? Please be as descriptive as possible."></textarea>
   <div class="rbrow"><button class="gold" id="rbsend" type="button">Send</button><button id="rbcancel" type="button">Cancel</button></div>
   <div class="rbnote" id="rbnote"></div>
 </div></div>` : ""}
