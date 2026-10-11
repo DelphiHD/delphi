@@ -70,6 +70,8 @@ export interface PersonSide {
   design: Placement[];
   /** The 88-degree instant, for drawing their design side on a wheel. */
   designUtc?: string;
+  /** The birth instant, for The World's map of this person. */
+  birthUtc?: string;
 }
 
 export interface ConnectionChart {
@@ -173,6 +175,7 @@ function side(name: string, raw: Record<string, unknown>): PersonSide {
     personality: placements(raw.Personality),
     design: placements(raw.Design),
     designUtc: typeof props.DesignDateUtcStandard === "string" ? props.DesignDateUtcStandard : undefined,
+    birthUtc: typeof props.BirthDateUtcStandard === "string" ? props.BirthDateUtcStandard : undefined,
   };
 }
 

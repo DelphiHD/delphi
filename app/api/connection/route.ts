@@ -12,7 +12,8 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { getConnectionChart } from "@/lib/hd/relationship";
 import { getTimezoneForLocation } from "@/lib/mybodygraph";
-import { getAstro } from "@/lib/astro";
+import { getAstro, locate } from "@/lib/astro";
+import { buildWorldData, type WorldData } from "@/lib/world";
 import { renderWheel } from "@/scripts/astro-wheel";
 import { CLIENTS } from "@/scripts/client-roster";
 import { chartByToken, briefFromRecord } from "@/lib/hd/chart-record";
@@ -39,6 +40,8 @@ interface Person {
   birthPlace: string;
   lookupPlace?: string;
   birthTimezone?: string;
+  /** Exact enough to place an angle (documented or told), for The World. */
+  exact?: boolean;
 }
 
 /**
@@ -56,13 +59,14 @@ async function whoIs(db: Db, token: string): Promise<Person | null> {
     .maybeSingle();
   if (!rec || rec.revoked_at) return null;
   const roster = CLIENTS[String(rec.client_slug)] as Person | undefined;
-  if (roster) return roster;
+  if (roster) return { ...roster, exact: true };
   const row = await chartByToken(token);
   if (!row) return null;
   const b = briefFromRecord(row);
   return {
     name: b.name, birthDate: b.birthDate, birthTime: b.birthTime,
     birthPlace: b.birthPlace, lookupPlace: b.lookupPlace, birthTimezone: b.birthTimezone,
+    exact: b.timeAccuracy === "document" || b.timeAccuracy === "told",
   };
 }
 
@@ -209,7 +213,8 @@ export async function GET(request: Request) {
     them = await whoIs(db, other);
     if (!them) return bad("that chart could not be found", 404);
   } else {
-    them = { name, birthDate: date, birthTime: time, birthPlace: place };
+    // typed in by the reader: a time given is taken as told
+    them = { name, birthDate: date, birthTime: time, birthPlace: place, exact: !!time };
   }
 
   try {
@@ -235,6 +240,10 @@ export async function GET(request: Request) {
     let wheelSvgBD: string | null = null;
     let partnerDesign: unknown = null;
     let wheelError: string | null = null;
+    // The other person's sky for The World, when their time is exact enough to
+    // place an angle. Kaycee, 2026-10-11: otherwise The World shows the first
+    // person alone.
+    let world: WorldData | null = null;
     // The aspects between the two of them, kept where the response can reach
     // them: the pair of charts they are worked out from lives inside the wheel
     // block below.
@@ -355,6 +364,21 @@ export async function GET(request: Request) {
         synastryDesign = crossAspects(myDesign.planets, theirDesign.planets);
       }
       partnerDesign = theirDesign;
+      if (them.exact && theirDesign && conn.b.birthUtc && conn.b.designUtc) {
+        try {
+          world = await buildWorldData({
+            person: them.name,
+            born: { date: them.birthDate, time: them.birthTime, place: them.birthPlace },
+            birthplace: await locate(askAbout(them)),
+            utc: conn.b.birthUtc, designUtc: conn.b.designUtc,
+            astro: { personality: theirs, design: theirDesign },
+            activations: { personality: conn.b.personality, design: conn.b.design },
+            basic: {},
+          });
+        } catch (e) {
+          console.error(`connection world: ${(e as Error).message}`);
+        }
+      }
       if (wheelSvg) {
         wheelSvg = wheelSvg
           .replace(/(data-side="personality"[^>]*?)fill="#2f2a33"/g, `$1fill="${PERSON_A}"`)
@@ -386,6 +410,7 @@ export async function GET(request: Request) {
       // "where is the aspect grid in the astrology view?"
       synastry,
       synastryDesign,
+      world,
       // The other person's own moments, so the Dates tab can say whose dates
       // it is showing instead of presenting one person's as the chart's.
       bBirth: {

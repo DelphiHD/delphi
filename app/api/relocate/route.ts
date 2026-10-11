@@ -36,6 +36,25 @@ export async function GET(request: Request): Promise<Response> {
   if (!chart) return bad("no chart with that link", 404);
   if (!chart.birth_time) return bad("a relocated chart needs a birth time", 422);
 
+  // The second person of a Relationship, whose birth the page has from the
+  // connection it cast (they may not have a chart here at all). Still needs a
+  // chart link; casting a moment at a place says nothing about anyone.
+  if (q.get("who") === "b") {
+    const iso = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+    const p = q.get("p") ?? "", d = q.get("d") ?? "", place = (q.get("place") ?? "").slice(0, 160);
+    if (!iso.test(p) || !iso.test(d) || place.length < 2) return bad("the other person's birth is needed");
+    const gates = (k: string) => (q.get(k) ?? "").split(",").map(Number).filter((n) => n >= 1 && n <= 64);
+    try {
+      const out = await relocate({ place, utc: p, designUtc: d, lat, lon, wheels: q.get("wheels") !== "0",
+        name: (q.get("name") ?? "").slice(0, 80), at: (q.get("at") ?? "").slice(0, 120),
+        personalityGates: gates("pg"), designGates: gates("dg") });
+      return NextResponse.json({ ok: true, ...out });
+    } catch (e) {
+      console.error(`relocate b ${token}: ${e instanceof Error ? e.message : String(e)}`);
+      return bad("that could not be cast", 502);
+    }
+  }
+
   try {
     const hd = await getChart({
       birthDate: String(chart.birth_date),

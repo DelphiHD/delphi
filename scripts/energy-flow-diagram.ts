@@ -7271,11 +7271,9 @@ if (DATA.client) {
   var applyView = function () {
     // and the one view it does have is the one it opens on
     if (curMod === 'variations' && curView !== 'plain') curView = 'plain';
-    // The World is the person's own map. Relationship is not wired into it yet,
-    // so it is greyed out there rather than showing a natal map a reader could
-    // take for the pair. Kaycee, 2026-10-11. Transit is wired: the transit
-    // lines are drawn over the chart's own.
-    if (curMod === 'relation' && curView === 'world') curView = 'plain';
+    // The World answers to every chart type but Variations: transit lines over
+    // the chart's own, and on a Relationship both people's lines. Kaycee,
+    // 2026-10-11.
     var v = curView;
     // Circuits mean nothing over a transit: the button is disabled rather than
     // hidden, and the drawing falls back to the plain body.
@@ -7303,6 +7301,7 @@ if (DATA.client) {
         fontCss: FONTCSS,
         planets: DATA.planets,
         findHost: document.getElementById('worldside'),
+        connection: DATA.connection || null,
         // the moment the file was built, until the date picker says otherwise
         transitAt: DATA.sky ? DATA.sky.date + 'T' + DATA.sky.time + ':00Z' : '',
       });
@@ -7322,8 +7321,7 @@ if (DATA.client) {
         // cast for it. Kaycee, 2026-10-08: "All views except for Bodygraph
         // should be greyed out when Variations is selected, if someone wants
         // to explore a timepoint more closely they can save that chart."
-        var off = (curMod === 'variations' && pair[0] !== 'plain') ||
-          (pair[0] === 'world' && curMod === 'relation');
+        var off = curMod === 'variations' && pair[0] !== 'plain';
         b.disabled = off;
         b.classList.toggle('disabled', off);
       });
@@ -7551,6 +7549,8 @@ if (DATA.client) {
         '<tspan fill="' + B_P + '">' + esc(conn.b.name) + '</tspan>';
     }
     DATA.connection = conn;
+    // The World draws the other person too, from the sky this carries.
+    document.dispatchEvent(new CustomEvent('delphi:connection', { detail: conn }));
     if (window.__pairMandala) window.__pairMandala(curMod === 'relation');
     relDates(conn);
     pairColumns(conn);
@@ -7862,6 +7862,7 @@ if (DATA.client) {
       var abox = document.querySelector('.astro');
       if (abox && window.__soloWheel) abox.innerHTML = window.__soloWheel;
       DATA.connection = null;
+      document.dispatchEvent(new CustomEvent('delphi:connection', { detail: null }));
       if (window.__pairMandala) window.__pairMandala(false);
       relDates(null);
       if (window.__paintAstroRows) window.__paintAstroRows();

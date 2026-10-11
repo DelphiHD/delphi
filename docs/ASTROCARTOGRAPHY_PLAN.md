@@ -407,3 +407,24 @@ whole world daily and only mean something for event charts.
   gives an MC 13' from Jupiter (its latitude, in mundo as intended); Jupiter on
   her Lisbon design MC exact 18 Oct 2026, matching an independent ephemeris
   read; all 1,541 marks resolve.
+- **Transits live for everyone:** all 83 charts republished 11 October with
+  transits in The World (15.6 minutes, no failures).
+
+## Relationship in The World (11 October), built, awaiting copy approval
+
+Kaycee's design calls: both people's lines on one map in the Relationship
+view's person colours (first purple, second teal), design a lighter shade of
+each; sides follow the panel; the place panel lists both people's lines and a
+relocated chart per person with their own gates ("In [Name]'s Chart"); Find
+My Places offers **Each Person** (a place counts only when each has a chosen
+planet close) and **Combined** (scores added), Each Person by default; no
+cross-person parans (two births are two moments); a second person whose time
+is not exact enough leaves the first person alone on the map, with a note.
+
+How: /api/connection also returns `world` for the second person when their
+time is documented, told or typed in with a time (lib/world buildWorldData;
+lib/hd/relationship now carries their birthUtc). /api/relocate casts the
+second person (who=b) from the birth the page has, still behind a chart link.
+The page tags every mark of the second person with data-who="b" as well as
+side, so hovers, pins and labels never cross people. The chart announces the
+pair with a delphi:connection event.

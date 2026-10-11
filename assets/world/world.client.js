@@ -198,6 +198,14 @@ let bothOff=false;   // the chart's panel has both sides off
 // Transit chart type; Transit Only hides the natal lines.
 const tr={on:false,alone:false,at:opts.transitAt||"",sky:null,loading:""};
 let TWHERE={};
+// Relationship (Kaycee, 2026-10-11): the other person's lines with this
+// chart's, in the Relationship view's person colours, design a lighter shade.
+// PB is their sky from the connection the chart casts; null when there is none
+// or their time is not exact enough, and then this chart's person shows alone.
+const rel={on:false,name:""};let PB=null;
+const first=n=>String(n||"").split(" ")[0];
+const isB=l=>l.who==="b";
+const whoName=l=>rel.on&&PB?first(isB(l)?PB.person:PERSON)+" · ":"";
 // The transiting sky for tr.at, from the site; the lines are drawn here against
 // each side's natal sidereal time (lib/world-transit.ts says why).
 function loadSky(){
@@ -225,18 +233,20 @@ const lineOn=b=>st.lines.has(b)||st.extras.has(b);
 // Transit chart type and the transit Moon switch (off to start: it crosses
 // every angle within a day). Natal lines step aside under Transit Only.
 const lineVisible=l=>!bothOff&&(st.side==="both"||l.side===st.side)&&lineOn(l.body)&&st.angles.has(l.angle)&&
+  (isB(l)?rel.on&&!!PB:true)&&
   (l.tr?(tr.on&&(l.body!=="Moon"||st.trx.has("Moon"))):!(tr.on&&tr.alone));
 const chartBodies=()=>[...BODIES.filter(b=>st.lines.has(b)),...EXTRAS.filter(b=>st.extras.has(b))];
 // One resolver answers "what is this?", read from the element, never its position.
 function describe(el){
-  const d=el.dataset, side=SIDE[d.side];
+  const d=el.dataset, side=(rel.on&&PB?first(d.who==="b"?PB.person:PERSON)+" · ":"")+SIDE[d.side];
+  const WH=d.who==="b"&&PB?PB.where:WHERE;
   if(d.body2){const lat=+d.lat;
     return "<b>"+side+" Paran</b>"+
       '<div class="w-row">'+side+" "+d.body+" "+pill(d.angle)+"</div>"+
       '<div class="w-row">'+side+" "+d.body2+" "+pill(d.angle2)+"</div>"+
       '<span class="w-meta">Latitude '+Math.abs(lat).toFixed(1)+"°"+(lat>=0?"N":"S")+"</span>";}
   if(d.transit)return "<b>Transit "+d.body+(TWHERE[d.body]?" in "+TWHERE[d.body]:"")+"</b><br>"+side+" "+pill(d.angle);
-  return "<b>"+side+" "+d.body+" in "+WHERE[d.side][d.body]+"</b><br>"+pill(d.angle);
+  return "<b>"+side+" "+d.body+" in "+WH[d.side][d.body]+"</b><br>"+pill(d.angle);
 }
 const NS="http://www.w3.org/2000/svg";
 const mk=(t,a)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e};
@@ -249,14 +259,37 @@ const gl=document.getElementById("w-lines"),gp=document.getElementById("w-parans
 // Each line also gets a wide invisible twin, so it can be hovered and clicked
 // without hunting for a 2 pixel stroke. The twin carries the same identity.
 const gh=document.getElementById("w-hits");
-function lineEls(l){const id={"data-person":PERSON,"data-side":l.side,"data-body":l.body,"data-angle":l.angle};
+function lineEls(l){const id={"data-person":isB(l)?PB.person:PERSON,"data-side":l.side,"data-body":l.body,"data-angle":l.angle};
   if(l.tr)id["data-transit"]="1";
-  l.el=mk("path",{class:"ln "+l.side+" "+l.angle+(l.tr?" transit":""),...id});gl.append(l.el);
+  if(isB(l))id["data-who"]="b";
+  l.el=mk("path",{class:"ln "+l.side+" "+l.angle+(l.tr?" transit":"")+(isB(l)?" who-b":""),...id});gl.append(l.el);
   l.hit=mk("path",{class:"hit",...id});gh.append(l.hit)}
 for(const l of LN)lineEls(l);
-for(const p of PR){
-  p.el=mk("g",{class:"pr "+p.side,"data-person":PERSON,"data-side":p.side,"data-body":p.a,"data-angle":p.angleA,"data-body2":p.b,"data-angle2":p.angleB,"data-lat":p.lat.toFixed(2)});
+function paranEls(p){
+  p.el=mk("g",{class:"pr "+p.side+(isB(p)?" who-b":""),"data-person":isB(p)?PB.person:PERSON,"data-side":p.side,"data-body":p.a,"data-angle":p.angleA,"data-body2":p.b,"data-angle2":p.angleB,"data-lat":p.lat.toFixed(2)});
+  if(isB(p))p.el.setAttribute("data-who","b");
   p.rect=mk("rect",{x:0,width:W});p.dot=mk("circle",{r:3.5});p.el.append(p.rect,p.dot);gp.append(p.el)}
+for(const p of PR)paranEls(p);
+// The other person of a Relationship: their lines and their own parans, in.
+function setPartner(B,name){
+  for(let i=LN.length-1;i>=0;i--)if(isB(LN[i])){LN[i].el.remove();LN[i].hit.remove();LN.splice(i,1)}
+  for(let i=PR.length-1;i>=0;i--)if(isB(PR[i])){PR[i].el.remove();PR.splice(i,1)}
+  PB=B&&B.v===1?B:null;rel.name=name||(PB?PB.person:"");
+  if(PB)for(const side of ["personality","design"]){
+    for(const b of linesFromSky(PB.sky[side]))for(const angle of Object.keys(b.lines)){const l={side,body:b.body,angle,runs:b.lines[angle],who:"b"};LN.push(l);lineEls(l)}
+    for(const p of paransFromSky(PB.sky[side])){if(p.lat>TOP||p.lat<BOTTOM)continue;const q={side,a:p.a,angleA:p.angleA,b:p.b,angleB:p.angleB,lat:p.lat,lon:p.lon,who:"b"};PR.push(q);paranEls(q)}
+  }
+  renderName();
+  if(typeof paint==="function")paint();
+}
+// The person's name over the view; on a Relationship both, as the chart shows
+// a pair, or a word that the other's time is not exact enough for a map.
+function renderName(){
+  const n=root.querySelector(".w-name");if(!n)return;
+  const e=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  if(rel.on&&PB)n.innerHTML='<span class="pa">'+e(PERSON)+'</span><span class="and"> and </span><span class="pb">'+e(PB.person)+'</span>';
+  else n.innerHTML=e(PERSON)+(rel.on&&rel.name?'<div class="w-note">'+e(first(rel.name))+"'s birth time is not exact enough for the map.</div>":"");
+}
 function draw(){
   document.getElementById("w-world").setAttribute("transform","matrix("+view.k+",0,0,"+view.k+","+view.tx+","+view.ty+")");
   for(const l of LN){l.hit.classList.toggle("off",l.el.classList.contains("off"));if(l.el.classList.contains("off"))continue;
@@ -325,7 +358,7 @@ function anchors(l){
 function layoutLabels(){
   const g=document.getElementById("w-labels");g.replaceChildren();
   const LABELS=[];
-  for(const l of LN)if(!l.el.classList.contains("off"))for(const a of anchors(l))LABELS.push({side:l.side,body:l.body,angle:l.angle,tr:!!l.tr,...a});
+  for(const l of LN)if(!l.el.classList.contains("off"))for(const a of anchors(l))LABELS.push({side:l.side,body:l.body,angle:l.angle,tr:!!l.tr,who:l.who,...a});
   const vis=LABELS;
   for(const edge of ["top","bottom","left","right"]){
     const row=vis.filter(l=>l.edge===edge).sort((a,b)=>a.pos-b.pos);
@@ -336,8 +369,9 @@ function layoutLabels(){
     if(over>0)for(let i=at.length-1;i>=0;i--){at[i]=Math.min(at[i],(i===at.length-1?max:at[i+1]-gap))}
     row.forEach((l,i)=>{
       const p=at[i];
-      const lab=mk("text",{class:"lbl "+l.side+(l.tr?" transit":""),"data-person":PERSON,"data-side":l.side,"data-body":l.body,"data-angle":l.angle});
+      const lab=mk("text",{class:"lbl "+l.side+(l.tr?" transit":"")+(isB(l)?" who-b":""),"data-person":isB(l)?PB.person:PERSON,"data-side":l.side,"data-body":l.body,"data-angle":l.angle});
       if(l.tr)lab.setAttribute("data-transit","1");
+      if(isB(l))lab.setAttribute("data-who","b");
       const gl=mk("tspan",{class:"g"});gl.textContent=GLYPH[l.body];
       const an=mk("tspan",{class:"a"});an.textContent=l.angle;
       let lead;
@@ -354,7 +388,7 @@ function layoutLabels(){
         else{lab.append(gl,an);an.setAttribute("dx","4");}
         lead=mk("path",{d:"M"+(left?ML-10:ML+W+10)+","+(MT+p)+"L"+(left?ML:ML+W)+","+(MT+l.pos)});}
       if(pinned.has(key(l)))lab.classList.add("pinned");
-      lead.setAttribute("class","lead "+l.side+(l.tr?" transit":""));
+      lead.setAttribute("class","lead "+l.side+(l.tr?" transit":"")+(isB(l)?" who-b":""));
       g.append(lead,lab);
     });
   }
@@ -368,8 +402,9 @@ function paint(){
   const sideOk=d=>!bothOff&&(st.side==="both"||d.side===st.side);
   for(const l of LN)l.el.classList.toggle("off",!lineVisible(l));
   for(const el of document.querySelectorAll("#w-parans [data-side]"))
-    el.classList.toggle("off",!(sideOk(el.dataset)&&pairOk(el.dataset)&&(st.angles.has(el.dataset.angle)||st.angles.has(el.dataset.angle2))&&!(tr.on&&tr.alone)));
+    el.classList.toggle("off",!(sideOk(el.dataset)&&pairOk(el.dataset)&&(st.angles.has(el.dataset.angle)||st.angles.has(el.dataset.angle2))&&!(tr.on&&tr.alone)&&(el.dataset.who!=="b"||rel.on)));
   root.classList.toggle("tr-on",tr.on);
+  root.classList.toggle("rel-on",rel.on&&!!PB);
   for(const c of document.querySelectorAll(".w-opt[data-kind]"))c.classList.toggle("on",st[c.dataset.kind].has(c.dataset.chip));
   for(const x of EXTRAS)root.classList.toggle("x-"+x,st.extras.has(x));
   for(const k in ALL){const nEl=root.querySelector('[data-dd="'+k+'"] .n');if(nEl)nEl.textContent=st[k].size===ALL[k].length?"All":st[k].size?st[k].size:"None";}
@@ -389,10 +424,10 @@ root.addEventListener("click",e=>{
 });
 const tip=document.getElementById("w-tip");
 function hot(d,on){
-  const t=d.transit?'[data-transit]':':not([data-transit])';
+  const t=(d.transit?'[data-transit]':':not([data-transit])')+(d.who==="b"?'[data-who="b"]':':not([data-who])');
   const q=(b,a)=>'#w-lines [data-side="'+d.side+'"][data-body="'+b+'"][data-angle="'+a+'"]'+t+', #w-labels [data-side="'+d.side+'"][data-body="'+b+'"][data-angle="'+a+'"]'+t;
   for(const el of document.querySelectorAll(q(d.body,d.angle)+(d.body2?", "+q(d.body2,d.angle2):"")))el.classList.toggle("hot",on);
-  if(d.body2)for(const p of PR)if(p.side===d.side&&p.a===d.body&&p.angleA===d.angle&&p.b===d.body2&&p.angleB===d.angle2&&!p.el.classList.contains("off"))p.el.classList.toggle("hot",on);
+  if(d.body2)for(const p of PR)if((p.who||"")===(d.who||"")&&p.side===d.side&&p.a===d.body&&p.angleA===d.angle&&p.b===d.body2&&p.angleB===d.angle2&&!p.el.classList.contains("off"))p.el.classList.toggle("hot",on);
 }
 let cur=null;
 document.getElementById("w-map").addEventListener("mousemove",e=>{
@@ -446,7 +481,7 @@ function distTo(l,lat,lon){
 let here=null;   // {lat, lon, name, country}
 // Lines clicked to keep them lit, by identity: side, body and angle.
 const pinned=new Set();
-const key=l=>(l.tr?"T|":"")+l.side+"|"+l.body+"|"+l.angle;
+const key=l=>(isB(l)?"B|":"")+(l.tr?"T|":"")+l.side+"|"+l.body+"|"+l.angle;
 const ANGLE_NAME={ASC:"Ascendant",DSC:"Descendant",MC:"Midheaven",IC:"IC"};
 // Saved places stay in this browser for now. In the live chart they belong to
 // the account that saved them.
@@ -463,6 +498,7 @@ function analyze(lat,lon){
   }
   for(const p of PR){
     if(tr.on&&tr.alone)continue;
+    if(isB(p)&&!rel.on)continue;
     if(!sideOk(p.side)||!lineOn(p.a)||!lineOn(p.b)||!(st.angles.has(p.angleA)||st.angles.has(p.angleB)))continue;
     const d=Math.abs(p.lat-lat),g=gradeLat(d);if(g)prs.push({p,d,g});
   }
@@ -492,7 +528,7 @@ function drawHere(){
   }
 }
 const fmtLat=v=>Math.abs(v).toFixed(1)+"°"+(v>=0?"N":"S"),fmtLon=v=>Math.abs(v).toFixed(1)+"°"+(v>=0?"E":"W");
-const tag=(side,body,angle,isT)=>'data-side="'+side+'" data-body="'+body+'" data-angle="'+angle+'"'+(isT?' data-transit="1"':'');
+const tag=(side,body,angle,isT,bWho)=>'data-side="'+side+'" data-body="'+body+'" data-angle="'+angle+'"'+(isT?' data-transit="1"':'')+(bWho?' data-who="b"':'');
 const gradePill=g=>'<span class="gr g'+g[1]+'">'+g[2]+'</span>';
 const isSaved=h=>saved.some(s=>Math.abs(s.lat-h.lat)<1e-4&&Math.abs(s.lon-h.lon)<1e-4);
 function renderHere(){
@@ -500,9 +536,11 @@ function renderHere(){
   const box=document.getElementById("w-here");
   if(!here&&!pinned.size){box.classList.remove("open");return}
   // A pinned line: her Delphi Basic for the planet, and the angle by name.
-  const cards=[...pinned].map(k=>{const isT=k.startsWith("T|"),[side,body,angle]=k.replace(/^T\|/,"").split("|");
-    return '<div class="w-card" '+tag(side,body,angle,isT)+'><button class="un" data-un="'+k+'" title="Unpin">&times;</button>'+
-      '<b>'+(isT?"Transit "+body+" · "+SIDE[side]+" ":SIDE[side]+" "+body+" · ")+ANGLE_NAME[angle]+'</b><div class="deg">'+body+" in "+((isT?TWHERE:WHERE[side])[body]||"")+' <span class="ap">'+angle+'</span></div>'+
+  const cards=[...pinned].map(k=>{const bk=k.startsWith("B|"),k2=k.replace(/^B\|/,""),isT=k2.startsWith("T|"),[side,body,angle]=k2.replace(/^T\|/,"").split("|");
+    if(bk&&!PB)return"";
+    const nm=rel.on&&PB?first(bk?PB.person:PERSON)+" · ":"";
+    return '<div class="w-card" '+tag(side,body,angle,isT,bk)+'><button class="un" data-un="'+k+'" title="Unpin">&times;</button>'+
+      '<b>'+(isT?"Transit "+body+" · "+SIDE[side]+" ":nm+SIDE[side]+" "+body+" · ")+ANGLE_NAME[angle]+'</b><div class="deg">'+body+" in "+((isT?TWHERE:(bk?PB.where:WHERE)[side])[body]||"")+' <span class="ap">'+angle+'</span></div>'+
       (BASIC[body]?'<p>'+BASIC[body]+'</p>':'')+'</div>'}).join("");
   if(!here){box.innerHTML='<button class="x" title="Close">&times;</button>'+cards;box.classList.add("open");return}
   const {rows,prs}=analyze(here.lat,here.lon);
@@ -511,11 +549,11 @@ function renderHere(){
     '<div class="co">'+(here.name?(here.country?here.country+" · ":"")+fmtLat(here.lat)+", "+fmtLon(here.lon):"")+'</div>'+
     (isSaved(here)?'<button class="save done">Saved</button>':'<button class="save" data-save="1">Save Place</button>')+
     relocHtml()+timelineHtml()+
-    '<h3>Lines</h3>'+(rows.length?rows.map(r=>'<div class="hr" '+tag(r.l.side,r.l.body,r.l.angle,r.l.tr)+'>'+
-      '<span class="gl '+r.l.side+(r.l.tr?" transit":"")+'">'+GLYPH[r.l.body]+'</span><span class="nm">'+(r.l.tr?"Transit "+r.l.body+' <span class="was">'+SIDE[r.l.side]+'</span>':SIDE[r.l.side]+" "+r.l.body)+' <span class="ap">'+r.l.angle+'</span></span>'+
+    '<h3>Lines</h3>'+(rows.length?rows.map(r=>'<div class="hr" '+tag(r.l.side,r.l.body,r.l.angle,r.l.tr,isB(r.l))+'>'+
+      '<span class="gl '+r.l.side+(r.l.tr?" transit":"")+(isB(r.l)?" who-b":"")+'">'+GLYPH[r.l.body]+'</span><span class="nm">'+(r.l.tr?"Transit "+r.l.body+' <span class="was">'+SIDE[r.l.side]+'</span>':whoName(r.l)+SIDE[r.l.side]+" "+r.l.body)+' <span class="ap">'+r.l.angle+'</span></span>'+
       '<span class="mi">'+Math.round(r.mi)+' mi</span>'+gradePill(r.g)+'</div>').join(""):'<div class="none">No lines within 700 miles.</div>')+
-    '<h3>Parans</h3>'+(prs.length?prs.map(r=>'<div class="hr" '+tag(r.p.side,r.p.a,r.p.angleA)+' data-body2="'+r.p.b+'" data-angle2="'+r.p.angleB+'">'+
-      '<span class="nm">'+SIDE[r.p.side]+" "+r.p.a+' <span class="ap">'+r.p.angleA+'</span> '+r.p.b+' <span class="ap">'+r.p.angleB+'</span></span>'+
+    '<h3>Parans</h3>'+(prs.length?prs.map(r=>'<div class="hr" '+tag(r.p.side,r.p.a,r.p.angleA,false,isB(r.p))+' data-body2="'+r.p.b+'" data-angle2="'+r.p.angleB+'">'+
+      '<span class="nm">'+whoName(r.p)+SIDE[r.p.side]+" "+r.p.a+' <span class="ap">'+r.p.angleA+'</span> '+r.p.b+' <span class="ap">'+r.p.angleB+'</span></span>'+
       '<span class="mi">'+r.d.toFixed(1)+'°</span>'+gradePill(r.g)+'</div>').join(""):'<div class="none">No parans within 1° of this latitude.</div>');
   box.classList.add("open");
 }
@@ -562,52 +600,62 @@ function timelineHtml(){
     '<td class="when">'+(e.exact.length?e.exact.map(shortDay).join(", "):"")+'</td></tr>').join("")+'</table>';
 }
 /** Cast a place; with wheels for the panel, without for the comparison. */
-function fetchReloc(pl,wheels,done){
-  if(!live)return;const k=keyOf(pl),have=reloc.get(k);
+// The other person of a Relationship is cast from the birth their connection
+// carries (who=b); the chart's own person from the chart link alone.
+const gatesOf=g=>({pg:Object.values(g.personality).map(x=>x.split(".")[0]).join(","),dg:Object.values(g.design).map(x=>x.split(".")[0]).join(",")});
+function fetchReloc(pl,wheels,done,who){
+  if(!live||(who==="b"&&!PB))return;const k=keyOf(pl)+(who==="b"?"|b":""),have=reloc.get(k);
   if(have==="loading"||(have&&have.ok&&(have.svg||!wheels)))return;
   reloc.set(k,"loading");
-  fetch(withToken(API.relocate+"?"+new URLSearchParams({lat:pl.lat,lon:pl.lon,name:PERSON,at:placeName(pl),wheels:wheels?"1":"0",...CAST,...GATES}))).then(r=>r.json())
+  const q=who==="b"?{who:"b",lat:pl.lat,lon:pl.lon,name:PB.person,at:placeName(pl),wheels:wheels?"1":"0",place:PB.cast.place,p:PB.cast.p,d:PB.cast.d,...gatesOf(PB.gateOf)}
+    :{lat:pl.lat,lon:pl.lon,name:PERSON,at:placeName(pl),wheels:wheels?"1":"0",...CAST,...GATES};
+  fetch(withToken(API.relocate+"?"+new URLSearchParams(q))).then(r=>r.json())
     .then(r=>{reloc.set(k,r.ok?r:"failed");done()})
     .catch(()=>{reloc.set(k,"failed");done()});
 }
 const fmtDeg=v=>{let d=Math.floor(v),m=Math.round((v-d)*60);if(m===60){d++;m=0}return d+"°"+(m<10?"0":"")+m+"'"};
-// Whose gate a relocated angle lands in, from this chart's own activations.
-// Whose gate a relocated angle lands in, from this chart's own activations,
+// Whose gate a relocated angle lands in, from that person's own activations,
 // among the bodies in view.
-function ownGate(g){
+function ownGate(g,gateOf){
   const on=new Set(chartBodies()),who=[];
-  for(const sd of ["personality","design"])for(const [pl,gl] of Object.entries(GATE_OF[sd]))
+  for(const sd of ["personality","design"])for(const [pl,gl] of Object.entries(gateOf[sd]))
     if(on.has(pl)&&+gl.split(".")[0]===g)who.push(SIDE[sd]+" "+pl+" "+gl);
   return who;
 }
+const pairOn=()=>rel.on&&!!PB;
 function relocHtml(){
   if(!live)return"";
   const head='<button class="reltog'+(relOpen?" open":"")+'" data-reltog="1">Relocated Chart</button>';
   if(!relOpen)return head;
-  const r=reloc.get(relocKey());
-  if(!r||r==="loading")return head+'<div class="none">Casting…</div>';
-  if(r==="failed")return head+'<div class="none">Could not cast this place.</div>';
+  return head+relocBlock("a")+(pairOn()?relocBlock("b"):"");
+}
+// One person's relocated chart: angles here and natal with their gates (a gate
+// that person carries in gold, named once beneath), then the planets that
+// change house. On a Relationship each person has their own, under their name.
+function relocBlock(who){
+  const isb=who==="b",r=reloc.get(relocKey()+(isb?"|b":""));
+  const NAT=isb?PB.natal:NATAL,GO=isb?PB.gateOf:GATE_OF,name=isb?PB.person:PERSON;
+  const top=pairOn()?'<div class="relwho '+(isb?"pb":"pa")+'">'+name+'</div>':"";
+  if(!r||r==="loading")return top+'<div class="none">Casting…</div>';
+  if(r==="failed")return top+'<div class="none">Could not cast this place.</div>';
   const sides=st.side==="both"?["personality","design"]:[st.side];
   const ANGULAR=new Set([1,4,7,10]);
-  let h=head+'<div class="rel"><button class="wheelbtn" data-wheel="1">View Chart</button>';
-  // Angles: here and natal side by side, each with its gate as plain text.
-  // A gate this chart carries is gold, and the line beneath says whose.
+  let h=top+'<div class="rel"><button class="wheelbtn" data-wheel="'+who+'">View Chart</button>';
   const mine=[];
   for(const sd of sides){
     h+='<table class="rt"><tr><th>'+SIDE[sd]+'</th><th>Here</th><th>Gate</th><th class="n">Natal</th><th class="n">Gate</th></tr>';
-    for(const a of ["ASC","DSC","MC","IC"]){const R=r[sd].angles[a],N=NATAL[sd].angles[a],who=ownGate(R.gate);
-      if(who.length)mine.push({g:R.gate+"."+R.line,at:SIDE[sd]+" "+ANGLE_NAME[a],who});
-      h+='<tr><td>'+ANGLE_NAME[a]+'</td><td>'+R.sign+" "+fmtDeg(R.deg)+'</td><td class="g'+(who.length?" own":"")+'">'+R.gate+"."+R.line+'</td>'+
+    for(const a of ["ASC","DSC","MC","IC"]){const R=r[sd].angles[a],N=NAT[sd].angles[a],w2=ownGate(R.gate,GO);
+      if(w2.length)mine.push({g:R.gate+"."+R.line,at:SIDE[sd]+" "+ANGLE_NAME[a],who:w2});
+      h+='<tr><td>'+ANGLE_NAME[a]+'</td><td>'+R.sign+" "+fmtDeg(R.deg)+'</td><td class="g'+(w2.length?" own":"")+'">'+R.gate+"."+R.line+'</td>'+
         '<td class="n">'+N.text+'</td><td class="n g">'+N.gate+"."+N.line+'</td></tr>'}
     h+='</table>';
   }
-  if(mine.length)h+='<div class="mine"><b>In Your Chart</b>'+mine.map(m=>'<div><span class="own">'+m.g+'</span> '+m.at+' · '+m.who.join(", ")+'</div>').join("")+'</div>';
-  // Houses: only the bodies that move, natal to here; an angular house in gold.
+  if(mine.length)h+='<div class="mine"><b>'+(pairOn()?"In "+first(name)+"'s Chart":"In Your Chart")+'</b>'+mine.map(m=>'<div><span class="own">'+m.g+'</span> '+m.at+' · '+m.who.join(", ")+'</div>').join("")+'</div>';
   const moved=[];
   for(const sd of sides)for(const b of chartBodies()){
-    const a=NATAL[sd].house[b],z=r[sd].house[b];if(a&&z&&a!==z)moved.push({sd,b,a,z})}
+    const a=NAT[sd].house[b],z=r[sd].house[b];if(a&&z&&a!==z)moved.push({sd,b,a,z})}
   h+='<h3>Planets Changing House</h3>'+(moved.length?'<table class="rt ht"><tr><th></th><th>Natal</th><th>Here</th></tr>'+moved.map(m=>
-    '<tr class="hr" '+tag(m.sd,m.b,"")+'><td><span class="gl '+m.sd+'">'+GLYPH[m.b]+'</span> '+SIDE[m.sd]+" "+m.b+'</td>'+
+    '<tr class="hr" '+tag(m.sd,m.b,"",false,isb)+'><td><span class="gl '+m.sd+(isb?" who-b":"")+'">'+GLYPH[m.b]+'</span> '+SIDE[m.sd]+" "+m.b+'</td>'+
     '<td class="n">'+ord(m.a)+'</td><td'+(ANGULAR.has(m.z)?' class="own" title="Angular house"':'')+'>'+ord(m.z)+'</td></tr>').join("")+'</table>'
     :'<div class="none">No planet changes house here.</div>');
   return h+'</div>';
@@ -617,23 +665,24 @@ function utcWhen(iso){const m=/^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-
   return MONTHS[+m[2]-1]+" "+(+m[3])+", "+m[1]+" · "+(h%12===0?12:h%12)+":"+m[5]+" "+(h<12?"AM":"PM")+" UTC"}
 // Personality and design each on their own relocated horizon, or both
 // together on the personality's, as the Astrology view draws a natal chart.
-function showWheel(r,where,which){
+function showWheel(r,where,which,who){
+  who=who||"a";
   const w=document.getElementById("w-wheel");
-  w.querySelector(".box").innerHTML='<button class="x" title="Close">&times;</button><h2>Relocated Chart · '+where+'</h2>'+
+  w.querySelector(".box").innerHTML='<button class="x" title="Close">&times;</button><h2>Relocated Chart · '+(pairOn()?(who==="b"?PB.person:PERSON)+" · ":"")+where+'</h2>'+
     '<div class="wtabs">'+[["personality","Personality"],["design","Design"],["both","Both"]].map(([k,t])=>'<button class="w-pill'+(k===which?" on":"")+'" data-wtab="'+k+'">'+t+'</button>').join("")+'<button class="w-pill snap" data-snapwheel="1">Save Chart Image</button></div>'+
     // A one-sided wheel has no corner legend (that drawing is shared with the
     // live charts and left alone), so the window says which side it is.
-    (which==="both"?"":'<div class="wsub" style="color:'+(which==="design"?"var(--design)":"var(--ink)")+'"><b>'+SIDE[which]+'</b> · '+utcWhen(which==="design"?CAST.d:CAST.p)+" · "+where+'</div>')+
+    (which==="both"?"":'<div class="wsub" style="color:'+(which==="design"?"var(--design)":"var(--ink)")+'"><b>'+SIDE[which]+'</b> · '+utcWhen(which==="design"?(who==="b"&&PB?PB.cast:CAST).d:(who==="b"&&PB?PB.cast:CAST).p)+" · "+where+'</div>')+
     r.svg[which];
-  w.dataset.where=where;w.dataset.which=which;w.classList.add("open");
+  w.dataset.where=where;w.dataset.which=which;w.dataset.who=who;w.classList.add("open");
 }
 document.getElementById("w-wheel").addEventListener("click",e=>{
   if(e.target.id==="wheel"||e.target.closest(".x"))return e.currentTarget.classList.remove("open");
-  const t=e.target.closest("[data-wtab]");if(t){const r=reloc.get(relocKey());if(r&&r.svg)showWheel(r,e.currentTarget.dataset.where,t.dataset.wtab)}
+  const t=e.target.closest("[data-wtab]");if(t){const who=e.currentTarget.dataset.who;const r=reloc.get(relocKey()+(who==="b"?"|b":""));if(r&&r.svg)showWheel(r,e.currentTarget.dataset.where,t.dataset.wtab,who)}
   if(e.target.closest("[data-snapwheel]")){const w=e.currentTarget,which=w.dataset.which;
-    snapshot(w.querySelector(".box svg"),[PERSON,"Relocated Chart · "+w.dataset.where,
-      which==="both"?"Personality + Design":SIDE[which]+" · "+utcWhen(which==="design"?CAST.d:CAST.p)],
-      PERSON+" - Relocated Chart - "+w.dataset.where.split(",")[0]+" - "+(which==="both"?"Both":SIDE[which])+".png")}
+    const who=w.dataset.who;snapshot(w.querySelector(".box svg"),[who==="b"&&PB?PB.person:PERSON,"Relocated Chart · "+w.dataset.where,
+      which==="both"?"Personality + Design":SIDE[which]+" · "+utcWhen(which==="design"?(who==="b"&&PB?PB.cast:CAST).d:(who==="b"&&PB?PB.cast:CAST).p)],
+      (w.dataset.who==="b"&&PB?PB.person:PERSON)+" - Relocated Chart - "+w.dataset.where.split(",")[0]+" - "+(which==="both"?"Both":SIDE[which])+".png")}
 });
 // Hovers on the relocated wheel, read from the glyph's own tags: the side it
 // carries and the body it names. Same pills as the Astrology view, with the
@@ -643,13 +692,14 @@ const ANGLE_OF={As:["asc","Ascendant"],Ds:["asc","Descendant"],Mc:["mc","Midheav
 const opp=sd=>{const z=ZOD.indexOf(sd.sign);return {sign:ZOD[(z+6)%12],deg:sd.deg}};
 const ZOD=["Aries","Taurus","Gemini","Cancer","Leo","Virgo","Libra","Scorpio","Sagittarius","Capricorn","Aquarius","Pisces"];
 function wheelTip(el){
-  const r=reloc.get(relocKey());if(!r||!r.svg)return"";
-  const w=document.getElementById("w-wheel"),which=w.dataset.which;
+  const w=document.getElementById("w-wheel"),which=w.dataset.which,isb=w.dataset.who==="b";
+  const r=reloc.get(relocKey()+(isb?"|b":""));if(!r||!r.svg)return"";
+  const GO=isb&&PB?PB.gateOf:GATE_OF;
   const pill=(t,c)=>t?'<span class="w-pill '+(c||String(t).toLowerCase())+'">'+t+'</span>':"";
   if(el.dataset.aplanet){
     const sd=el.dataset.side==="design"?"design":"personality";
     const pl=r[sd].planets[el.dataset.aplanet];if(!pl)return"";
-    const label=WHEEL_NAME[el.dataset.aplanet]||pl.label,gate=GATE_OF[sd][label];
+    const label=WHEEL_NAME[el.dataset.aplanet]||pl.label,gate=GO[sd][label];
     return "<b>"+SIDE[sd]+" "+label+" in "+pl.sign+" "+fmtDeg(pl.deg)+"</b>"+
       pill(pl.quality)+pill(pl.element)+(pl.house?pill("House "+pl.house,"house"):"")+(gate?pill("Gate "+gate,"house"):"")+
       ([1,4,7,10].includes(pl.house)?pill("Angular","ang"):"")+
@@ -762,7 +812,7 @@ function openReport(title,settings,table){
 }
 function findReport(){
   const F=lastFind;if(!F||!F.top.length)return;
-  const head=F.groups.map(g=>'<th>'+SIDE[g.sd]+" "+g.b+'</th>').join("");
+  const head=F.groups.map(g=>'<th>'+(pairOn()?first(g.who==="b"?PB.person:PERSON)+" · ":"")+SIDE[g.sd]+" "+g.b+'</th>').join("");
   const table='<table><tr><th></th><th>City</th>'+head+'</tr>'+F.top.map((t,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+t.c.n+'</b><br><span class="was">'+t.c.c+'</span></td>'+
     t.per.map(p=>'<td class="mi">'+(p.v?Math.round(p.mi)+" mi "+gradePill(GRADES.find(g=>g[1]===p.v)):'')+'</td>').join("")+'</tr>').join("")+'</table>';
   openReport("Find My Places",[
@@ -786,6 +836,7 @@ function mapState(){
   if(st.side!=="design")dates.push("Personality: "+born);
   if(st.side!=="personality")dates.push("Design: "+utcWhen(CAST.d));
   if(tr.on&&tr.sky)dates.push("Transit: "+utcWhen(tr.at)+(tr.alone?"  ·  Transit Only":""));
+  if(pairOn())dates.push("With "+PB.person);
   return ["The World · "+(st.side==="both"?"Personality + Design":SIDE[st.side]),...dates,
     "Lines: "+n("lines")+"  ·  Angles: "+n("angles")+"  ·  Parans: "+n("parans")];
 }
@@ -794,13 +845,13 @@ function openHere(lat,lon,city){
   const c=city||nearestCity(lat,lon);
   here={lat,lon,name:city?city.n:(c?"Near "+c.n:null),country:c?c.c:null};
   if(city){here.lat=city.lat;here.lon=city.lon}
-  if(relOpen)fetchReloc(here,true,renderHere);renderHere();redraw();
+  if(relOpen){fetchReloc(here,true,renderHere);if(pairOn())fetchReloc(here,true,renderHere,"b")}renderHere();redraw();
 }
 document.getElementById("w-here").addEventListener("click",e=>{
   if(e.target.closest(".x")){here=null;pinned.clear();renderHere();redraw();return}
   if(e.target.closest("[data-tltog]")){tlOpen=!tlOpen;if(tlOpen)fetchTimeline();renderHere();return}
-  if(e.target.closest("[data-reltog]")){relOpen=!relOpen;if(relOpen&&here)fetchReloc(here,true,renderHere);renderHere();return}
-  if(e.target.closest("[data-wheel]")){const r=reloc.get(relocKey());if(r&&r.svg)showWheel(r,placeName(here),"personality");return}
+  if(e.target.closest("[data-reltog]")){relOpen=!relOpen;if(relOpen&&here){fetchReloc(here,true,renderHere);if(pairOn())fetchReloc(here,true,renderHere,"b")}renderHere();return}
+  const wb=e.target.closest("[data-wheel]");if(wb){const who=wb.dataset.wheel;const r=reloc.get(relocKey()+(who==="b"?"|b":""));if(r&&r.svg)showWheel(r,placeName(here),"personality",who);return}
   const un=e.target.closest("[data-un]");if(un){pinned.delete(un.dataset.un);renderHere();redraw();return}
   if(e.target.closest("[data-save]")&&here){
     saved.push({n:here.name?here.name.replace(/^Near /,"Near "):fmtLat(here.lat)+", "+fmtLon(here.lon),c:here.country||"",lat:here.lat,lon:here.lon});
@@ -831,18 +882,23 @@ function densePts(l){
     for(let k=0;k<n;k++){const t=k/n;out.push([a[0]+t*(b[0]-a[0]),a[1]+t*(b[1]-a[1])])}}
   dense.set(l,out);return out;
 }
+// On a Relationship, Find My Places looks for both people: Each Person keeps
+// only places where each has a chosen planet close; Combined adds the two
+// together. Kaycee, 2026-10-11.
+let findMode="each";
 function chosenLines(){
   const sides=st.side==="both"?["personality","design"]:[st.side];
   const groups=[];
-  for(const sd of sides)for(const b of want){
-    const ls=LN.filter(l=>!l.tr&&l.side===sd&&l.body===b&&st.angles.has(l.angle));if(ls.length)groups.push({sd,b,ls})}
+  for(const who of pairOn()?["a","b"]:["a"])for(const sd of sides)for(const b of want){
+    const ls=LN.filter(l=>!l.tr&&(who==="b")===isB(l)&&l.side===sd&&l.body===b&&st.angles.has(l.angle));if(ls.length)groups.push({who,sd,b,ls})}
   return groups;
 }
 const gradeVal=mi=>mi<=300?3:mi<=500?2:mi<=700?1:0;
 let lastFind=null;
 function computeFind(){
   const groups=chosenLines();
-  const score=new Float32Array(GC*GR);
+  const score=new Float32Array(GC*GR),sA=new Float32Array(GC*GR),sB=new Float32Array(GC*GR);
+  const each=pairOn()&&findMode==="each";
   for(const g of groups){
     const best=new Float32Array(GC*GR).fill(Infinity);
     for(const l of g.ls)for(const [plon,plat] of densePts(l)){
@@ -854,8 +910,10 @@ function computeFind(){
         for(let cc=c0;cc<=c1;cc++){const c=((cc%GC)+GC)%GC,clon=-180+(c+.5)*STEP;
           const d=hav(clat,clon,plat,plon),i=r*GC+c;if(d<best[i])best[i]=d}}
     }
-    for(let i=0;i<best.length;i++)score[i]+=gradeVal(best[i]);
+    const into=g.who==="b"?sB:sA;
+    for(let i=0;i<best.length;i++)into[i]+=gradeVal(best[i]);
   }
+  for(let i=0;i<score.length;i++)score[i]=each&&!(sA[i]>0&&sB[i]>0)?0:sA[i]+sB[i];
   const max=3*groups.length;
   // Paint the score as a soft gold wash under the lines.
   const cv=document.createElement("canvas");cv.width=GC;cv.height=GR;const g=cv.getContext("2d"),img=g.createImageData(GC,GR);
@@ -866,8 +924,10 @@ function computeFind(){
   const cell=(lat,lon)=>{const r=Math.min(GR-1,Math.max(0,Math.floor((TOP-lat)/STEP))),c=Math.min(GC-1,Math.max(0,Math.floor((lon+180)/STEP)));return score[r*GC+c]};
   const ranked=[];
   if(groups.length)for(const c of CITIES){if(c.stn||(conts.size&&!conts.has(c.ct))||Math.abs(c.lat)>latLimit||c.lat>TOP||c.lat<BOTTOM||cell(c.lat,c.lon)<=0)continue;
-    let sc=0,sum=0;const per=[];
-    for(const g2 of groups){const mi=Math.min(...g2.ls.map(l=>distTo(l,c.lat,c.lon)));const v=gradeVal(mi);sc+=v;sum+=Math.min(mi,700);per.push({sd:g2.sd,b:g2.b,mi,v})}
+    let sc=0,sum=0,ga=0,gb=0;const per=[];
+    for(const g2 of groups){const mi=Math.min(...g2.ls.map(l=>distTo(l,c.lat,c.lon)));const v=gradeVal(mi);sc+=v;sum+=Math.min(mi,700);
+      if(g2.who==="b")gb+=v;else ga+=v;per.push({who:g2.who,sd:g2.sd,b:g2.b,mi,v})}
+    if(each&&!(ga>0&&gb>0))continue;
     if(sc>0)ranked.push({c,sc,sum,per})}
   ranked.sort((a,b)=>b.sc-a.sc||a.sum-b.sum);
   lastFind={groups,max,top:ranked.slice(0,12)};
@@ -886,15 +946,17 @@ function renderFind(){
   const F=lastFind;
   box.innerHTML='<button class="x" title="Close">&times;</button><h2>Find My Places</h2>'+
     '<div class="grid">'+[...BODIES,...EXTRAS.filter(x=>st.extras.has(x))].map(b=>'<div class="w-opt'+(want.has(b)?" on":"")+'" data-want="'+b+'"><span class="radio"></span><span class="gl">'+GLYPH[b]+'</span>'+b+'</div>').join("")+'</div>'+
+    (pairOn()?'<h3>Match</h3><div class="lims">'+[["each","Each Person"],["combined","Combined"]].map(([k,t])=>'<button class="w-pill'+(findMode===k?" on":"")+'" data-fmode="'+k+'">'+t+'</button>').join("")+'</div>':"")+
     '<h3>Continent</h3><div class="lims">'+['All',...CONTS].map(t=>'<button class="w-pill'+((t==="All"?!conts.size:conts.has(t))?" on":"")+'" data-cont="'+t+'">'+t+'</button>').join("")+'</div>'+
     '<h3>Latitude Limit</h3><div class="lims">'+[[45,"45°"],[60,"60°"],[66.5,"Polar Circles"],[90,"No Limit"]].map(([v,t])=>'<button class="w-pill'+(v===latLimit?" on":"")+'" data-lim="'+v+'">'+t+'</button>').join("")+'</div>'+
     (F.groups.length?'<h3>Closest Matches</h3>'+(F.top.length?'<button class="w-pill pdf" data-pdf="find">Save As PDF</button>':'')+(F.top.length?F.top.map((t,i)=>'<div class="fr" data-fi="'+i+'"><b>'+t.c.n+'</b> <span class="co">'+t.c.c+'</span>'+
-      '<div class="mt">'+t.per.filter(p=>p.v).map(p=>'<span><span style="color:'+(p.sd==="design"?"var(--design)":"var(--ink)")+'">'+GLYPH[p.b]+'</span>'+gradePill(GRADES.find(g=>g[1]===p.v))+'</span>').join("")+'</div></div>').join(""):'<div class="none">No cities within 700 miles of these lines.</div>'):"");
+      '<div class="mt">'+t.per.filter(p=>p.v).map(p=>'<span><span style="color:'+(p.who==="b"?(p.sd==="design"?"#5fb3a8":"#0d9488"):pairOn()?(p.sd==="design"?"#b48bc0":"#845095"):p.sd==="design"?"var(--design)":"var(--ink)")+'">'+GLYPH[p.b]+'</span>'+gradePill(GRADES.find(g=>g[1]===p.v))+'</span>').join("")+'</div></div>').join(""):'<div class="none">No cities within 700 miles of these lines.</div>'):"");
   box.classList.add("open");
 }
 document.getElementById("w-findBtn").onclick=()=>{finding=!finding;renderFind()};
 document.getElementById("w-find").addEventListener("click",e=>{
   if(e.target.closest(".x")){finding=false;return renderFind()}
+  const fm=e.target.closest("[data-fmode]");if(fm){findMode=fm.dataset.fmode;return renderFind()}
   const ct=e.target.closest("[data-cont]");if(ct){const t=ct.dataset.cont;if(t==="All")conts.clear();else conts.has(t)?conts.delete(t):conts.add(t);return renderFind()}
   if(e.target.closest("[data-pdf=find]"))return findReport();
   const lim=e.target.closest("[data-lim]");if(lim){latLimit=+lim.dataset.lim;return renderFind()}
@@ -921,7 +983,7 @@ function renderCompare(){
   const lines=new Map(),pars=new Map();
   A.forEach((a,i)=>{
     for(const r of a.rows){const k=key(r.l);if(!lines.has(k))lines.set(k,{l:r.l,at:[],best:9e9});const e=lines.get(k);e.at[i]=r;e.best=Math.min(e.best,r.mi)}
-    for(const r of a.prs){const p=r.p,k=[p.side,p.a,p.angleA,p.b,p.angleB].join("|");if(!pars.has(k))pars.set(k,{p,at:[],best:9});const e=pars.get(k);e.at[i]=r;e.best=Math.min(e.best,r.d)}
+    for(const r of a.prs){const p=r.p,k=[p.who||"",p.side,p.a,p.angleA,p.b,p.angleB].join("|");if(!pars.has(k))pars.set(k,{p,at:[],best:9});const e=pars.get(k);e.at[i]=r;e.best=Math.min(e.best,r.d)}
   });
   const cell=r=>r?'<td class="mi">'+(r.mi!==undefined?Math.round(r.mi)+" mi":r.d.toFixed(1)+"°")+" "+gradePill(r.g)+"</td>":"<td></td>";
   const count=(a,n)=>a.rows.filter(r=>r.g[1]===n).length+a.prs.filter(r=>r.g[1]===n).length;
@@ -932,9 +994,9 @@ function renderCompare(){
     '<tr class="sum"><td>Mild</td>'+A.map(a=>'<td>'+count(a,1)+'</td>').join("")+'</tr>'+
     relocRows()+
     '<tr class="w-sec"><td colspan="'+(saved.length+1)+'">Lines</td></tr>'+
-    [...lines.values()].sort((a,b)=>a.best-b.best).map(e=>'<tr '+tag(e.l.side,e.l.body,e.l.angle,e.l.tr)+'><td><span class="gl '+e.l.side+'" style="color:'+(e.l.tr?"#0d9488":e.l.side==="design"?"var(--design)":"var(--ink)")+'">'+GLYPH[e.l.body]+'</span> '+(e.l.tr?"Transit "+e.l.body+' <span class="was">'+SIDE[e.l.side]+'</span>':SIDE[e.l.side]+" "+e.l.body)+' <span class="ap">'+e.l.angle+'</span></td>'+saved.map((s,i)=>cell(e.at[i])).join("")+'</tr>').join("")+
+    [...lines.values()].sort((a,b)=>a.best-b.best).map(e=>'<tr '+tag(e.l.side,e.l.body,e.l.angle,e.l.tr,isB(e.l))+'><td><span class="gl '+e.l.side+(isB(e.l)?" who-b":"")+(e.l.tr?" transit":"")+'">'+GLYPH[e.l.body]+'</span> '+(e.l.tr?"Transit "+e.l.body+' <span class="was">'+SIDE[e.l.side]+'</span>':whoName(e.l)+SIDE[e.l.side]+" "+e.l.body)+' <span class="ap">'+e.l.angle+'</span></td>'+saved.map((s,i)=>cell(e.at[i])).join("")+'</tr>').join("")+
     '<tr class="w-sec"><td colspan="'+(saved.length+1)+'">Parans</td></tr>'+
-    [...pars.values()].sort((a,b)=>a.best-b.best).map(e=>{const p=e.p;return '<tr '+tag(p.side,p.a,p.angleA)+' data-body2="'+p.b+'" data-angle2="'+p.angleB+'"><td>'+SIDE[p.side]+" "+p.a+' <span class="ap">'+p.angleA+'</span> '+p.b+' <span class="ap">'+p.angleB+'</span></td>'+saved.map((s,i)=>cell(e.at[i])).join("")+'</tr>'}).join("")+
+    [...pars.values()].sort((a,b)=>a.best-b.best).map(e=>{const p=e.p;return '<tr '+tag(p.side,p.a,p.angleA,false,isB(p))+' data-body2="'+p.b+'" data-angle2="'+p.angleB+'"><td>'+whoName(p)+SIDE[p.side]+" "+p.a+' <span class="ap">'+p.angleA+'</span> '+p.b+' <span class="ap">'+p.angleB+'</span></td>'+saved.map((s,i)=>cell(e.at[i])).join("")+'</tr>'}).join("")+
     '</table>';
   box.classList.add("open");
 }
@@ -949,7 +1011,7 @@ function relocRows(){
   let h='<tr class="w-sec"><td colspan="'+(saved.length+1)+'">Relocated Chart</td></tr>';
   for(const sd of sides)for(const a of ["ASC","DSC","MC","IC"]){const N=NATAL[sd].angles[a];
     h+='<tr><td>'+SIDE[sd]+" "+ANGLE_NAME[a]+' <span class="was">natal '+N.text+" · "+N.gate+"."+N.line+'</span></td>'+
-      cellOf(r=>{const R=r[sd].angles[a],who=ownGate(R.gate);
+      cellOf(r=>{const R=r[sd].angles[a],who=ownGate(R.gate,GATE_OF);
         return R.sign+" "+fmtDeg(R.deg)+' <span class="'+(who.length?"own":"was")+'"'+(who.length?' title="'+who.join(", ")+'"':"")+'>'+R.gate+"."+R.line+'</span>'})+'</tr>'}
   for(const sd of sides)for(const bd of chartBodies()){const n=NATAL[sd].house[bd];
     h+='<tr><td><span style="color:'+(sd==="design"?"var(--design)":"var(--ink)")+'">'+GLYPH[bd]+'</span> '+SIDE[sd]+" "+bd+' <span class="was">natal '+ord(n)+'</span></td>'+
@@ -1002,7 +1064,7 @@ svg.addEventListener("pointermove",e=>{if(press&&Math.hypot(e.clientX-press.x,e.
   if(!drag||!press||!press.moved)return;svg.classList.add("grabbing");const s=svg.getScreenCTM().a;view.tx=drag.tx+(e.clientX-drag.x)/s;view.ty=drag.ty+(e.clientY-drag.y)/s;clampView();redraw()});
 svg.addEventListener("pointerup",e=>{
   const onLine=press&&!press.moved&&press.line;
-  if(onLine){const d=onLine.dataset,k=(d.transit?"T|":"")+d.side+"|"+d.body+"|"+d.angle;pinned.has(k)?pinned.delete(k):pinned.add(k);renderHere();redraw();press=null;drag=null;return}
+  if(onLine){const d=onLine.dataset,k=(d.who==="b"?"B|":"")+(d.transit?"T|":"")+d.side+"|"+d.body+"|"+d.angle;pinned.has(k)?pinned.delete(k):pinned.add(k);renderHere();redraw();press=null;drag=null;return}
   if(press&&!press.moved){const [fx,fy]=frameAt(e.clientX,e.clientY);
     if(fx>=0&&fx<=W&&fy>=0&&fy<=H){const lon=((fx-view.tx)/view.k)/W*360-180,lat=TOP-((fy-view.ty)/view.k)/H*(TOP-BOTTOM);openHere(lat,lon)}}
   press=null;drag=null;svg.classList.remove("grabbing")});
@@ -1064,10 +1126,14 @@ if(opts.planets){
     st.side=offP&&!offD?"design":offD&&!offP?"personality":"both";
     bothOff=offP&&offD;
     tr.on=c.contains("mod-transit");tr.alone=c.contains("tr-alone");
+    const relNow=c.contains("mod-relation");if(relNow!==rel.on){rel.on=relNow;renderName()}
     if(tr.on)loadSky();
   };
   // A new moment on the date picker: new transit lines, and the place's
   // timeline counted again from it, at once rather than when the lines land.
+  // The pair the Relationship view casts, or none: their sky arrives with it.
+  document.addEventListener("delphi:connection",e=>{const c=e.detail;setPartner(c&&c.world,c&&c.b&&c.b.name)});
+  if(opts.connection)setPartner(opts.connection.world,opts.connection.b&&opts.connection.b.name);
   document.addEventListener("delphi:transit",e=>{tr.at=e.detail.iso;if(tr.on){loadSky();if(here)renderHere()}});
   readChart();
   // Follow at once, not on the next frame: a browser tab in the background
@@ -1080,7 +1146,7 @@ if(opts.planets){
 // The chart's Reset puts this view back as it opened, too.
 const resetWorld=()=>{view.k=1;view.tx=0;view.ty=0;clampView();here=null;pinned.clear();relOpen=false;
   st.lines=new Set(BODIES.filter(b=>!START_OFF.includes(b)));st.angles=new Set(ANGLES);st.extras=new Set();st.trx=new Set();
-  finding=false;want.clear();conts.clear();comparing=false;st.parans.clear();renderFind();renderCompare();paint()};
+  finding=false;want.clear();conts.clear();findMode="each";comparing=false;st.parans.clear();renderFind();renderCompare();paint()};
 // For the checks (the tooltip sweep and the parity test): what this view drew
 // and how it names it.
 root.world = { D: D, LN: LN, PR: PR, describe: describe, state: st, reset: resetWorld };
