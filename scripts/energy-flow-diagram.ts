@@ -4859,7 +4859,7 @@ body.view-mandala svg.canvas { display:none !important; }
 
   /* Anything that hovers has to be reachable and readable at this size. */
   .tip { max-width: 84vw; font-size: 12.5px; }
-  .card { position: fixed; left: 8px; right: 8px; bottom: 8px; width: auto; max-height: 52vh; overflow-y: auto; }
+  .card { position: fixed; left: 8px !important; right: 8px; bottom: 8px; top: auto !important; width: auto; max-height: 36vh; overflow-y: auto; }
 }
 
 /* A phone held sideways is mostly screen height, so give the drawing more of it. */
@@ -5468,7 +5468,13 @@ if (DATA.client) {
     var vb = (svg.getAttribute('viewBox') || '').trim().split(' ').map(Number);
     var vw = vb[2] || svg.clientWidth, vh = vb[3] || svg.clientHeight;
     var clone = svg.cloneNode(true);
+    // On a phone the drawing's own columns and name give way to the slim ones
+    // beside it; the saved picture is the whole chart, so they come back for
+    // the moment it is copied.
+    var phoneCols = body.classList.contains('has-sidecols');
+    if (phoneCols) body.classList.remove('has-sidecols');
     bake(svg, clone);
+    if (phoneCols) body.classList.add('has-sidecols');
     clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
     clone.setAttribute('width', vw);
     clone.setAttribute('height', vh);
