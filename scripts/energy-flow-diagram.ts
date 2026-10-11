@@ -4403,6 +4403,12 @@ body.view-world #relhome > details, body.view-world #relswap { display:none !imp
   .sidecols .sg { display:flex; align-items:center; justify-content:center; width:1.15em; height:1.15em; }
   .sidecols .sgl { width:100%; height:100%; overflow:visible; display:block; }
   .sidecols .sn { text-align:right; }
+  .sidecols .srow .sn { text-align:center; }
+  .sidecols .srow { display:grid; grid-template-columns:1.15em auto auto; align-items:center; column-gap:.55em; line-height:1.2;
+    padding:.32em .45em; border-radius:.55em; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .sidecols .srow:nth-child(odd):not(.shead2) { background:#f6f2f7; }
+  .sidecols .shead2 { padding-top:0; padding-bottom:0; letter-spacing:.08em; }
+  .sidecols .shead:empty { display:none; }
   .sidecols .sa { font-size:.7em; text-align:left; }
   .sidecols .prow.hi, .sidecols .trow.hi { background:rgba(132,80,149,.22); }
   /* a gate's details sit along the bottom of the screen on a phone, never
@@ -8563,6 +8569,57 @@ if (DATA.client) {
     var over = cols.getBoundingClientRect().bottom - r.bottom;
     if (over > 0) canvas.style.marginBottom = (over + 10) + 'px';
   };
+  // A pair's column, as the browser version draws it: one per person, each row
+  // the glyph, then their Personality gate in their dark colour and their
+  // Design gate in the light one, under PERS and DESIGN. The name is not
+  // repeated over the column: the names over the drawing carry the same two
+  // colours. Kaycee, 2026-10-11: "If we have to remove the names from the
+  // columns that's fine, you can indicate by color who is who at the top."
+  var pairRows = function (t, col, h) {
+    var NS = 'http://www.w3.org/2000/svg', w = 150, byY = {};
+    [].forEach.call(t.children, function (el) {
+      var y = el.tagName === 'text' ? +el.getAttribute('y') : null;
+      if (el.tagName === 'g') { var l = el.querySelector('line'); y = l ? Math.round(+l.getAttribute('y1') + 10.5) : null; }
+      if (y == null || isNaN(y)) return;
+      (byY[y] = byY[y] || []).push(el);
+    });
+    var ys = Object.keys(byY).map(Number).sort(function (a, b) { return a - b; });
+    var labels = ys.filter(function (y) { return y > 18 && y < 50; })[0];
+    h.textContent = '';
+    if (labels != null) {
+      // PERS and DESIGN, in their colours, over the two numbers
+      var hr = document.createElement('div'); hr.className = 'srow shead2';
+      hr.appendChild(document.createElement('span')).className = 'sg';
+      byY[labels].sort(function (a, b) { return +a.getAttribute('x') - +b.getAttribute('x'); }).forEach(function (tx) {
+        var sp = document.createElement('span'); sp.className = 'sn'; sp.textContent = tx.textContent;
+        sp.style.color = tx.getAttribute('fill'); hr.appendChild(sp);
+      });
+      h.appendChild(hr);
+    }
+    ys.filter(function (y) { return y >= 50; }).forEach(function (y) {
+      var d = document.createElement('div'); d.className = 'srow';
+      var gcell = document.createElement('span'); gcell.className = 'sg'; d.appendChild(gcell);
+      var nums = [];
+      byY[y].forEach(function (el) {
+        var x = el.tagName === 'text' ? +el.getAttribute('x') : w / 2;
+        if (Math.abs(x - w / 2) < 6) {
+          var mini = document.createElementNS(NS, 'svg'); mini.setAttribute('class', 'sgl');
+          mini.appendChild(el.cloneNode(true));
+          mini.setAttribute('viewBox', (w / 2 - 9) + ' ' + (y - 13) + ' 18 18');
+          gcell.appendChild(mini);
+        } else nums.push(el);
+      });
+      nums.sort(function (a, b) { return +a.getAttribute('x') - +b.getAttribute('x'); });
+      // two number cells always, so a planet with only one side keeps its column
+      [w * 0.3, w * 0.78].forEach(function (cx) {
+        var n = document.createElement('span'); n.className = 'sn';
+        var tx = nums.filter(function (e) { return Math.abs(+e.getAttribute('x') - cx) < 8; })[0];
+        if (tx) { n.textContent = tx.textContent; n.style.color = tx.getAttribute('fill'); }
+        d.appendChild(n);
+      });
+      col.appendChild(d);
+    });
+  };
   var buildCols = function () {
     [].forEach.call(document.querySelectorAll('div.sidecols'), function (c) { c.remove(); }); cols = null;
     document.body.classList.remove('has-sidecols');
@@ -8581,7 +8638,17 @@ if (DATA.client) {
     var head = document.createElement('div'); head.className = 'sname';
     [].forEach.call(canvas.querySelectorAll(':scope > .cname, :scope > .tname'), function (tx) {
       if (!tx.textContent.trim() || getComputedStyle(tx).display === 'none') return;
-      var line = document.createElement('div'); line.textContent = tx.textContent.trim();
+      var line = document.createElement('div');
+      // a pair's heading is each name in its own colour: kept, so the colours
+      // say whose column is whose
+      if (tx.querySelector('tspan')) {
+        [].forEach.call(tx.querySelectorAll('tspan'), function (ts) {
+          var sp = document.createElement('span'); sp.textContent = ts.textContent;
+          if (ts.getAttribute('fill')) sp.style.color = ts.getAttribute('fill');
+          if (ts.getAttribute('font-weight')) sp.style.fontWeight = ts.getAttribute('font-weight');
+          line.appendChild(sp);
+        });
+      } else line.textContent = tx.textContent.trim();
       if (tx.classList.contains('tname')) line.className = 'sdate';
       head.appendChild(line);
     });
@@ -8618,6 +8685,7 @@ if (DATA.client) {
       if (rule && rule.getAttribute('stroke')) h.style.borderBottomColor = rule.getAttribute('stroke');
       h.textContent = head ? head.textContent.trim() : '';
       col.appendChild(h);
+      if (/^pair-/.test(t.getAttribute('data-side') || '')) { pairRows(t, col, h); row.appendChild(col); return; }
       [].forEach.call(t.querySelectorAll('.prow, .trow'), function (row) {
         var d = document.createElement('div');
         d.className = row.getAttribute('class');
@@ -8661,11 +8729,13 @@ if (DATA.client) {
     document.body.classList.add('has-sidecols');
     // one width for every number in a column, so they line up on the decimal
     var alignNumbers = function () {
+      // per position in the row: a pair's PERS numbers share one width and
+      // its DESIGN numbers another
       [].forEach.call(cols.querySelectorAll('.scol'), function (c) {
-        var w = 0;
+        var rows = c.querySelectorAll('.prow, .trow, .srow'), w = [];
         [].forEach.call(c.querySelectorAll('.sn'), function (n) { n.style.width = ''; });
-        [].forEach.call(c.querySelectorAll('.sn'), function (n) { w = Math.max(w, n.getBoundingClientRect().width); });
-        [].forEach.call(c.querySelectorAll('.sn'), function (n) { n.style.width = Math.ceil(w) + 'px'; });
+        [].forEach.call(rows, function (r) { [].forEach.call(r.querySelectorAll('.sn'), function (n, i) { w[i] = Math.max(w[i] || 0, n.getBoundingClientRect().width); }); });
+        [].forEach.call(rows, function (r) { [].forEach.call(r.querySelectorAll('.sn'), function (n, i) { n.style.width = Math.ceil(w[i]) + 'px'; }); });
       });
     };
     alignNumbers();

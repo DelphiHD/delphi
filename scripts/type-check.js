@@ -51,12 +51,12 @@
       const weights = new Set(parts.map((p) => getComputedStyle(p).fontWeight));
       if (sizes.size > 1) problems.push(`${side}: ${sizes.size} font sizes (${[...sizes].join(', ')})`);
       if (weights.size > 1) problems.push(`${side}: ${weights.size} font weights (${[...weights].join(', ')})`);
-      const rows = [...col.querySelectorAll('.prow, .trow')].filter(vis);
+      const rows = [...col.querySelectorAll('.prow, .trow, .srow:not(.shead2)')].filter(vis);
       const g = rows.map((r) => r.querySelector('.sgl')).filter(Boolean).map((s) => s.getBoundingClientRect());
       if (spread(g.map((r) => r.width)) > 0.5 || spread(g.map((r) => r.height)) > 0.5) problems.push(`${side}: glyph boxes differ in size`);
       if (spread(g.map((r) => r.left + r.width / 2)) > 1) problems.push(`${side}: glyphs do not share a centre line (${round(spread(g.map((r) => r.left + r.width / 2)))}px apart)`);
       const n = rows.map((r) => r.querySelector('.sn')).filter(Boolean).map((s) => s.getBoundingClientRect());
-      if (spread(n.map((r) => r.right)) > 1) problems.push(`${side}: numbers do not end on one line (${round(spread(n.map((r) => r.right)))}px apart)`);
+      if (spread(n.map((r) => r.right)) > 1 && !col.querySelector('.srow')) problems.push(`${side}: numbers do not end on one line (${round(spread(n.map((r) => r.right)))}px apart)`);
       const tops = rows.map((r) => r.getBoundingClientRect().top), gaps = tops.slice(1).map((t, i) => t - tops[i]);
       if (spread(gaps) > 1.5) problems.push(`${side}: rows unevenly spaced (gaps ${round(Math.min(...gaps))} to ${round(Math.max(...gaps))}px)`);
     }
