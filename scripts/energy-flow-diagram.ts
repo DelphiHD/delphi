@@ -4415,11 +4415,8 @@ body.view-world #relhome > details, body.view-world #relswap { display:none !imp
      and below the wheel on a phone. The wheel sets the height here. */
   body.view-astro .astro { height:auto; }
   body.view-astro .astro svg { height:auto; width:100%; }
-  /* The wheels zoom inside themselves (wheelZoom, in the page script): up and
-     down still scrolls the page, two fingers zoom, one finger moves a zoomed
-     wheel, a double tap puts it back. */
-  .mandala > svg, .astro > svg { touch-action:pan-y; }
-  .mandala > svg.zoomed, .astro > svg.zoomed { touch-action:none; }
+  /* The wheels zoom with Safari's own pinch, as the bodygraph does. */
+
   /* the person's name over The Wheel, as every other view carries it */
   body.view-mandala:not(.mod-relation) .mname { display:block; }
   /* room for the side panel on a desktop; on a phone the panel is above */
@@ -8752,7 +8749,9 @@ if (DATA.client) {
     var lift = function (e) { delete pts[e.pointerId]; if (Object.keys(pts).length < 2) pinch = null; if (!Object.keys(pts).length) drag = null; };
     window.addEventListener('pointerup', lift); window.addEventListener('pointercancel', lift);
   };
-  [].forEach.call(document.querySelectorAll('.mandala > svg, .astro > svg'), wheelZoom);
+  // The wheels take Safari's own pinch, as the bodygraph always has: it is
+  // the smoothest there is, and nothing on a wheel needs its own (Kaycee,
+  // 2026-10-11). wheelZoom is kept, unused, should a wheel ever need it.
 
   var va0 = document.getElementById('vAstro');
   if (va0) va0.onclick = function () { view('astro'); };
