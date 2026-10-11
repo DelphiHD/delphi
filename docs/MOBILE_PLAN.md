@@ -59,3 +59,17 @@ All five steps are built, phone-only (under 760px), and checked at iPhone size. 
 5. **Variations.** In the page under the controls, one card at a time, swiped sideways.
 
 Noticed, left for her review: the Transit block up top is tall (date, location, Transit Only, Transit Placements, about 230px). Location and Transit Placements could stay down in the panel.
+
+## Placement columns on a phone (2026-10-11)
+
+Step 3 first took the columns off the drawing: buttons opened them, first as a full sheet, then as a drawer. Kaycee turned both down. The columns teach through their link to the bodygraph ("if someone clicks the gate in the placement table it highlights it in the bodygraph"), and covering the drawing "completely annihilated" that link. They also "need to be columns", the traditional way people read them. Her screenshots of the established apps showed the answer: columns beside the bodygraph, slim enough to work.
+
+**What's built:**
+- Slim columns down the full height of the drawing, beside a narrowed bodygraph. Each row is just the glyph and gate.line in 13px type.
+- Every glyph is copied from the chart's own drawing. Uranus is drawn in lines, not a font character.
+- Each number keeps its own colour. A transit's combined column carries Design and Personality side by side, red and black.
+- Each column is as wide as its rows. The bodygraph sits centred between them, and the drawing's space grows if the columns are taller.
+- The rows are the drawing's own rows retold, with the same data-side and data-planet. A tap reads as a desktop hover and lights the gate; touching a gate lights its row.
+- The headings are the columns' own: Design and Personality; under Transit, her name and Transit.
+
+**Trap found:** the body must never carry a class that a cleanup selector removes. It was `sidecols`, the same name as the columns, so clearing old columns could have removed the page. The marker on the body is now `has-sidecols`.
