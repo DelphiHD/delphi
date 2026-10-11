@@ -445,3 +445,13 @@ Kaycee: "It's a lot of info for two people and it's only showing one person's ho
 - The second person's relocated charts are cached under their birth, so changing the second person never reuses the old casts.
 - In The World the panel reads, top to bottom: the date picker (Transit) or the picker and people buttons (Relationship), then Find My Places.
 - Hidden in The World: Between You, Side by Side, Placements, Centers and Swap Perspective.
+
+## Saved places and Compare Places are two things (open, 2026-10-11)
+
+Kaycee: people will want to keep favourite places without having them in Compare Places, for example while weighing up a holiday somewhere else in the world. "In my mind they are two different things, but we can flesh that out."
+
+The direction, to be worked out with her when the journal page is built:
+- **Saved places** are keepers: they live in the journal (`journal_entries`, kind `place`) and stay there.
+- **Compare Places** is a working list for one decision. You fill it from saved places or from the map, and clearing it never removes a saved place.
+
+Today the two are the same list. Separating them needs one marker per entry (in the comparison or not) in `journal_entries`, not a new table.
