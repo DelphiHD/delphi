@@ -4342,6 +4342,11 @@ body.view-world #relhome > details, body.view-world #relswap { display:none !imp
   body.view-world .stage { gap:4px; }
   /* room for the side panel on a desktop; on a phone the panel is above */
   body.view-world .world .w-bar.in-chart { padding-left:0; }
+  /* Find My Places lives in the panel on a desktop; on a phone that is below
+     the map, so it comes up from the bottom like everything else here. */
+  body.view-world #worldside #w-find.open { position:fixed; left:0; right:0; bottom:0; top:auto; z-index:30;
+    max-height:52vh; overflow:auto; background:#fff; border-radius:18px 18px 0 0; margin:0;
+    padding:24px 16px 16px; border:1px solid #d9d0e0; box-shadow:0 -8px 30px rgba(47,42,51,.18); }
 }
 #worldside #w-find { position:static; width:auto; max-height:none; overflow:visible; box-shadow:none;
   border:0; border-radius:0; padding:4px 0 12px; margin:0 0 10px; border-bottom:1px solid rgba(132,80,149,.18);
