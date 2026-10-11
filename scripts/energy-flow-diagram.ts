@@ -4376,17 +4376,18 @@ body.view-world #relhome > details, body.view-world #relswap { display:none !imp
   body:not(.view-astro):not(.view-world):not(.view-mandala) .phonebar { display:flex; }
   body.mod-transit #circpill, body.mod-variations .phonebar { display:none !important; }
   .phonebar { order:-1; width:100%; justify-content:space-between; align-items:center; gap:6px; padding:2px 4px 0; box-sizing:border-box; }
-  .phonebar #colpills { display:flex; gap:6px; margin-left:auto; }
   .phonebar button { font:inherit; font-size:12px; padding:6px 12px; border-radius:999px; border:1px solid rgba(132,80,149,.3);
     background:#fff; color:var(--ink, #1c1a2e); cursor:pointer; }
   .phonebar .circpill.on { background:#845095; border-color:#845095; color:#fff; }
-  .colsheet.open { display:block; position:fixed; left:0; right:0; bottom:0; z-index:40; height:44vh; overflow:auto;
-    background:#fff; border-radius:16px 16px 0 0; padding:22px 10px 10px; box-sizing:border-box; box-shadow:0 -8px 30px rgba(47,42,51,.22); }
-  .colsheet svg { width:100%; max-width:330px; height:auto; display:block; margin:0 auto; }
-  .phonebar .colpill.on { background:#845095; border-color:#845095; color:#fff; }
-  body.colsopen .panel { margin-bottom:44vh; }
-  /* the drawing's own columns are in the drawer; shrunk, their edges would show */
-  body.colsopen .wrap .stage svg.canvas > .ptable { visibility:hidden; }
+  /* the drawing's own columns give way to the slim ones beside it */
+  body.sidecols .wrap .stage svg.canvas > .ptable { visibility:hidden; }
+  .sidecols { position:absolute; left:0; right:0; pointer-events:none; display:flex; justify-content:space-between; padding:0 2px; }
+  .sidecols .scol { width:19%; display:flex; flex-direction:column; justify-content:space-between; pointer-events:auto; }
+  .sidecols .shead { font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; color:#6b6790; font-weight:600; padding:0 4px 2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sidecols .scol.right .shead { text-align:right; }
+  .sidecols .prow, .sidecols .trow { font-size:13px; font-weight:600; line-height:1; padding:4px 5px; border-radius:6px; white-space:nowrap; cursor:pointer; font-variant-numeric:tabular-nums; }
+  .sidecols .scol.right .prow, .sidecols .scol.right .trow { text-align:right; }
+  .sidecols .prow.hi, .sidecols .trow.hi { background:rgba(132,80,149,.22); }
   .phonetop { order:-1; width:100%; box-sizing:border-box; padding:0 4px; }
   .phonetop .datesec { margin:0 0 4px; padding-top:6px; }
   body:not(.mod-relation) .phonetop #relpick, body:not(.mod-relation) .phonetop #partyrow { display:none !important; }
@@ -4394,7 +4395,6 @@ body.view-world #relhome > details, body.view-world #relswap { display:none !imp
   .phonetop #partyrow { margin:2px 0 6px; display:flex; gap:6px; flex-wrap:wrap; }
   .phonetop #partyrow[hidden] { display:none; }
   .phonetop #partyrow button { font-size:12px; padding:6px 11px; }
-  .colsheet .x { position:absolute; top:8px; right:12px; border:0; background:none; font-size:22px; color:#6b6790; cursor:pointer; }
   /* Astrology: the desktop's fixed-height box left about 140px blank above
      and below the wheel on a phone. The wheel sets the height here. */
   body.view-astro .astro { height:auto; }
@@ -4414,7 +4414,7 @@ body.view-world #relhome > details, body.view-world #relswap { display:none !imp
     max-height:52vh; overflow:auto; background:#fff; border-radius:18px 18px 0 0; margin:0;
     padding:24px 16px 16px; border:1px solid #d9d0e0; box-shadow:0 -8px 30px rgba(47,42,51,.18); }
 }
-.phonebar, .colsheet, .mname { display:none; }
+.phonebar, .mname { display:none; }
 .mname { text-align:center; font-size:19px; font-weight:600; color:#1c1a2e; padding:4px 0 0; width:100%; }
 #worldside #w-find { position:static; width:auto; max-height:none; overflow:visible; box-shadow:none;
   border:0; border-radius:0; padding:4px 0 12px; margin:0 0 10px; border-bottom:1px solid rgba(132,80,149,.18);
@@ -4856,7 +4856,7 @@ body.view-mandala .mandala svg { max-height:calc(100vh - 28px); width:auto; heig
 <body class="skin-paper${d.client ? " chart" : ""}">
 <div class="wrap">
   ${logoSrc ? `<img class="brandmark logo" src="${logoSrc}" alt="Delphi">` : ""}
-  <div class="stage">${canvases}${mandala}${astro}${d.world ? `<div class="world" id="worldview"></div>` : ""}<div class="tip" id="tip" hidden></div><div class="card" id="card" hidden></div>${knowSrc ? `<img class="brandmark know" src="${knowSrc}" alt="Know thyself">` : ""}${d.client ? `<div class="varpanel" id="varpanel"></div><div class="viewdock docked">${viewControls}</div><div class="phonebar" id="phonebar"><button id="circpill" class="circpill">Circuits</button><span id="colpills"></span></div><div class="colsheet" id="colsheet"></div><div class="phonetop" id="phonetop"></div>` : ""}</div>
+  <div class="stage">${canvases}${mandala}${astro}${d.world ? `<div class="world" id="worldview"></div>` : ""}<div class="tip" id="tip" hidden></div><div class="card" id="card" hidden></div>${knowSrc ? `<img class="brandmark know" src="${knowSrc}" alt="Know thyself">` : ""}${d.client ? `<div class="varpanel" id="varpanel"></div><div class="viewdock docked">${viewControls}</div><div class="phonebar" id="phonebar"><button id="circpill" class="circpill">Circuits</button></div><div class="phonetop" id="phonetop"></div>` : ""}</div>
   <aside class="panel">
 ${d.client ? "" : `<h1 id="ptitle">Centers, function, and flow</h1>
     <p class="sub" id="psub">Nine centers, each labeled with what it does. The moving light follows every channel toward the Throat, the only center that turns energy into expression.</p>`}
@@ -8514,74 +8514,78 @@ if (DATA.client) {
   placeActions(); placeTop();
   var circ = document.getElementById('circpill');
   if (circ) circ.onclick = function () { view(curView === 'body' ? 'plain' : 'body'); };
-  var sheet = document.getElementById('colsheet');
   var visibleCanvas = function () {
     return [].filter.call(document.querySelectorAll('svg.canvas'), function (c) { return getComputedStyle(c).display !== 'none'; })[0];
   };
-  // The placement columns in a drawer over the bottom of the screen, both
-  // side by side as they are traditionally read, with the bodygraph shrunk to
-  // stay whole above them. Kaycee, 2026-10-11: the columns teach by their link
-  // to the drawing, "if someone clicks the gate in the placement table it
-  // highlights it in the bodygraph", so nothing may cover it. A tap on a row
-  // lights its gate above; a tap on a gate lights its row below.
-  var fitAbove = function (open) {
+  // The placement columns stay beside the bodygraph on a phone, slim: the
+  // glyph and gate.line in type large enough to read, running the height of
+  // the drawing, with the bodygraph narrowed between them. Kaycee,
+  // 2026-10-11: they "need to be columns", that is how people are used to
+  // seeing them, and the link she teaches with ("if someone clicks the gate in
+  // the placement table it highlights it in the bodygraph") has to stay on
+  // screen. A drawer and a sheet both broke it; the way the established apps
+  // lay it out (her screenshots) keeps it. Each row is the drawing's own row
+  // retold: same data-side and data-planet, so a tap reads exactly as a hover
+  // does on a desktop and a gate lights its row here through litGate.
+  var cols = null, BG = 0.6;
+  var placeCols = function () {
     var canvas = visibleCanvas();
+    if (!cols || !canvas) return;
+    var s = cols.parentNode.getBoundingClientRect(), r = canvas.getBoundingClientRect();
+    cols.style.top = (r.top - s.top + r.height * 0.085) + 'px';
+    cols.style.height = (r.height * 0.86) + 'px';
+  };
+  var buildCols = function () {
+    if (cols) { cols.remove(); cols = null; }
+    document.body.classList.remove('sidecols');
     [].forEach.call(document.querySelectorAll('svg.canvas'), function (c) { c.style.width = ''; c.style.marginLeft = ''; });
-    document.body.classList.toggle('colsopen', open);
-    if (!open || !canvas) return;
-    var avail = window.innerHeight - sheet.offsetHeight - 12;
-    var f = Math.min(1, avail / canvas.getBoundingClientRect().height);
-    canvas.style.width = (146 * f) + '%';
-    canvas.style.marginLeft = ((100 - 100 * f) / 2 - 22.4 * f) + '%';
-    window.scrollTo(0, canvas.getBoundingClientRect().top + window.scrollY - 6);
-  };
-  var openColumns = function () {
-    var canvas = visibleCanvas();
-    if (!canvas || !sheet) return;
-    var tables = [].filter.call(canvas.querySelectorAll(':scope > .ptable'), function (t) { return getComputedStyle(t).display !== 'none'; });
-    if (!tables.length) return;
-    var NS = 'http://www.w3.org/2000/svg', t = document.createElementNS(NS, 'svg');
-    sheet.innerHTML = '<button class="x" aria-label="Close">&times;</button>';
-    sheet.appendChild(t); sheet.classList.add('open');
-    // left to right as on the drawing, each at its own place across the canvas
-    // side by side with a small gap between, not a bodygraph's width apart
-    var x = 0;
-    tables.sort(function (a, b) { return a.getBBox().x + a.transform.baseVal.consolidate().matrix.e - (b.getBBox().x + b.transform.baseVal.consolidate().matrix.e); })
-      .forEach(function (src) {
-        var g = src.cloneNode(true), w = src.getBBox().width;
-        g.style.display = ''; g.setAttribute('transform', 'translate(' + x + ',0)');
-        t.appendChild(g); x += w + 16;
-      });
-    var b = t.getBBox();
-    t.setAttribute('viewBox', (b.x - 4) + ' ' + (b.y - 4) + ' ' + (b.width + 8) + ' ' + (b.height + 8));
-    fitAbove(true);
-  };
-  var closeColumns = function () { if (!sheet) return; sheet.classList.remove('open'); sheet.innerHTML = ''; fitAbove(false); };
-  if (sheet) {
-    sheet.addEventListener('click', function (e) {
-      if (e.target.closest('.x')) { closeColumns(); return; }
-      var row = e.target.closest('.prow, .trow');
-      if (!row) return;
-      // the drawing's own hover, so a row tapped here reads exactly as a row
-      // hovered on a desktop: its gate lit above, its details beside it
-      e.stopPropagation();
-      row.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: e.clientX, clientY: e.clientY }));
-    });
-  }
-  // The switch for the columns, and Circuits, above the drawing.
-  var phoneBar = function () {
-    var pills = document.getElementById('colpills');
-    if (circ) circ.classList.toggle('on', curView === 'body');
-    if (!pills) return;
-    pills.innerHTML = '';
-    closeColumns();
     if (!phoneMQ.matches) return;
     var canvas = visibleCanvas();
-    if (!canvas || !canvas.querySelector(':scope > .ptable')) return;
-    var b = document.createElement('button');
-    b.className = 'colpill'; b.id = 'colpill'; b.textContent = 'Placement Columns';
-    b.onclick = function () { if (sheet.classList.contains('open')) { closeColumns(); b.classList.remove('on'); } else { openColumns(); b.classList.add('on'); } };
-    pills.appendChild(b);
+    if (!canvas) return;
+    var tables = [].filter.call(canvas.querySelectorAll(':scope > .ptable'), function (t) { return getComputedStyle(t).display !== 'none'; });
+    if (!tables.length) return;
+    var x = function (t) { return t.getBoundingClientRect().left; };
+    tables.sort(function (a, b) { return x(a) - x(b); });
+    cols = document.createElement('div'); cols.className = 'sidecols';
+    tables.forEach(function (t, i) {
+      var col = document.createElement('div');
+      col.className = 'scol ' + (i === 0 ? 'left' : 'right') + ' s-' + t.getAttribute('data-side');
+      var head = t.querySelector(':scope > text');
+      var h = document.createElement('div'); h.className = 'shead';
+      h.textContent = head ? head.textContent.trim().toLowerCase().split(' ').map(function (w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join(' ') : '';
+      col.appendChild(h);
+      [].forEach.call(t.querySelectorAll('.prow, .trow'), function (row) {
+        var d = document.createElement('div');
+        d.className = row.getAttribute('class');
+        [].forEach.call(row.attributes, function (a) { if (a.name.indexOf('data-') === 0) d.setAttribute(a.name, a.value); });
+        var texts = [].map.call(row.querySelectorAll('text'), function (tx) { return tx.textContent.trim(); }).filter(Boolean);
+        d.textContent = texts.join(' ');
+        var num = row.querySelector('text[fill]');
+        if (num) d.style.color = num.getAttribute('fill');
+        col.appendChild(d);
+      });
+      cols.appendChild(col);
+    });
+    canvas.parentNode.appendChild(cols);
+    document.body.classList.add('sidecols');
+    canvas.style.width = (146 * BG) + '%';
+    canvas.style.marginLeft = ((100 - 100 * BG) / 2 - 22.4 * BG) + '%';
+    placeCols();
+  };
+  document.addEventListener('click', function (e) {
+    var row = e.target.closest && e.target.closest('.sidecols .prow, .sidecols .trow');
+    if (!row) return;
+    // the drawing's own hover, so a row tapped here reads as a desktop hover:
+    // its gate lit on the bodygraph, its details beside it
+    e.stopPropagation();
+    row.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: e.clientX, clientY: e.clientY }));
+  }, true);
+  window.addEventListener('resize', placeCols);
+  if (window.ResizeObserver) new ResizeObserver(placeCols).observe(document.querySelector('.stage'));
+  // Circuits above the drawing; the columns build themselves with each view.
+  var phoneBar = function () {
+    if (circ) circ.classList.toggle('on', curView === 'body');
+    buildCols();
   };
   phoneBar();
   // Pinch inside a wheel on a phone, by its viewBox, so the page itself never
