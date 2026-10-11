@@ -1430,3 +1430,33 @@ Kaycee: "would it be possible to semi-automate the bug hunt? ... it automaticall
 - `npx tsx scripts/reports.ts` lists the open ones for a session to work through, with the pictures saved to `.cache/reports/`. Status, notes and resolution are then kept on the dashboard.
 
 Tested on her chart with one report marked TEST. It arrived with its picture and details, and was then marked Fixed with a note.
+
+---
+
+## 2026-10-11 — Storage: staying on the free plan until launch
+
+**What happened:** Supabase warned that the project was past the free plan's storage (1.1 GB). By evening the total was nearly 3 GB, made up of:
+- 2.65 GB of rollback copies
+- 0.29 GB of live chart pages
+- about 22 MB of everything else
+
+**Why the copies grew:**
+- Every publish keeps the page it replaces, and we republished all charts seven times that day.
+- The clean-up that keeps five copies per chart looked in the wrong folder, so most charts held about nine.
+- Every copy was stored uncompressed.
+
+**Kaycee's decisions:**
+- Upgrade to Pro ($25 a month) at the official launch, not now: "probably not right now if we can get away with the free version until official launch."
+- Keep five copies per chart and clear the rest.
+
+**What was done:**
+- Copies are now stored gzipped. A chart page goes from 3.4 MB to under 1 MB.
+- The clean-up and `--rollback` look where the copies actually are. The restore had the same folder bug, so some charts could not have been rolled back at all.
+- `scripts/tidy-rollbacks.ts` cleared 397 older copies and compressed the 411 kept, taking the copies from 2.53 GB to about 0.37 GB.
+
+**At launch, upgrade to Pro for:**
+- 100 GB of storage
+- daily database backups (the free plan has none, and clients now have accounts and journals)
+- no pausing after a quiet week
+
+The upgrade is hers to do: Supabase dashboard, then the DelphiHD organization, then Billing, then Change Plan.

@@ -619,6 +619,10 @@
     {
       "on": "2026-10-11",
       "what": "Anything visual is run through scripts/type-check.js (fonts, sizes, alignment, overlaps) before it goes to Kaycee."
+    },
+    {
+      "on": "2026-10-11",
+      "what": "Stay on Supabase's free plan until launch, then upgrade to Pro ($25/month) for 100 GB, daily backups and no pausing. Rollback copies are now compressed and kept at five per chart, which brought storage back under the free limit."
     }
   ],
   "open": [
@@ -663,6 +667,9 @@
     },
     {
       "what": "astro-wheel.ts is not covered by scripts/copy-check.ts, so words added to the wheel itself (the corner labels, Inner/Middle/Outer wheel) reach a client without the copy gate seeing them. Adding the file would surface a large backlog of existing strings for approval in one go."
+    },
+    {
+      "what": "Upgrade Supabase to Pro at the official launch (Kaycee's own step: Supabase dashboard, then the DelphiHD organization, then Billing, then Change Plan). Until then storage must stay under 1.1 GB: check before any large new store of files."
     }
   ],
   "brief": "https://claude.ai/code/artifact/3428e24e-262a-4fd7-86a6-93468244cb44",
