@@ -435,3 +435,13 @@ Bob Dylan's birth (from the roster) through /api/connection, no form submitted:
 Sun MC line at 147.9E matches the hand reckoning (apparent noon at 02:05 UT);
 place panel, both relocated charts and Find My Places (both modes) work.
 Client charts get it at the next republish, on Kaycee's say-so.
+
+## Compare Places for two people (2026-10-11)
+
+Kaycee: "It's a lot of info for two people and it's only showing one person's houses."
+- Grade counts per person, each name in their own colour. These always show.
+- Relocated Chart, Lines and Parans fold. Lines starts open, the other two start folded.
+- Within each section, each person's rows sit under their own name. The people buttons decide who appears.
+- The second person's relocated charts are cached under their birth, so changing the second person never reuses the old casts.
+- In The World the panel reads, top to bottom: the date picker (Transit) or the picker and people buttons (Relationship), then Find My Places.
+- Hidden in The World: Between You, Side by Side, Placements, Centers and Swap Perspective.
