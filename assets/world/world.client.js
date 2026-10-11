@@ -275,7 +275,6 @@ function lineEls(l){const id={"data-person":isB(l)?PB.person:PERSON,"data-side":
   l.el=mk("path",{class:"ln "+l.side+" "+l.angle+(l.tr?" transit":"")+(isB(l)?" who-b":""),...id});gl.append(l.el);
   l.hit=mk("path",{class:"hit",...id});gh.append(l.hit)}
 for(const l of LN)lineEls(l);
-buildLS();
 function paranEls(p){
   p.el=mk("g",{class:"pr "+p.side+(isB(p)?" who-b":""),"data-person":isB(p)?PB.person:PERSON,"data-side":p.side,"data-body":p.a,"data-angle":p.angleA,"data-body2":p.b,"data-angle2":p.angleB,"data-lat":p.lat.toFixed(2)});
   if(isB(p))p.el.setAttribute("data-who","b");
@@ -1305,6 +1304,9 @@ window.addEventListener("orientationchange",()=>setTimeout(fitPhone,300));
 q.addEventListener("input",()=>{if(!phone()){res.style.top="";return}res.style.top=(q.getBoundingClientRect().bottom+6)+"px"});
 new MutationObserver(fitOnce).observe(root.closest("body")||document.body,{attributes:true,attributeFilter:["class"]});
 requestAnimationFrame(fitOnce);setTimeout(fitOnce,300);
+
+// Local space last: it reads state declared further down than the map.
+buildLS();paint();
 
 root.world = { D: D, LN: LN, PR: PR, describe: describe, state: st, reset: resetWorld };
 }
