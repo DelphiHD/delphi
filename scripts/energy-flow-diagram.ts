@@ -4385,6 +4385,8 @@ body.view-world #relhome > details, body.view-world #relswap { display:none !imp
   .colsheet svg { width:100%; max-width:330px; height:auto; display:block; margin:0 auto; }
   .phonebar .colpill.on { background:#845095; border-color:#845095; color:#fff; }
   body.colsopen .panel { margin-bottom:44vh; }
+  /* the drawing's own columns are in the drawer; shrunk, their edges would show */
+  body.colsopen .wrap .stage svg.canvas > .ptable { visibility:hidden; }
   .phonetop { order:-1; width:100%; box-sizing:border-box; padding:0 4px; }
   .phonetop .datesec { margin:0 0 4px; padding-top:6px; }
   body:not(.mod-relation) .phonetop #relpick, body:not(.mod-relation) .phonetop #partyrow { display:none !important; }
