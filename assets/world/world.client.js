@@ -555,6 +555,7 @@ function renderHere(){
     '<h2>'+(here.name||fmtLat(here.lat)+", "+fmtLon(here.lon))+'</h2>'+
     '<div class="co">'+(here.name?(here.country?here.country+" · ":"")+fmtLat(here.lat)+", "+fmtLon(here.lon):"")+'</div>'+
     (isSaved(here)?'<button class="save done">Saved</button>':'<button class="save" data-save="1">Save Place</button>')+
+    ' <button class="w-pill pdf" data-pdf="place">Save As PDF</button>'+
     relocHtml()+timelineHtml()+
     '<h3>Lines</h3>'+(rows.length?rows.map(r=>'<div class="hr" '+tag(r.l.side,r.l.body,r.l.angle,r.l.tr,isB(r.l))+'>'+
       '<span class="gl '+r.l.side+(r.l.tr?" transit":"")+(isB(r.l)?" who-b":"")+'">'+GLYPH[r.l.body]+'</span><span class="nm">'+(r.l.tr?"Transit "+r.l.body+' <span class="was">'+SIDE[r.l.side]+'</span>':whoName(r.l)+SIDE[r.l.side]+" "+r.l.body)+' <span class="ap">'+r.l.angle+'</span></span>'+
@@ -800,9 +801,15 @@ const RCSS='body{font-family:Montserrat,-apple-system,sans-serif;color:#1c1a2e;m
   'tr.sum td{font-weight:600}.ap,.gr{display:inline-block;padding:1px 6px;border-radius:999px;font-size:8.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}'+
   '.ap{background:#845095;color:#fff}.gr.g3{background:#c79a2e;color:#fff}.gr.g2{background:#ecd9a4;color:#6b5210}.gr.g1{border:1px solid #d8c48c;color:#8a6a14}'+
   '.own{color:#9c7415;font-weight:600}.was{color:#6b6790;font-weight:400}.mi{color:#4b4553}'+
+  '.relwho{font-weight:600;font-size:13px;margin:12px 0 2px}.relwho.pa{color:#845095}.relwho.pb{color:#0d9488}'+
+  '.rt td.own::after{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:#c79a2e;margin-left:4px;vertical-align:middle}'+
+  '.mine{margin:8px 0 4px;padding:6px 8px;background:#fffbf0;border:1px solid #ecd9a4;border-radius:6px;font-size:10.5px;line-height:1.6}.mine b{display:block;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:#8a6a14}'+
+  'h3{font-size:9.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#6b6790;margin:16px 0 4px}.n{color:#6b6790}.none{color:#6b6790;font-size:11px}'+
   'tr{page-break-inside:avoid}@page{margin:14mm}';
-function openReport(title,settings,table){
-  const w=window.open("","_blank");
+// win: a window already opened on the tap itself, for a report that has to
+// wait for something first (a browser refuses a window opened later).
+function openReport(title,settings,table,win){
+  const w=win||window.open("","_blank");
   if(!w)return;
   w.document.write('<!doctype html><title>'+PERSON+' - '+title+'</title><p style="font-family:sans-serif;padding:30px">…</p>');
   mapPng(png=>{
@@ -830,6 +837,37 @@ function findReport(){
     "Continent: "+(conts.size?[...conts].join(", "):"All")+"  ·  Latitude Limit: "+(latLimit>=90?"No Limit":latLimit===66.5?"Polar Circles":latLimit+"°"),
     mapState().slice(-1)[0],
   ],'<h1 style="font-size:14px">Closest Matches</h1>'+table);
+}
+// One place on a page, for a session: the map close in on it, its lines and
+// parans with their grades, each person's relocated chart, and under Transit
+// the year's transits to its angles. Kaycee chose it from the list of what
+// would make The World more useful, 2026-10-11.
+async function placeReport(){
+  if(!here)return;
+  const P=here,people=pairOn()?["a","b"].filter(w=>party[w]):["a"];
+  const win=window.open("","_blank");if(!win)return;
+  win.document.write('<!doctype html><title>'+PERSON+'</title><p style="font-family:sans-serif;padding:30px">…</p>');
+  // What the report needs, cast if it has not been yet.
+  if(live)for(const w of people)fetchReloc(P,true,()=>{},w);
+  const wasTl=tlOpen;tlOpen=true;if(tr.on)fetchTimeline();
+  const ready=()=>(!live||people.every(w=>{const r=reloc.get(keyOf(P)+(w==="b"?BK():""));return r&&r!=="loading"}))&&
+    (!tr.on||!API.timeline||(tlCache.get(tlKey())&&tlCache.get(tlKey())!=="loading"));
+  for(let t=0;t<60&&!ready();t++)await new Promise(r=>setTimeout(r,250));
+  const {rows,prs}=analyze(P.lat,P.lon);
+  const lines='<h3>Lines</h3>'+(rows.length?'<table>'+rows.map(r=>'<tr><td>'+(r.l.tr?"Transit "+r.l.body+' <span class="was">'+SIDE[r.l.side]+'</span>':whoName(r.l)+SIDE[r.l.side]+" "+r.l.body)+' <span class="ap">'+r.l.angle+'</span></td>'+
+    '<td class="mi">'+Math.round(r.mi)+' mi</td><td>'+gradePill(r.g)+'</td></tr>').join("")+'</table>':'<div class="none">No lines within 700 miles.</div>');
+  const parans='<h3>Parans</h3>'+(prs.length?'<table>'+prs.map(r=>'<tr><td>'+whoName(r.p)+SIDE[r.p.side]+" "+r.p.a+' <span class="ap">'+r.p.angleA+'</span> '+r.p.b+' <span class="ap">'+r.p.angleB+'</span></td>'+
+    '<td class="mi">'+r.d.toFixed(1)+'°</td><td>'+gradePill(r.g)+'</td></tr>').join("")+'</table>':'<div class="none">No parans within 1° of this latitude.</div>');
+  const strip=h=>{const d=document.createElement("div");d.innerHTML=h;d.querySelectorAll("button").forEach(b=>b.remove());return d.innerHTML};
+  const relocated=live?'<h3>Relocated Chart</h3>'+strip(people.map(w=>relocBlock(w)).join("")):"";
+  const transits=tr.on&&API.timeline?'<h3>Upcoming Transits</h3>'+strip(timelineHtml()):"";
+  tlOpen=wasTl;
+  // The map close in on the place for the picture, then back as it was.
+  const was={...view};
+  const k=Math.max(view.k,4);view.k=k;view.tx=W/2-((P.lon+180)/360*W)*k;view.ty=H/2-((TOP-P.lat)/(TOP-BOTTOM)*H)*k;clampView();draw();
+  const title=placeName(P);
+  openReport(title,[(P.name?fmtLat(P.lat)+", "+fmtLon(P.lon)+"  ·  ":"")+mapState().slice(-1)[0]],lines+parans+relocated+transits,win);
+  Object.assign(view,was);clampView();redraw();
 }
 function compareReport(){
   const t=document.querySelector("#w-compare table");if(!t)return;
@@ -860,6 +898,7 @@ function openHere(lat,lon,city){
 }
 document.getElementById("w-here").addEventListener("click",e=>{
   if(e.target.closest(".x")){here=null;pinned.clear();renderHere();redraw();return}
+  if(e.target.closest("[data-pdf=place]"))return placeReport();
   if(e.target.closest("[data-tltog]")){tlOpen=!tlOpen;if(tlOpen)fetchTimeline();renderHere();return}
   if(e.target.closest("[data-reltog]")){relOpen=!relOpen;if(relOpen&&here){fetchReloc(here,true,renderHere);if(pairOn())fetchReloc(here,true,renderHere,"b")}renderHere();return}
   const wb=e.target.closest("[data-wheel]");if(wb){const who=wb.dataset.wheel;const r=reloc.get(relocKey()+(who==="b"?BK():""));if(r&&r.svg)showWheel(r,placeName(here),"personality",who);return}
