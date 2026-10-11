@@ -4380,9 +4380,11 @@ body.view-world #relhome > details, body.view-world #relswap { display:none !imp
   .phonebar button { font:inherit; font-size:12px; padding:6px 12px; border-radius:999px; border:1px solid rgba(132,80,149,.3);
     background:#fff; color:var(--ink, #1c1a2e); cursor:pointer; }
   .phonebar .circpill.on { background:#845095; border-color:#845095; color:#fff; }
-  .colsheet.open { display:block; position:fixed; left:0; right:0; bottom:0; z-index:40; max-height:78vh; overflow:auto;
-    background:#fff; border-radius:18px 18px 0 0; padding:26px 18px 18px; box-shadow:0 -8px 30px rgba(47,42,51,.22); }
-  .colsheet svg { height:min(64vh, 520px); width:auto; max-width:100%; display:block; margin:0 auto; }
+  .colsheet.open { display:block; position:fixed; left:0; right:0; bottom:0; z-index:40; height:44vh; overflow:auto;
+    background:#fff; border-radius:16px 16px 0 0; padding:22px 10px 10px; box-sizing:border-box; box-shadow:0 -8px 30px rgba(47,42,51,.22); }
+  .colsheet svg { width:100%; max-width:330px; height:auto; display:block; margin:0 auto; }
+  .phonebar .colpill.on { background:#845095; border-color:#845095; color:#fff; }
+  body.colsopen .panel { margin-bottom:44vh; }
   .phonetop { order:-1; width:100%; box-sizing:border-box; padding:0 4px; }
   .phonetop .datesec { margin:0 0 4px; padding-top:6px; }
   body:not(.mod-relation) .phonetop #relpick, body:not(.mod-relation) .phonetop #partyrow { display:none !important; }
@@ -8511,39 +8513,73 @@ if (DATA.client) {
   var circ = document.getElementById('circpill');
   if (circ) circ.onclick = function () { view(curView === 'body' ? 'plain' : 'body'); };
   var sheet = document.getElementById('colsheet');
-  var showColumn = function (side) {
-    var canvas = [].filter.call(document.querySelectorAll('svg.canvas'), function (c) { return getComputedStyle(c).display !== 'none'; })[0];
-    var src = canvas && canvas.querySelector('.ptable[data-side="' + side + '"]');
-    if (!src || !sheet) return;
+  var visibleCanvas = function () {
+    return [].filter.call(document.querySelectorAll('svg.canvas'), function (c) { return getComputedStyle(c).display !== 'none'; })[0];
+  };
+  // The placement columns in a drawer over the bottom of the screen, both
+  // side by side as they are traditionally read, with the bodygraph shrunk to
+  // stay whole above them. Kaycee, 2026-10-11: the columns teach by their link
+  // to the drawing, "if someone clicks the gate in the placement table it
+  // highlights it in the bodygraph", so nothing may cover it. A tap on a row
+  // lights its gate above; a tap on a gate lights its row below.
+  var fitAbove = function (open) {
+    var canvas = visibleCanvas();
+    [].forEach.call(document.querySelectorAll('svg.canvas'), function (c) { c.style.width = ''; c.style.marginLeft = ''; });
+    document.body.classList.toggle('colsopen', open);
+    if (!open || !canvas) return;
+    var avail = window.innerHeight - sheet.offsetHeight - 12;
+    var f = Math.min(1, avail / canvas.getBoundingClientRect().height);
+    canvas.style.width = (146 * f) + '%';
+    canvas.style.marginLeft = ((100 - 100 * f) / 2 - 22.4 * f) + '%';
+    window.scrollTo(0, canvas.getBoundingClientRect().top + window.scrollY - 6);
+  };
+  var openColumns = function () {
+    var canvas = visibleCanvas();
+    if (!canvas || !sheet) return;
+    var tables = [].filter.call(canvas.querySelectorAll(':scope > .ptable'), function (t) { return getComputedStyle(t).display !== 'none'; });
+    if (!tables.length) return;
     var NS = 'http://www.w3.org/2000/svg', t = document.createElementNS(NS, 'svg');
-    var g = src.cloneNode(true); g.removeAttribute('transform'); g.style.display = '';
-    t.appendChild(g);
     sheet.innerHTML = '<button class="x" aria-label="Close">&times;</button>';
     sheet.appendChild(t); sheet.classList.add('open');
-    var b = g.getBBox();
+    // left to right as on the drawing, each at its own place across the canvas
+    // side by side with a small gap between, not a bodygraph's width apart
+    var x = 0;
+    tables.sort(function (a, b) { return a.getBBox().x + a.transform.baseVal.consolidate().matrix.e - (b.getBBox().x + b.transform.baseVal.consolidate().matrix.e); })
+      .forEach(function (src) {
+        var g = src.cloneNode(true), w = src.getBBox().width;
+        g.style.display = ''; g.setAttribute('transform', 'translate(' + x + ',0)');
+        t.appendChild(g); x += w + 16;
+      });
+    var b = t.getBBox();
     t.setAttribute('viewBox', (b.x - 4) + ' ' + (b.y - 4) + ' ' + (b.width + 8) + ' ' + (b.height + 8));
+    fitAbove(true);
   };
-  if (sheet) sheet.addEventListener('click', function (e) { if (e.target.closest('.x')) sheet.classList.remove('open'); });
-  // One button per column the drawing carries, named by the column's own
-  // heading, so a transit or a pair gets its own without new words.
+  var closeColumns = function () { if (!sheet) return; sheet.classList.remove('open'); sheet.innerHTML = ''; fitAbove(false); };
+  if (sheet) {
+    sheet.addEventListener('click', function (e) {
+      if (e.target.closest('.x')) { closeColumns(); return; }
+      var row = e.target.closest('.prow, .trow');
+      if (!row) return;
+      // the drawing's own hover, so a row tapped here reads exactly as a row
+      // hovered on a desktop: its gate lit above, its details beside it
+      e.stopPropagation();
+      row.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: e.clientX, clientY: e.clientY }));
+    });
+  }
+  // The switch for the columns, and Circuits, above the drawing.
   var phoneBar = function () {
     var pills = document.getElementById('colpills');
     if (circ) circ.classList.toggle('on', curView === 'body');
     if (!pills) return;
     pills.innerHTML = '';
-    if (sheet) sheet.classList.remove('open');
+    closeColumns();
     if (!phoneMQ.matches) return;
-    var canvas = [].filter.call(document.querySelectorAll('svg.canvas'), function (c) { return getComputedStyle(c).display !== 'none'; })[0];
-    if (!canvas) return;
-    [].forEach.call(canvas.querySelectorAll(':scope > .ptable'), function (t) {
-      if (getComputedStyle(t).display === 'none') return;
-      var head = t.querySelector(':scope > text');
-      var name = (head ? head.textContent.trim() : t.getAttribute('data-side')).toLowerCase().split(' ').map(function (w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join(' ');
-      var b = document.createElement('button');
-      b.className = 'colpill'; b.textContent = name;
-      b.onclick = function () { showColumn(t.getAttribute('data-side')); };
-      pills.appendChild(b);
-    });
+    var canvas = visibleCanvas();
+    if (!canvas || !canvas.querySelector(':scope > .ptable')) return;
+    var b = document.createElement('button');
+    b.className = 'colpill'; b.id = 'colpill'; b.textContent = 'Placement Columns';
+    b.onclick = function () { if (sheet.classList.contains('open')) { closeColumns(); b.classList.remove('on'); } else { openColumns(); b.classList.add('on'); } };
+    pills.appendChild(b);
   };
   phoneBar();
   // Pinch inside a wheel on a phone, by its viewBox, so the page itself never
