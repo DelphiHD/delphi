@@ -4380,7 +4380,7 @@ body.view-world #relhome > details, body.view-world #relswap { display:none !imp
     background:#fff; color:var(--ink, #1c1a2e); cursor:pointer; }
   .phonebar .circpill.on { background:#845095; border-color:#845095; color:#fff; }
   /* the drawing's own columns give way to the slim ones beside it */
-  body.sidecols .wrap .stage svg.canvas > .ptable { visibility:hidden; }
+  body.has-sidecols .wrap .stage svg.canvas > .ptable { visibility:hidden; }
   .sidecols { position:absolute; left:0; right:0; pointer-events:none; display:flex; justify-content:space-between; padding:0 2px; }
   .sidecols .sgl { width:15px; height:15px; vertical-align:-2px; margin-right:4px; overflow:visible; }
   .sidecols .scol.right .sgl { margin-right:4px; }
@@ -8538,8 +8538,8 @@ if (DATA.client) {
     cols.style.height = (r.height * 0.86) + 'px';
   };
   var buildCols = function () {
-    [].forEach.call(document.querySelectorAll('.sidecols'), function (c) { c.remove(); }); cols = null;
-    document.body.classList.remove('sidecols');
+    [].forEach.call(document.querySelectorAll('div.sidecols'), function (c) { c.remove(); }); cols = null;
+    document.body.classList.remove('has-sidecols');
     [].forEach.call(document.querySelectorAll('svg.canvas'), function (c) { c.style.width = ''; c.style.marginLeft = ''; });
     if (!phoneMQ.matches) return;
     var canvas = visibleCanvas();
@@ -8580,7 +8580,7 @@ if (DATA.client) {
       cols.appendChild(col);
     });
     document.querySelector('.stage').appendChild(cols);
-    document.body.classList.add('sidecols');
+    document.body.classList.add('has-sidecols');
     canvas.style.width = (146 * BG) + '%';
     canvas.style.marginLeft = ((100 - 100 * BG) / 2 - 22.4 * BG) + '%';
     placeCols();
