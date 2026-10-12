@@ -1406,7 +1406,7 @@ function drawGates(){
   if(!st.gates.size&&!st.hz.size){if(gatesKey){g.replaceChildren();gatesKey=""}return}
   const key=[...st.gates].sort().join(",")+"|"+[...st.hz].join(",")+"|"+gateSide();
   if(key===gatesKey)return;gatesKey=key;g.replaceChildren();
-  if(!st.gates.size)return;
+  if(!st.gates.size&&!st.hz.size)return;
   const gast=D.sky[gateSide()].gast,mine=carried();
   if(st.hz.size){
     // Placidus, as her astrology charts are: the house of the planet's
