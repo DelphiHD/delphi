@@ -1394,6 +1394,9 @@ const gateSide=()=>st.side==="design"?"design":"personality";
 var gatesKey=""; // var, not let: paint() can run before this line is reached
 function drawGates(){
   const g=document.getElementById("w-gates");if(!g)return;
+  // Nothing on: return before touching anything declared further down, since
+  // the first paint runs while the map is still being set up.
+  if(!st.gates.size){if(gatesKey){g.replaceChildren();gatesKey=""}return}
   const key=[...st.gates].sort().join(",")+"|"+gateSide();
   if(key===gatesKey)return;gatesKey=key;g.replaceChildren();
   if(!st.gates.size)return;
