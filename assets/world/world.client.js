@@ -132,7 +132,13 @@ function markup(G, inChart, findHosted, person) {
     // angle. Kaycee, 2026-10-11: "would it be possible to put a human design
     // gate overlay over the astrocartography map?"
     '<div class="dd" data-dd="gates"><button>Gates<span class="n"></span></button><div class="menu">' +
-    opt("gates", "MC", swatch("MC"), "Midheaven Gates") + opt("gates", "ASC", swatch("ASC"), "Ascendant Gates") + '</div></div>';
+    opt("gates", "MC", swatch("MC"), "Midheaven Gates") + opt("gates", "ASC", swatch("ASC"), "Ascendant Gates") +
+    // A gate's houses across the Earth: the same gate, the house it falls in
+    // from each place. Kaycee, 2026-10-11: "in astrology you are standing on
+    // the earth, but in HD you are looking at a diagram that includes the
+    // Earth in it."
+    '<div class="sep"></div><div class="w-opt was" style="cursor:default">House Zones</div>' +
+    HD_BODIES.map(function (b) { return opt("hz", b, GLYPHS[b], b); }).join("") + '</div></div>';
   // Two rows (Kaycee, 2026-10-11): finding places first, search then Find My
   // Places, with zoom at the right; the view's own switches together beneath.
   // The person's name over the view, as every other view carries it, so a
@@ -200,7 +206,7 @@ const ALL={lines:BODIES,parans:BODIES,angles:ANGLES};
 // Earth and both Nodes start off: Kaycee, 10 October. They are still one
 // click away, and All includes them.
 const START_OFF=["Earth","North Node","South Node"];
-const st={side:"both",lines:new Set(BODIES.filter(b=>!START_OFF.includes(b))),angles:new Set(ANGLES),parans:new Set(),extras:new Set(),trx:new Set(),ls:new Set(),gates:new Set()};
+const st={side:"both",lines:new Set(BODIES.filter(b=>!START_OFF.includes(b))),angles:new Set(ANGLES),parans:new Set(),extras:new Set(),trx:new Set(),ls:new Set(),gates:new Set(),hz:new Set()};
 const EXTRAS=["Chiron","Lilith"];
 let bothOff=false;   // the chart's panel has both sides off
 // Transit (Kaycee, 2026-10-11): where each transiting body sits on this
@@ -471,6 +477,7 @@ root.addEventListener("click",e=>{
   if(t.dataset.all){st[t.dataset.all]=new Set(ALL[t.dataset.all]);return paint()}
   if(t.dataset.none){st[t.dataset.none].clear();return paint()}
   if(t.dataset.lsback){lsFrom=null;buildLS();return paint()}
+  if(t.dataset.kind==="hz"){const b=t.dataset.chip,had=st.hz.has(b);st.hz.clear();if(!had)st.hz.add(b);return paint()}
   if(t.dataset.kind){const s=st[t.dataset.kind],b=t.dataset.chip;s.has(b)?s.delete(b):s.add(b);paint();if(t.dataset.kind==="ls"&&here)renderHere()}
 });
 const tip=document.getElementById("w-tip");
@@ -485,7 +492,7 @@ document.getElementById("w-map").addEventListener("mousemove",e=>{
   const el=e.target.closest("[data-side]");
   if(cur&&cur!==el){cur.classList.remove("hot");hot(cur.dataset,false)}
   cur=el;
-  if(!el&&st.gates.size&&typeof gateTip==="function"){const html=gateTip(e);if(html){tip.innerHTML=html;tip.style.display="block";tip.style.transform="none";
+  if(!el&&(st.gates.size||st.hz.size)&&typeof gateTip==="function"){const html=gateTip(e);if(html){tip.innerHTML=html;tip.style.display="block";tip.style.transform="none";
     tip.style.left=Math.min(e.clientX+14,innerWidth-tip.offsetWidth-8)+"px";tip.style.top=Math.min(e.clientY+14,innerHeight-tip.offsetHeight-8)+"px";return}}
   if(!el){tip.style.display="none";return}
   if(el.dataset.body2){el.classList.add("hot");el.parentNode.appendChild(el)}
@@ -1396,11 +1403,29 @@ function drawGates(){
   const g=document.getElementById("w-gates");if(!g)return;
   // Nothing on: return before touching anything declared further down, since
   // the first paint runs while the map is still being set up.
-  if(!st.gates.size){if(gatesKey){g.replaceChildren();gatesKey=""}return}
-  const key=[...st.gates].sort().join(",")+"|"+gateSide();
+  if(!st.gates.size&&!st.hz.size){if(gatesKey){g.replaceChildren();gatesKey=""}return}
+  const key=[...st.gates].sort().join(",")+"|"+[...st.hz].join(",")+"|"+gateSide();
   if(key===gatesKey)return;gatesKey=key;g.replaceChildren();
   if(!st.gates.size)return;
   const gast=D.sky[gateSide()].gast,mine=carried();
+  if(st.hz.size){
+    // Placidus, as her astrology charts are: the house of the planet's
+    // ecliptic degree from each place, by its hour angle against its semi-arcs.
+    // Angular houses (1, 4, 7, 10) gold, the next (2, 5, 8, 11) mid, the last
+    // (3, 6, 9, 12) light. Beyond the polar circles Placidus has no answer and
+    // the map is left plain.
+    const body=[...st.hz][0],lonE=lonOfWhere(WHERE[gateSide()][body]);
+    if(lonE!=null){
+      const cw=720,ch=Math.round(cw*(TOP-BOTTOM)/360),cv=document.createElement("canvas");cv.width=cw;cv.height=ch;
+      const c2=cv.getContext("2d"),img=c2.createImageData(cw,ch);
+      const tone={1:[199,154,46,95],4:[199,154,46,95],7:[199,154,46,95],10:[199,154,46,95],2:[132,80,149,46],5:[132,80,149,46],8:[132,80,149,46],11:[132,80,149,46]};
+      for(let y=0;y<ch;y++){const lat=TOP-(y+.5)/ch*(TOP-BOTTOM);
+        for(let x=0;x<cw;x++){const lon=-180+(x+.5)/cw*360,h=placidusHouse(gast+lon,lat,lonE),o=(y*cw+x)*4;
+          if(h==null)continue;const c=tone[h]||[132,80,149,14];img.data[o]=c[0];img.data[o+1]=c[1];img.data[o+2]=c[2];img.data[o+3]=c[3]}}
+      c2.putImageData(img,0,0);
+      g.append(mk("image",{x:0,y:0,width:W,height:H,preserveAspectRatio:"none",href:cv.toDataURL()}));
+    }
+  }
   const fillFor=(gate,i)=>mine.has(gate)?"rgba(199,154,46,.30)":(i%2?"rgba(132,80,149,.10)":"rgba(132,80,149,.03)");
   if(st.gates.has("ASC")){
     // a picture, cell by cell, laid under the lines like the Find My Places wash
@@ -1422,13 +1447,27 @@ function drawGates(){
     close(180);
   }
 }
+// "Gemini 25°46'" to 85.77: the provider's sign and degree, as the chart reads it.
+function lonOfWhere(txt){const m=/^(\S+) (\d+)°(\d+)'/.exec(String(txt||""));if(!m)return null;const z=["Aries","Taurus","Gemini","Cancer","Leo","Virgo","Libra","Scorpio","Sagittarius","Capricorn","Aquarius","Pisces"].indexOf(m[1]);return z<0?null:z*30+(+m[2])+(+m[3])/60}
+function placidusHouse(lstDeg,lat,lonE){
+  const l=lonE*RAD,ra=Math.atan2(Math.sin(l)*Math.cos(OBL),Math.cos(l))/RAD,dec=Math.asin(Math.sin(l)*Math.sin(OBL));
+  const x=-Math.tan(lat*RAD)*Math.tan(dec);if(Math.abs(x)>1)return null;
+  const dsa=Math.acos(x)/RAD,nsa=180-dsa,ha=((lstDeg-ra)%360+540)%360-180;
+  if(ha>=-dsa&&ha<0)return [10,11,12][Math.min(2,Math.floor(-ha/dsa*3))];
+  if(ha>=0&&ha<=dsa)return [9,8,7][Math.min(2,Math.floor(ha/dsa*3))];
+  if(ha>dsa)return [6,5,4][Math.min(2,Math.floor((ha-dsa)/nsa*3))];
+  return [3,2,1][Math.min(2,Math.floor((ha+180)/nsa*3))];
+}
 // What a hover over the map says when the gates are showing: the gate and
 // line on each angle shown, here, for the side shown.
 function gateTip(e){
   const [fx,fy]=frameAt(e.clientX,e.clientY);if(fx<0||fx>W||fy<0||fy>H)return"";
   const lon=((fx-view.tx)/view.k)/W*360-180,lat=TOP-((fy-view.ty)/view.k)/H*(TOP-BOTTOM),gast=D.sky[gateSide()].gast,mine=carried();
   const row=(name,v)=>{const q=gateOfLon(v);return '<div class="w-row">'+SIDE[gateSide()]+" "+name+" · Gate "+q.gate+"."+q.line+(mine.has(q.gate)?' <span class="w-pill ang">Yours</span>':"")+"</div>"};
-  return "<b>"+fmtLat(lat)+", "+fmtLon(lon)+"</b>"+(st.gates.has("MC")?row("Midheaven",mcAt(gast,lon)):"")+(st.gates.has("ASC")?row("Ascendant",ascAt(gast,lon,lat)):"");
+  let hz="";
+  if(st.hz.size){const b=[...st.hz][0],lonE=lonOfWhere(WHERE[gateSide()][b]),h=lonE==null?null:placidusHouse(gast+lon,lat,lonE),gl=(GATE_OF[gateSide()]||{})[b];
+    hz='<div class="w-row">'+SIDE[gateSide()]+" "+b+(gl?" "+gl:"")+(h?" · "+ord(h)+" house here":" · no Placidus house this far north or south")+"</div>"}
+  return "<b>"+fmtLat(lat)+", "+fmtLon(lon)+"</b>"+(st.gates.has("MC")?row("Midheaven",mcAt(gast,lon)):"")+(st.gates.has("ASC")?row("Ascendant",ascAt(gast,lon,lat)):"")+hz;
 }
 
 // Until she approves it, the Gates menu shows on her own chart only, so a
