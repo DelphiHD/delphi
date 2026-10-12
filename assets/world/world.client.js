@@ -1466,7 +1466,7 @@ function gateTip(e){
   const row=(name,v)=>{const q=gateOfLon(v);return '<div class="w-row">'+SIDE[gateSide()]+" "+name+" · Gate "+q.gate+"."+q.line+(mine.has(q.gate)?' <span class="w-pill ang">Yours</span>':"")+"</div>"};
   let hz="";
   if(st.hz.size){const b=[...st.hz][0],lonE=lonOfWhere(WHERE[gateSide()][b]),h=lonE==null?null:placidusHouse(gast+lon,lat,lonE),gl=(GATE_OF[gateSide()]||{})[b];
-    hz='<div class="w-row">'+SIDE[gateSide()]+" "+b+(gl?" "+gl:"")+(h?" · "+ord(h)+" house here":" · no Placidus house this far north or south")+"</div>"}
+    hz='<div class="w-row">'+SIDE[gateSide()]+" "+b+(gl?" "+gl:"")+(h?" · "+ord(h)+" house here":"")+"</div>"}
   return "<b>"+fmtLat(lat)+", "+fmtLon(lon)+"</b>"+(st.gates.has("MC")?row("Midheaven",mcAt(gast,lon)):"")+(st.gates.has("ASC")?row("Ascendant",ascAt(gast,lon,lat)):"")+hz;
 }
 
