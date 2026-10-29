@@ -205,7 +205,12 @@ async function main() {
   console.log(`\nCalling Claude (Sonnet 4.6, kind=${kind}${kind === "foundation" ? `, length=${length}` : ""}) …`);
   const t0 = Date.now();
   const apiKey = must("ANTHROPIC_API_KEY");
-  const ceiling = Number(process.env.HARD_COST_CEILING_CENTS ?? 80);
+  // Reports have their own ceiling. A first Foundation or Planetary call writes
+  // the prompt cache and came to about $1.14 in October, over the shared 80
+  // cents, and the ceiling is checked after the call is paid for, so every
+  // first draft was bought and thrown away. Kaycee approved raising it
+  // 2026-10-29. Transit and Echoes keep HARD_COST_CEILING_CENTS.
+  const ceiling = Number(process.env.REPORT_COST_CEILING_CENTS ?? 200);
   const result =
     kind === "foundation"
       ? await buildFoundationReport({

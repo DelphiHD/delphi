@@ -1460,3 +1460,23 @@ Tested on her chart with one report marked TEST. It arrived with its picture and
 - no pausing after a quiet week
 
 The upgrade is hers to do: Supabase dashboard, then the DelphiHD organization, then Billing, then Change Plan.
+
+---
+
+## 2026-10-29 — Reports could not read the library after the September sync
+
+**What happened:** Josh Stuart's reports refused to run: "Channel metadata is empty (0 of 36 channels loaded)." No report had been written since 2026-08-30, so nobody had seen it. The library was complete; the report writer could not read it.
+
+**How:**
+- 2026-08-24 (commit d4c20dc, inside "Client chart links"): the sync began saving relations as the linked pages' titles joined with ", " instead of as objects. No decision entry, never shown to Kaycee.
+- That did no harm at first, because the sync was not writing properties to the database at all, so the old object form stayed there. The August reports read that.
+- 2026-09-09 (e19a32b, 0be3d58): the sync was fixed to write properties, on Kaycee's instruction that every bit of metadata and page content matters. The next full sync replaced the object form with text. Charts were taught to read the text and checked; the report writer (`lib/chart/datapass.ts`) was not checked.
+- The health check counted that properties exist, not that anything could read them, so it kept passing.
+
+**Fix (Kaycee approved 2026-10-29):** the report writer reads relations stored as text by looking for each known library title whole (gates, channels, centers, circuits), never by splitting on commas, because "Ego (Heart, Will)" contains one. The object form is still read. Nothing else changed: not the sync, not charts, not the prompts, voice or report checks.
+
+**Verified:** report facts built for all 37 clients with a cached chart match the provider's chart (channels, defined centers, split count) with every channel's centers, circuit and type found and no warnings. Josh's matched his Notion reading exactly before his reports were run.
+
+**Still open, Kaycee to decide:** (1) edits to the sync, the library reader and the report-data step should stop and ask her before they happen (a Claude Code permission rule); (2) a push touching those files should be refused without a decision entry; (3) every sync should test-build report facts for a known chart, so a break shows that night.
+
+**Report cost ceiling (Kaycee approved 2026-10-29):** Foundation and Planetary first calls now cost about $1.14 (they write the prompt cache), over the shared 80-cent per-call ceiling. The ceiling is checked after the call is paid, so each first draft was bought and discarded, then retried. Reports now use `REPORT_COST_CEILING_CENTS`, default 200; transit and Evening Echoes keep `HARD_COST_CEILING_CENTS` (80). The .docx/PDF render makes no model calls, so it is not part of the cost. Kaycee no longer needs .docx or PDF: client reports live on the online chart as markdown, HTML in the portal later. Turning the .docx render off is a separate change, not yet made.

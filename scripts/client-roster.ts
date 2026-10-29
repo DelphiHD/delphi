@@ -98,6 +98,7 @@ export const CLIENTS: Record<string, ClientBrief> = {
   brett:    { id: "HD-035", slug: "brett", name: "Brett Bradshaw", birthDate: "1977-03-24", birthTime: "22:10", birthPlace: "Phoenix, Arizona, United States" },
   sir:      { id: "HD-036", slug: "sir", name: "Sir Alexander Smartwood III", birthDate: "1987-10-05", birthTime: "08:03", birthPlace: "Newport Beach, California, United States" },
   lisa:     { id: "HD-037", slug: "lisa", name: "Lisa Bradshaw", birthDate: "1979-01-29", birthTime: "14:24", birthPlace: "Bountiful, Utah, United States" },
+  josh:     { id: "HD-038", slug: "josh", name: "Josh Stuart", birthDate: "1982-10-30", birthTime: "14:08", birthPlace: "Orem, Utah, United States" },
 };
 
 /** Resolve a slug to a ClientBrief or exit with usage. */

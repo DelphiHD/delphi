@@ -269,9 +269,32 @@ function parseGateNumberFromTitle(title: string): number | null {
   return m ? parseInt(m[1], 10) : null;
 }
 
-function asRelationArray(v: unknown): RelationLink[] {
-  if (!Array.isArray(v)) return [];
-  return v.filter((x): x is RelationLink => !!x && typeof x === "object");
+// Since the 2026-09-09 full sync, relations are stored as the linked pages'
+// titles joined with ", " ("Ego (Heart, Will), Spleen"), not as objects. A
+// title can itself contain ", ", so the string is never split: each known
+// library title is looked for whole, bounded by the start, the end or ", ".
+// The object form is still accepted, so either shape reads the same.
+function asRelationArray(v: unknown, known: RelationLink[] = []): RelationLink[] {
+  if (Array.isArray(v)) return v.filter((x): x is RelationLink => !!x && typeof x === "object");
+  if (typeof v !== "string" || !v.trim()) return [];
+  const s = v.trim();
+  const hits: { at: number; end: number; link: RelationLink }[] = [];
+  for (const k of known) {
+    const t = (k.title ?? "").trim();
+    if (!t) continue;
+    for (let at = s.indexOf(t); at !== -1; at = s.indexOf(t, at + 1)) {
+      const end = at + t.length;
+      const startOk = at === 0 || s.slice(at - 2, at) === ", ";
+      const endOk = end === s.length || s.slice(end, end + 2) === ", ";
+      if (startOk && endOk) hits.push({ at, end, link: { id: k.id, title: t, kind: k.kind } });
+    }
+  }
+  // Longest title wins where two overlap ("Tribal: Ego" over "Tribal").
+  hits.sort((a, b) => a.at - b.at || b.end - a.end);
+  const out: RelationLink[] = [];
+  let upTo = -1;
+  for (const h of hits) if (h.at > upTo) { out.push(h.link); upTo = h.end - 1; }
+  return out;
 }
 
 function asString(v: unknown): string | null {
@@ -282,6 +305,17 @@ async function fetchChunkMetadata(
   supabase: SupabaseClient,
 ): Promise<{ gates: Map<number, GateMetadata>; channels: Map<string, ChannelMetadata>; warnings: string[] }> {
   const warnings: string[] = [];
+
+  // Every title a relation can point at, for reading relations stored as text.
+  const { data: titleRows, error: titleErr } = await supabase
+    .from("chunks")
+    .select("notion_page_id, title, source_kind")
+    .in("source_kind", ["gate", "channel", "center", "circuit"]);
+  if (titleErr) throw titleErr;
+  const titlesOf = (kind: string): RelationLink[] =>
+    (titleRows ?? []).filter((r) => r.source_kind === kind).map((r) => ({ id: r.notion_page_id, title: r.title, kind }));
+  const gateTitles = titlesOf("gate"), channelTitles = titlesOf("channel");
+  const centerTitles = titlesOf("center"), circuitTitles = titlesOf("circuit");
 
   // Gates.
   const { data: gateRows, error: gateErr } = await supabase
@@ -294,11 +328,11 @@ async function fetchChunkMetadata(
   for (const row of gateRows ?? []) {
     if (row.gate_number == null) continue;
     const m = (row.metadata ?? {}) as Record<string, unknown>;
-    const centerRel = asRelationArray(m["Center"]);
-    const channelRel = asRelationArray(m["Channel"]);
-    const partnerRel = asRelationArray(m["Channel Partner Gate"]);
+    const centerRel = asRelationArray(m["Center"], centerTitles);
+    const channelRel = asRelationArray(m["Channel"], channelTitles);
+    const partnerRel = asRelationArray(m["Channel Partner Gate"], gateTitles);
     const quarter = asString(m["Quarter"]);
-    const circuitRel = asRelationArray(m["Human Design Circuits"]);
+    const circuitRel = asRelationArray(m["Human Design Circuits"], circuitTitles);
     const keynote = asString(m["Keynote"]);
 
     gates.set(row.gate_number, {
@@ -325,7 +359,7 @@ async function fetchChunkMetadata(
   const channels = new Map<string, ChannelMetadata>();
   for (const row of channelRows ?? []) {
     const m = (row.metadata ?? {}) as Record<string, unknown>;
-    const gatesRel = asRelationArray(m["Gates"]);
+    const gatesRel = asRelationArray(m["Gates"], gateTitles);
     const gateNumbers = gatesRel
       .map((r) => (r.title ? parseGateNumberFromTitle(r.title) : null))
       .filter((n): n is number => n !== null);
@@ -334,13 +368,13 @@ async function fetchChunkMetadata(
       continue;
     }
     const [lo, hi] = gateNumbers.sort((a, b) => a - b);
-    const centersRel = asRelationArray(m["Centers"]);
+    const centersRel = asRelationArray(m["Centers"], centerTitles);
     const centerNames = centersRel.map((r) => r.title ?? "").filter(Boolean);
     if (centerNames.length !== 2) {
       warnings.push(`channel "${row.title}" has ${centerNames.length} center relations; expected 2`);
     }
     const channelType = asString(m["Channel Type"]);
-    const circuitRel = asRelationArray(m["Circuit"]);
+    const circuitRel = asRelationArray(m["Circuit"], circuitTitles);
 
     channels.set(`${lo}-${hi}`, {
       notionPageId: row.notion_page_id,
