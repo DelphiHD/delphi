@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "ask": [
+      "Edit(/scripts/sync-notion.ts)",
+      "Edit(/lib/hd/chunks-source.ts)",
+      "Edit(/lib/hd/library-names.ts)",
+      "Edit(/lib/retrieval/**)",
+      "Edit(/lib/chart/datapass.ts)",
+      "Edit(/lib/chart/types.ts)",
+      "Edit(/lib/report/**)",
+      "Edit(/scripts/generate-report.ts)",
+      "Edit(/scripts/add-client.ts)",
+      "Edit(/lib/llm/core.ts)",
+      "Edit(/lib/mybodygraph.ts)",
+      "Edit(/lib/transit/sky.ts)",
+      "Edit(/lib/render/mandala.ts)",
+      "Edit(/supabase/migrations/**)",
+      "Edit(/.githooks/**)",
+      "Edit(/.claude/settings.json)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/protect-core.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1480,3 +1480,17 @@ The upgrade is hers to do: Supabase dashboard, then the DelphiHD organization, t
 **Still open, Kaycee to decide:** (1) edits to the sync, the library reader and the report-data step should stop and ask her before they happen (a Claude Code permission rule); (2) a push touching those files should be refused without a decision entry; (3) every sync should test-build report facts for a known chart, so a break shows that night.
 
 **Report cost ceiling (Kaycee approved 2026-10-29):** Foundation and Planetary first calls now cost about $1.14 (they write the prompt cache), over the shared 80-cent per-call ceiling. The ceiling is checked after the call is paid, so each first draft was bought and discarded, then retried. Reports now use `REPORT_COST_CEILING_CENTS`, default 200; transit and Evening Echoes keep `HARD_COST_CEILING_CENTS` (80). The .docx/PDF render makes no model calls, so it is not part of the cost. Kaycee no longer needs .docx or PDF: client reports live on the online chart as markdown, HTML in the portal later. Turning the .docx render off is a separate change, not yet made.
+
+---
+
+## 2026-10-29 — Core files are locked
+
+**Why:** structural changes are Kaycee's decision, but that rule lived only in instructions an agent reads. On 2026-08-24 a sync change rode in inside an unrelated commit and broke the reports for two months.
+
+**What (Kaycee approved 2026-10-29):**
+- `.claude/hooks/protect-core.sh`, run before every agent edit. Core files ask her where a prompt can be shown, and are refused in auto, bypass and dontAsk modes. Tested in this session: the "ask" rules in `.claude/settings.json` and an "ask" from the hook were both approved silently in auto mode, so refusing there is the only real lock. A test edit to `lib/chart/datapass.ts` was then refused.
+- `.githooks/pre-push` refuses a push that touches a core file without an entry in `docs/DECISIONS.md` in the same push. Tested: it refuses d40220b (report code, no decision) and passes 64c2348 (today's fix, with its decision).
+
+**Core files:** `scripts/sync-notion.ts`, `lib/hd/chunks-source.ts`, `lib/hd/library-names.ts`, `lib/retrieval/`, `lib/chart/datapass.ts`, `lib/chart/types.ts`, `lib/report/`, `scripts/generate-report.ts`, `scripts/add-client.ts`, `lib/llm/core.ts`, `lib/mybodygraph.ts`, `lib/transit/sky.ts`, `lib/render/mandala.ts`, `supabase/migrations/`, `.githooks/`, `.claude/settings.json`, `.claude/hooks/`.
+
+**Limits, said plainly:** the edit check sees the editing tools, not shell commands; the push check is what catches those, at push time. Bodygraphs: not touched.

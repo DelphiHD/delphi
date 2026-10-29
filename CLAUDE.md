@@ -164,6 +164,11 @@ The repo is `DelphiHD/delphi`, cloned to `~/delphi`. The product is HD Reports. 
 
 A pre-push hook at `.githooks/pre-push` refuses to push if any file listed in "Read first" above is missing locally or exists but is untracked. This catches the failure mode where canonical docs are edited locally and never committed.
 
+**Core-file locks (2026-10-29).** Two locks hold the "Change governance" rule above, so it does not depend on an agent remembering it:
+- Before any agent edit, `.claude/hooks/protect-core.sh` checks the file. A core file (the sync, the library readers, the report-data step and report code, the spine modules, migrations, the hooks themselves) asks Kaycee where Claude Code can show her a prompt, and is refused outright in auto or bypass modes, where an ask would be approved without her seeing it. To approve a change she switches the session to Ask permissions.
+- `.githooks/pre-push` refuses a push that changes a core file unless the same push adds to `docs/DECISIONS.md`. This also covers Codex and any other agent, and edits made by shell commands, which the edit check cannot see.
+The two lists of core files are kept identical.
+
 On a fresh clone, run once:
 
     git config core.hooksPath .githooks

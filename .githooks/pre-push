@@ -53,6 +53,29 @@ if (( ${#missing[@]} + ${#untracked[@]} > 0 )); then
   exit 1
 fi
 
+# Core files do not change without a written decision. On 2026-08-24 the sync
+# changed how it stores relations inside a commit about chart links; the
+# reports could not read the library from the next full sync until 2026-10-29,
+# and nothing said so. A push that touches any of these must also add to
+# docs/DECISIONS.md in the same push. Keep this list in step with the "ask"
+# list in .claude/settings.json.
+protected_re='^(scripts/sync-notion\.ts|lib/hd/chunks-source\.ts|lib/hd/library-names\.ts|lib/retrieval/|lib/chart/datapass\.ts|lib/chart/types\.ts|lib/report/|scripts/generate-report\.ts|scripts/add-client\.ts|lib/llm/core\.ts|lib/mybodygraph\.ts|lib/transit/sky\.ts|lib/render/mandala\.ts|supabase/migrations/|\.githooks/|\.claude/settings\.json)'
+zero=0000000000000000000000000000000000000000
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+  [[ "$local_sha" == "$zero" ]] && continue
+  if [[ "$remote_sha" == "$zero" ]]; then range="$local_sha"; else range="$remote_sha..$local_sha"; fi
+  changed=$(git diff --name-only "$range" 2>/dev/null || git show --name-only --format= "$local_sha")
+  touched=$(printf '%s\n' "$changed" | grep -E "$protected_re" || true)
+  if [[ -n "$touched" ]] && ! printf '%s\n' "$changed" | grep -qx "docs/DECISIONS.md"; then
+    echo "pre-push: core files changed with no decision written down."
+    printf '    - %s\n' $touched
+    echo
+    echo "Add an entry to docs/DECISIONS.md saying what changed, why, what else it"
+    echo "touches, and that Kaycee approved it, then push again."
+    exit 1
+  fi
+done
+
 # No sentence reaches a client that Kaycee has not seen. On 2026-09-12 four of
 # mine did, in one morning, and each one cost her a screenshot and a message
 # telling me where it was. She asked the right question: "how are we going to

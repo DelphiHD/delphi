@@ -1,6 +1,6 @@
 # Delphi Dashboard: Spec
 
-Draft 2026-10-29, for Kaycee to mark up. Nothing here is built yet. When she has
+Draft 2026-10-29, approved by Kaycee. Nothing here is built yet. When she has
 approved it, this page is the definition of done: every line works from her
 phone, signed in, from anywhere, and is ticked off here as it does.
 

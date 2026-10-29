@@ -39,6 +39,7 @@ out/
 .claude/*
 !.claude/skills/
 !.claude/settings.json
+!.claude/hooks/
 
 # Logs and pipes
 *.log
