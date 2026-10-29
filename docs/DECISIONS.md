@@ -1494,3 +1494,16 @@ The upgrade is hers to do: Supabase dashboard, then the DelphiHD organization, t
 **Core files:** `scripts/sync-notion.ts`, `lib/hd/chunks-source.ts`, `lib/hd/library-names.ts`, `lib/retrieval/`, `lib/chart/datapass.ts`, `lib/chart/types.ts`, `lib/report/`, `scripts/generate-report.ts`, `scripts/add-client.ts`, `lib/llm/core.ts`, `lib/mybodygraph.ts`, `lib/transit/sky.ts`, `lib/render/mandala.ts`, `supabase/migrations/`, `.githooks/`, `.claude/settings.json`, `.claude/hooks/`.
 
 **Limits, said plainly:** the edit check sees the editing tools, not shell commands; the push check is what catches those, at push time. Bodygraphs: not touched.
+
+---
+
+## 2026-10-29 — Dashboard phase 1: the operations log is in the cloud
+
+**What (Kaycee approved phase 1, 2026-10-29):** new table `ops_log` (migration `20261029_ops_log.sql`): one row per log line, the whole line kept as written, keyed by its hash so a line is never stored twice. RLS on, no policies, no browser grants; tested: the browser key is refused both reading and writing, the server key reads.
+- `generate-report.ts` writes every report attempt (now with what a failed attempt cost), every finished report and every check failure to it, beside the files.
+- `add-client.ts` writes every delivery; `energy-flow-diagram.ts` writes every chart publish, including publishes from the website, which had no log at all.
+- `scripts/ops-sync.ts` copies the Mac files in and compares counts; safe to re-run. First run: 15 attempts, 99 reports, 250 check failures, 11 deliveries, 744 publishes, all matching.
+
+**Not changed:** the files on the Mac (still written), the Mac dashboard, the charts, the sync, report writing. Next: the online dashboard reads `ops_log` (phase 2).
+
+**Also:** the Supabase access token used for migrations had expired; Kaycee made a new one 2026-10-29. A pre-existing type error at `generate-report.ts:550` (a "planetary" comparison inside a branch TypeScript has already narrowed) was there before today and is untouched.

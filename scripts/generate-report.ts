@@ -30,6 +30,7 @@ import { renderReportDocx, svgToPng } from "@/lib/render/docx";
 import { renderCrossMandala } from "@/lib/render/mandala";
 import type { Activation as MandalaActivation, MandalaChart, Planet as MandalaPlanet } from "@/lib/render/mandala.types";
 import { CLIENTS, type ClientBrief, placeForLookup } from "./client-roster";
+import { recordOps } from "@/lib/ops/record";
 
 function must(name: string): string {
   const v = process.env[name];
@@ -124,12 +125,15 @@ async function main() {
   const attemptStart = Date.now();
   const startedAt = new Date().toISOString();
   let attemptRecorded = false;
-  const recordAttempt = (outcome: "completed" | "failed" | "killed", note = "") => {
+  // cost_usd is what a failed attempt was charged, where it is known (a
+  // cost-ceiling stop is charged in full before it is refused), so money spent
+  // on attempts that produced nothing shows on the dashboard.
+  const recordAttempt = (outcome: "completed" | "failed" | "killed", note = "", costUsd?: number) => {
     if (attemptRecorded) return;
     attemptRecorded = true;
     try {
       mkdirSync(".cache/reports", { recursive: true });
-      appendFileSync(ATTEMPT_LOG, JSON.stringify({
+      const line = JSON.stringify({
         at: new Date().toISOString(),
         started_at: startedAt,
         client: brief.name,
@@ -138,13 +142,20 @@ async function main() {
         elapsed_sec: Math.round((Date.now() - attemptStart) / 10) / 100,
         outcome,
         note: note.slice(0, 300),
-      }) + "\n", "utf8");
+        ...(costUsd !== undefined ? { cost_usd: Math.round(costUsd * 10000) / 10000 } : {}),
+      });
+      appendFileSync(ATTEMPT_LOG, line + "\n", "utf8");
+      void recordOps("report_attempt", line);
     } catch { /* never let bookkeeping take down a run */ }
   };
   for (const sig of ["SIGTERM", "SIGINT", "SIGHUP"] as const) {
     process.on(sig, () => { recordAttempt("killed", "stopped by " + sig); process.exit(130); });
   }
-  process.on("uncaughtException", (e) => { recordAttempt("failed", String(e)); throw e; });
+  process.on("uncaughtException", (e) => {
+    const cents = (e as { cents?: unknown }).cents;
+    recordAttempt("failed", String(e), typeof cents === "number" ? cents / 100 : undefined);
+    throw e;
+  });
   (globalThis as Record<string, unknown>).__recordAttempt = recordAttempt;
 
 
@@ -373,7 +384,7 @@ async function main() {
       ...softIssues.map((x) => ({ ...x, severity: "soft" })),
     ];
     for (const i of logged) {
-      appendFileSync(".cache/reports/failures.jsonl", JSON.stringify({
+      const line = JSON.stringify({
         at: generatedAt,
         id: brief.id, slug: brief.slug, client: brief.name,
         report: kindLabel2,
@@ -383,7 +394,9 @@ async function main() {
         message: i.message,
         detected: i.detected,
         file: `${brief.name} - ${outSuffix} - v${nextV}.md`,
-      }) + "\n");
+      });
+      appendFileSync(".cache/reports/failures.jsonl", line + "\n");
+      await recordOps("report_failure", line);
     }
   } catch { /* the log is for watching; never worth failing a report over */ }
 
@@ -473,7 +486,9 @@ soft_warnings: ${softCount}
   })();
   Object.assign(logEntry, effort);
 
-  appendFileSync(".cache/reports/log.jsonl", JSON.stringify(logEntry) + "\n");
+  const logLine = JSON.stringify(logEntry);
+  appendFileSync(".cache/reports/log.jsonl", logLine + "\n");
+  await recordOps("report_run", logLine);
 
   // 6. Lint: no em dashes.
   if (/—/.test(result.text)) {

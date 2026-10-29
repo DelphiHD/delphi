@@ -42,6 +42,7 @@ import { createInterface } from "node:readline/promises";
 import { execFileSync, spawn } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { CLIENTS, clientOutputDir, type ClientBrief } from "./client-roster";
+import { recordOps } from "@/lib/ops/record";
 
 const ROSTER = "scripts/client-roster.ts";
 const DELIVERY_LOG = ".cache/reports/deliveries.jsonl";
@@ -547,7 +548,9 @@ async function main() {
   const recordDelivery = (rec: Record<string, unknown>) => {
     try {
       mkdirSync(".cache/reports", { recursive: true });
-      appendFileSync(DELIVERY_LOG, JSON.stringify(rec) + "\n");
+      const line = JSON.stringify(rec);
+      appendFileSync(DELIVERY_LOG, line + "\n");
+      void recordOps("delivery", line);
     } catch { /* never fail a run over a metric */ }
   };
   for (const b of briefs) {

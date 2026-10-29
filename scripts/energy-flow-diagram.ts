@@ -43,6 +43,7 @@ import { CHANNELS } from "@/lib/hd/channels";
 import { CENTER_GATES, centerOf, type Center } from "@/lib/hd/gate-center";
 import { loadLibraryChunks } from "@/lib/hd/chunks-source";
 import { cacheDir, cacheRoot, tryMkdir } from "@/lib/cache-dir";
+import { recordOps } from "@/lib/ops/record";
 import { chartByToken, briefFromRecord, reliabilityForChart } from "@/lib/hd/chart-record";
 import { type Cycles } from "@/lib/chart/cycles";
 import { cyclesFor } from "@/lib/hd/cycles-node";
@@ -12501,7 +12502,7 @@ async function publishChart(client: ClientCtx, html: string): Promise<string> {
     console.warn(`  ! summary not written: ${e instanceof Error ? e.message : e}`);
   }
 
-  recordChange(client, { previousHtml, nextHtml: html, rolledFrom });
+  await recordChange(client, { previousHtml, nextHtml: html, rolledFrom });
 
   return `${SITE}/c/${token}`;
 }
@@ -12535,10 +12536,10 @@ const KEEP_VERSIONS = 5;
  * and the page around it are separated, because a chart republished for a new
  * view is a different event from one republished because the report was rewritten.
  */
-function recordChange(
+async function recordChange(
   client: ClientCtx,
   args: { previousHtml: string; nextHtml: string; rolledFrom: string },
-): void {
+): Promise<void> {
   const { previousHtml, nextHtml, rolledFrom } = args;
   const at = new Date().toISOString();
 
@@ -12572,6 +12573,9 @@ function recordChange(
       appendFileSync(join(dir, "changelog.jsonl"), `${JSON.stringify(entry)}\n`, "utf8");
     } catch { /* the chart matters; the note does not */ }
   }
+  // The cloud copy is the one a publish from the website leaves, since the
+  // server has no folder to keep the note in. Never fatal, like the file.
+  await recordOps("chart_publish", JSON.stringify(entry));
 
   const day = at.slice(0, 10);
   const time = at.slice(11, 16);
