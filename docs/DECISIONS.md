@@ -1515,4 +1515,4 @@ The upgrade is hers to do: Supabase dashboard, then the DelphiHD organization, t
 Josh Stuart had a live chart and was missing from Everyone: the list read only `charts`, and `add-client.ts` never wrote a row there (the roster had been added once by `seed-charts.ts`). Kaycee: "ALL FUCKING CLIENTS. Every. Single. One. Regardless of where they came from." Now:
 - The online list also shows any live published chart with no `charts` row, and counts it under People.
 - The morning check fails, naming them, if any live chart has no list record (fix: `npx tsx scripts/seed-charts.ts`). Today: none missing; Josh was seeded.
-- Still to do, needs her approval (core file): `add-client.ts` runs `seed-charts.ts` after publishing, so new clients get their full record at once.
+- `add-client.ts` runs `seed-charts.ts` after publishing (Kaycee approved the core-file edit 2026-10-29), so a new client is on the list with their full record at once. `seed-charts.ts` now resolves a new client's timezone with the provider when no chart is cached yet, instead of skipping them, which is what left Josh off.

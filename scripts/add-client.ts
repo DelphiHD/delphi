@@ -647,6 +647,11 @@ async function main() {
     failed.length
       ? `${done.length} of ${briefs.length} done. ${failed.length} need a look.`
       : `${done.length} chart${done.length === 1 ? "" : "s"} published.`);
+  // Everyone published goes on the dashboard's list with their birth record:
+  // the list is the one place Kaycee sees every client (Josh Stuart was
+  // published 2026-10-29 and missing from it). Never fails the run.
+  try { process.stdout.write(run("scripts/seed-charts.ts", [])); }
+  catch { console.log("  ⚠ could not add the new chart(s) to the dashboard list; run: npx tsx scripts/seed-charts.ts"); }
   console.log("\nTheir reads start with tomorrow's transit report, which reads the roster.\n");
 }
 

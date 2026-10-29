@@ -18,7 +18,8 @@ loadEnv({ path: ".env.local", override: true });
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createClient } from "@supabase/supabase-js";
-import { CLIENTS } from "./client-roster";
+import { CLIENTS, placeForLookup } from "./client-roster";
+import { getTimezoneForLocation } from "@/lib/mybodygraph";
 
 const DRY = process.argv.includes("--dry-run");
 
@@ -62,8 +63,12 @@ async function main(): Promise<void> {
     }>)[link.client_slug];
     if (!person) { skipped.push(`${link.client_slug}: not in the roster`); continue; }
 
-    const tz = cachedTimezone(link.client_slug);
-    if (!tz) { skipped.push(`${person.name}: no resolved timezone on file`); continue; }
+    // A client added today has no chart cached yet; the provider resolves the
+    // timezone from the same place query their chart and reports were cast
+    // with, so it is the same answer, not a guess (Josh Stuart, 2026-10-29).
+    let tz = cachedTimezone(link.client_slug);
+    if (!tz) { try { tz = await getTimezoneForLocation(placeForLookup(CLIENTS[link.client_slug])); } catch { tz = null; } }
+    if (!tz) { skipped.push(`${person.name}: timezone could not be resolved`); continue; }
 
     rows.push({
       person_name: person.name,
