@@ -113,6 +113,28 @@ async function checkMetadata(): Promise<Check> {
  * Personality Sun and its four gates. This walks all of them and says which
  * pages a chart could not use, or could confuse with another.
  */
+// Every client with a published chart is on the dashboard's list with their
+// birth record. Josh Stuart had a live chart and no list row on 2026-10-29
+// because add-client never wrote one; the list now shows such charts anyway,
+// but without the record. Kaycee: one place to see every client, every one.
+async function checkEveryClientListed(): Promise<Check> {
+  const name = "Every client is on the dashboard list";
+  try {
+    const supa = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+    const [{ data: links, error: e1 }, { data: rows, error: e2 }] = await Promise.all([
+      supa.from("client_charts").select("token, client_name, revoked_at"),
+      supa.from("charts").select("token"),
+    ]);
+    if (e1 || e2) return { name, pass: false, detail: (e1 ?? e2)!.message, fix: "check Supabase" };
+    const listed = new Set((rows ?? []).map((r) => String(r.token)));
+    const missing = (links ?? []).filter((l) => !l.revoked_at && !listed.has(String(l.token))).map((l) => String(l.client_name));
+    if (missing.length) return { name, pass: false, detail: `${missing.length} live chart(s) with no list record: ${missing.join(", ")}`, fix: "npx tsx scripts/seed-charts.ts" };
+    return { name, pass: true, detail: `all ${(links ?? []).filter((l) => !l.revoked_at).length} live charts listed` };
+  } catch (e) {
+    return { name, pass: false, detail: e instanceof Error ? e.message : String(e), fix: "check Supabase" };
+  }
+}
+
 async function checkCrossLibrary(): Promise<Check> {
   const name = "Incarnation crosses are all findable";
   try {
@@ -399,6 +421,7 @@ async function main() {
     await checkMetadata(),
     await checkChartApis(),
     await checkCrossLibrary(),
+    await checkEveryClientListed(),
     await checkTodayTransit(),
     await checkYesterdayTransit(),
     await checkTransitReads(),

@@ -1507,3 +1507,12 @@ The upgrade is hers to do: Supabase dashboard, then the DelphiHD organization, t
 **Not changed:** the files on the Mac (still written), the Mac dashboard, the charts, the sync, report writing. Next: the online dashboard reads `ops_log` (phase 2).
 
 **Also:** the Supabase access token used for migrations had expired; Kaycee made a new one 2026-10-29. A pre-existing type error at `generate-report.ts:550` (a "planetary" comparison inside a branch TypeScript has already narrowed) was there before today and is untouched.
+
+---
+
+## 2026-10-29 — Every client is on the dashboard list
+
+Josh Stuart had a live chart and was missing from Everyone: the list read only `charts`, and `add-client.ts` never wrote a row there (the roster had been added once by `seed-charts.ts`). Kaycee: "ALL FUCKING CLIENTS. Every. Single. One. Regardless of where they came from." Now:
+- The online list also shows any live published chart with no `charts` row, and counts it under People.
+- The morning check fails, naming them, if any live chart has no list record (fix: `npx tsx scripts/seed-charts.ts`). Today: none missing; Josh was seeded.
+- Still to do, needs her approval (core file): `add-client.ts` runs `seed-charts.ts` after publishing, so new clients get their full record at once.

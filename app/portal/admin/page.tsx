@@ -63,7 +63,7 @@ export default async function AdminPage() {
 
   const [{ data: charts }, { data: links }, { data: profiles }, transits, admins, lastBuilt, mine] = await Promise.all([
     db.from("charts").select("id, person_name, source, tier, time_accuracy, token, created_at, for_email, owner_id").order("created_at", { ascending: false }),
-    db.from("client_charts").select("token, client_name, revoked_at"),
+    db.from("client_charts").select("token, client_name, revoked_at, created_at"),
     db.from("profiles").select("id, email, account_type, created_at"),
     db.storage.from("charts").list("transits", { limit: 90, sortBy: { column: "name", order: "desc" } }),
     db.from("delphi_admins").select("user_id"),
@@ -132,6 +132,22 @@ export default async function AdminPage() {
     email: String(r.for_email ?? ""),
     since: String(r.created_at ?? "").slice(0, 10),
   }));
+  // Every client, whatever made their chart. A published chart with no row in
+  // charts (add-client never wrote one, so Josh Stuart was missing on
+  // 2026-10-29) is still somebody's chart and is listed. Kaycee: "ALL FUCKING
+  // CLIENTS. Every. Single. One. Regardless of where they came from."
+  const listed = new Set(rows.map((r) => String(r.token)));
+  const unlisted = (links ?? []).filter((l) => !l.revoked_at && !listed.has(String(l.token)));
+  for (const l of unlisted) everyone.push({
+    id: String(l.token),
+    name: fileAs(String(l.client_name ?? "")),
+    chart: "open",
+    chartHref: `${SITE}/c/${l.token}`,
+    how: "Roster",
+    time: "Exact",
+    email: "",
+    since: String(l.created_at ?? "").slice(0, 10),
+  });
 
   // Every account, with what it can see. Accounts arrive on their own now, so
   // this is where Kaycee finds out who turned up and the only place either
@@ -237,7 +253,7 @@ export default async function AdminPage() {
 
   const cards: [string, number, string][] = [
     ["Open reports", reports.filter((r) => r.status === "new" || r.status === "looking").length, "problems people sent"],
-    ["People", people.length, "charts that belong to somebody"],
+    ["People", people.length + unlisted.length, "charts that belong to somebody"],
     ["Signed up", signups.length, "through the website or an event"],
     ["Accounts", accountList.length, "can sign in"],
     ["Live links", live.size, "charts anyone can open"],
