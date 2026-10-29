@@ -208,7 +208,10 @@ export default async function AdminPage() {
     .filter((o) => o.kind === "report_run" || (o.kind === "report_attempt" && o.data.outcome !== "completed"))
     .map((o, i) => {
       const run = o.kind === "report_run";
-      const cost = Number(o.data.cost_usd ?? 0);
+      // Attempts from before cost_usd was recorded still carry what they were
+      // charged in their note: "cost ceiling exceeded: $1.1450 > $0.8000".
+      const noted = /cost ceiling exceeded: \$([\d.]+)/.exec(String(o.data.note ?? ""));
+      const cost = Number(o.data.cost_usd ?? (noted ? noted[1] : 0));
       return {
         id: `k${i}`, when: o.at.slice(0, 16).replace("T", " "), client: opName(o),
         report: String(o.data.report_type ?? ""),
