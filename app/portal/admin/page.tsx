@@ -92,6 +92,18 @@ export default async function AdminPage() {
     if (f.data) health = JSON.parse(await f.data.text());
   } catch { /* the tab says when it has nothing */ }
 
+  // The operations log, from the cloud since 2026-10-29 (phase 1 of
+  // docs/DASHBOARD_SPEC.md): what every report and every failed attempt cost,
+  // and every issue the report checks found. Before this it was only on the Mac.
+  type Op = { kind: string; at: string; client_slug: string | null; data: Record<string, unknown> };
+  let ops: Op[] = [];
+  try {
+    const { data } = await db.from("ops_log").select("kind, at, client_slug, data")
+      .in("kind", ["report_run", "report_attempt", "report_failure"])
+      .order("at", { ascending: false }).limit(5000);
+    ops = (data ?? []) as Op[];
+  } catch { /* the tabs say when they have nothing */ }
+
   // The chart change log travels with the code, so it can be read here.
   let changes: Row[] = [];
   try {
@@ -188,6 +200,36 @@ export default async function AdminPage() {
       item: it.title, status: it.status ?? "", note: (it.note ?? "").slice(0, 160),
     })));
 
+  const money = (n: number) => `$${n.toFixed(2)}`;
+  const opName = (o: Op) => fileAs(String(o.data.client ?? o.client_slug ?? ""));
+  // Every report written, and every attempt that was paid for and produced
+  // nothing: a stop at the cost ceiling is charged in full before it is refused.
+  const costRows: Row[] = ops
+    .filter((o) => o.kind === "report_run" || (o.kind === "report_attempt" && o.data.outcome !== "completed"))
+    .map((o, i) => {
+      const run = o.kind === "report_run";
+      const cost = Number(o.data.cost_usd ?? 0);
+      return {
+        id: `k${i}`, when: o.at.slice(0, 16).replace("T", " "), client: opName(o),
+        report: String(o.data.report_type ?? ""),
+        outcome: run ? (Number(o.data.hard_failures ?? 0) ? "written, failed checks" : "written") : String(o.data.outcome ?? ""),
+        cost: cost ? money(cost) : run ? "" : "not recorded",
+        costN: cost, words: run ? Number(o.data.words ?? 0) : "",
+      };
+    });
+  const failureRows: Row[] = ops.filter((o) => o.kind === "report_failure").map((o, i) => ({
+    id: `f${i}`, when: o.at.slice(0, 16).replace("T", " "), client: opName(o),
+    report: String(o.data.report ?? ""), severity: String(o.data.severity ?? ""),
+    rule: String(o.data.rule ?? ""), message: String(o.data.message ?? ""),
+    detected: String(o.data.detected ?? "").slice(0, 200),
+  }));
+  const month = new Date().toISOString().slice(0, 7);
+  const thisMonth = costRows.filter((r) => String(r.when).startsWith(month));
+  const spent = thisMonth.reduce((a, r) => a + Number(r.costN ?? 0), 0);
+  const wasted = thisMonth.filter((r) => !String(r.outcome).startsWith("written")).reduce((a, r) => a + Number(r.costN ?? 0), 0);
+  const failedChecks = new Set(ops.filter((o) => o.kind === "report_failure" && o.at.startsWith(month) && o.data.severity === "hard")
+    .map((o) => `${o.client_slug}|${o.data.report}`)).size;
+
   const statusRows: Row[] = (health.checks ?? []).map((c, i) => ({
     id: `s${i}`, check: c.name, state: c.pass ? "pass" : "FAIL", detail: c.detail, fix: c.fix ?? "",
   }));
@@ -251,8 +293,10 @@ export default async function AdminPage() {
     phone: byDevice(list, "phone"), tablet: byDevice(list, "tablet"), computer: byDevice(list, "computer"),
   }));
 
-  const cards: [string, number, string][] = [
+  const cards: [string, number | string, string][] = [
     ["Open reports", reports.filter((r) => r.status === "new" || r.status === "looking").length, "problems people sent"],
+    ["Report spend", money(spent), wasted ? `this month, ${money(wasted)} on attempts that produced nothing` : "this month"],
+    ["Reports failing checks", failedChecks, "this month, need a hand-touch"],
     ["People", people.length + unlisted.length, "charts that belong to somebody"],
     ["Signed up", signups.length, "through the website or an event"],
     ["Accounts", accountList.length, "can sign in"],
@@ -293,6 +337,17 @@ export default async function AdminPage() {
           color: var(--purple); background: rgba(132,80,149,.1); padding: 2px 6px; border-radius: 999px; }
         .note { font-size: 12.5px; color: #9c4a28; background: rgba(192,96,60,.09);
           border-radius: 10px; padding: 9px 11px; margin: 0 0 10px; }
+        .health { border: 1px solid rgba(132,80,149,.18); border-radius: 13px; padding: 10px 12px; background: #fff; margin-bottom: 12px; }
+        .hbhead { font-size: 13px; font-weight: 600; margin-bottom: 7px; }
+        .hbhead span { font-weight: 400; color: var(--muted); font-size: 12px; }
+        .hbrow { display: flex; flex-wrap: wrap; gap: 6px; }
+        .hb { font-size: 11.5px; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+        .hb::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+        .hb.ok { background: rgba(46,125,80,.08); color: #2e5d40; }
+        .hb.ok::before { background: #2e7d50; }
+        .hb.bad { background: rgba(192,60,60,.10); color: #9c2a2a; font-weight: 600; }
+        .hb.bad::before { background: #c03c3c; }
+        .hbwhy { font-size: 12px; color: #9c2a2a; margin: 7px 0 0; }
         @media (max-width: 620px) { .hide-sm { display: none; } }
       `}</style>
 
@@ -303,13 +358,30 @@ export default async function AdminPage() {
         {deployedSha && <> Site running {deployedSha}.</>}
       </p>
 
+      {health.checks && (
+        <div className="health">
+          <div className="hbhead">
+            {health.allGreen ? "All systems green" : `${(health.checks ?? []).filter((c) => !c.pass).length} need a look`}
+            <span> · checked {String(health.at ?? "").slice(0, 16).replace("T", " ")} UTC</span>
+          </div>
+          <div className="hbrow">
+            {(health.checks ?? []).map((c) => (
+              <span key={c.name} className={c.pass ? "hb ok" : "hb bad"} title={c.detail}>{c.name}</span>
+            ))}
+          </div>
+          {(health.checks ?? []).filter((c) => !c.pass).map((c) => (
+            <p key={c.name} className="hbwhy"><b>{c.name}:</b> {c.detail}</p>
+          ))}
+        </div>
+      )}
+
       <div className="cards">
         {cards.map(([label, n, note]) => (
           <div className="card" key={label}><b>{n}</b><span>{label}</span><em>{note}</em></div>
         ))}
       </div>
 
-      <Tabs names={["Everyone", "New chart", "Reports", "Visits", "Status", "Transits", "Changes", "Accounts", "Decided", "Launch"]}>
+      <Tabs names={["Everyone", "New chart", "Reports", "Visits", "Status", "Cost", "Failures", "Transits", "Changes", "Accounts", "Decided", "Launch"]}>
         <SortableTable
           initial={{ key: "since", dir: -1 }}
           columns={[
@@ -375,6 +447,42 @@ export default async function AdminPage() {
             ]}
             rows={statusRows}
             empty="Nothing published yet."
+          />
+        </div>
+        <div>
+          <p className="sub">
+            Every report written and every attempt that was paid for and produced nothing. This month: {money(spent)}{wasted ? `, of which ${money(wasted)} produced nothing` : ""}.
+            Attempts before 29 October did not record their cost.
+          </p>
+          <SortableTable
+            initial={{ key: "when", dir: -1 }}
+            columns={[
+              { key: "when", label: "When (UTC)" },
+              { key: "client", label: "Client" },
+              { key: "report", label: "Report", small: true },
+              { key: "outcome", label: "Outcome" },
+              { key: "cost", label: "Cost" },
+              { key: "words", label: "Words", numeric: true, small: true },
+            ]}
+            rows={costRows}
+            empty="No reports recorded yet."
+          />
+        </div>
+        <div>
+          <p className="sub">Every issue the report checks found. Hard ones stop a report from going out until it is fixed.</p>
+          <SortableTable
+            initial={{ key: "when", dir: -1 }}
+            columns={[
+              { key: "when", label: "When (UTC)" },
+              { key: "client", label: "Client" },
+              { key: "report", label: "Report", small: true },
+              { key: "severity", label: "Severity" },
+              { key: "rule", label: "Rule", small: true },
+              { key: "message", label: "What it found" },
+              { key: "detected", label: "In the text", small: true },
+            ]}
+            rows={failureRows}
+            empty="No check failures recorded."
           />
         </div>
         <SortableTable
