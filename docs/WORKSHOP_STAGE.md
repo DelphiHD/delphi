@@ -33,6 +33,35 @@ Flags worth knowing:
 - `--with "First Last"` adds somebody who is not signed up. Left empty for BFKI:
   "only people marked bfki should count".
 
+## One-to-one sessions (2026-11-04)
+
+    npx tsx scripts/workshop-deck.ts --session "Joel"              one client
+    npx tsx scripts/workshop-deck.ts --session "Joel,Ann Smith"    a client and a partner
+
+Kaycee asked for "a stage like we did for the BFKI event for individual
+sessions", shared on Google Meet; "Slides are not the answer." Session mode
+picks people by name from `charts`, whatever made their chart (an event, the
+roster, the New chart tab), writes `<Name> Session` beside the workshop
+folders, and makes the Stage only, no deck. On the Stage, no room counts or
+percentages: Build a Chart opens straight on the person, the Centers panel says
+Defined, Undefined or Open for them, and where a page counted people it shows
+their name on what is theirs. Add `--sky-date`, `--sky-time`, `--sky-tz` for the
+day of the session. To share it on a call, open `Stage.html` in the browser and
+share that window; it needs no network.
+
+For a demo, add Kaycee and sandbox charts after the client (2026-11-11, Joel):
+`--session "Joel,Kaycee Vandenberg,Sandbox Manifestor Simple Split,Sandbox Projector Triple Split,Sandbox Reflector No Definition"`.
+The client stays first, sandbox charts get short stand-in names (Cora, Dane,
+Eli) instead of "Sandbox", the browser tab leaves them out, and with more than
+one person the pages count like a room again. The folder is named for the
+first person, the client.
+
+The Six Lines card on Origins opens the house (`assets/brand/Six Lines - House.svg`,
+2026-11-11), drawn from her line pages: line 1 the ground floor and foundation,
+3 where the floors meet, 4 the foundation of the second floor, 5 at the
+second-story window, 6 on the roof; the lower trigram personal, the upper
+transpersonal.
+
 ## Who is in the room
 
 Everyone whose chart carries the event's source tag, which happens when they

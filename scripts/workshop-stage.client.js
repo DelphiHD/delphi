@@ -2,6 +2,10 @@
 // bodygraph and the wheel. Plain script, read from its own file.
 (function () {
   var D = JSON.parse(document.getElementById('deck-data').textContent);
+  // A one-to-one session (--session) with one person: no counts of a room. Where a
+  // page counted people, it shows the person's name on what is theirs. A session
+  // with others added (a demo with sandbox charts) counts like a room.
+  var SESSION = !!D.session && D.room.length === 1;
   // Presenter edits to the room, kept on this laptop: a different name on a pill (two
   // people with the same first name) or a person taken off the screen. Made on The
   // Room page with E. Kaycee, 2026-09-14.
@@ -10,6 +14,7 @@
   var editKey = function (p) { return String(p.token || p.fullName || p.name); };
   D.room.forEach(function (p) { p.origName = p.origName || p.name; var e = EDITS[editKey(p)]; if (e && e.name) p.name = e.name; });
   var ROOM = D.room.filter(function (p) { var e = EDITS[editKey(p)]; return !(e && e.hidden); }), LIB = D.lib;
+  function tally(n, pct) { return SESSION ? (n ? ROOM.map(function (p) { return p.name; }).join(' & ') : '') : n + ' · ' + pct + '%'; }
   function saveEdits() { try { localStorage.setItem('delphi-stage-edits', JSON.stringify(EDITS)); } catch (e) {} }
   var app = document.getElementById('app');
   function esc(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
@@ -29,7 +34,7 @@
     '<div class="bar">' + (D.logo ? '<img src="' + D.logo + '" alt="Delphi">' : '') +
     '<div class="modes">' + ['The Room', 'Origins', 'Living Mandala', 'Build a Chart', 'Centers', 'Authority', 'Definition', 'Profile', 'Auras', 'Conditioning'].map(function (m) {
       return '<button data-mode="' + m + '">' + m + '</button>';
-    }).join('') + '</div><span class="sp"></span><span class="room">' + ROOM.length + ' in the room</span></div>' +
+    }).join('') + '</div><span class="sp"></span><span class="room">' + (SESSION ? '' : ROOM.length + ' in the room') + '</span></div>' +
     '<div class="stage">' +
     '<div class="layer body" id="body">' + D.teachSvg + '</div>' +
     '<div class="layer hide" id="sky">' + D.rings + '</div>' +
@@ -234,6 +239,7 @@
   function say(html) {
     var top = note.classList.contains('top');
     if (!html) { note.className = 'note hide' + (top ? ' top' : ''); return; }
+    if (SESSION) html = html.replace(/<div class="k">[^<]*in the room[^<]*<\/div>/g, '');
     note.innerHTML = html; note.className = 'note' + (top ? ' top' : '');
   }
   var controls = $('#controls'), caption = $('#caption');
@@ -359,14 +365,14 @@
   function roster() {
     hideNames();
     var P = $('#cpanel');
-    P.innerHTML = '<div class="k">' + ROOM.length + ' in the room</div><h2>Centers</h2><div class="cover">' +
+    P.innerHTML = (SESSION ? '' : '<div class="k">' + ROOM.length + ' in the room</div>') + '<h2>Centers</h2><div class="cover">' +
       D.centerOrder.map(function (c) {
         var n = { defined: 0, undefined: 0, open: 0 };
         ROOM.forEach(function (p) { n[p.centers[c]]++; });
         var w = function (k) { return ROOM.length ? (n[k] / ROOM.length * 100) : 0; };
         return '<div class="crow" data-c="' + c + '"><span>' + esc(D.centerName[c]) + '</span><div class="cbar">' +
           '<i class="def" style="width:' + w('defined') + '%"></i><i class="und" style="width:' + w('undefined') + '%"></i><i class="opn" style="width:' + w('open') + '%"></i></div>' +
-          '<b>' + n.defined + ' · ' + n.undefined + ' · ' + n.open + '</b></div>';
+          '<b>' + (SESSION ? ({ defined: 'Defined', undefined: 'Undefined', open: 'Open' })[ROOM[0] && ROOM[0].centers[c]] || '' : n.defined + ' · ' + n.undefined + ' · ' + n.open) + '</b></div>';
       }).join('') + '</div><div class="ckey"><span class="def"></span>Defined <span class="und"></span>Undefined <span class="opn"></span>Open</div>';
     $$('#cpanel .crow').forEach(function (r) { r.onclick = function () { focusCenter(r.dataset.c); }; });
   }
@@ -412,7 +418,7 @@
       '<div class="k">' + esc(centerFns(c).join(' · ')) + '</div><h2>' + esc(D.centerName[c]) + '</h2>' +
       '<p class="themes">' + esc(L.themes || '') + '</p>' +
       '<div class="tabs">' + ['defined', 'undefined', 'open'].map(function (st) {
-        return '<button class="tab ' + cls[st] + (st === centerTab ? ' on' : '') + '" data-st="' + st + '"><b>' + STATE[st] + '</b><span>' + by[st].length + ' · ' + pct(st) + '%</span></button>';
+        return '<button class="tab ' + cls[st] + (st === centerTab ? ' on' : '') + '" data-st="' + st + '"><b>' + STATE[st] + '</b><span>' + tally(by[st].length, pct(st)) + '</span></button>';
       }).join('') + '</div>' +
       ['defined', 'undefined', 'open'].map(function (st) {
         return '<section class="st ' + cls[st] + '" data-st="' + st + '"' + (st === centerTab ? '' : ' hidden') + '>' +
@@ -619,6 +625,8 @@
         if (pic) pic.hidden = c.dataset.el === 'gates' ? !pic.hidden : true;
         var story = $('.otrigrams.story', layer);
         if (story) story.hidden = c.dataset.el === 'story' ? !story.hidden : true;
+        var house = $('.otrigrams.house', layer);
+        if (house) house.hidden = c.dataset.el === 'lines' ? !house.hidden : true;
       };
     });
     if (!$('.otrigrams.story', layer)) {
@@ -674,6 +682,14 @@
       pic.onclick = function () { pic.hidden = true; };
       $('.obody', layer).appendChild(pic);
     }
+    // Six Lines pops up the house: line 1 the foundation, line 6 on the roof
+    if (D.linesHouse && !$('.otrigrams.house', layer)) {
+      var house = document.createElement('div');
+      house.className = 'otrigrams house'; house.hidden = true;
+      house.innerHTML = '<div class="obox"><button class="ox" aria-label="Close">&times;</button>' + D.linesHouse + '</div>';
+      house.onclick = function () { house.hidden = true; };
+      $('.obody', layer).appendChild(house);
+    }
     if (D.raChart) return;
     if (!R) { $('.ohead', layer).innerHTML = '<h2>Ra Uru Hu</h2>'; return; }
     $('.ohead', layer).innerHTML = '<h2>Ra Uru Hu</h2><div class="osub">April 9, 1948 · 12:05 AM · Montreal, Quebec</div>' +
@@ -726,7 +742,7 @@
       var list = (keys || Object.keys(count).sort(function (a, b) { return count[b] - count[a]; })).filter(function (k) { return count[k]; });
       var max = Math.max.apply(null, list.map(function (k) { return count[k]; }).concat([1]));
       return '<div class="rcard"><div class="k">' + title + '</div>' + list.map(function (k) {
-        return '<div class="rrow"><span>' + esc(k) + '</span><div class="rtrack"><i style="width:' + (count[k] / max * 100) + '%"></i></div><b>' + count[k] + '</b><em>' + pct(count[k]) + '%</em></div>';
+        return '<div class="rrow"><span>' + esc(k) + '</span><div class="rtrack"><i style="width:' + (count[k] / max * 100) + '%"></i></div>' + (SESSION ? '' : '<b>' + count[k] + '</b><em>' + pct(count[k]) + '%</em>') + '</div>';
       }).join('') + '</div>';
     };
     var DEF_ORDER = ['Single', 'Simple Split', 'Wide Split', 'Triple Split', 'Quadruple Split', 'No Definition'];
@@ -738,7 +754,7 @@
             '<button class="rhide">' + (e.hidden ? 'Show' : 'Hide') + '</button></span>';
         }).join('') + '<button class="rdone">Done</button>'
       : ROOM.map(function (p, i) { return '<span style="animation-delay:' + (i * 40) + 'ms">' + esc(p.name) + '</span>'; }).join('');
-    $('#room').innerHTML = '<div class="rhead"><div class="rnum">' + ROOM.length + '</div><div class="rsub">in the room</div></div>' +
+    $('#room').innerHTML = (SESSION ? '' : '<div class="rhead"><div class="rnum">' + ROOM.length + '</div><div class="rsub">in the room</div></div>') +
       '<div class="rnames">' + namesHtml + '</div>' +
       '<div class="rgrid">' +
         card('Type', TYPE_ORDER, function (p) { return p.type; }) +
@@ -812,7 +828,7 @@
     host.innerHTML = '<div class="pgrid2"><div class="hexbox">' + hexagramSvg() + '</div><div class="pcards">' + present.map(function (k) {
       var list = ROOM.filter(function (p) { return p.profile === k; }), pct = ROOM.length ? Math.round(list.length / ROOM.length * 100) : 0;
       var a = +k.split('/')[0], b = +k.split('/')[1];
-      return '<div class="pcard" data-k="' + k + '"><div class="phd"><b>' + k + '</b><span>' + list.length + ' · ' + pct + '%</span></div>' +
+      return '<div class="pcard" data-k="' + k + '"><div class="phd"><b>' + k + '</b><span>' + tally(list.length, pct) + '</span></div>' +
         '<div class="pnm">' + esc(LINES[a - 1].name + ' ' + LINES[b - 1].name) + '</div>' +
         '<div class="dnames">' + list.map(function (p) { return '<span class="nm-open" data-person="' + esc(p.name) + '">' + esc(p.name) + '</span>'; }).join('') + '</div></div>';
     }).join('') + '</div></div>';
@@ -878,7 +894,7 @@
     host.innerHTML = '<div class="dcols">' + present.map(function (a) {
       var list = byKey(a), pct = ROOM.length ? Math.round(list.length / ROOM.length * 100) : 0;
       return '<div class="dcol" data-a="' + a.key + '"><div class="acenter">' + esc(a.center) + '</div>' +
-        '<h3>' + esc(a.name) + '</h3><div class="dcount">' + list.length + ' · ' + pct + '%</div>' +
+        '<h3>' + esc(a.name) + '</h3><div class="dcount">' + tally(list.length, pct) + '</div>' +
         '<div class="dnames">' + list.map(function (p) { return '<span class="nm-open" data-person="' + esc(p.name) + '">' + esc(p.name) + '</span>'; }).join('') + '</div></div>';
     }).join('') + '</div>';
     $$('#auths .dcol').forEach(function (col) {
@@ -916,7 +932,7 @@
       for (var i = 0; i < DEF_ISLANDS[d]; i++) dots += '<i class="' + (d === 'Wide Split' && i === 1 ? 'far' : '') + '"></i>';
       if (!DEF_ISLANDS[d]) dots = '<i class="none"></i>';
       return '<div class="dcol" data-d="' + esc(d) + '"><div class="islands' + (d === 'Wide Split' ? ' wide' : '') + '">' + dots + '</div>' +
-        '<h3>' + esc(d) + '</h3><div class="dcount">' + list.length + ' · ' + pct + '%</div>' +
+        '<h3>' + esc(d) + '</h3><div class="dcount">' + tally(list.length, pct) + '</div>' +
         '<div class="dnames">' + list.map(function (p) { return '<span class="nm-open" data-person="' + esc(p.name) + '">' + esc(p.name) + '</span>'; }).join('') + '</div></div>';
     }).join('') + '</div>';
     $$('#defs .dcol').forEach(function (col) {
@@ -953,7 +969,7 @@
       a.className = 'aura ' + AURA[t];
       a.style.left = x + 'px'; a.style.top = (y - 62) + 'px'; a.style.width = size + 'px'; a.style.height = size + 'px';
       var pct = ROOM.length ? Math.round(list.length / ROOM.length * 100) : 0;
-      a.innerHTML = '<div class="glow"></div><div class="t">' + esc(t) + '<small>' + list.length + ' · ' + pct + '%</small></div>';
+      a.innerHTML = '<div class="glow"></div><div class="t">' + esc(t) + '<small>' + tally(list.length, pct) + '</small></div>';
       a.style.cursor = 'pointer';
       a.onclick = function () {
         var L = LIB.types[norm(t)] || {};
@@ -992,6 +1008,7 @@
         onPick(chosen.map(function (n) { return pool.filter(function (p) { return p.name === n; })[0]; }));
       };
     });
+    if (SESSION && !multi && ROOM.length === 1) { var only = controls.querySelector('.pickrow button'); if (only) only.click(); }
   }
   // Build a Chart: the person's own chart, opened on The Wheel with the placement
   // tables beside it, building design side first (the chart page runs it).

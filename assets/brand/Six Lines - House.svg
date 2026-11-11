@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 860" width="1120" height="860" font-family="Montserrat, 'Helvetica Neue', Arial, sans-serif">
+<rect width="1120" height="860" fill="#FFFFFF"/>
+<text x="560" y="44" text-anchor="middle" fill="#845095" font-size="20" font-weight="300" letter-spacing="6">THE SIX LINES</text>
+<g transform="translate(0,40)">
+<rect x="385" y="88" width="28" height="70" fill="#c9b6e4" stroke="#845095" stroke-width="3"/>
+<polygon points="490,60 312,202 668,202" fill="#845095" stroke="#845095" stroke-width="3" stroke-linejoin="round"/>
+<path d="M573 131 L573 113 Q573 106 581 106 Q589 106 589 113 L589 127 Z" fill="#d9a21b"/><path d="M587 126 L603 136 L606 147" fill="none" stroke="#d9a21b" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="581" cy="96" r="9" fill="#d9a21b"/>
+<rect x="345" y="202" width="290" height="203" fill="#f5eff8" stroke="#845095" stroke-width="3"/>
+<rect x="450" y="240" width="80" height="72" fill="#eef3fb" stroke="#845095" stroke-width="3"/><circle cx="490" cy="276" r="11" fill="#845095"/><path d="M470 312 Q470 292 490 292 Q510 292 510 312 Z" fill="#845095"/><path d="M452 242 L472 242 Q462 278 468 310 L452 310 Z" fill="#c9b6e4"/><path d="M528 242 L508 242 Q518 278 512 310 L528 310 Z" fill="#c9b6e4"/><rect x="444" y="234" width="92" height="8" rx="3" fill="#845095"/>
+<rect x="347" y="382" width="286" height="22" fill="#c9b6e4"/>
+<line x1="383" y1="382" x2="383" y2="404" stroke="#845095" stroke-width="1.5" opacity=".6"/>
+<line x1="419" y1="382" x2="419" y2="404" stroke="#845095" stroke-width="1.5" opacity=".6"/>
+<line x1="491" y1="382" x2="491" y2="404" stroke="#845095" stroke-width="1.5" opacity=".6"/>
+<line x1="527" y1="382" x2="527" y2="404" stroke="#845095" stroke-width="1.5" opacity=".6"/>
+<line x1="563" y1="382" x2="563" y2="404" stroke="#845095" stroke-width="1.5" opacity=".6"/>
+<line x1="599" y1="382" x2="599" y2="404" stroke="#845095" stroke-width="1.5" opacity=".6"/>
+<rect x="438" y="382" width="34" height="22" fill="#f5eff8"/>
+<rect x="345" y="405" width="290" height="240" fill="#fbf8fc" stroke="#845095" stroke-width="3"/>
+<polygon points="352.0,645.0 352.0,611.7 366.5,611.7 366.5,578.4 381.0,578.4 381.0,545.1 395.5,545.1 395.5,511.8 410.0,511.8 410.0,478.5 424.5,478.5 424.5,445.2 439.0,445.2 439.0,411.9 453.5,411.9 453.5,645.0" fill="#c9b6e4" stroke="#845095" stroke-width="2.5" stroke-linejoin="round"/>
+<rect x="478" y="565" width="48" height="80" rx="4" fill="#845095" opacity=".85"/><circle cx="517" cy="607" r="3.5" fill="#fff"/>
+<rect x="556" y="560" width="66" height="85" rx="3" fill="#c9b6e4" stroke="#845095" stroke-width="2.5"/>
+<rect x="562" y="612" width="54" height="26" rx="2" fill="#fff" stroke="#845095" stroke-width="2"/><circle cx="589" cy="625" r="3" fill="#845095"/>
+<rect x="566" y="572" width="62" height="28" rx="2" fill="#fff" stroke="#845095" stroke-width="2"/>
+<ellipse cx="597" cy="582" rx="9" ry="6" fill="#d9a21b"/><path d="M597 576 Q597 568 604 565 Q603 573 597 576 Z" fill="#7aa36b"/>
+<circle cx="597" cy="592" r="3" fill="#845095"/>
+<rect x="332" y="647" width="60" height="43" rx="4" fill="#e9e1ef" stroke="#845095" stroke-width="2"/><rect x="396" y="647" width="60" height="43" rx="4" fill="#e9e1ef" stroke="#845095" stroke-width="2"/><rect x="460" y="647" width="60" height="43" rx="4" fill="#e9e1ef" stroke="#845095" stroke-width="2"/><rect x="524" y="647" width="60" height="43" rx="4" fill="#e9e1ef" stroke="#845095" stroke-width="2"/><rect x="588" y="647" width="60" height="43" rx="4" fill="#e9e1ef" stroke="#845095" stroke-width="2"/><rect x="332" y="694" width="28" height="43" rx="4" fill="#e9e1ef" stroke="#845095" stroke-width="2"/><rect x="364" y="694" width="60" height="43" rx="4" fill="#e9e1ef" stroke="#845095" stroke-width="2"/><rect x="428" y="694" width="60" height="43" rx="4" fill="#e9e1ef" stroke="#845095" stroke-width="2"/><rect x="492" y="694" width="60" height="43" rx="4" fill="#e9e1ef" stroke="#845095" stroke-width="2"/><rect x="556" y="694" width="60" height="43" rx="4" fill="#e9e1ef" stroke="#845095" stroke-width="2"/><rect x="620" y="694" width="28" height="43" rx="4" fill="#e9e1ef" stroke="#845095" stroke-width="2"/>
+<path d="M290 64 L280 64 L280 400 L290 400" fill="none" stroke="#c9b6e4" stroke-width="3"/>
+<path d="M290 410 L280 410 L280 738 L290 738" fill="none" stroke="#c9b6e4" stroke-width="3"/>
+<g transform="translate(244,232) rotate(-90)"><text text-anchor="middle" fill="#845095" font-size="13" font-weight="500" letter-spacing="3">UPPER TRIGRAM</text><text y="24" text-anchor="middle" fill="#6b6580" font-size="15">Transpersonal</text></g>
+<g transform="translate(244,574) rotate(-90)"><text text-anchor="middle" fill="#845095" font-size="13" font-weight="500" letter-spacing="3">LOWER TRIGRAM</text><text y="24" text-anchor="middle" fill="#6b6580" font-size="15">Personal</text></g>
+<polyline points="593,116 642,116 690,110" fill="none" stroke="#845095" stroke-width="1.5" stroke-dasharray="3 4" opacity=".55"/>
+<circle cx="593" cy="116" r="4.5" fill="#d9a21b" stroke="#fff" stroke-width="1.5"/>
+<rect x="704" y="129.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<rect x="704" y="120.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<rect x="704" y="111.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<rect x="704" y="102.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<rect x="704" y="93.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<rect x="704" y="84.5" width="44" height="5" rx="1.5" fill="#d9a21b"/>
+<text x="770" y="108" fill="#1c1a2e" font-size="22" font-weight="600"><tspan fill="#845095">6</tspan>  Role Model</text>
+<text x="770" y="132" fill="#6b6580" font-size="15">Sits on the roof, looking back over the house</text>
+<polyline points="530,276 610,276 690,230" fill="none" stroke="#845095" stroke-width="1.5" stroke-dasharray="3 4" opacity=".55"/>
+<circle cx="530" cy="276" r="4.5" fill="#d9a21b" stroke="#fff" stroke-width="1.5"/>
+<rect x="704" y="249.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<rect x="704" y="240.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<rect x="704" y="231.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<rect x="704" y="222.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<rect x="704" y="213.5" width="44" height="5" rx="1.5" fill="#d9a21b"/>
+<rect x="704" y="204.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<text x="770" y="228" fill="#1c1a2e" font-size="22" font-weight="600"><tspan fill="#845095">5</tspan>  Heretic</text>
+<text x="770" y="252" fill="#6b6580" font-size="15">Peeks out the second-story window</text>
+<polyline points="633,393 662,393 690,350" fill="none" stroke="#845095" stroke-width="1.5" stroke-dasharray="3 4" opacity=".55"/>
+<circle cx="633" cy="393" r="4.5" fill="#d9a21b" stroke="#fff" stroke-width="1.5"/>
+<rect x="704" y="369.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<rect x="704" y="360.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<rect x="704" y="351.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<rect x="704" y="342.5" width="44" height="5" rx="1.5" fill="#d9a21b"/>
+<rect x="704" y="333.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<rect x="704" y="324.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<text x="770" y="348" fill="#1c1a2e" font-size="22" font-weight="600"><tspan fill="#845095">4</tspan>  Opportunist</text>
+<text x="770" y="372" fill="#6b6580" font-size="15">The foundation of the second floor</text>
+<polyline points="430,500 560,500 690,470" fill="none" stroke="#845095" stroke-width="1.5" stroke-dasharray="3 4" opacity=".55"/>
+<circle cx="430" cy="500" r="4.5" fill="#d9a21b" stroke="#fff" stroke-width="1.5"/>
+<rect x="704" y="489.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<rect x="704" y="480.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<rect x="704" y="471.5" width="44" height="5" rx="1.5" fill="#d9a21b"/>
+<rect x="704" y="462.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<rect x="704" y="453.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<rect x="704" y="444.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<text x="770" y="468" fill="#1c1a2e" font-size="22" font-weight="600"><tspan fill="#845095">3</tspan>  Martyr</text>
+<text x="770" y="492" fill="#6b6580" font-size="15">Where the first and second floors meet</text>
+<polyline points="628,586 659,586 690,590" fill="none" stroke="#845095" stroke-width="1.5" stroke-dasharray="3 4" opacity=".55"/>
+<circle cx="628" cy="586" r="4.5" fill="#d9a21b" stroke="#fff" stroke-width="1.5"/>
+<rect x="704" y="609.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<rect x="704" y="600.5" width="44" height="5" rx="1.5" fill="#d9a21b"/>
+<rect x="704" y="591.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<rect x="704" y="582.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<rect x="704" y="573.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<rect x="704" y="564.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<text x="770" y="588" fill="#1c1a2e" font-size="22" font-weight="600"><tspan fill="#845095">2</tspan>  Hermit</text>
+<text x="770" y="612" fill="#6b6580" font-size="15">The natural, a seed waiting in the drawer</text>
+<polyline points="650,712 670,712 690,710" fill="none" stroke="#845095" stroke-width="1.5" stroke-dasharray="3 4" opacity=".55"/>
+<circle cx="650" cy="712" r="4.5" fill="#d9a21b" stroke="#fff" stroke-width="1.5"/>
+<rect x="704" y="729.5" width="44" height="5" rx="1.5" fill="#d9a21b"/>
+<rect x="704" y="720.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<rect x="704" y="711.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<rect x="704" y="702.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<rect x="704" y="693.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<rect x="704" y="684.5" width="44" height="5" rx="1.5" fill="#d9cce6"/>
+<text x="770" y="708" fill="#1c1a2e" font-size="22" font-weight="600"><tspan fill="#845095">1</tspan>  Investigator</text>
+<text x="770" y="732" fill="#6b6580" font-size="15">The ground floor, the foundation</text>
+</g></svg>

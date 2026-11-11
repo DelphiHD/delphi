@@ -273,6 +273,9 @@ body.pairnote #buildchart { bottom:136px; }
 .otrigrams img { display:block; max-width:calc(92vw - 28px); max-height:calc(92vh - 28px); width:auto; height:auto; }
 .otrigrams .ox { position:absolute; top:6px; right:8px; border:0; background:#fff; border-radius:50%; width:34px; height:34px; font-size:24px; color:var(--muted); cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.12); }
 .otrigrams[hidden] { display:none !important; }
+.otrigrams .obox > svg { display:block; width:auto; height:auto; max-width:calc(92vw - 28px); max-height:calc(92vh - 28px); }
+/* an open pop-up lifts the whole stage above the top bar, so its close button can be clicked */
+.stage:has(.otrigrams:not([hidden])) { z-index:40; }
 /* Profile */
 #profiles { padding:20px 3vw 0; }
 .pgrid2 { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:24px; height:100%; align-items:start; }

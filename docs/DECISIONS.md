@@ -1516,3 +1516,15 @@ Josh Stuart had a live chart and was missing from Everyone: the list read only `
 - The online list also shows any live published chart with no `charts` row, and counts it under People.
 - The morning check fails, naming them, if any live chart has no list record (fix: `npx tsx scripts/seed-charts.ts`). Today: none missing; Josh was seeded.
 - `add-client.ts` runs `seed-charts.ts` after publishing (Kaycee approved the core-file edit 2026-10-29), so a new client is on the list with their full record at once. `seed-charts.ts` now resolves a new client's timezone with the provider when no chart is cached yet, instead of skipping them, which is what left Josh off.
+
+---
+
+## 2026-11-04 — Exalted and detriment: the rule stays exactly as it is
+
+Kaycee, 2026-11-04: "The exaltation/detriment rule is only relevant for naming fixing planets for placements when it isn't relevant (if they aren't in detriment or exalted) because it's confusing. It's ok if the placement is actually in detriment or exalted."
+
+**Do not change the `fixing-planet-named` rule in `lib/report/validate.ts`.** It is stricter than her rule on purpose. Kaycee: "The rule we have now kind of works as a dam. It's not perfect, but it's better than it was." Loosened, the model writes "40 pages... ONLY talking about exaltations and detriments." She wants to keep seeing its flags: "I'm hoping that future versions of AI are smart enough to know how to interpret this rule."
+
+**Reading a flag:** a sentence naming a placement that really is exalted or in detriment is acceptable to her; raising exaltation or detriment for a placement that is neither is the real problem. Report the flags; never ask her to re-explain or re-validate the rule. Joel's six flagged sentences (2026-11-04) were all true placements.
+
+**And, in her words: "DO NOT CHANGE ANYTHING WITHOUT ASKING FIRST THAT IS HOW THINGS BREAK AND THE THINGS WE CREATED WERE CREATED FOR A REASON."**

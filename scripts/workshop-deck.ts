@@ -45,8 +45,19 @@ const EVENT = (() => {
   return i > -1 ? args[i + 1] : "bfki";
 })();
 
+// A one-to-one session: the Stage for the people named, whatever made their
+// chart (an event, the roster, the New chart tab), and no slide deck.
+// Kaycee, 2026-11-04: a stage like BFKI's "for individual sessions", shared on
+// a Google Meet; "Slides are not the answer."
+//   npx tsx scripts/workshop-deck.ts --session "Joel"            one person
+//   npx tsx scripts/workshop-deck.ts --session "Joel,Ann Smith"  with a partner
+const SESSION = (() => {
+  const i = args.indexOf("--session");
+  return i > -1 ? args[i + 1].split(",").map((x) => x.trim()).filter(Boolean) : [];
+})();
+
 const OUT_DIR = join(process.env.HOME ?? "", "Desktop", "Mandala Renderer Output", "Educational",
-  DEMO ? "Workshop (demo)" : `${EVENT.toUpperCase()} Workshop`);
+  DEMO ? "Workshop (demo)" : SESSION.length ? `${SESSION[0]} Session` : `${EVENT.toUpperCase()} Workshop`);
 const BRAND_DIR = join(process.cwd(), "assets", "brand");
 
 const CENTER_ORDER: Center[] = ["head", "ajna", "throat", "g", "heart", "spleen", "solar-plexus", "sacral", "root"];
@@ -90,7 +101,9 @@ async function people() {
   const cols = "person_name, birth_date, birth_time, birth_timezone, birth_place, token, time_accuracy, created_at";
   const { data, error } = DEMO
     ? await d.from("charts").select(cols).eq("source", "sandbox").order("person_name")
-    : await d.from("charts").select(cols).eq("source", EVENT).order("created_at");
+    : SESSION.length
+      ? await d.from("charts").select(cols).in("person_name", SESSION).order("created_at")
+      : await d.from("charts").select(cols).eq("source", EVENT).order("created_at");
   if (error) throw new Error(`could not read the roster: ${error.message}`);
   // someone who signs up twice is one person: same first name and birth date keeps the
   // newest sign-up, which carries his corrections (Patrick, 2026-09-15, added a birth time)
@@ -110,6 +123,9 @@ async function people() {
       if (!same) rows.unshift(e);
     }
   }
+  // a session keeps the order it was asked for, so the client is first (the Centers
+  // panel and Build a Chart open on the first person)
+  if (SESSION.length) rows.sort((l, r) => SESSION.indexOf(String(l.person_name)) - SESSION.indexOf(String(r.person_name)));
   return rows;
 }
 
@@ -302,7 +318,7 @@ function authorityKey(value: string, type: string): string {
 async function main() {
   mkdirSync(OUT_DIR, { recursive: true });
   const roster = await people();
-  console.log(`${roster.length} ${DEMO ? "sandbox" : EVENT} chart(s)`);
+  console.log(`${roster.length} ${DEMO ? "sandbox" : SESSION.length ? "session" : EVENT} chart(s)`);
   const lib = await library();
   const wheel = mandalaWheelGeometry(1000);
 
@@ -337,7 +353,9 @@ async function main() {
     const profile = (chart.profile.value.match(/\d\s*\/\s*\d/) ?? [""])[0].replace(/\s/g, "");
     room.push({
       // the demo stands in short first names, like the real room will have
-      name: DEMO ? DEMO_NAMES[room.length % DEMO_NAMES.length] : first,
+      // a sandbox chart in a session stands in a short first name too, instead of "Sandbox"
+      name: DEMO || (SESSION.length && /^Sandbox\b/.test(String(r.person_name)))
+        ? DEMO_NAMES[room.length % DEMO_NAMES.length] : first,
       fullName: String(r.person_name),
       token: r.token,
       type, strategy: chart.strategy.value, authority: chart.authority.value,
@@ -543,7 +561,15 @@ async function main() {
     // the eight trigrams, shown from the 64 Gates card on the Origins page
     trigrams: existsSync(join(BRAND_DIR, "Eight Trigrams - Grid.svg"))
       ? `data:image/svg+xml;base64,${readFileSync(join(BRAND_DIR, "Eight Trigrams - Grid.svg")).toString("base64")}` : "",
-    event: DEMO ? "Workshop" : EVENT.toUpperCase(),
+    // the house of the six lines, shown from the Six Lines card on the Origins page
+    // (Kaycee, 2026-11-11). Put into the page itself, not as an image, so it has Montserrat.
+    linesHouse: existsSync(join(BRAND_DIR, "Six Lines - House.svg"))
+      ? readFileSync(join(BRAND_DIR, "Six Lines - House.svg"), "utf8").replace(/^<\?xml[^>]*>\s*/, "") : "",
+    // the browser tab shows on a shared screen: first names, sandbox charts left out
+    event: DEMO ? "Workshop" : SESSION.length
+      ? SESSION.filter((n) => !/^Sandbox\b/.test(n)).map((n) => n.trim().split(/\s+/)[0]).join(" & ")
+      : EVENT.toUpperCase(),
+    session: SESSION.length > 0,
     builtAt: new Date().toISOString(),
     centerOrder: CENTER_ORDER, centerName: CENTER_NAME, centerLib: CENTER_LIB,
     room, lib, rings, marks, logo, know, blank, teachSvg,
@@ -571,9 +597,11 @@ async function main() {
 <script id="deck-data" type="application/json">${json}</script>
 <script>${js}</script>
 </body></html>`;
-  const out = join(OUT_DIR, "Workshop.html");
-  writeFileSync(out, html);
-  console.log(`\n✓ ${out}`);
+  if (!SESSION.length) {
+    const out = join(OUT_DIR, "Workshop.html");
+    writeFileSync(out, html);
+    console.log(`\n✓ ${out}`);
+  }
 
   // The stage: one screen, no slides, everything happening on the bodygraph and
   // the wheel. Kaycee, 2026-09-13: "It still looks like a powerpoint slideshow...
