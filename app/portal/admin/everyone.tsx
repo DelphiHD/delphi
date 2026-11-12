@@ -40,6 +40,8 @@ export function Everyone({ columns, rows }: { columns: Column[]; rows: Row[] }) 
   const [busy, setBusy] = useState("");
   const [said, setSaid] = useState<{ text: string; bad?: boolean } | null>(null);
   const [sure, setSure] = useState(false);
+  // gone from the list at once, rather than when the page next reloads
+  const [gone, setGone] = useState<string[]>([]);
   const lookup = useRef<ReturnType<typeof setTimeout> | null>(null);
   const panel = useRef<HTMLDivElement | null>(null);
 
@@ -108,6 +110,7 @@ export function Everyone({ columns, rows }: { columns: Column[]; rows: Row[] }) 
       });
       const j = await r.json();
       if (!j.ok) { setSaid({ text: j.error ?? "That did not delete.", bad: true }); return; }
+      setGone((g) => [...g, String(open.id)]);
       setOpen(null);
       router.refresh();
     } catch (e) {
@@ -194,7 +197,7 @@ export function Everyone({ columns, rows }: { columns: Column[]; rows: Row[] }) 
       <SortableTable
         initial={{ key: "since", dir: -1 }}
         columns={columns}
-        rows={rows}
+        rows={rows.filter((r) => !gone.includes(String(r.id)))}
         onAction={(id) => start(id)}
       />
     </>
