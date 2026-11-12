@@ -35,6 +35,8 @@ const bad = (m: string, code = 400) =>
 
 interface Body {
   token?: string;
+  /** only from the dashboard; the portal does not send it */
+  name?: string;
   birthDate?: string;
   birthTime?: string;
   place?: string;
@@ -63,8 +65,13 @@ export async function POST(request: Request): Promise<Response> {
     .select("id, owner_id, person_name, birth_date, birth_time, birth_place, birth_timezone, time_accuracy")
     .eq("token", token).maybeSingle();
   if (!chart) return bad("no chart with that link", 404);
-  // Ownership, not possession of the link.
-  if (chart.owner_id !== user.id) {
+  // Ownership, not possession of the link. A Delphi admin may also correct any
+  // chart, from the dashboard: Kaycee, 2026-11-11, after a mistyped birth date
+  // on a chart she had just made left her with no way to fix it and no way to
+  // make it again. "Can I just have a system so I can do it myself?"
+  const { data: isAdmin } = await db.from("delphi_admins")
+    .select("user_id").eq("user_id", user.id).maybeSingle();
+  if (chart.owner_id !== user.id && !isAdmin) {
     return bad("this chart belongs to somebody else", 403);
   }
 
@@ -88,7 +95,11 @@ export async function POST(request: Request): Promise<Response> {
     return bad("a birth time is needed, as HH:MM, unless it is unknown");
   }
 
+  // The name, only when the dashboard sends one.
+  const name = isAdmin ? (body.name ?? "").trim() : "";
+
   const was = {
+    person_name: String(chart.person_name ?? ""),
     birth_date: String(chart.birth_date ?? ""),
     birth_time: String(chart.birth_time ?? "").slice(0, 5),
     birth_place: String(chart.birth_place ?? ""),
@@ -96,6 +107,7 @@ export async function POST(request: Request): Promise<Response> {
     time_accuracy: String(chart.time_accuracy ?? ""),
   };
   const now = {
+    person_name: name || String(chart.person_name ?? ""),
     birth_date: birthDate,
     birth_time: timeAccuracy === "unknown" ? "" : birthTime,
     birth_place: place,
@@ -108,17 +120,21 @@ export async function POST(request: Request): Promise<Response> {
   // The scan belongs to the details it was run against, so an edit throws it
   // away rather than leaving a confident answer about the old ones behind.
   const patch: Record<string, unknown> = {
+    person_name: now.person_name,
     birth_date: now.birth_date,
     birth_time: now.birth_time || null,
     birth_place: now.birth_place,
     birth_timezone: now.birth_timezone,
     time_accuracy: now.time_accuracy,
-    time_scan: null,
-    time_scan_at: null,
-    time_scan_for: null,
   };
+  if (changed.some((k) => k !== "person_name")) {
+    Object.assign(patch, { time_scan: null, time_scan_at: null, time_scan_for: null });
+  }
   const { error: upErr } = await db.from("charts").update(patch).eq("id", chart.id);
   if (upErr) return bad("that could not be saved", 500);
+  if (changed.includes("person_name")) {
+    await db.from("client_charts").update({ client_name: now.person_name }).eq("token", token);
+  }
 
   // Logged before the rebuild, so a rebuild that fails still leaves a record
   // of what was changed and by whom.

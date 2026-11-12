@@ -26,6 +26,7 @@ import launchPlan from "@/docs/launch-plan.json";
 import { SortableTable, Tabs, type Row } from "./table";
 import { People, type Person } from "./people";
 import { CreateChart } from "./create";
+import { Everyone } from "./everyone";
 import { Reports, type Report } from "./reports";
 
 export const metadata = { title: "Dashboard — Delphi Human Design" };
@@ -62,7 +63,7 @@ export default async function AdminPage() {
   if (!isAdmin) redirect("/portal");
 
   const [{ data: charts }, { data: links }, { data: profiles }, transits, admins, lastBuilt, mine] = await Promise.all([
-    db.from("charts").select("id, person_name, source, tier, time_accuracy, token, created_at, for_email, owner_id").order("created_at", { ascending: false }),
+    db.from("charts").select("id, person_name, source, tier, time_accuracy, token, created_at, for_email, owner_id, birth_date, birth_time, birth_place, birth_timezone").order("created_at", { ascending: false }),
     db.from("client_charts").select("token, client_name, revoked_at, created_at"),
     db.from("profiles").select("id, email, account_type, created_at"),
     db.storage.from("charts").list("transits", { limit: 90, sortBy: { column: "name", order: "desc" } }),
@@ -143,6 +144,15 @@ export default async function AdminPage() {
       ? "Astrology database" : TIMING[String(r.time_accuracy)] ?? "Exact",
     email: String(r.for_email ?? ""),
     since: String(r.created_at ?? "").slice(0, 10),
+    fix: "Fix",
+    // what the Fix panel starts from
+    chartId: String(r.id),
+    fullName: String(r.person_name ?? ""),
+    birthDate: String(r.birth_date ?? ""),
+    birthTime: String(r.birth_time ?? ""),
+    birthPlace: String(r.birth_place ?? ""),
+    birthZone: String(r.birth_timezone ?? ""),
+    accuracy: String(r.time_accuracy ?? ""),
   }));
   // Every client, whatever made their chart. A published chart with no row in
   // charts (add-client never wrote one, so Josh Stuart was missing on
@@ -385,8 +395,7 @@ export default async function AdminPage() {
       </div>
 
       <Tabs names={["Everyone", "New chart", "Reports", "Visits", "Status", "Cost", "Failures", "Transits", "Changes", "Accounts", "Decided", "Launch"]}>
-        <SortableTable
-          initial={{ key: "since", dir: -1 }}
+        <Everyone
           columns={[
             { key: "name", label: "Name" },
             { key: "chart", label: "Chart", link: "chartHref" },
@@ -394,6 +403,7 @@ export default async function AdminPage() {
             { key: "time", label: "Birth time", small: true },
             { key: "email", label: "Email", small: true },
             { key: "since", label: "Since" },
+            { key: "fix", label: "", action: true },
           ]}
           rows={everyone}
         />

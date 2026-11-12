@@ -106,7 +106,7 @@ export function SortableTable({ columns, rows, initial, empty, picked, onPick, p
                             aria-label={String(r.name ?? id)}
                           />
                         : c.action
-                          ? <button type="button" className="perm" onClick={() => onAction?.(id, c.key)}>{String(v ?? "")}</button>
+                          ? v === null || v === undefined || v === "" ? <span className="dim">—</span> : <button type="button" className="perm" onClick={() => onAction?.(id, c.key)}>{String(v ?? "")}</button>
                         : href
                           ? <a href={href} target="_blank" rel="noreferrer">{String(v ?? "open")}</a>
                           : (v === null || v === undefined || v === "" ? <span className="dim">—</span> : String(v))}

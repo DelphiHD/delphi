@@ -1528,3 +1528,9 @@ Kaycee, 2026-11-04: "The exaltation/detriment rule is only relevant for naming f
 **Reading a flag:** a sentence naming a placement that really is exalted or in detriment is acceptable to her; raising exaltation or detriment for a placement that is neither is the real problem. Report the flags; never ask her to re-explain or re-validate the rule. Joel's six flagged sentences (2026-11-04) were all true placements.
 
 **And, in her words: "DO NOT CHANGE ANYTHING WITHOUT ASKING FIRST THAT IS HOW THINGS BREAK AND THE THINGS WE CREATED WERE CREATED FOR A REASON."**
+
+## 2026-11-12 — Fix and Delete on the dashboard; an admin may correct or erase any chart
+
+Kaycee mistyped a birth date on a chart made from the New chart tab and had no way to correct it, and the duplicate-name guard stopped her making it again. "Can I just have a system so I can do it myself? And fix problems/delete charts made in error without having to write you a dissertation?"
+
+Every chart on the Everyone tab now has a Fix button: name, place, date, time and birth-time accuracy, saved through the same `/api/chart/edit` the owners use (edit history kept, chart redrawn on the same link), and a Delete that asks once and then uses the portal's own delete. Both routes now accept the chart's owner OR a Delphi admin; before, only the owner. Nothing else about who can edit changed: a link holder still cannot. A name change also renames the link's record and keeps the birth-time scan; any birth-detail change still throws the scan away. The duplicate-name refusal now says where Fix and Delete are.

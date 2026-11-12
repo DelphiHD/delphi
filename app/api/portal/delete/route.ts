@@ -39,12 +39,16 @@ export async function POST(request: Request): Promise<Response> {
   const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
 
   const { data: chart } = await db.from("charts").select("id, token, owner_id, person_name").eq("id", chartId).maybeSingle();
-  if (!chart || chart.owner_id !== user.id) return fail("not found", 404);
+  // The owner, or a Delphi admin from the dashboard (Kaycee, 2026-11-11: "fix
+  // problems/delete charts made in error without having to write you a
+  // dissertation").
+  const { data: isAdmin } = await db.from("delphi_admins").select("user_id").eq("user_id", user.id).maybeSingle();
+  if (!chart || (chart.owner_id !== user.id && !isAdmin)) return fail("not found", 404);
   const r = await eraseChart(db, chartId, String(chart.token));
   if (!r.ok) {
     console.error(`delete ${String(chart.token).slice(0, 6)}: ${r.error}`);
     return fail("could not delete the chart just now", 503);
   }
-  console.log(`delete ${String(chart.token).slice(0, 6)}: erased by its owner`);
+  console.log(`delete ${String(chart.token).slice(0, 6)}: erased by ${chart.owner_id === user.id ? "its owner" : "an admin"}`);
   return Response.json({ ok: true });
 }

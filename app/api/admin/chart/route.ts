@@ -108,7 +108,7 @@ export async function POST(request: Request): Promise<Response> {
   if (twin.data?.token) {
     return Response.json({
       ok: false,
-      error: `${name} is already in the funnel here.`,
+      error: `${name} is already here. To change it, use Fix beside their name on the Everyone tab; Delete is there too.`,
       token: twin.data.token,
       url: `https://charts.delphihd.com/c/${twin.data.token}`,
     }, { status: 409 });
